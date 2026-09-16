@@ -9,7 +9,9 @@
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",
     "qr": "node scripts/gen-qr.mjs",
-    "test:master": "vite build && node tests/analytics.test.mjs && node tests/alerts.test.mjs && node tests/costs.test.mjs && node tests/sales.test.mjs && node tests/master-gate.test.mjs && node tests/master-ping.test.mjs && node tests/master-paywall.test.mjs && node tests/master-records.test.mjs && node tests/master-faults.test.mjs && node tests/master-alerts.test.mjs && node tests/master-costs.test.mjs && node tests/master-sales.test.mjs && node tests/master-pwa.test.mjs && node tests/store-versions.test.mjs && node tests/master-stores.test.mjs && node tests/master-pings-tab.test.mjs && node tests/master-push.test.mjs && node tests/master-links.test.mjs && node tests/download.test.mjs",
+    "og": "node scripts/gen-og.mjs",
+    "og:overlay": "node scripts/gen-og-overlay.mjs",
+    "test:master": "vite build && node tests/analytics.test.mjs && node tests/alerts.test.mjs && node tests/costs.test.mjs && node tests/sales.test.mjs && node tests/master-gate.test.mjs && node tests/master-ping.test.mjs && node tests/master-paywall.test.mjs && node tests/master-records.test.mjs && node tests/master-faults.test.mjs && node tests/master-alerts.test.mjs && node tests/master-costs.test.mjs && node tests/master-sales.test.mjs && node tests/master-pwa.test.mjs && node tests/store-versions.test.mjs && node tests/master-stores.test.mjs && node tests/master-pings-tab.test.mjs && node tests/master-push.test.mjs && node tests/master-links.test.mjs && node tests/download.test.mjs && node tests/og.test.mjs",
     "check": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json",
     "releases": "node scripts/gen-releases.mjs"
   },
@@ -19,6 +21,7 @@
     "jsdom": "^26.1.0",
     "qrcode": "^1.5.4",
     "remark-gfm": "^4.0.1",
+    "sharp": "^0.35.4",
     "svelte": "^5.0.0",
     "svelte-check": "^4.0.0",
     "typescript": "^5.0.0",

@@ -8,6 +8,7 @@
   import { formatDate, isoDate, articleHref } from '$lib/site';
   import { topicLabel } from '$lib/topics';
   import { writerSlug, getWriter } from '$lib/writers';
+  import ogCards from '$lib/og-cards.json';
 
   type Meta = {
     title: string;
@@ -31,8 +32,20 @@
   $: primaryCat = meta.categories?.[0];
   // Canonical is always the primary-topic URL, matching every link to this article.
   $: canonical = `https://autonomic.care/insights/${primaryCat ?? 'basics'}/${meta.slug}/`;
-  // Scrapers need an absolute og:image, so a cover served from this site gets the origin.
-  $: ogImage = meta.photoLocation ? (meta.photoLocation.startsWith('/') ? `https://autonomic.care${meta.photoLocation}` : meta.photoLocation) : 'https://autonomic.care/og.png';
+  // The SHARE card is not the cover. scripts/gen-og.mjs writes a 1200x630 card
+  // per article (the cover, with the brand strip along the bottom) into
+  // static/og/, which is what Facebook, Reddit and X get; the page itself still
+  // renders photoLocation untouched. Covers come in at every aspect from 763px
+  // wide up, so pointing scrapers at one gave a `summary_large_image` promise
+  // that half the articles could not keep. Fall back to the cover, then to the
+  // site card, for any article gen-og.mjs has no entry for.
+  $: ogCard = (ogCards as Record<string, string>)[meta.slug]
+    ? `https://autonomic.care/og/${meta.slug}.jpg`
+    : null;
+  $: ogImage = ogCard
+    ?? (meta.photoLocation
+      ? (meta.photoLocation.startsWith('/') ? `https://autonomic.care${meta.photoLocation}` : meta.photoLocation)
+      : 'https://autonomic.care/og.png');
   $: authorSlug = writerSlug(meta.author);
   $: bio = getWriter(authorSlug)?.about;
   $: extraCats = (meta.categories ?? []).slice(1);
@@ -127,6 +140,11 @@
   <meta property="og:description" content={meta.description || meta.summary} />
   <meta property="og:image" content={ogImage} />
   <meta property="og:image:alt" content={meta.title} />
+  {#if ogCard}
+    <meta property="og:image:type" content="image/jpeg" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+  {/if}
   <meta property="og:url" content={canonical} />
   <meta property="article:published_time" content={isoDate(meta.date)} />
   <meta property="article:modified_time" content={isoDate(meta.updated || meta.date)} />
