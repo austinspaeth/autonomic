@@ -2386,13 +2386,23 @@
       /* Both lifecycle counts are of installs active on the SAME newest day,
          split by where they are in their own life — a today number wearing an
          age label, which is why they sit here and not under All installs. */
+      /* Both carry the same three comparisons every other today tile does.
+         They are a day's count like the rest, so there was never a reason for
+         them to be the two numbers on the row a reader cannot tell a strong day
+         from a normal one on — and the split between the two is exactly where a
+         move is worth seeing: in-trial rising while past-trial holds is
+         acquisition, the other way round is the free tier filling up. The age
+         bucket is recomputed per day rather than read off `live`, because an
+         install's side of the boundary moves with the day being asked about. */
       tile({
         label: 'Active in trial', color: PC.trial, value: fmtInt(live.inTrial),
-        meta: 'day 0–14 · ' + fmtInt(started.inTrial) + ' started a trial in that window'
+        meta: 'day 0–14 · ' + fmtInt(started.inTrial) + ' started a trial in that window',
+        deltas: dayDeltas(ix.last, days, function (d) { return A.lifecycleActive(ix, d).inTrial; })
       }),
       tile({
         label: 'Active past the trial', color: PC.postTrial, value: fmtInt(live.postTrial),
-        meta: 'day 15+: free tier, Pro features locked'
+        meta: 'day 15+: free tier, Pro features locked',
+        deltas: dayDeltas(ix.last, days, function (d) { return A.lifecycleActive(ix, d).postTrial; })
       }),
       platformTile(ix)
     ].join('');
@@ -3105,14 +3115,127 @@
 
   /* -------------------------------------------------- 5. active by cohort */
 
+  /**
+   * The bar tooltip's building blocks.
+   *
+   * A bar on this card is one cohort on one day, and it has TWO normals, which
+   * is why the tooltip is in two blocks rather than one list. Down the cohort's
+   * own life: is this cohort fading, and how much of what installed is left.
+   * Across cohorts at the same AGE: is a day-2 bar this tall usually. Neither
+   * answers the other — a cohort holding half its installs at D2 is doing well
+   * or badly entirely depending on what every other D2 did — and the chart's
+   * shape invites the second comparison while none of its numbers made it.
+   *
+   * `ttLine` is the row: a label, and the numbers right-aligned in tabular
+   * figures so a column of them can be read down.
+   */
+  function ttGroup(title) { return '<div class="tt-grp">' + esc(title) + '</div>'; }
+
+  function ttLine(label, value, note) {
+    if (value === null || value === undefined || value === '') return '';
+    return '<div class="tt-line">' + esc(label) +
+      '<span class="n">' + value + (note ? ' <span class="note">' + esc(note) + '</span>' : '') +
+      '</span></div>';
+  }
+
+  /**
+   * One "was → is" comparison.
+   *
+   * It prints the BASE and the value, and only then a percentage — and on this
+   * card the percentage is usually absent on purpose. A cohort is a handful of
+   * installs, so its day-over-day base is almost always under `DELTA_MIN_BASE`,
+   * where `pctChange` refuses to divide: one person to two is not "+100%", it
+   * is one person to two, and the tiles above already decline that number for
+   * the same reason on a smaller base than this. What the reader asked for is
+   * "is this a strong day for these people", and "1.4 → 4" answers it exactly
+   * where a percentage would only dress it up. The percentage appears the
+   * moment the base is big enough to carry one.
+   */
+  function ttMove(label, now, before, note) {
+    if (before === null || before === undefined || !isFinite(before)) return '';
+    var pct = pctChange(now, before);
+    var was = before >= 10 || before === Math.round(before) ? fmtInt(before) : before.toFixed(1);
+    return ttLine(label, was + ' \u2192 ' + fmtInt(now) + (pct === null ? '' : ' ' + deltaSpan(pct)), note);
+  }
+
+  /** A share, said the way this card says shares: whole percent, no decimals
+   *  on numbers whose denominator is a dozen people. */
+  function ttPct(n) {
+    return (n === null || n === undefined || !isFinite(n)) ? null : Math.round(n) + '%';
+  }
+
+  function cohortBarNote(ix, row, day, rangeDays, total) {
+    var norm = A.cohortNorm(ix, row.cohort, day, rangeDays || []);
+    var ages = A.ageNorm(ix, row.age, day, row.cohort);
+    var D = 'D' + row.age;
+    var sameDays = norm.range && norm.all && norm.range.days === norm.all.days;
+
+    var head = '<div class="tt-line">' + fmtInt(row.count) + ' of ' + fmtInt(total) +
+      ' active installs on ' + esc(labelDay(day)) + '</div>';
+
+    /* Down its own life. */
+    var mine = ttGroup('This cohort' + (norm.size ? ' \u00b7 ' + fmtInt(norm.size) + ' installed' : '')) +
+      (norm.size
+        ? ttLine('Still here', fmtInt(norm.now) + ' of ' + fmtInt(norm.size) + ' \u00b7 ' + ttPct(norm.retained))
+        /* Its size was never observed, so there is no share to report — and a
+           blank is the honest row, not a zero. */
+        : ttLine('Still here', fmtInt(norm.now), 'installed before the counter')) +
+      ttMove('vs the day before', norm.now, norm.prev) +
+      ttMove('vs its own average', norm.now, norm.all && norm.all.avg,
+        norm.all && ('over ' + fmtInt(norm.all.days) + ' days')) +
+      (sameDays ? '' : ttMove('vs its average in range', norm.now, norm.range && norm.range.avg,
+        norm.range && ('over ' + fmtInt(norm.range.days) + ' days'))) +
+      (norm.peak ? ttLine('Its best day', fmtInt(norm.peak.count), 'on D' + norm.peak.age) : '');
+
+    /* Across cohorts, at this age. */
+    var theirs = ttGroup(D + ' across cohorts') +
+      ttMove('The ' + D + ' bar yesterday', norm.now, ages.yesterday) +
+      ttMove('The usual ' + D + ' bar', norm.now, ages.median,
+        ages.cohorts ? 'median of ' + fmtInt(ages.cohorts) : null) +
+      /* The rate is what makes two cohorts comparable at all: four of twelve
+         and four of forty are the same bar and nothing like the same day. It
+         is also the only row here a pre-counter cohort cannot join, since it
+         has no denominator — it gets the typical figure alone rather than a
+         comparison with a number nobody has. */
+      (ages.retention && ages.retention.available
+        ? ttLine(D + ' retention',
+            norm.retained === null ? ttPct(ages.retention.pct)
+              : ttPct(norm.retained) + ' vs ' + ttPct(ages.retention.pct),
+            norm.retained === null
+              ? 'typical \u00b7 this one never counted'
+              : 'typical, over ' + fmtInt(ages.retention.cohorts) + ' cohorts')
+        : '');
+
+    /* A cohort with no comparable cohorts behind it is a real state — it is
+       the app's first week, or a platform slice holding one — and saying so
+       beats an empty block that looks like a rendering fault. */
+    if (!ages.cohorts && ages.yesterday === null) {
+      theirs = ttGroup(D + ' across cohorts') +
+        ttLine('No other cohort', 'has reached ' + D + ' yet');
+    }
+
+    return head + mine + theirs;
+  }
+
   function renderActiveByCohort(ix, r) {
     /* "Who is using it today" means the latest day IN THE RANGE. On the default
        window that is simply the newest day the counter holds; on a custom range
        ending last month it is that range's last day, which is the only reading
        of "today" a date filter can honestly have. */
     var day = (r && r.to && ix.last && r.to < ix.last) ? r.to : ix.last;
+    /* Bound before the tooltip closure, because inside it `r` is the ROW. */
+    var rangeDays = (r && r.from && r.to) ? A.range(r.from, r.to) : (ix.days || []);
     var abc = A.activeByCohort(ix, day);
-    var rows = abc.rows.slice(0, 24);
+    /* EVERY active cohort is charted, however old. This used to keep the 24
+       youngest, which is the one truncation this card cannot afford: rows run
+       youngest first, so the bars it dropped were the app's most established
+       users — exactly the install an activity toast names, and the reader then
+       watches the chart not move. A chart of "who is using it today" that
+       leaves people out is answering a different question, and there was
+       nothing on screen saying it had. The x axis thins its own labels, so the
+       cost of a long tail is narrower bars and not a broken chart; the date
+       behind each bar rides in its tooltip title and in the Table view. */
+    var rows = abc.rows;
     var B = A.BOUNDARIES;
 
     /* The boundary rules sit at an AGE, and a row is a cohort that happened to
@@ -3127,7 +3250,10 @@
 
     drawChart('pgActiveCohort', {
       x: rows.map(function (r) {
-        return { label: 'D' + r.age, full: labelFull(r.cohort) + ' · ' + r.age + ' days old' };
+        return {
+          label: 'D' + r.age,
+          full: labelFull(r.cohort) + ' · ' + r.age + (r.age === 1 ? ' day old' : ' days old')
+        };
       }),
       series: [{
         key: 'n', name: 'Active today', type: 'bar',
@@ -3138,9 +3264,7 @@
       emptyText: 'Nobody has pinged on the latest day yet.',
       guides: [guideAt(B.firstPostTrial, 'post-trial', PC.trial)].filter(Boolean),
       tooltipNote: function (i) {
-        var r = rows[i];
-        return fmtInt(r.count) + ' of today\'s ' + fmtInt(abc.total) + ' active installs' +
-          (r.measurable ? '' : ' · installed before the counter, so no retention rate for it');
+        return cohortBarNote(ix, rows[i], day, rangeDays, abc.total);
       }
     });
 

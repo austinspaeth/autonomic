@@ -199,6 +199,89 @@ check('measurable cohorts are still marked measurable',
 check('rows run youngest first', abc.rows.map((r) => r.age).every((a, i, arr) => i === 0 || arr[i - 1] <= a),
   abc.rows.map((r) => r.age).join(','));
 
+/* ------------------------------------------- a cohort against its own normal */
+
+/* The bar tooltip's three comparisons. Every one of them is about ONE cohort,
+   which is the only way "is this a strong day for these people" can be asked:
+   the app's own busy day says nothing about a cohort of eight. */
+const normC1 = A.cohortNorm(ix, C1, LAST, A.range('2026-06-16', LAST));
+check('a cohort norm reads its own day', normC1.now === A.countOn(ix, LAST, C1), JSON.stringify(normC1.now));
+check('...and the day before it', normC1.prev === A.countOn(ix, A.addDays(LAST, -1), C1),
+  JSON.stringify(normC1.prev));
+check('...over only the days the counter holds',
+  normC1.all && normC1.all.days === ix.days.filter((d) => d >= C1 && d <= LAST).length,
+  JSON.stringify(normC1.all));
+check('...and only the range days, for the range average',
+  normC1.range && normC1.range.days === ix.days.filter((d) => d >= '2026-06-16' && d <= LAST).length,
+  JSON.stringify(normC1.range));
+
+/* A cohort does not exist before its own install day, and averaging those days
+   in as zeroes would make every cohort's normal a function of how much history
+   it missed — the youngest would always look strongest. */
+const normC3 = A.cohortNorm(ix, C3, LAST, A.range(FIRST, LAST));
+check('a cohort is never averaged over days before it existed',
+  normC3.all && normC3.all.days === ix.days.filter((d) => d >= C3 && d <= LAST).length,
+  JSON.stringify(normC3.all));
+check('...so its average is of its own life, not of the journal',
+  normC3.all && normC3.all.days <= 3, JSON.stringify(normC3.all));
+
+/* And a term with nothing to average says so, rather than reporting a change
+   from a number nobody has. */
+const normBorn = A.cohortNorm(ix, C3, C3, A.range(C3, C3));
+check('the day before a cohort exists is unknown, not zero', normBorn.prev === null,
+  JSON.stringify(normBorn.prev));
+
+/* An install older than the counter is charted, so it is normed too. */
+const normOld = A.cohortNorm(ix, OLD, LAST, A.range(FIRST, LAST));
+check('a pre-counter cohort still gets a normal', normOld.all && normOld.all.days > 0,
+  JSON.stringify(normOld));
+
+/* A cohort also carries the two things that need no comparison to be read:
+   what it started with, and its own best day. */
+const normDay1 = A.cohortNorm(ix, C3, A.addDays(C3, 1), A.range(C3, LAST));
+check('a cohort norm knows what installed', normDay1.size === 20, JSON.stringify(normDay1.size));
+check('...and how much of that is still here',
+  normDay1.now === 12 && near(normDay1.retained, 60), JSON.stringify([normDay1.now, normDay1.retained]));
+check('...and its best day, with the day of its life it fell on',
+  normDay1.peak && normDay1.peak.count === 20 && normDay1.peak.age === 0, JSON.stringify(normDay1.peak));
+
+/* A cohort born before the counter has no denominator and never will, so the
+   share is absent rather than zero — the one thing about those installs we
+   genuinely cannot say. */
+const normPre = A.cohortNorm(ix, OLD, LAST, A.range(FIRST, LAST));
+check('a pre-counter cohort reports no share of what installed',
+  normPre.size === null && normPre.retained === null, JSON.stringify([normPre.size, normPre.retained]));
+check('...but still gets a normal', normPre.all && normPre.all.days > 0, JSON.stringify(normPre.all));
+
+/* ------------------------------------------- the same age, across cohorts */
+
+/* The other axis of a bar. C1 and C2 have both lived through a day 1 (60 of
+   100 and 30 of 50), so for C3's own day 1 the typical bar is their median and
+   the typical RATE is what makes two cohorts of different sizes comparable. */
+const age1 = A.ageNorm(ix, 1, LAST, C3);
+check('an age is compared across the cohorts that reached it', age1.cohorts === 2, JSON.stringify(age1));
+check('...as the median bar', age1.median === 45, String(age1.median));
+check('...and as a retention rate', near(age1.retention.pct, 60), JSON.stringify(age1.retention));
+
+/* Yesterday's bar in the same slot is a DIFFERENT cohort, one day younger at
+   the time — which is what "the D1 bar yesterday" means on a chart of ages. */
+check('the same slot yesterday is the cohort one day younger', age1.yesterday === 12,
+  String(age1.yesterday));
+
+/* The cohort being asked about is never part of the normal it is measured
+   against. */
+const age1b = A.ageNorm(ix, 1, LAST, C1);
+check('the subject cohort is excluded from its own comparison',
+  age1b.cohorts === 2 && age1b.median === 21, JSON.stringify([age1b.cohorts, age1b.median]));
+
+/* And a view of a past day never borrows from its own future. */
+const early = A.ageNorm(ix, 2, '2026-06-01', null);
+check('no cohort counts before it has reached that age',
+  early.cohorts === 0 && early.retention === null, JSON.stringify(early));
+check('a slot nobody was born into is unknown, not zero',
+  A.ageNorm(ix, 1, '2026-06-01', null).yesterday === null,
+  JSON.stringify(A.ageNorm(ix, 1, '2026-06-01', null).yesterday));
+
 const pre = A.preTrackingCohorts(ix);
 check('pre-counter cohorts are listed on their own', pre.length === 1 && pre[0].cohort === OLD, JSON.stringify(pre));
 check('with age, last-seen and active counts',

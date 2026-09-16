@@ -525,6 +525,7 @@ input[type="number"] { -moz-appearance: textfield; }
   padding: 8px 10px;
   font-size: 12.5px;
   min-width: 150px;
+  max-width: 340px;
   box-shadow: 0 8px 24px rgba(0,0,0,.5);
   z-index: 20;
   opacity: 0;
@@ -535,6 +536,17 @@ input[type="number"] { -moz-appearance: textfield; }
 .tooltip .tt-row { display: flex; align-items: center; gap: 8px; color: var(--text-secondary); line-height: 1.65; }
 .tooltip .tt-row .n { margin-left: auto; color: var(--text-primary); font-variant-numeric: tabular-nums; }
 .tooltip .tt-note { color: var(--text-muted); margin-top: 6px; padding-top: 6px; border-top: 1px solid var(--border); }
+
+/* A tooltip that carries two blocks of comparisons rather than one line: the
+   group heading names what the rows under it are measured against, and the
+   figures right-align into a column that can be read straight down. */
+.tooltip .tt-grp { color: var(--text-secondary); font-weight: 600; margin: 7px 0 2px; }
+.tooltip .tt-line { display: flex; align-items: baseline; gap: 14px; line-height: 1.6; }
+.tooltip .tt-line .n {
+  margin-left: auto; color: var(--text-primary);
+  font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.tooltip .tt-line .note { color: var(--text-muted); font-weight: 400; }
 
 .empty {
   color: var(--text-muted);

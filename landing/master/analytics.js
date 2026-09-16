@@ -1952,6 +1952,128 @@ window.Analytics = (function () {
   }
 
   /**
+   * One cohort's day, read against that cohort's OWN normal.
+   *
+   * The bar above says how many of an install age opened the app today. It
+   * cannot say whether that is a lot for them, and on counts this small the
+   * answer is the whole question: three of a five-install cohort is a strong
+   * day, three of a forty-install one is a quiet week. So each bar carries the
+   * same day / week / average comparison the tiles do, except that every term
+   * is about the SAME cohort rather than about the app.
+   *
+   * Two rules keep the averages honest, and both are the "months before you
+   * started logging are not zeroes" rule in another costume:
+   *
+   *   a cohort does not exist before its own install day, so days before it
+   *   are skipped rather than averaged in as zeroes — otherwise every cohort's
+   *   normal would be dragged toward nothing by the history it was not alive
+   *   for, and the newest cohorts, which have the least of it, would look
+   *   strongest;
+   *
+   *   and only days the counter actually holds are counted. A day it has a row
+   *   for and this cohort is absent from IS a zero — nobody from it opened the
+   *   app — and counts as one.
+   *
+   * `days` is the view's current range. All-time sweeps `ix.days`, both
+   * clamped at `day`, so a range ending in the past is never compared against
+   * its own future. A term with nothing to average returns null and the UI
+   * drops it, rather than printing a change from a number nobody has.
+   */
+  function cohortNorm(ix, cohort, day, days) {
+    var has = {};
+    (ix.days || []).forEach(function (d) { has[d] = true; });
+    var alive = function (d) { return !!has[d] && d >= cohort && d <= day; };
+    var mean = function (list) {
+      var sum = 0, n = 0;
+      (list || []).forEach(function (d) {
+        if (!alive(d)) return;
+        sum += countOn(ix, d, cohort); n++;
+      });
+      return n ? { avg: sum / n, days: n } : null;
+    };
+    var prevDay = addDays(day, -1);
+
+    /* Its best day, and which day of its life that was. The peak is the only
+       figure here that needs no comparison to be read: a cohort sitting well
+       under its own best day is one that is leaving, whatever the app's
+       average for that age happens to be. */
+    var peak = null;
+    (ix.days || []).forEach(function (d) {
+      if (!alive(d)) return;
+      var n = countOn(ix, d, cohort);
+      if (!peak || n > peak.count) peak = { count: n, day: d, age: ageDays(cohort, d) };
+    });
+
+    /* How many installed, and how much of that is left. Null for a cohort born
+       before the counter: its size was never observed and never will be, which
+       is the one thing about those installs we genuinely cannot say. */
+    var size = cohortSize(ix, cohort) || null;
+    var now = countOn(ix, day, cohort);
+
+    return {
+      cohort: cohort, day: day, age: ageDays(cohort, day),
+      now: now,
+      prev: alive(prevDay) ? countOn(ix, prevDay, cohort) : null,
+      range: mean(days),
+      all: mean(ix.days),
+      size: size,
+      retained: size ? (now / size) * 100 : null,
+      peak: peak
+    };
+  }
+
+  /**
+   * The OTHER axis of the same bar: what a day-N bar usually looks like.
+   *
+   * A cohort's own history says whether it is fading. It cannot say whether
+   * day 2 is a strong day 2 — for that the comparison is across cohorts, at
+   * the same AGE, which is the one comparison the chart's shape invites and
+   * none of its numbers made. Two readings of it, and they answer different
+   * questions:
+   *
+   *   `yesterday` is literally the bar that stood in this slot on the previous
+   *   day — a DIFFERENT cohort, one day younger at the time. It is the "did
+   *   this move" reading, and it is null rather than zero when no cohort was
+   *   born to fill that slot, because an empty slot is not a quiet one;
+   *
+   *   `median` / `retention` are the app's own history at that age. The median
+   *   COUNT is what the reader is looking at (bar heights), and the retention
+   *   RATE is what makes cohorts of different sizes comparable at all — four
+   *   of twelve and four of forty are the same bar and nothing like the same
+   *   day. Both exclude the cohort being asked about, or it would be part of
+   *   the normal it is being measured against.
+   *
+   * Every cohort counted has to have REACHED day N on or before `day`, so a
+   * view of a past day never borrows from its own future.
+   */
+  function ageNorm(ix, age, day, exclude) {
+    var prevDay = addDays(day, -1);
+    var prevCohort = addDays(prevDay, -age);
+    var yesterday = cohortSize(ix, prevCohort) ? countOn(ix, prevDay, prevCohort) : null;
+
+    var counts = [], others = [];
+    (ix.cohorts || []).forEach(function (c) {
+      if (c === exclude) return;
+      var at = addDays(c, age);
+      if (at > day) return;
+      if (!cohortSize(ix, c)) return;
+      counts.push(countOn(ix, at, c));
+      others.push(c);
+    });
+    counts.sort(function (a, b) { return a - b; });
+
+    return {
+      age: age, day: day,
+      yesterday: yesterday,
+      median: counts.length ? (counts.length % 2
+        ? counts[(counts.length - 1) / 2]
+        : (counts[counts.length / 2 - 1] + counts[counts.length / 2]) / 2) : null,
+      cohorts: counts.length,
+      retention: others.length ? retentionAt(ix, others, age) : null
+    };
+  }
+
+  /**
    * Installs older than the counter, with everything we DO know about them:
    * which day they installed, how old that makes them, when they last checked
    * in and how many were active on the newest day. No percentages, because
@@ -2488,7 +2610,8 @@ window.Analytics = (function () {
     conversion: conversion, activation: activation, activationAges: activationAges,
 
     // shape of activity
-    activeByCohort: activeByCohort, preTrackingCohorts: preTrackingCohorts, peakOver: peakOver,
+    activeByCohort: activeByCohort, cohortNorm: cohortNorm, ageNorm: ageNorm,
+    preTrackingCohorts: preTrackingCohorts, peakOver: peakOver,
     byWeekday: byWeekday, retentionByInstallWeekday: retentionByInstallWeekday,
 
     // store + events
