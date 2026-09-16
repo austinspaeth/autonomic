@@ -763,9 +763,47 @@ the UI, each of them deliberate:
   curve adds them together and calls the total retention — which is the whole
   reason the card is not just a smoothed version of the one above it.
 
+- **"Is retention improving?" is the only card that answers the question over
+  TIME, and it exists because none of the others can.** A pooled curve averages
+  every mature cohort, so history drowns the present: a genuine 12% -> 20% at D3
+  across 250 recent installs reads 15% against 400 older ones, and reads WORSE
+  the more installs accumulate, because the denominator diluting it only grows.
+  A recent-vs-earlier split answers it until the change is old enough to sit on
+  both sides of the cut, after which the two lines converge and the card renders
+  a finding of "no difference" that is really a question that expired.
+
+  `presenceByWeek` plots ONE age across EVERY weekly cohort in birth order. A
+  cohort's point never moves and never pools with another's, so a trend stays a
+  trend for as long as the app exists, and the releases drawn over it as rules
+  turn "did that change anything" into something to look at rather than argue
+  from. The age is selectable (D1 / D3 / D7 / D14) because the answer differs by
+  step, and the step that matters is wherever the funnel is currently breaking.
+
+  A week whose newest days have not lived the whole window is `partial`: a real
+  answer over fewer installs, marked rather than dropped, since dropping it
+  would redraw the time axis so that two points a month apart sat adjacent. And
+  the note carries the newest complete week's **confidence interval**, because
+  the failure mode of this chart is reading a two-point wiggle as a trend — at
+  ~100 installs a week a D3 rate carries roughly +/-7 points of sampling noise.
+  Past `NOISE_UNUSABLE` the interval is wider than anything it could measure, and
+  the note says so instead of quoting a threshold the axis would swallow.
+
+- **A recent-vs-earlier split is cut at a RELEASE, never the median.** The
+  median moves, so a card split on it answers "is it better than it was" only
+  until the change being asked about has aged past the midpoint. `splitFor`
+  walks the release log backwards for the newest version that still leaves
+  `SPLIT_MIN_COHORTS` on each side, and both the retention curve and the
+  attendance/survival card use the same one — so they cannot disagree about who
+  is recent — and name the version in the legend, or the reader cannot tell what
+  is being contrasted. A cohort born ON the day counts as RECENT: it met the
+  release from its first launch, which is the population the question is about.
+  Asked to split a set too small to split, both cards fall back to the pooled
+  series rather than drawing two lines over one cohort a side.
+
   **All installs is not a third nicety, it is the reason the split is not two.**
   A retention curve, a cohort heatmap, purchase and activation timing, the habit
-  curve, the sensor-mix-by-age card and the attendance/survival pair ignore the
+  curve, the sensor-mix-by-age card, the attendance/survival pair and the
+  weekly trend ignore the
   date range entirely — they
   pool every cohort old enough to have reached the day being asked about. Filing
   them under "This range" would be a claim they do not make, which is the same

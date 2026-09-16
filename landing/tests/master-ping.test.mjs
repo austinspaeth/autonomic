@@ -614,6 +614,43 @@ check('the decomposition row explains what it separates',
 check('and every age band either carries a figure or says why not',
   /\/ 7 days/.test(intens) || /not enough aged cohorts/.test(intens), intens.slice(0, 200));
 
+/* ------------------------------------------------- is it improving?
+
+   The trend card is the only one that survives time: every curve pools cohorts
+   and dilutes a real gain against history, and a recent-vs-earlier split stops
+   contrasting once the change ages past the cut. One age, one point per weekly
+   cohort, releases drawn over it. */
+check('the trend chart rendered', !!$('pgTrend').querySelector('svg'));
+check('it draws the releases it can reach as rules on the axis',
+  /v1\.2/.test($('pgTrend').textContent), $('pgTrend').textContent.slice(-60));
+
+const trendNote = $('pgTrendNote').textContent;
+check('the trend note carries a denominator, never a bare percentage',
+  /installs/.test(trendNote) || /has fully lived/.test(trendNote), trendNote.slice(0, 160));
+/* At the fixture's cohort sizes the interval is wider than anything it could
+   measure, and the note has to say THAT rather than print a noise threshold on
+   an axis it would swallow whole. */
+check('a cohort too small to carry a rate says so instead of quoting a threshold',
+  !/wider than anything/.test(trendNote) || !/sampling noise/.test(trendNote),
+  trendNote.slice(0, 240));
+
+/* The split is cut at a RELEASE, not the median, so the comparison stays the
+   same comparison as cohorts age past it. This fixture holds three cohorts,
+   which cannot give SPLIT_MIN_COHORTS a side each — so the real assertion here
+   is the refusal: asked to split a set too small to split, the card falls back
+   to the pooled series rather than drawing a two-line comparison over one
+   cohort a side and calling the difference a finding. (The version-labelled
+   path shares its release lookup with the trend card's rules, which the
+   assertion above exercises.) */
+window.document.querySelector('#pgCurveMode button[data-v="split"]').click();
+await new Promise((r) => setTimeout(r, 80));
+const splitLeg = $('pgCurve').textContent;
+check('too few cohorts to split falls back rather than inventing a contrast',
+  !!$('pgCurve').querySelector('svg') && !/Before v1\./.test(splitLeg) && !/Earlier cohorts/.test(splitLeg),
+  splitLeg.slice(0, 160));
+window.document.querySelector('#pgCurveMode button[data-v="all"]').click();
+await new Promise((r) => setTimeout(r, 80));
+
 /* ------------------------------------------------------ timeline tab */
 
 window.document.querySelector('.tab[data-view="timeline"]').click();
