@@ -1495,7 +1495,15 @@ old web app so old `export.json` files import directly.
   day-exact line comes from `dayOnePct` inside the same sweep and NEVER from
   `retentionAt`, whose eligible-cohort set is different and can therefore plot
   attendance above survival; and the curve ends `win - 1` days short rather than
-  padding. The paywall counter gets **Opened vs paywalled** and **Which
+  padding. **"Is retention improving?"** is the only card that answers over TIME:
+  `presenceByWeek` plots ONE age across every weekly cohort in birth order, with
+  the release log drawn as rules. Every other view pools cohorts, so history
+  dilutes a real gain and dilutes it further as installs accumulate; and a
+  recent-vs-earlier split stops contrasting once the change ages past the cut.
+  That cut is now a RELEASE and never the median (`splitFor`, shared by the
+  retention curve and the survival card so they cannot disagree about who is
+  recent, named in the legend, falling back to the pooled series when a set is
+  too small to split). The paywall counter gets **Opened vs paywalled** and **Which
   wall they meet first**, and the two new fields get **Who is in the app** (the
   tier split, with a Pro share read off three different counters side by side)
   and **What they are running** (version adoption); all four are pinned by

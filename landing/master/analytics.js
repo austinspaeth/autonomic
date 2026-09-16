@@ -1570,6 +1570,63 @@ window.Analytics = (function () {
     return retentionAt(ix, week.days, n);
   }
 
+  /**
+   * ONE age, EVERY weekly cohort, in birth order — the only shape here that
+   * answers "is retention improving over time".
+   *
+   * The curves elsewhere cannot. A pooled curve averages every mature cohort,
+   * so history drowns the present: a genuine 12% -> 20% at D3 across 250 recent
+   * installs reads as 15% against 400 older ones, and reads WORSE the more
+   * installs accumulate. A recent-vs-earlier split answers it only until the
+   * improvement is old enough to sit on both sides of the split, at which point
+   * the two lines converge and the card silently stops saying anything.
+   *
+   * A cohort's point never moves and never pools with another's, so a trend
+   * stays a trend for as long as the app exists. Read against the release rules
+   * the UI draws on it, this is the chart that says whether a release did
+   * anything — the question every other view can only be argued from.
+   *
+   * A week is `partial` when only some of its days have lived the whole window:
+   * a real answer over fewer installs, which is different from no answer, and
+   * the UI is expected to mark it rather than drop it.
+   */
+  function presenceByWeek(ix, cohorts, n, win) {
+    return weeklyCohorts(ix, cohorts).map(function (w) {
+      var p = presenceAt(ix, w.days, n, win);
+      return {
+        key: w.key, size: w.size, days: w.days,
+        day: n, win: p.win,
+        alive: p.alive, of: p.of, dayOne: p.dayOne, dayCount: p.dayCount,
+        alivePct: p.alivePct, dayOnePct: p.dayOnePct, intensity: p.intensity,
+        cohorts: p.cohorts, immature: p.immature, small: p.small,
+        partial: p.available && p.immature > 0,
+        available: p.available
+      };
+    });
+  }
+
+  /**
+   * Split cohorts at a FIXED day rather than at the median.
+   *
+   * The median moves. A card split on it answers "is it better than it was"
+   * only until the change being asked about has aged past the midpoint, after
+   * which the same installs sit on both sides and the contrast washes out — the
+   * card keeps rendering, shows two identical lines, and looks like a finding of
+   * "no difference" rather than a question that expired.
+   *
+   * A release date does not move, so the comparison it draws stays the same
+   * comparison in November as it was the week it shipped. A cohort born ON the
+   * day counts as RECENT: it met the release from its first launch, which is
+   * the population the question is about.
+   */
+  function splitCohortsAt(cohorts, isoDay) {
+    var earlier = [], recent = [];
+    (cohorts || []).forEach(function (c) {
+      if (isoDay && c >= isoDay) recent.push(c); else earlier.push(c);
+    });
+    return { at: isoDay || null, earlier: earlier, recent: recent };
+  }
+
   function weekMilestones(ix, week, cols) {
     return (cols || MILESTONES).map(function (n) {
       var r = retentionAt(ix, week.days, n);
@@ -2423,6 +2480,7 @@ window.Analytics = (function () {
     retentionAt: retentionAt, curve: curve, milestoneRow: milestoneRow,
     presenceAt: presenceAt, presenceCurve: presenceCurve, PRESENCE_WINDOW: PRESENCE_WINDOW,
     weeklyCohorts: weeklyCohorts, weekRetentionAt: weekRetentionAt, weekMilestones: weekMilestones,
+    presenceByWeek: presenceByWeek, splitCohortsAt: splitCohortsAt,
 
     // lifecycle + money
     survival: survival, lifecycleNow: lifecycleNow, lifecycleActive: lifecycleActive,

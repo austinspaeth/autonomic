@@ -264,6 +264,43 @@ const w0 = A.presenceAt(fx, [X, Y], 0);
 check('a cohort too young for the WHOLE window is excluded, not truncated',
   w0.cohorts === 1 && w0.immature === 1 && w0.of === 20, JSON.stringify(w0));
 
+/* ---- one age, every weekly cohort: the only shape that shows a TREND.
+   A pooled curve dilutes a real gain against history and dilutes it further the
+   more installs arrive; a median split stops contrasting once the change ages
+   past the midpoint. A cohort's own point does neither. */
+const byWeek = A.presenceByWeek(fx, [X, Y], 1);
+check('weekly cohorts come back in birth order, one point each',
+  byWeek.length === 2 && byWeek[0].key < byWeek[1].key,
+  byWeek.map((w) => w.key).join(','));
+check('a week that cannot answer yet says so rather than reading zero',
+  byWeek[1].available === false && byWeek[1].alivePct === null, JSON.stringify(byWeek[1]));
+check('and a week that can carries the same floor the pooled call gives',
+  near(byWeek[0].alivePct, A.presenceAt(fx, [X], 1).alivePct), String(byWeek[0].alivePct));
+
+/* A week is PARTIAL when only some of its days have lived the whole window —
+   a real answer over fewer installs, which is not the same as no answer, and
+   the UI marks it instead of dropping the point. */
+const mixWeek = {};
+put(mixWeek, '2026-06-01', '2026-06-01', 10);   // Monday: old enough
+put(mixWeek, '2026-06-06', '2026-06-06', 10);   // Saturday, same week: not
+put(mixWeek, '2026-06-08', '2026-06-01', 4);
+put(mixWeek, '2026-06-10', '2026-06-01', 1);
+const mixIx = A.index({ open: shape(mixWeek) });
+const mixed = A.presenceByWeek(mixIx, mixIx.cohorts, 1)[0];
+check('a half-mature week reports on the days that qualify and flags itself',
+  mixed.partial === true && mixed.cohorts === 1 && mixed.immature === 1, JSON.stringify(mixed));
+check('...and its denominator is only the days it could answer for',
+  mixed.of === 10, String(mixed.of));
+
+/* ---- a fixed-date split, because the median one expires. */
+const sp = A.splitCohortsAt([C1, C2, C3], C2);
+check('a cohort born ON the split day counts as recent, not earlier',
+  sp.recent.includes(C2) && !sp.earlier.includes(C2), JSON.stringify(sp));
+check('and the split keeps every cohort exactly once',
+  sp.earlier.length + sp.recent.length === 3);
+check('no split day puts everything in earlier rather than guessing one',
+  A.splitCohortsAt([C1, C2], null).earlier.length === 2);
+
 /* The window costs (win - 1) days of reach at the end. Stated, not padded. */
 const pc = A.presenceCurve(fx, [X], 60), rc = A.curve(fx, [X], 60);
 check('the window curve ends 6 days before the day-exact one',

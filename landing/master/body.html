@@ -616,6 +616,29 @@
       <div id="pgIntensity"></div>
     </div>
 
+    <!-- ---------- 3d. is it improving? ----------
+         The only shape on this page that answers the question over TIME. Every
+         curve above pools cohorts, so history drowns the present and a real
+         gain reads smaller the more installs accumulate; a recent-vs-earlier
+         split answers it only until the change is old enough to sit on both
+         sides. One age, every weekly cohort, in birth order: a point that never
+         moves and never pools, read against the releases that might have moved
+         it. -->
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Is retention improving?</h2><span class="spacer"></span>
+        <div class="segmented" id="pgTrendAge">
+          <button data-v="1" aria-pressed="false">D1</button>
+          <button data-v="3" aria-pressed="true">D3</button>
+          <button data-v="7" aria-pressed="false">D7</button>
+          <button data-v="14" aria-pressed="false">D14</button>
+        </div>
+        <button class="btn sm" data-table-toggle="pgTrend">Table</button></header>
+      <p class="hint">One age, every weekly cohort, in the order they were born — so a <b>slope</b> is visible as a slope. Each week keeps its own point forever: it never pools with another week and never gets diluted by history, which is what every curve above this one does. The dashed rules are releases, so "did that change anything" is a question you can look at rather than argue from. A week whose newest days have not lived the whole window yet still reports on the days that qualify — a real answer over fewer installs, not a smaller one — and says so on hover and under the chart.</p>
+      <div id="pgTrend"></div>
+      <div id="pgTrend-table" class="hidden" style="margin-top:12px"></div>
+      <div id="pgTrendNote"></div>
+    </div>
+
     <div class="card" style="margin-bottom:14px">
       <header><h2>Cohort retention</h2><span class="spacer"></span>
         <div class="segmented" id="pgHeatGrain">

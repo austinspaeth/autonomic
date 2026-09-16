@@ -1547,7 +1547,7 @@
       try { localStorage.removeItem(PING_KEY); } catch (e2) { /* ignore */ }
     }
   }
-  var pingUI = { tlMode: 'usage', tlMetric: 'active', curveMode: 'all', presenceMode: 'gap', heatGrain: 'week', cohort: null, event: null, editing: null, rawKind: 'all', fltSort: 'installs' };
+  var pingUI = { tlMode: 'usage', tlMetric: 'active', curveMode: 'all', presenceMode: 'gap', trendAge: '3', heatGrain: 'week', cohort: null, event: null, editing: null, rawKind: 'all', fltSort: 'installs' };
 
   var PC = {
     fresh: COLOR.green,        // first run — an install the counter had not seen
@@ -1864,7 +1864,7 @@
     if (blank) {
       document.getElementById('pgHeat').innerHTML =
         '<div class="empty">No pings yet. The counter starts filling the first time a build carrying it is opened.</div>';
-      ['pgTimeline', 'pgCurve', 'pgSurvival', 'pgPresence', 'pgActiveCohort', 'pgPurchaseAge',
+      ['pgTimeline', 'pgCurve', 'pgSurvival', 'pgPresence', 'pgTrend', 'pgActiveCohort', 'pgPurchaseAge',
         'pgActivationAge', 'pgMethods', 'pgMeasureDaily', 'pgMeasureCurve', 'pgReadMethods',
         'pgPayDaily', 'pgSurfaces', 'pgTiers', 'pgBuilds', 'pgBuildShare',
         'pgFunnel', 'pgOffers', 'pgEvents', 'pgLogs', 'pgDig',
@@ -1884,6 +1884,7 @@
     renderCurve(scoped);
     renderSurvival(scoped);
     renderPresence(scoped);
+    renderTrend(scoped);
     renderHeat(scoped);
     renderActiveByCohort(scoped, r);
     renderPurchases(scoped, r);
@@ -2689,6 +2690,41 @@
 
   /* ------------------------------------------------------------- 3. curve */
 
+  /**
+   * Where to cut a recent-vs-earlier comparison.
+   *
+   * The MEDIAN cohort was the obvious choice and it expires. It answers "is it
+   * better than it was" only until the change being asked about has aged past
+   * the midpoint — after that the same installs sit on both sides, the two
+   * lines converge, and the card renders a finding of "no difference" that is
+   * really a question nobody is asking any more.
+   *
+   * The most recent RELEASE that still leaves cohorts on both sides does not
+   * move, so the comparison it draws in November is the comparison it drew the
+   * week it shipped, and the card names the version so what is being compared
+   * is never in doubt. The median stays as the fallback for a range with no
+   * release in it, which is the only case where an arbitrary cut beats none.
+   */
+  var SPLIT_MIN_COHORTS = 2;
+  /* Half-width (percentage points) past which a weekly point's interval is
+     wider than the thing it would measure, and the note says so rather than
+     printing a noise threshold nobody can use. */
+  var NOISE_UNUSABLE = 15;
+  function splitFor(ix) {
+    var rels = releaseEvents().slice().sort(function (a, b) { return a.date.localeCompare(b.date); });
+    for (var i = rels.length - 1; i >= 0; i--) {
+      var s = A.splitCohortsAt(ix.cohorts, rels[i].date);
+      if (s.earlier.length >= SPLIT_MIN_COHORTS && s.recent.length >= SPLIT_MIN_COHORTS) {
+        return { earlier: s.earlier, recent: s.recent, at: rels[i].date, label: rels[i].title };
+      }
+    }
+    var half = Math.ceil(ix.cohorts.length / 2);
+    return {
+      earlier: ix.cohorts.slice(0, half), recent: ix.cohorts.slice(half),
+      at: ix.cohorts[half] || null, label: null
+    };
+  }
+
   function renderCurve(ix) {
     var B = A.BOUNDARIES;
     var maxN = 60;
@@ -2698,14 +2734,15 @@
     function toValues(curve) { return curve.map(function (p) { return p.pct; }); }
 
     if (pingUI.curveMode === 'split' && ix.cohorts.length >= 4) {
-      // Split at the median cohort so "is retention improving?" has an answer
-      // that does not depend on an arbitrary date.
-      var half = Math.ceil(ix.cohorts.length / 2);
-      var earlier = ix.cohorts.slice(0, half), recent = ix.cohorts.slice(half);
-      var cE = A.curve(ix, earlier, maxN), cR = A.curve(ix, recent, maxN);
+      // Cut at the newest release rather than the median, so the comparison
+      // stays the same comparison as the cohorts age past it — see splitFor.
+      var sp = splitFor(ix);
+      var cE = A.curve(ix, sp.earlier, maxN), cR = A.curve(ix, sp.recent, maxN);
       len = Math.max(cE.length, cR.length);
-      series.push({ key: 'earlier', name: 'Earlier cohorts', color: COLOR.muted, type: 'line', dashed: true, values: toValues(cE) });
-      series.push({ key: 'recent', name: 'Recent cohorts', color: PC.fresh, type: 'line', values: toValues(cR) });
+      var beforeName = sp.label ? 'Before ' + sp.label : 'Earlier cohorts';
+      var afterName = sp.label ? sp.label + ' onward' : 'Recent cohorts';
+      series.push({ key: 'earlier', name: beforeName, color: COLOR.muted, type: 'line', dashed: true, values: toValues(cE) });
+      series.push({ key: 'recent', name: afterName, color: PC.fresh, type: 'line', values: toValues(cR) });
     } else {
       var c = A.curve(ix, ix.cohorts, maxN);
       len = c.length;
@@ -2757,16 +2794,18 @@
     var series = [], len = 0, split = false;
 
     if (pingUI.presenceMode === 'split' && ix.cohorts.length >= 4) {
-      // Same median split the retention curve uses, so the two cards answer
-      // "is this improving?" over identical groups of installs.
+      // The same cut the retention curve uses, so the two cards compare
+      // identical groups of installs and cannot disagree about who is recent.
       split = true;
-      var half = Math.ceil(ix.cohorts.length / 2);
-      var pE = A.presenceCurve(ix, ix.cohorts.slice(0, half), maxN);
-      var pR = A.presenceCurve(ix, ix.cohorts.slice(half), maxN);
+      var sp = splitFor(ix);
+      var pE = A.presenceCurve(ix, sp.earlier, maxN);
+      var pR = A.presenceCurve(ix, sp.recent, maxN);
       len = Math.max(pE.length, pR.length);
-      series.push({ key: 'e', name: 'Earlier cohorts · alive', color: COLOR.muted, type: 'line', dashed: true,
+      series.push({ key: 'e', name: (sp.label ? 'Before ' + sp.label : 'Earlier') + ' · alive',
+        color: COLOR.muted, type: 'line', dashed: true,
         values: pE.map(function (p) { return p.alivePct; }) });
-      series.push({ key: 'r', name: 'Recent cohorts · alive', color: PC.fresh, type: 'line',
+      series.push({ key: 'r', name: (sp.label ? sp.label + ' onward' : 'Recent') + ' · alive',
+        color: PC.fresh, type: 'line',
         values: pR.map(function (p) { return p.alivePct; }) });
     } else {
       var pres = A.presenceCurve(ix, ix.cohorts, maxN);
@@ -2839,6 +2878,107 @@
       'This is the other half: a change that makes the same people open more often moves this row, and a change ' +
       'that keeps more people moves the chart above. The day-N curve adds them together and calls the total ' +
       'retention.</p><div class="mini-rows">' + rows + '</div>';
+  }
+
+  /* ------------------------------------------------- 3d. is it improving?
+   *
+   * The one shape on this page that answers the question over TIME, and the
+   * reason it has to exist separately from everything above it:
+   *
+   * A POOLED curve averages every mature cohort, so history drowns the present.
+   * A genuine 12% -> 20% at D3 across 250 recent installs reads 15% against 400
+   * older ones — and reads WORSE the more installs accumulate, because the
+   * denominator it is diluted by only grows.
+   *
+   * A RECENT-VS-EARLIER split answers it until the change is old enough to sit
+   * on both sides of the split, at which point the two lines converge and the
+   * card goes on rendering a finding of "no difference" that is really a
+   * question that expired.
+   *
+   * One age, every weekly cohort, in birth order: a point that never moves and
+   * never pools, with the releases drawn over it.
+   */
+  function renderTrend(ix) {
+    var n = parseInt(pingUI.trendAge, 10);
+    if (!(n >= 0)) n = 3;
+    var weeks = A.presenceByWeek(ix, ix.cohorts, n);
+
+    /* Weeks stay on the axis even when they cannot answer yet — a null is a gap
+       in the line, and dropping the column instead would quietly redraw the time
+       axis so that two points a month apart sat next to each other. */
+    var x = weeks.map(function (w) {
+      return { label: labelDay(w.key), full: 'Week of ' + labelFull(w.key) };
+    });
+
+    /* Releases that land inside the plotted weeks, collapsed per week: two
+       versions cut three days apart are one rule, or the labels overprint and
+       neither is readable. */
+    var byWeek = {};
+    releaseEvents().forEach(function (r) {
+      var k = A.weekStart(r.date);
+      (byWeek[k] = byWeek[k] || []).push(r.title);
+    });
+    var guides = [];
+    weeks.forEach(function (w, i) {
+      if (!byWeek[w.key]) return;
+      var names = byWeek[w.key];
+      guides.push({
+        index: i, color: A.eventColor ? A.eventColor({ category: 'RELEASE' }) : PC.trial,
+        label: names.length > 2 ? names[0] + ' +' + (names.length - 1) : names.join(' · ')
+      });
+    });
+
+    drawChart('pgTrend', {
+      x: x, height: 300, format: fmtPct, xLabel: 'Week the cohort installed',
+      series: [{
+        key: 'alive', name: 'Still alive at D' + n, color: PC.fresh, type: 'line',
+        values: weeks.map(function (w) { return w.available ? w.alivePct : null; })
+      }],
+      guides: guides,
+      emptyText: 'No weekly cohort has lived through a whole window at D' + n + ' yet.',
+      tooltipNote: function (i) {
+        var w = weeks[i];
+        if (!w.available) return 'no cohort in this week has reached D' + n + ' plus its window yet';
+        var bits = [fmtInt(w.alive) + ' of ' + fmtInt(w.of) + ' still here'];
+        if (w.partial) bits.push('PARTIAL — ' + w.immature + ' of its days are still too young');
+        if (w.small) bits.push('small cohort');
+        return bits.join(' · ');
+      }
+    });
+
+    /* The note's job is to stop a two-point wiggle being read as a trend. At
+       ~100 installs a week a D3 rate carries roughly ±7 points of sampling
+       noise, so adjacent weeks bounce around by more than most real changes are
+       worth — the interval is printed rather than described, and the pooling
+       rule beside it says what it would take to see a move at all. */
+    var done = weeks.filter(function (w) { return w.available && !w.partial; });
+    var host = document.getElementById('pgTrendNote');
+    if (!done.length) {
+      host.innerHTML = '<p class="note" style="margin-top:10px">No week has fully lived through D' + n +
+        ' plus its ' + A.PRESENCE_WINDOW + '-day window yet. The first complete point appears ' +
+        (n + A.PRESENCE_WINDOW) + ' days after a week\'s last install.</p>';
+      return;
+    }
+    var last = done[done.length - 1];
+    var p = last.alivePct / 100, half = 1.96 * Math.sqrt(Math.max(p * (1 - p), 0.0001) / last.of) * 100;
+    var partials = weeks.filter(function (w) { return w.partial; }).length;
+    host.innerHTML = '<p class="note" style="margin-top:10px">Newest complete week (' +
+      esc(labelFull(last.key)) + '): <b>' + fmtPct(last.alivePct) + '</b> at D' + n +
+      ', ± ' + half.toFixed(1) + ' points over ' + fmtInt(last.of) + ' installs.' +
+      (partials ? ' ' + partials + ' later week' + (partials === 1 ? ' is' : 's are') +
+        ' still partial and will move as their newest days mature.' : '') + '</p>' +
+      /* Past a certain width the interval stops being a caution and becomes the
+         whole answer: a "moves under 40 points are noise" line on a chart whose
+         axis is 0-100 tells the reader nothing except that the number is
+         unusable, so say THAT instead of dressing it as a threshold. */
+      (half > NOISE_UNUSABLE
+        ? '<p class="hint" style="margin:8px 0 0">At ' + fmtInt(last.of) + ' installs that interval is wider than ' +
+          'anything it could be used to measure — this week can be read as "somebody came back", and not as a rate. ' +
+          'A weekly cohort needs to be several times this size before its point is worth comparing to its neighbour\'s.</p>'
+        : '<p class="hint" style="margin:8px 0 0">That interval is the reason to read the <b>slope</b> and not the ' +
+          'last two points: at this cohort size a week-to-week move smaller than roughly ' +
+          (half * 1.4).toFixed(0) + ' points is sampling noise. A change worth acting on shows up as several ' +
+          'weeks leaning the same way, or by pooling a fortnight either side of a release rule.</p>');
   }
 
   /* ---------------------------------------------------------- 3b. survival */
@@ -4574,6 +4714,7 @@
     segment('pgTlMode', 'tlMode', renderPing);
     segment('pgCurveMode', 'curveMode', renderPing);
     segment('pgPresenceMode', 'presenceMode', renderPing);
+    segment('pgTrendAge', 'trendAge', renderPing);
     segment('pgHeatGrain', 'heatGrain', function () { pingUI.cohort = null; renderPing(); });
     segment('tlMetric', 'tlMetric', renderTimelineView);
     segment('pgRawKind', 'rawKind', renderPings);
