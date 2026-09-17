@@ -69,12 +69,32 @@ export function refusalSignature(o: {
   durationSec: number;
   /** Did the pipeline produce metrics at all? */
   hasFields: boolean;
+  /**
+   * Beats the artifact rate was computed OVER — `rrClean.length`. Zero means
+   * there is no rate to report, and the band has to say so.
+   *
+   * `computeHrv` sets `artifactPct = clean.length ? flagged / clean.length : 0`,
+   * so a reading that kept no beats arrives here claiming a 0% artifact rate
+   * and bands as `art<5` — the cleanest band there is, on a reading with no
+   * signal in it at all. That is not a small cosmetic wrong: the whole point of
+   * the signature is to separate "the finger was there and noisy" from "the
+   * pulse was barely arriving", and a fabricated clean band puts every
+   * no-data refusal in the first group. It also reads, across a report, as
+   * proof that nothing is ever refused for noise.
+   */
+  beats: number;
 }): string {
   const src = o.source || 'unknown';
+  const cov = coverageBand(o.coverageSec, o.durationSec);
   const kind = !o.hasFields
     ? 'nodata'
-    : coverageBand(o.coverageSec, o.durationSec) === 'cov<25' || coverageBand(o.coverageSec, o.durationSec) === 'cov25-50'
+    : cov === 'cov<25' || cov === 'cov25-50'
       ? 'thin'
       : 'noisy';
-  return `${src} ${kind} ${artifactBand(o.artifactPct)} ${coverageBand(o.coverageSec, o.durationSec)}`;
+  // Unknown is never reported as clean, the same rule `isPoorImport` follows in
+  // the other direction. Note this is NOT the same question as `hasFields`: a
+  // reading can keep beats and still compute no metrics, and there the artifact
+  // rate is real and worth having.
+  const art = o.beats > 0 ? artifactBand(o.artifactPct) : 'art?';
+  return `${src} ${kind} ${art} ${cov}`;
 }

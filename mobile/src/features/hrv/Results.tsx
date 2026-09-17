@@ -262,6 +262,7 @@ export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, 
       coverageSec: result.coverageSec,
       durationSec,
       hasFields: Object.keys(result.fields).length > 0,
+      beats: result.rrClean.length,
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -304,6 +305,7 @@ export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, 
       coverageSec: result.coverageSec,
       durationSec,
       hasFields: true,
+      beats: result.rrClean.length,
     }));
   };
 
