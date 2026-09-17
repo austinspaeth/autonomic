@@ -1598,6 +1598,36 @@ old web app so old `export.json` files import directly.
   watchdog (no `onInitialized` in 5s, no frames in 4s), since the failures that
   strand a user are the silent ones. A rung that binds at 30 fps coarsens RR
   timing but still produces a reading.
+- **A frame the camera will not hand over is caught, counted, and then stopped
+  asking for.** `frame.toArrayBuffer()` copies the frame GPU→CPU by locking its
+  HardwareBuffer, and on some Android devices that lock simply fails.
+  VisionCamera catches whatever a worklet throws and rethrows it on the JS
+  thread as "Frame Processor Error: Failed to lock HardwareBuffer for
+  reading!", where nothing catches it — an uncaught fatal, which on Android is
+  a process kill, and it was the app's most common crash (it arrived TWICE per
+  crash, as `uncaught.fatal` from the JS hook and again as the Java handler's
+  `native.crash`). The worklet in `ppg/CameraView.tsx` now wraps its WHOLE body
+  rather than just the read, because every `frame.*` access is a JSI host call
+  that throws the same way once the buffer is gone. Three things hang off that
+  catch. (1) **It must stop asking.** Upstream acquires the HardwareBuffer
+  before it locks and only releases it after the copy, so a failed lock leaks
+  the acquired reference (mrousavy/react-native-vision-camera#3128) — which
+  never mattered while the first one killed the process and is a leak per frame
+  now that it does not. So the tally is a worklets-core `useSharedValue`
+  incremented INSIDE the worklet, the only place that can gate the next frame
+  without a round trip to JS, and `FRAME_FAULT_LIMIT` is both the per-rung
+  allowance and the leak bound. (2) **Spending a rung's allowance is a failed
+  attempt**, calling the same `fallback` the frame watchdog calls, so a format
+  this device WILL release is still found; the counter resets per rung. (3) **It
+  is reported, not swallowed** — `ppgBridge.noteFrameFault` →
+  `ppgTrace.countFrameFault` + `logError('ppg.frame')`, once per distinct cause
+  per session. That last part is the load-bearing one: an unreadable frame is
+  never counted as a frame, so "no frames at all" and "no READABLE frames"
+  stall on the SAME milestone while wanting opposite answers — the worklet
+  versus the camera driver — and `trace.frameFaults` is the only thing that
+  tells them apart, in `cameraVerdict`, in the collected notes, and in the
+  setup card's own `frames` fault card ("close the other app using the camera"
+  is useless advice when there is nothing to close).
 - **The app's whole state is diagnosable too.** An 8-second hold on the brand
   card at the top of Settings collects the general support dump
   (`src/lib/diagnostics/collectApp.ts` → `formatAppDiagnostics`), rendered into

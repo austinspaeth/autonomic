@@ -102,6 +102,27 @@ export const PPG_ATTEMPTS: { label: string; width: number | null; height: number
 export const ATTEMPT_INIT_TIMEOUT_MS = 5000;
 export const ATTEMPT_FRAME_TIMEOUT_MS = 4000;
 
+/**
+ * How many frames a rung may fail to READ before it counts as a failed attempt
+ * and the ladder drops to the next one.
+ *
+ * `frame.toArrayBuffer()` copies the frame GPU→CPU by locking its
+ * HardwareBuffer, and on some Android devices that lock simply fails
+ * ("Failed to lock HardwareBuffer for reading!"). It is not a per-frame
+ * hiccup to ride out: the buffer either comes back CPU-readable for this
+ * capture configuration or it never does, so the allowance is small — enough
+ * to shrug off a one-off across a session rebind, not enough to sit there.
+ *
+ * It is also a LEAK bound, which is why the gate lives in the worklet rather
+ * than in the JS that hears about it. VisionCamera acquires the HardwareBuffer
+ * before it locks and only releases it after the copy, so a failed lock leaks
+ * the acquired reference (mrousavy/react-native-vision-camera#3128). That
+ * never mattered while the throw killed the process on the first frame; now
+ * that the worklet catches it, the frame processor has to STOP ASKING, and
+ * this is how many buffers per rung that costs.
+ */
+export const FRAME_FAULT_LIMIT = 3;
+
 /* ---------- trace ---------- */
 
 export interface PpgTraceEvent {
@@ -124,6 +145,10 @@ export interface PpgAttempt {
   appliedFps: number | null;
   initialized: boolean;
   frames: number;
+  /** Frames this rung delivered that could not be read at all — see
+   *  {@link FRAME_FAULT_LIMIT}. A rung can have both: the count is what
+   *  distinguishes "the worklet never ran" from "it ran and was refused". */
+  frameFaults: number;
   error: string | null;
 }
 
@@ -146,6 +171,13 @@ export interface PpgTraceState {
   attempt: number;
   torch: string | null;
   frames: number;
+  /** Frames that reached the worklet and could not be read at all, across every
+   *  rung. Kept apart from `frames` because a frame that cannot be read is
+   *  never counted as one, so the two faults stall on the same milestone and
+   *  only this number tells them apart. */
+  frameFaults: number;
+  /** What the last unreadable frame said. */
+  lastFrameFault: string | null;
   firstFrameMs: number | null;
   lastFrameMs: number | null;
   /** Inferred frame-timestamp unit; null means the scale was never resolved. */
@@ -176,6 +208,8 @@ function emptyState(): PpgTraceState {
     attempt: 0,
     torch: null,
     frames: 0,
+    frameFaults: 0,
+    lastFrameFault: null,
     firstFrameMs: null,
     lastFrameMs: null,
     tScale: null,
@@ -272,6 +306,20 @@ export const ppgTrace = {
     // No notify() per frame — subscribers only care about the state changes
     // above, and this runs at up to 60 Hz.
   },
+  /**
+   * A frame arrived and could not be read at all. Bounded by
+   * {@link FRAME_FAULT_LIMIT} at the call site, so unlike `countFrame` this is
+   * not a hot path — but the message is fixed for a given cause, so only the
+   * first of a run is written to the event log and the rest are the counter's.
+   */
+  countFrameFault(why: string) {
+    state.frameFaults++;
+    const last = state.attempts[state.attempts.length - 1];
+    if (last) last.frameFaults++;
+    if (state.lastFrameFault === why) return;
+    state.lastFrameFault = why;
+    this.note('frame-unreadable', why);
+  },
   /** Cheap read for the frame watchdog — no snapshot allocation. */
   frameCount() { return state.frames; },
   snapshot(): PpgTraceState {
@@ -328,13 +376,25 @@ export function firstUnreached(reached: Partial<Record<PpgMilestone, number>>): 
   return PPG_MILESTONES.find((m) => reached[m] == null) ?? null;
 }
 
+/**
+ * What to say when frames DID reach the worklet and not one of them could be
+ * read. It stalls on exactly the milestone "no frames at all" stalls on —
+ * nothing is counted until a frame is successfully read — and it is a
+ * completely different fault with a completely different answer, so the
+ * verdict has to tell the two apart or it sends the reader after the worklet.
+ */
+export const UNREADABLE_FRAMES_NOTE = 'The camera is streaming, but this phone would not hand a single frame over to be read: every one was refused at the moment of copying it out of the GPU ("Failed to lock HardwareBuffer for reading"). That is a driver limit on the capture format rather than a placement, permission or worklet problem — see ATTEMPTS for the formats that were tried. A Bluetooth chest strap is unaffected.';
+
 /** One-line plain-language verdict — usually the whole answer. */
 export function cameraVerdict(d: CameraDiagnostics): string {
   const stalled = firstUnreached(d.trace.reached);
   if (!stalled) return 'The full camera path completed: session live, torch on, frames arriving, pulse locked.';
   if (stalled === 'card-opened') return STALLED_NOTE['card-opened'];
   const last = PPG_MILESTONES[PPG_MILESTONES.indexOf(stalled) - 1];
-  return `Stopped after "${MILESTONE_LABEL[last]}" — never reached "${MILESTONE_LABEL[stalled]}". ${STALLED_NOTE[stalled]}`;
+  const note = stalled === 'frames-arriving' && d.trace.frameFaults > 0
+    ? UNREADABLE_FRAMES_NOTE
+    : STALLED_NOTE[stalled];
+  return `Stopped after "${MILESTONE_LABEL[last]}" — never reached "${MILESTONE_LABEL[stalled]}". ${note}`;
 }
 
 function attemptLines(a: PpgAttempt): string[] {
@@ -342,7 +402,7 @@ function attemptLines(a: PpgAttempt): string[] {
     `  #${a.n} ${a.label}`,
     `      requested     ${a.requested.resolution ?? 'device default'} @ ${a.requested.fps == null ? 'device default fps' : `${a.requested.fps} fps`}`,
     `      resolved      ${a.resolved ?? '—'}${a.appliedFps == null ? '' : `  (applied ${a.appliedFps} fps)`}`,
-    `      initialized   ${yn(a.initialized)}   frames ${a.frames}`,
+    `      initialized   ${yn(a.initialized)}   frames ${a.frames}${a.frameFaults ? `   unreadable ${a.frameFaults}` : ''}`,
     `      error         ${a.error ?? 'none'}`,
   ];
 }
@@ -419,6 +479,8 @@ export function formatCameraDiagnostics(d: CameraDiagnostics): string {
   out.push(line('device has torch', yn(t.hasTorch)));
   out.push(line('fps applied', t.fps));
   out.push(line('frames', t.frames));
+  out.push(line('unreadable frames', t.frameFaults));
+  out.push(line('last unreadable frame', t.lastFrameFault));
   out.push(line('first frame', t.firstFrameMs == null ? null : `${t.firstFrameMs} ms`));
   out.push(line('last frame', t.lastFrameMs == null ? null : `${t.lastFrameMs} ms`));
   out.push(line('timestamp scale', t.tScale));

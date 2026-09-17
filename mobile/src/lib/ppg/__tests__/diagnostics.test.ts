@@ -76,6 +76,22 @@ describe('cameraVerdict', () => {
     const v = cameraVerdict(report({ trace: { ...ppgTrace.snapshot(), reached: reachedUpTo('finger-detected') } }));
     expect(v).toContain('placement/pressure problem, not a fault');
   });
+
+  // Frames that arrive and cannot be read stall on exactly the milestone that
+  // frames which never arrive stall on, because an unreadable frame is never
+  // counted as a frame. Only the fault counter separates them, and the two
+  // answers point in opposite directions — the worklet vs the camera driver.
+  it('blames the driver, not the worklet, when frames arrived and could not be read', () => {
+    const trace = { ...ppgTrace.snapshot(), reached: reachedUpTo('torch-on'), frameFaults: 3 };
+    const v = cameraVerdict(report({ trace }));
+    expect(v).toContain('Failed to lock HardwareBuffer');
+    expect(v).not.toContain('worklets-core not installed');
+  });
+
+  it('still blames the worklet when no frame arrived at all', () => {
+    const trace = { ...ppgTrace.snapshot(), reached: reachedUpTo('torch-on'), frameFaults: 0 };
+    expect(cameraVerdict(report({ trace }))).toContain('worklets-core not installed');
+  });
 });
 
 describe('formatCameraDiagnostics', () => {
@@ -96,13 +112,20 @@ describe('formatCameraDiagnostics', () => {
   it('lists every attempted configuration with its error', () => {
     const trace = ppgTrace.snapshot();
     trace.attempts = [
-      { n: 0, label: '320×240, up to 60 fps', requested: { resolution: '320×240', fps: 60 }, resolved: '640×480 @ 30–30 fps', appliedFps: 30, initialized: false, frames: 0, error: 'format/invalid-fps: 60 is higher than the format maximum' },
-      { n: 1, label: '320×240, device default fps', requested: { resolution: '320×240', fps: null }, resolved: '640×480 @ 30–30 fps', appliedFps: null, initialized: true, frames: 118, error: null },
+      { n: 0, label: '320×240, up to 60 fps', requested: { resolution: '320×240', fps: 60 }, resolved: '640×480 @ 30–30 fps', appliedFps: 30, initialized: false, frames: 0, frameFaults: 0, error: 'format/invalid-fps: 60 is higher than the format maximum' },
+      { n: 1, label: '320×240, device default fps', requested: { resolution: '320×240', fps: null }, resolved: '640×480 @ 30–30 fps', appliedFps: null, initialized: true, frames: 118, frameFaults: 0, error: null },
     ];
     const text = formatCameraDiagnostics(report({ trace }));
     expect(text).toContain('ATTEMPTS (2)');
     expect(text).toContain('format/invalid-fps');
     expect(text).toContain('frames 118');
+  });
+
+  it('prints the unreadable-frame counter beside the frame counter', () => {
+    const trace = { ...ppgTrace.snapshot(), frames: 0, frameFaults: 3, lastFrameFault: 'Failed to lock HardwareBuffer for reading!' };
+    const text = formatCameraDiagnostics(report({ trace }));
+    expect(text).toMatch(/unreadable frames\s+3/);
+    expect(text).toContain('Failed to lock HardwareBuffer for reading!');
   });
 
   it('says so plainly when no session was ever attempted', () => {
@@ -149,7 +172,7 @@ describe('ppgTrace', () => {
   });
 
   it('marks frames-arriving on the first frame only, and counts the rest', () => {
-    ppgTrace.beginAttempt({ n: 0, label: 'x', requested: { resolution: null, fps: null }, resolved: null, appliedFps: null, initialized: false, frames: 0, error: null });
+    ppgTrace.beginAttempt({ n: 0, label: 'x', requested: { resolution: null, fps: null }, resolved: null, appliedFps: null, initialized: false, frames: 0, frameFaults: 0, error: null });
     const before = ppgTrace.snapshot().events.length;
     for (let i = 0; i < 50; i++) ppgTrace.countFrame();
     const s = ppgTrace.snapshot();
@@ -158,6 +181,31 @@ describe('ppgTrace', () => {
     expect(s.reached['frames-arriving']).toBeDefined();
     // One milestone event, not fifty — a per-frame event log is unreadable.
     expect(s.events.length).toBe(before + 1);
+  });
+
+  // The cause is fixed for a given capture configuration, so the log gets one
+  // line and the counter gets the rest — but the count must be whole, because
+  // it is what the ladder and the report both read.
+  it('counts every unreadable frame and writes one event per distinct cause', () => {
+    ppgTrace.beginAttempt({ n: 0, label: 'x', requested: { resolution: null, fps: null }, resolved: null, appliedFps: null, initialized: true, frames: 0, frameFaults: 0, error: null });
+    const before = ppgTrace.snapshot().events.length;
+    for (let i = 0; i < 3; i++) ppgTrace.countFrameFault('Failed to lock HardwareBuffer for reading!');
+    const s = ppgTrace.snapshot();
+    expect(s.frameFaults).toBe(3);
+    expect(s.attempts[0].frameFaults).toBe(3);
+    expect(s.lastFrameFault).toBe('Failed to lock HardwareBuffer for reading!');
+    expect(s.events.length).toBe(before + 1);
+    ppgTrace.countFrameFault('Frame is already closed!');
+    expect(ppgTrace.snapshot().events.length).toBe(before + 2);
+  });
+
+  // An unreadable frame is not a frame: counting it as one would retire the
+  // frames-arriving milestone and send every later diagnosis to the wrong place.
+  it('never lets an unreadable frame reach the frames-arriving milestone', () => {
+    ppgTrace.countFrameFault('Failed to lock HardwareBuffer for reading!');
+    const s = ppgTrace.snapshot();
+    expect(s.frames).toBe(0);
+    expect(s.reached['frames-arriving']).toBeUndefined();
   });
 
   it('caps the event log without losing the opening events', () => {

@@ -33,7 +33,11 @@ function moduleReport(vc: VisionCamera | null): Record<string, string> {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const w = require('react-native-worklets-core');
-    out['react-native-worklets-core'] = w?.useRunOnJS ? 'loaded' : 'loaded but useRunOnJS missing';
+    // Both hooks, because the camera view needs both: `useRunOnJS` to get a
+    // frame's channel means back to JS, `useSharedValue` to hold the
+    // unreadable-frame count the worklet gates itself on.
+    const missing = ['useRunOnJS', 'useSharedValue'].filter((k) => !w?.[k]);
+    out['react-native-worklets-core'] = missing.length ? `loaded but ${missing.join(' + ')} missing` : 'loaded';
   } catch (e) {
     out['react-native-worklets-core'] = `MISSING (${describeError(e)})`;
   }
@@ -173,7 +177,15 @@ export async function collectCameraDiagnostics(
     notes.push('Frames are arriving but the lens never read as covered — this is placement, not a fault.');
   }
   if (trace.reached['session-initialized'] != null && trace.frames === 0) {
-    notes.push('The session initialized but produced no frames at all. In a release build that points at the frame-processor worklet (react-native-worklets-core) rather than the camera.');
+    // "No frames" and "no READABLE frames" reach here identically — a frame
+    // that cannot be read is never counted — and they want opposite answers,
+    // so the counter is what decides which note is written.
+    notes.push(trace.frameFaults > 0
+      ? `The session initialized and delivered frames, but ${trace.frameFaults} of them could not be locked for reading at all (${trace.lastFrameFault}). That is the device refusing to release its capture buffer to the CPU, so the worklet is fine and the format is not — see ATTEMPTS for what was tried.`
+      : 'The session initialized but produced no frames at all. In a release build that points at the frame-processor worklet (react-native-worklets-core) rather than the camera.');
+  }
+  if (trace.frames > 0 && trace.frameFaults > 0) {
+    notes.push(`${trace.frameFaults} frame(s) could not be locked for reading, but the reading ran on the rest — the fallback found a format this device would release.`);
   }
   if (!trace.startedAt) {
     notes.push('The trace is empty: this dump was collected without the camera setup card having run, so it shows device capability only.');

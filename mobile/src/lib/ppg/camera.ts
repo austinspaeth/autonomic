@@ -17,6 +17,7 @@
 import { assessPulse, detectBeats, fingerPresent, type PulseQuality } from './detect';
 import { ppgTrace } from './diagnostics';
 import { createPermissionGate } from './permission';
+import { logError } from '../diagnostics/errorLog';
 import { mean } from '../hrv';
 
 export interface PpgSignal { locked: boolean; quality: PulseQuality }
@@ -76,6 +77,9 @@ let pendingGap = false;
 // the scale is inferred from the first inter-frame delta.
 let tScale: number | null = null;
 let prevRawT: number | null = null;
+// Last unreadable-frame message already written to the error log this session,
+// so a rung's whole allowance of refused frames is one line rather than three.
+let lastFrameFault = '';
 
 function resetSignalState() {
   tBuf = [];
@@ -89,6 +93,7 @@ function resetSignalState() {
   pendingGap = false;
   tScale = null;
   prevRawT = null;
+  lastFrameFault = '';
 }
 
 function emitSignal(s: PpgSignal) {
@@ -202,6 +207,23 @@ export const ppgBridge = {
     while (trim < tBuf.length && tBuf[trim] < t - BUFFER_MS) trim++;
     if (trim > 0) { tBuf = tBuf.slice(trim); vBuf = vBuf.slice(trim); }
     analyze(t);
+  },
+  /**
+   * A frame reached the worklet and could not be read at all — the other half
+   * of `pushFrame`, and deliberately not silent.
+   *
+   * This used to be an uncaught throw out of `frame.toArrayBuffer()` that
+   * VisionCamera rethrew on the JS thread, which on Android is a process kill;
+   * it was the app's most common crash. Catching it is the fix, but a fix that
+   * only silenced it would leave a phone that can NEVER take a camera reading
+   * looking exactly like one that simply never tried — the app degrades
+   * invisibly here, which is the case `logError` exists for.
+   */
+  noteFrameFault(why: string) {
+    ppgTrace.countFrameFault(why);
+    if (why === lastFrameFault) return;
+    lastFrameFault = why;
+    logError('ppg.frame', new Error(why));
   },
 };
 

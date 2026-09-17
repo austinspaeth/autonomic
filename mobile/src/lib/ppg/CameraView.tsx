@@ -9,7 +9,9 @@
  * `<Camera>` or vision-camera calls into the native view by tag at the moment
  * it may already be gone (see the prop for the crash that caused). The frame
  * processor is deliberately trivial — a strided mean of B/G/R over a center
- * crop — with all detection done in JS (`camera.ts` → `detect.ts`).
+ * crop — with all detection done in JS (`camera.ts` → `detect.ts`), and it
+ * NEVER THROWS: a frame VisionCamera cannot hand over used to take the whole
+ * process down (see the catch at the bottom of the worklet).
  *
  * Renders null when react-native-vision-camera / worklets aren't in the build
  * (Expo Go / simulator / web), mirroring the manager's graceful stub.
@@ -24,7 +26,7 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { Platform } from 'react-native';
 import { ppgBridge } from './camera';
 import {
-  ATTEMPT_FRAME_TIMEOUT_MS, ATTEMPT_INIT_TIMEOUT_MS, PPG_ATTEMPTS, ppgTrace,
+  ATTEMPT_FRAME_TIMEOUT_MS, ATTEMPT_INIT_TIMEOUT_MS, FRAME_FAULT_LIMIT, PPG_ATTEMPTS, ppgTrace,
 } from './diagnostics';
 import { describeError } from '../diagnostics/env';
 
@@ -67,7 +69,7 @@ export function PpgCameraView({ preview }: { preview?: number }) {
 
 function PpgCameraInner({ preview }: { preview?: number }) {
   const { Camera, useCameraDevice, useCameraFormat, useFrameProcessor } = vc!;
-  const { useRunOnJS } = worklets!;
+  const { useRunOnJS, useSharedValue } = worklets!;
   const [running, setRunning] = useState(ppgBridge.isRunning());
   useEffect(() => ppgBridge.subscribe(setRunning), []);
 
@@ -95,6 +97,14 @@ function PpgCameraInner({ preview }: { preview?: number }) {
   // rather than leaving the user staring at a black circle forever.
   const [attempt, setAttempt] = useState(0);
   const spec = PPG_ATTEMPTS[attempt];
+
+  // Unreadable frames on the current rung — per-rung state, so it lives here.
+  // It is counted inside the worklet rather than on this thread so the frame
+  // processor can stop asking without waiting on a round trip: every failed
+  // read leaks the frame's HardwareBuffer upstream, so the gate has to sit on
+  // the camera thread. `useSharedValue` is a `useRef` over a thread-safe box,
+  // so its identity is as fixed as every other worklet dependency here.
+  const frameFaults = useSharedValue(0);
 
   const device = useCameraDevice('back');
   useEffect(() => {
@@ -135,6 +145,9 @@ function PpgCameraInner({ preview }: { preview?: number }) {
     if (!running || !device || registered.current === attempt) return;
     registered.current = attempt;
     setInitialized(false);
+    // A fresh rung gets a fresh allowance: the next format may hand back a
+    // buffer this device will actually let us lock.
+    frameFaults.value = 0;
     ppgTrace.set({ fps: fps ?? null });
     ppgTrace.beginAttempt({
       n: attempt,
@@ -144,6 +157,7 @@ function PpgCameraInner({ preview }: { preview?: number }) {
       appliedFps: fps ?? null,
       initialized: false,
       frames: 0,
+      frameFaults: 0,
       error: null,
     });
     if (picked) ppgTrace.mark('format-chosen', `${picked.videoWidth}×${picked.videoHeight}`);
@@ -201,10 +215,21 @@ function PpgCameraInner({ preview }: { preview?: number }) {
   }, [running, initialized]);
 
   // Stable for the life of this component: `useRunOnJS([])` and
-  // `useFrameProcessor` are both `useMemo`, and the deps below never change.
-  // That identity is load-bearing — see the frameProcessor prop at the bottom.
+  // `useFrameProcessor` are both `useMemo`, `useSharedValue` is a `useRef`, and
+  // the deps below never change. That identity is load-bearing — see the
+  // frameProcessor prop at the bottom.
   const push = useRunOnJS((t: number, r: number, g: number, b: number) => {
     ppgBridge.pushFrame(t, r, g, b);
+  }, []);
+
+  // The JS half of an unreadable frame: record it, and once the rung has spent
+  // its allowance, treat it exactly as the frame watchdog treats a rung that
+  // delivered nothing — because that is what it did. A different format may
+  // allocate a buffer this device will actually let us lock; if none does, the
+  // ladder runs out and the setup card says so.
+  const noteFrameFault = useRunOnJS((why: string, n: number) => {
+    ppgBridge.noteFrameFault(why);
+    if (n >= FRAME_FAULT_LIMIT) fallback(`frames arrived but could not be read (${why})`);
   }, []);
 
   // pixelFormat "rgb" delivers BGRA bytes on iOS but RGBA on Android, so the
@@ -214,42 +239,65 @@ function PpgCameraInner({ preview }: { preview?: number }) {
 
   const frameProcessor = useFrameProcessor((frame) => {
     'worklet';
-    // Strided mean over the center half of the frame — keep the worklet
-    // trivial, detection happens in JS.
-    const data = new Uint8Array(frame.toArrayBuffer());
-    const w = frame.width, h = frame.height;
-    // frame.bytesPerRow is not reliable on every Android device (undefined /
-    // nonsense values poison the indexes into NaN) — trust the buffer itself
-    // and fall back to the declared value only when it's plausible.
-    const declared = frame.bytesPerRow;
-    const fromBuf = Math.floor(data.length / h);
-    const bpr = declared && declared >= w * 4 && declared <= fromBuf ? declared : fromBuf;
-    // Average a fixed ~1200 pixels no matter what resolution the device
-    // actually handed back. The per-frame mean's noise floor is set by how many
-    // pixels go into it, not by the frame size, and useCameraFormat only
-    // promises the *closest* available format to the one requested — so a fixed
-    // stride would silently give a device that only offers 1280x720 a very
-    // different signal from one that offers 320x240. Deriving it keeps every
-    // device on the same noise floor. At 640x480 this evaluates to exactly 8,
-    // the stride this loop used when the requested format was fixed, so the
-    // signal on any device that reports that format is unchanged.
-    const TARGET_SAMPLES = 1200;
-    const stride = Math.max(1, Math.round(Math.sqrt((w * h) / (4 * TARGET_SAMPLES))));
-    let r = 0, g = 0, b = 0, count = 0;
-    const x0 = w >> 2, x1 = (3 * w) >> 2;
-    const y0 = h >> 2, y1 = (3 * h) >> 2;
-    for (let y = y0; y < y1; y += stride) {
-      const row = y * bpr;
-      for (let x = x0; x < x1; x += stride) {
-        const i = row + x * 4;
-        b += data[i + bOff];
-        g += data[i + 1];
-        r += data[i + rOff];
-        count++;
+    // This rung has already proved it cannot be read — see FRAME_FAULT_LIMIT.
+    // Returning here is not an optimisation: asking again leaks another
+    // HardwareBuffer, and CameraX keeps delivering frames until the rung is
+    // torn down.
+    if (frameFaults.value >= FRAME_FAULT_LIMIT) return;
+    try {
+      // Strided mean over the center half of the frame — keep the worklet
+      // trivial, detection happens in JS.
+      const data = new Uint8Array(frame.toArrayBuffer());
+      const w = frame.width, h = frame.height;
+      // frame.bytesPerRow is not reliable on every Android device (undefined /
+      // nonsense values poison the indexes into NaN) — trust the buffer itself
+      // and fall back to the declared value only when it's plausible.
+      const declared = frame.bytesPerRow;
+      const fromBuf = Math.floor(data.length / h);
+      const bpr = declared && declared >= w * 4 && declared <= fromBuf ? declared : fromBuf;
+      // Average a fixed ~1200 pixels no matter what resolution the device
+      // actually handed back. The per-frame mean's noise floor is set by how many
+      // pixels go into it, not by the frame size, and useCameraFormat only
+      // promises the *closest* available format to the one requested — so a fixed
+      // stride would silently give a device that only offers 1280x720 a very
+      // different signal from one that offers 320x240. Deriving it keeps every
+      // device on the same noise floor. At 640x480 this evaluates to exactly 8,
+      // the stride this loop used when the requested format was fixed, so the
+      // signal on any device that reports that format is unchanged.
+      const TARGET_SAMPLES = 1200;
+      const stride = Math.max(1, Math.round(Math.sqrt((w * h) / (4 * TARGET_SAMPLES))));
+      let r = 0, g = 0, b = 0, count = 0;
+      const x0 = w >> 2, x1 = (3 * w) >> 2;
+      const y0 = h >> 2, y1 = (3 * h) >> 2;
+      for (let y = y0; y < y1; y += stride) {
+        const row = y * bpr;
+        for (let x = x0; x < x1; x += stride) {
+          const i = row + x * 4;
+          b += data[i + bOff];
+          g += data[i + 1];
+          r += data[i + rOff];
+          count++;
+        }
       }
+      if (count > 0) push(frame.timestamp, r / count, g / count, b / count);
+    } catch (e) {
+      // `frame.toArrayBuffer()` throws `Failed to lock HardwareBuffer for
+      // reading!` on some Android devices. VisionCamera catches whatever a
+      // worklet throws and rethrows it on the JS thread as
+      // "Frame Processor Error: …", where nothing catches it — so an
+      // unreadable frame was an uncaught fatal, which on Android is a process
+      // kill, and it was the app's most common crash. Catching it here is the
+      // whole fix. Everything around it exists so that swallowing the throw
+      // does not also swallow the fact.
+      //
+      // The whole body is inside the try, not just the read: every `frame.*`
+      // access is a JSI host call that throws the same way once the frame's
+      // buffer is gone.
+      const n = frameFaults.value + 1;
+      frameFaults.value = n;
+      noteFrameFault(String((e as { message?: string } | undefined)?.message ?? e), n);
     }
-    if (count > 0) push(frame.timestamp, r / count, g / count, b / count);
-  }, [push, rOff, bOff]);
+  }, [push, noteFrameFault, frameFaults, rOff, bOff]);
 
   if (!device || !hasPermission) {
     ppgTrace.set({
@@ -275,7 +323,9 @@ function PpgCameraInner({ preview }: { preview?: number }) {
       format={format}
       fps={fps}
       pixelFormat="rgb"
-      // ALWAYS attached, never toggled with `running`. vision-camera's
+      // ALWAYS attached, never toggled with `running`, and its identity never
+      // changes — every one of its dependencies is a `useMemo` or a `useRef`
+      // box, including the unreadable-frame counter. vision-camera's
       // componentDidUpdate reacts to a change of this prop's identity by calling
       // VisionCameraProxy.setFrameProcessor / removeFrameProcessor, which post a
       // runnable to the Android UI thread that resolves the native view by tag

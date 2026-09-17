@@ -75,7 +75,7 @@ const DIAGNOSTICS_HOLD_MS = 8000;
 
 /** Why the camera can't run. Each one used to render as the same eternal
  *  "Waiting for a steady pulse…" over a black circle. */
-type CameraFault = 'permission' | 'camera' | 'unavailable';
+type CameraFault = 'permission' | 'camera' | 'unavailable' | 'frames';
 
 /** Strap explainer on the website. Deliberately not an in-app product list:
  *  no stock, no prices and no hardware endorsement to maintain here. */
@@ -275,7 +275,12 @@ export function CameraSetup({ config, controls: _controls }: { config: SessionCo
     if (step !== 'wait') return;
     return ppgTrace.subscribe((t) => {
       if (t.lastError && t.attempts.length >= PPG_ATTEMPTS.length && t.attempts.every((a) => a.error)) {
-        setFault('camera');
+        // Two different faults stall in the same place, and the answer to one
+        // is useless for the other: a session that never bound is "close the
+        // other app using the camera", while frames that arrived and could not
+        // be read is the phone's own driver refusing to release them, where
+        // there is nothing to close and nothing to retry.
+        setFault(t.frameFaults > 0 ? 'frames' : 'camera');
       } else if (t.reached['frames-arriving'] != null) {
         // Frames are flowing — whatever went wrong on an earlier rung is now
         // history, and the fallback did its job.
@@ -595,6 +600,10 @@ function FaultCard({ fault }: { fault: CameraFault }) {
     camera: {
       title: 'The camera would not start',
       body: 'Every camera mode this phone offers was refused. Close any other app using the camera, check that camera access is not blocked in your Quick Settings, then try again. Hold "Start over" for 8 seconds to collect a report for support.',
+    },
+    frames: {
+      title: 'The camera ran but could not be read',
+      body: 'The camera started and the flash came on, but this phone refused to release a single frame for reading — a limit of its camera driver, not of how you were holding it, and every capture mode it offers was tried. A Bluetooth chest strap is unaffected. Hold "Start over" for 8 seconds to collect a report for support.',
     },
     unavailable: {
       title: 'No camera in this build',
