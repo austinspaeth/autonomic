@@ -275,7 +275,17 @@ old web app so old `export.json` files import directly.
   calls `reportFault` directly with `hrv.refused` (and `hrv.salvaged` when the
   user keeps one), over `lib/hrv/refusal.ts` — pure + tested, and BANDED, because
   the message IS the fault signature and a raw artifact rate would file every
-  refusal as its own bug. That buys occurrences beside install-days, split by
+  refusal as its own bug. **The artifact band takes a BEAT COUNT and reports
+  `art?` when it is zero**: `computeHrv` divides the flagged beats by the KEPT
+  beats (`clean.length ? … : 0`), so a reading that kept none arrives claiming
+  0% and banded as `art<5` — the cleanest band there is, on a reading with no
+  signal in it at all. It is the `isPoorImport` rule in the other direction, and
+  the cost of getting it wrong is not cosmetic: the signature exists to separate
+  "the finger was there and noisy" from "the pulse was barely arriving", a
+  fabricated clean band puts every no-data refusal in the wrong one, and read
+  across a whole report it looks like proof that nothing is ever refused for
+  noise. Note it is NOT the same question as `hasFields` — a reading can keep
+  beats and still compute no metrics, and there the rate is real. That buys occurrences beside install-days, split by
   platform / build / tier and ranked by breadth in the dashboard's Failures tab,
   with no new route, no lambda change and no deploy ordering. Before this,
   `finishSession` fired `pingCaptureCompleted` and `pingActivation` BEFORE

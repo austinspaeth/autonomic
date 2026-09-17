@@ -22,31 +22,47 @@ describe('describing a refused reading', () => {
   });
 
   it('groups every refusal of the same shape into one signature', () => {
-    const a = refusalSignature({ source: 'camera', artifactPct: 21.4, coverageSec: 176, durationSec: 180, hasFields: true });
-    const b = refusalSignature({ source: 'camera', artifactPct: 28.9, coverageSec: 171, durationSec: 180, hasFields: true });
+    const a = refusalSignature({ source: 'camera', artifactPct: 21.4, coverageSec: 176, durationSec: 180, hasFields: true, beats: 200 });
+    const b = refusalSignature({ source: 'camera', artifactPct: 28.9, coverageSec: 171, durationSec: 180, hasFields: true, beats: 200 });
     expect(a).toBe(b);
     expect(a).toBe('camera noisy art15-30 cov75+');
   });
 
   it('tells a noisy reading apart from one that barely got a pulse', () => {
-    expect(refusalSignature({ source: 'camera', artifactPct: 8, coverageSec: 30, durationSec: 180, hasFields: true }))
+    expect(refusalSignature({ source: 'camera', artifactPct: 8, coverageSec: 30, durationSec: 180, hasFields: true, beats: 200 }))
       .toBe('camera thin art5-15 cov<25');
-    expect(refusalSignature({ source: 'polar', artifactPct: 40, coverageSec: 300, durationSec: 300, hasFields: true }))
+    expect(refusalSignature({ source: 'polar', artifactPct: 40, coverageSec: 300, durationSec: 300, hasFields: true, beats: 320 }))
       .toBe('polar noisy art30-45 cov75+');
   });
 
   it('says so when nothing computed at all', () => {
-    expect(refusalSignature({ source: 'camera', artifactPct: 0, coverageSec: 4, durationSec: 180, hasFields: false }))
+    expect(refusalSignature({ source: 'camera', artifactPct: 0, coverageSec: 4, durationSec: 180, hasFields: false, beats: 0 }))
       .toMatch(/^camera nodata /);
   });
 
+  // `computeHrv` divides the flagged beats by the KEPT beats, so a reading that
+  // kept none arrives claiming 0% — the cleanest band there is, on a reading
+  // with no signal in it at all. Across a report that reads as proof that
+  // nothing is ever refused for noise.
+  it('never reports an artifact rate computed over no beats as a clean one', () => {
+    expect(refusalSignature({ source: 'camera', artifactPct: 0, coverageSec: 4, durationSec: 180, hasFields: false, beats: 0 }))
+      .toBe('camera nodata art? cov<25');
+  });
+
+  // Not the same question as `hasFields`: a reading can keep beats and still
+  // compute no metrics, and there the rate is real and worth having.
+  it('still bands the rate when beats were kept but nothing computed', () => {
+    expect(refusalSignature({ source: 'watch', artifactPct: 22, coverageSec: 80, durationSec: 180, hasFields: false, beats: 40 }))
+      .toBe('watch nodata art15-30 cov25-50');
+  });
+
   it('carries no digit run long enough for the fault redaction to eat', () => {
-    const sig = refusalSignature({ source: 'camera', artifactPct: 21, coverageSec: 176, durationSec: 180, hasFields: true });
+    const sig = refusalSignature({ source: 'camera', artifactPct: 21, coverageSec: 176, durationSec: 180, hasFields: true, beats: 200 });
     expect(sig).not.toMatch(/\d{4,}/);
   });
 
   it('never reports an absent source as a real one', () => {
-    expect(refusalSignature({ artifactPct: 20, coverageSec: 100, durationSec: 180, hasFields: true }))
+    expect(refusalSignature({ artifactPct: 20, coverageSec: 100, durationSec: 180, hasFields: true, beats: 200 }))
       .toMatch(/^unknown /);
   });
 });
