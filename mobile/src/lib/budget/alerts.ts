@@ -205,7 +205,7 @@ export function decidePacingAlert(input: PacingAlertInput): PacingAlert | null {
   const has = (k: PacingAlertKind) => (fired[k]?.length ?? 0) > 0;
 
   const env = v.envelope.effortMin;
-  const live = v.state === 'healthy' || v.state === 'ahead' || v.state === 'low';
+  const live = v.state === 'healthy' || v.state === 'ahead';
   const soft = v.envelope.confidence === 'low' || v.envelope.learning < SOFT_LEARNING;
 
   /* ---------- over ---------- */

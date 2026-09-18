@@ -41,11 +41,16 @@ import type { BudgetPulse } from './pulse';
 import type { BudgetState } from '../../lib/budget';
 
 
-/* A provisional reading used to wear a diagonal hatch over the whole bar. It
-   is gone: it never tiled cleanly to the bar's real width, and the grey fill
-   plus the softened "About 3h" figure plus the "Low confidence" label already
-   say the same thing three times without adding texture to a card whose whole
-   argument is restraint. */
+/* A provisional reading used to wear a diagonal hatch over the whole bar, and
+   then a grey fill. Both are gone. The hatch never tiled cleanly to the bar's
+   real width; the grey was worse, because a feature drawn in the placeholder
+   colour reads as BROKEN rather than as provisional — a user who hand-entered
+   a night of sleep without its low HR found the budget faded out, and there is
+   no way to tell that apart from a feature that has stopped working. Plenty of
+   people will never be able to feed it everything it would like. The softened
+   "About 3h" figure, the "Low confidence" label and the Todo already say the
+   same thing three times, in WORDS, which is where a qualification belongs:
+   the app may recommend, it may never diminish its own graphic. */
 
 /** The placeholder grey the Outlook card's ghost bars use, so the strip and the
  *  tiles below it are the same object while both are waiting. */
@@ -78,7 +83,6 @@ type Tint = {
 export function fillColorFor(state: BudgetState, p: ReturnType<typeof usePalette>): string {
   if (state === 'over' || state === 'final-over') return p.accent;
   if (state === 'ahead') return CAUTION_GOLD;
-  if (state === 'low') return p.textDim;
   return SCORE_COLORS.good;
 }
 

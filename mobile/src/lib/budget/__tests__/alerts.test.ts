@@ -10,6 +10,7 @@ const at = (hhmm: string) => new Date(`${DK}T${hhmm}:00`);
 
 const view = (over: Partial<BudgetView> = {}): BudgetView => ({
   state: 'healthy',
+  lowConfidence: false,
   envelope: { effortMin: 200, confidence: 'high', learning: 1 } as BudgetView['envelope'],
   burn: { effortMin: 100 } as BudgetView['burn'],
   pace: { expected: 0.5, byNowMin: 100, status: 'under', runsOutMin: null },

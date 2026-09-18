@@ -64,7 +64,7 @@ export interface WidgetSpark {
  * 'locked' is a free install, which gets no number at all, and 'awaiting' is an
  * empty journal or a day the widget has nothing honest to say about.
  */
-export type WidgetPacingState = 'healthy' | 'ahead' | 'over' | 'low' | 'paused' | 'locked' | 'awaiting';
+export type WidgetPacingState = 'healthy' | 'ahead' | 'over' | 'paused' | 'locked' | 'awaiting';
 
 export interface WidgetPacingTile { value: string; label: string; color: string }
 
@@ -382,23 +382,16 @@ export function pacingFrame(v: BudgetView, at: Date): WidgetPacingFrame {
     };
   }
 
-  if (state === 'low') {
-    // The one Todo is the most useful thing a low-confidence widget can say,
-    // and it is what the strip says in the same state.
-    const line = v.recommendation?.actionable ? v.recommendation.title : hard.sub;
-    return {
-      ...base, state, figure: hard.figure,
-      sub: line, subWide: line,
-      fill, fillColor: DIM, pace,
-      badge: 'LOW CONFIDENCE', badgeColor: DIM,
-      tiles,
-    };
-  }
-
+  /* Low confidence is NOT a state here either. The widget used to draw a grey
+     fill under a LOW CONFIDENCE badge, which on a home screen — with no card
+     around it to explain itself — reads as a widget that has stopped working.
+     What a thin estimate has to say is what would sharpen it, so the Todo
+     takes the SUBTEXT and the graphic is drawn like any other on-track day. */
+  const line = v.lowConfidence && v.recommendation?.actionable ? v.recommendation.title : null;
   return {
     ...base, state, figure: hard.figure,
-    sub: hard.sub,
-    subWide: hard.sub.startsWith('left of') ? `${hard.sub} today` : hard.sub,
+    sub: line ?? hard.sub,
+    subWide: line ?? (hard.sub.startsWith('left of') ? `${hard.sub} today` : hard.sub),
     fill, fillColor: SCORE_COLORS.good, pace,
     badge: 'ON TRACK', badgeColor: SCORE_COLORS.good,
     tiles,

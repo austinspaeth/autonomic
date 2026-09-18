@@ -232,6 +232,28 @@ describe('states', () => {
     expect(v.sub).toMatch(/^Pacing well for .+, with some in reserve$/);
   });
 
+  /* A thin day is the NORMAL day for a user who hand-enters sleep, has no
+     watch, or simply cannot feed the app everything it would like. The bar
+     used to draw itself in the placeholder grey there, which reads as a
+     feature that has broken rather than as one that is unsure. Confidence
+     lives in the words now, and the graphic is drawn at full strength. */
+  it('never turns confidence into a bar state', () => {
+    const thin = stateOf({
+      ...Object.fromEntries(
+        Array.from({ length: 3 }, (_, i) => [
+          addDays(dk, -(i + 1)),
+          day({ sleep: { bed: '23:00', wake: '07:00' } }),
+        ]),
+      ),
+      [dk]: day({ sleep: { bed: '23:00', wake: '07:00' }, activities: [act('walk', '20')] }),
+    });
+    const v = buildBudget(thin, dk, {}, { ...OPTS, now: AT_2PM() });
+    expect(v.lowConfidence || v.learning).toBe(true);
+    expect(['healthy', 'ahead', 'over']).toContain(v.state);
+    // ... and it still says so, in words.
+    expect(v.rightLabel).toBeTruthy();
+  });
+
   it('goes over with a caution, never a scolding', () => {
     const v = buildBudget(wellLogged([act('strenuousWork', '400')]), dk, {}, { ...OPTS, now: AT_2PM() });
     expect(v.state).toBe('over');

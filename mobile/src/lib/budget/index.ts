@@ -40,8 +40,10 @@ import { makeScoreLookup, makeSetLookup } from './outcome';
 import { nextRecommendation, type Recommendation } from './recommend';
 import { uprightSignature } from './upright';
 
+/** The states the BAR can be in. Confidence is deliberately not one of them —
+ *  see "which state" below. */
 export type BudgetState =
-  | 'healthy' | 'ahead' | 'over' | 'low' | 'suppressed'
+  | 'healthy' | 'ahead' | 'over' | 'suppressed'
   /** A finished day the app has no way to describe. Not zero, not full: it
    *  carries no bar at all, only a line saying so. */
   | 'unknown'
@@ -97,6 +99,9 @@ export interface BudgetView {
   flag: 'amber' | 'red' | null;
   /** The right-hand label: "Low confidence" or "Learning · day 3". */
   rightLabel: string | null;
+  /** The ceiling is fitted from thin evidence. It changes the WORDS — the
+   *  softened figure, the label, the Todo — and never the graphic. */
+  lowConfidence: boolean;
   recommendation: Recommendation | null;
   ceilingMoved: { min: number; dir: 'up' | 'down' } | null;
   /** True while the ceiling is still being fitted to the person. */
@@ -205,7 +210,7 @@ export function buildBudgetAt(
       leftMin: null, overByMin: null, fill: 0,
       figure: past ? 'Budget was paused' : 'Budget paused for today', figureSub: '',
       sub: past ? 'The app saw a downturn that day' : 'Take it easy, resume tomorrow',
-      flag: null, rightLabel: null,
+      flag: null, rightLabel: null, lowConfidence: false,
       recommendation: null,
       ceilingMoved: null,
       learning,
@@ -224,6 +229,7 @@ export function buildBudgetAt(
       leftMin: null, overByMin: null, fill: 0,
       figure: '', figureSub: '',
       sub: 'No pacing data for this day', flag: null, rightLabel: null,
+      lowConfidence: false,
       recommendation: null, ceilingMoved: null, learning, past, stepsMissing,
       skeleton,
     };
@@ -280,14 +286,23 @@ export function buildBudgetAt(
       spentShare: fill,
     });
 
-    /* ---------- which state ---------- */
+    /* ---------- which state ----------
+       Confidence is NOT a state. It used to be: low confidence outranked the
+       pace and the bar drew itself in the placeholder grey, which is the same
+       colour the card uses for "no data yet" — so a user who had hand-entered
+       a night of sleep without its low HR opened the Journal to a faded-out
+       budget and read it, correctly, as a broken feature. The estimate is real
+       on every one of those days, and for plenty of people it will never be
+       anything else. So the state is the day's own pace, the graphic is drawn
+       at full strength in every one of them, and how sure the app is is said in
+       WORDS — the softened "About 3h" figure, the "Low confidence" label and
+       the Todo below it. Recommend, never diminish. */
     const over = past ? spent > env : pace!.status === 'over';
     const view: BudgetState = past
       ? (over ? 'final-over' : 'final-under')
       : over ? 'over'
-        : low ? 'low'
-          : pace!.status === 'ahead' ? 'ahead'
-            : 'healthy';
+        : pace!.status === 'ahead' ? 'ahead'
+          : 'healthy';
 
     let figure: string;
     let figureSub: string;
@@ -328,7 +343,9 @@ export function buildBudgetAt(
     } else if (over) {
       sub = 'Resting now brings this back down';
       flag = 'red';
-    } else if (view === 'low' && recommendation) {
+    } else if (low && recommendation) {
+      /* The one useful thing a thin estimate can say: what would sharpen it.
+         This is the whole of what low confidence changes about the card. */
       sub = recommendation.title;
     } else if (view === 'ahead') {
       sub = pace!.runsOutMin != null
@@ -348,7 +365,7 @@ export function buildBudgetAt(
       // beside it had just called over budget.
       leftMin: left, overByMin: over ? spent - env : null,
       fill,
-      figure, figureSub, sub, flag, rightLabel,
+      figure, figureSub, sub, flag, rightLabel, lowConfidence: low,
       recommendation,
       ceilingMoved,
       learning,

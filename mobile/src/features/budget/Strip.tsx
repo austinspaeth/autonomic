@@ -12,10 +12,13 @@
  * because the bar is the thing being opened and the label row needs its full
  * width for the figure.
  *
- * Six states, all drawn from the design: healthy, ahead, over, low
- * confidence, suppressed, locked. Learning is not a seventh — it is whichever
- * of the first four applies, wearing "Learning · day 3" where the confidence
- * word would sit.
+ * Five states, all drawn from the design: healthy, ahead, over, suppressed,
+ * locked. CONFIDENCE IS NOT ONE OF THEM. Low confidence used to be a sixth,
+ * drawn in the placeholder grey, and a user who hand-entered a night of sleep
+ * with no overnight HR met a faded-out budget that reads as a broken feature.
+ * How sure the app is is said in words — the softened "About 3h" figure, the
+ * right-hand label ("Low confidence" / "Medium confidence" / "Learning · day
+ * 3") and the Todo on the subtext line — and never by weakening the graphic.
  */
 import React from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';

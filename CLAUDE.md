@@ -986,8 +986,20 @@ old web app so old `export.json` files import directly.
   `features/budget/pulse.ts`, one timeline in `features/budget/style.ts` shared
   by the bar and the subtext): the bar simply travels to its new length while
   the subtext steps aside for the phrase naming the movement ("+14m · HR above
-  95 bpm"). **LENGTH AND COLOUR ARE THE BAR'S WHOLE VOCABULARY, and a colour is
-  always a STATE.** It used to grow the moved slice in a colour of its own —
+  95 bpm"). **LENGTH AND COLOUR ARE THE BAR'S WHOLE VOCABULARY, a colour is
+  always a STATE, and CONFIDENCE IS NEVER ONE.** Low confidence used to be a
+  sixth state that outranked the pace and drew the fill in the placeholder
+  grey (`DIM` and a `LOW CONFIDENCE` badge on the widget). A user who
+  hand-entered a night of sleep with no overnight HR opened the Journal to a
+  faded-out budget and read it, correctly, as a broken feature — and for
+  plenty of people, who have no watch or cannot wear one, a thin day is every
+  day. The estimate is real on all of them, so the state is the day's own pace
+  and the graphic is drawn at full strength; how sure the app is is said in
+  WORDS, in three places that already say it (the softened "About 3h" figure,
+  the `rightLabel`, and the Todo on the subtext line, which is the one useful
+  thing a thin estimate can add — what would sharpen it). `BudgetView.lowConfidence`
+  carries it for copy. The app may RECOMMEND; it may never diminish or
+  de-emphasise its own feature. It used to grow the moved slice in a colour of its own —
   red for minutes spent, green for minutes bought back — which put a red chip
   on a plain green bar for two seconds on a day that was never over anything,
   reading as a verdict on the minutes rather than as the bar arriving
