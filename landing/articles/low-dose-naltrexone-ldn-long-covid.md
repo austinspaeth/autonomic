@@ -8,7 +8,7 @@ keywords: "low-dose naltrexone, LDN, LDN long COVID, low dose naltrexone long co
 date: 2026-09-18
 updated: 2026-09-18
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1545205597-3d9d02c29597?w=1760&h=990&fit=crop&crop=entropy&auto=format&q=80"
+photoLocation: "https://images.unsplash.com/photo-1624948465121-96e87ae34a87?w=1760&h=990&fit=crop&crop=entropy&auto=format&q=80"
 photoAttribution: "Unsplash"
 tldr: "Low-dose naltrexone (LDN) is the same molecule prescribed at 50 mg for addiction, given at roughly a tenth of that (about 0.5 to 4.5 mg) for a completely different purpose: dampening the low-grade neuroinflammation that may sit underneath long COVID, ME/CFS, and fibromyalgia. The leading theory is that it briefly blocks opioid receptors and quiets overactive glial cells in the nervous system. The evidence in long COVID is early and mostly uncontrolled, with randomized trials underway, so it is best thought of as a reasonable, well-tolerated thing to try with a clinician, not a proven cure. It works slowly over weeks to months, and because response varies so much person to person, the sensible move is to track your symptoms, resting heart rate, and HRV against your own baseline rather than expecting one number to change."
 categories:
