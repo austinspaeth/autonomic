@@ -1,6 +1,7 @@
 import { ACTIVITY_TYPES } from '../../registry';
 import {
-  HR_BAND_EDGES, HR_FULL_COVERAGE, HR_GAP_MAX, HR_GAP_MIN, HR_MIN_COVERAGE, HR_PER_MIN, STEP_EFFORT, UPRIGHT_PER_MIN,
+  HR_BAND_EDGES, HR_COUNT_MIN_COVERAGE, HR_FULL_COVERAGE, HR_GAP_HARD, HR_GAP_MAX, HR_GAP_MIN, HR_MIN_COVERAGE,
+  HR_PER_MIN, STEP_EFFORT, UPRIGHT_PER_MIN,
   buildBurn, gapToleranceFor, hrBandEffort, hrBandsLess, hrMinutesAbove, hrMinutesBelow, hrMinutesBelowByHour, minutesByHour,
   thinHrCurve, uprightHours, uprightMinutes, walkingMinutes,
 } from '../burn';
@@ -235,10 +236,27 @@ describe('buildBurn', () => {
 
   it('ignores a heart-rate row with too little coverage to mean anything', () => {
     const b = buildBurn({
-      day: day({ load: load({ hrAboveMin: 60, hrCoverageMin: HR_MIN_COVERAGE - 1, lineBpm: 100 }) }),
+      day: day({ load: load({ hrAboveMin: 60, hrCoverageMin: HR_COUNT_MIN_COVERAGE - 1, lineBpm: 100 }) }),
       types: TYPES, lineBpm: 100,
     });
     expect(b.rows.some((r) => r.source === 'hr')).toBe(false);
+  });
+
+  /* A watch put on for the hard part of the day. It used to charge NOTHING:
+     one bar answered both "did we see enough to say how well we saw it" and
+     "did we see enough to charge what we watched", and at two hours of wear
+     the second answer was wrong. What the app watched is charged; how little
+     of the day it saw is said by the coverage word, not by silence. */
+  it('charges what a partly worn day DID see, and still calls the day thin', () => {
+    const b = buildBurn({
+      day: day({ load: load({ hrAboveMin: 19, hrCoverageMin: HR_MIN_COVERAGE - 5, lineBpm: 100, steps: 2000 }) }),
+      types: TYPES, lineBpm: 100,
+    });
+    const hr = b.rows.find((r) => r.source === 'hr');
+    expect(hr).toBeTruthy();
+    expect(hr!.effortMin).toBeCloseTo(19 * HR_PER_MIN, 5);
+    // The minutes count; the day is still not called well covered.
+    expect(b.coverage).toBe('logged-only');
   });
 
   it('names the actual threshold in the heart-rate row title', () => {
@@ -522,12 +540,33 @@ describe('the gap tolerance is read off the day, not off one sensor', () => {
     expect(gapToleranceFor(sampleDay(1))).toBe(HR_GAP_MIN);
   });
 
-  it('stretches to meet a background wrist, and never past the cap', () => {
+  it('stretches to meet a background wrist', () => {
     expect(gapToleranceFor(sampleDay(3, 1))).toBeGreaterThan(HR_GAP_MIN);
-    expect(gapToleranceFor(sampleDay(8, 3))).toBe(HR_GAP_MAX);
-    // Even a day of four readings cannot buy more than the cap.
-    expect(gapToleranceFor([{ t: 0, bpm: 70 }, { t: 3 * 3600, bpm: 70 }, { t: 9 * 3600, bpm: 70 }, { t: 15 * 3600, bpm: 70 }]))
-      .toBe(HR_GAP_MAX);
+    expect(gapToleranceFor(sampleDay(8, 3))).toBeGreaterThan(HR_GAP_MIN);
+    expect(gapToleranceFor(sampleDay(8, 3))).toBeLessThanOrEqual(HR_GAP_MAX);
+  });
+
+  /* The ordinary cap may not decide that a regularly sampled day did not
+     happen. At a 20-minute cadence a fixed 20-minute ceiling marked EVERY
+     interval uncovered: 66 real minutes above the line came back as 7, and at
+     30 minutes the day read as never watched at all. */
+  it('never lands below the day\'s own cadence', () => {
+    [20, 30, 40].forEach((cadence) => {
+      const s = sampleDay(cadence, 2);
+      const tol = gapToleranceFor(s);
+      expect(tol).toBeGreaterThan(cadence);
+      const r = hrMinutesAbove(s, 90)!;
+      expect(r.coverageMin).toBeGreaterThan(HR_FULL_COVERAGE);
+    });
+  });
+
+  /* ...but a handful of readings is not a cadence. Four samples a day have a
+     "typical gap" of hours, and letting that raise the ceiling would report a
+     day nobody watched as watched end to end. */
+  it('still refuses to bridge hours, however sparse the day', () => {
+    const four = [{ t: 0, bpm: 70 }, { t: 3 * 3600, bpm: 70 }, { t: 9 * 3600, bpm: 70 }, { t: 15 * 3600, bpm: 70 }];
+    expect(gapToleranceFor(four)).toBe(HR_GAP_HARD);
+    expect(hrMinutesAbove(four, 60)!.coverageMin).toBe(0);
   });
 
   it('gives a background day real coverage where it used to have almost none', () => {

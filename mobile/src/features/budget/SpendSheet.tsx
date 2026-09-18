@@ -16,7 +16,7 @@ import type { Band, ScoreCat } from '../../lib/types';
 import { GRADE_COLORS, fonts, usePalette } from '../../theme';
 import { clock, hm, type BudgetView, type SpendRow } from '../../lib/budget';
 import { BAND_FRACTION } from '../../lib/budget/upright';
-import { HR_BAND_EDGES, HR_MIN_COVERAGE, HOURS, minutesByHour, uprightHours } from '../../lib/budget/burn';
+import { HR_BAND_EDGES, HR_COUNT_MIN_COVERAGE, HOURS, minutesByHour, uprightHours } from '../../lib/budget/burn';
 import { minutesOf } from '../../lib/budget/pace';
 import { getWaveform, useAppState } from '../../store/store';
 import { loadWaveformId } from '../../lib/waveforms';
@@ -248,7 +248,9 @@ export function SpendSheet({ dk, budget, row }: { dk: string; budget: BudgetView
     if (row.source === 'credits') {
       // Resting minutes count only when the series was trusted enough to be
       // credited at all (the same bar `buildBurn` applies).
-      const trusted = load?.hrAboveMin != null && (load.hrCoverageMin || 0) >= HR_MIN_COVERAGE;
+      // The CHARGING bar, so the drill-in can never go quiet about a row the
+      // strip is charging for.
+      const trusted = load?.hrAboveMin != null && (load.hrCoverageMin || 0) >= HR_COUNT_MIN_COVERAGE;
       const resting = trusted ? load?.hrBelowByHour ?? null : null;
       const acts = state.days[dk]?.activities || [];
       const logged = minutesByHour((row.members || []).flatMap((m) => {

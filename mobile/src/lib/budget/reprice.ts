@@ -50,11 +50,16 @@ export const CURVE_MAX = 400;
  * The pricing rules a stored day was charged under.
  *
  * 1 is every day written before the tolerance was fitted to the day (and is
- * what an absent field means). BUMP THIS whenever a change to ./burn or
- * ./upright would give a stored day a different answer from the same curve,
- * and the repair runs once more.
+ * what an absent field means). 3 is the ceiling on that tolerance yielding to
+ * the day's own cadence: at a 20-minute sampling rate a fixed 20-minute
+ * ceiling marked every ordinary interval uncovered, so a fully worn day was
+ * charged for a fraction of what it watched, and past 30 minutes it was
+ * charged for nothing at all. Those days are re-read from their curves.
+ *
+ * BUMP THIS whenever a change to ./burn or ./upright would give a stored day a
+ * different answer from the same curve, and the repair runs once more.
  */
-export const PRICE_VERSION = 2;
+export const PRICE_VERSION = 3;
 
 export type RepriceAction =
   /** Already priced under the current rules, or there is nothing to work from. */

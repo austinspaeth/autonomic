@@ -1106,8 +1106,31 @@ old web app so old `export.json` files import directly.
   confidence. The tolerance is now the day's own cadence (`GAP_PCT` of its gaps,
   times `GAP_TOLERANCE_K`) clamped to `[HR_GAP_MIN, HR_GAP_MAX]`, so a strap day
   is byte-identical to what it was and a background day goes from under two
-  hours of coverage to the whole waking day. A charger break is an hour and is
-  still unknown. **Widening it forced the charge to be INTERPOLATED**: an
+  hours of coverage to the whole waking day. **A FIXED CEILING HAS THE SAME
+  SHAPE ONE CADENCE FURTHER OUT, so `HR_GAP_MAX` is no longer the last word**
+  (`GAP_KEEP`): the tolerance may never land below the day's own spacing, or a
+  ceiling tighter than the cadence marks every ordinary interval uncovered and
+  reports a fully worn day as one nobody watched. Measured on one day resampled
+  at every rate against 66 true minutes above the line: at 20 minutes the old
+  cap returned **7 minutes** and 5½ hours of coverage, and at 30 minutes it
+  returned **nothing at all** — no row, no minutes, low confidence — while the
+  drill-in went on drawing the user's own spikes over the line. Now 35 and 37,
+  with the whole waking day covered. But a handful of readings is NOT a cadence:
+  four samples a day have a "typical gap" of hours, so `HR_GAP_HARD` (60) is the
+  one thing nothing may stretch past. A charger break is an hour and is still
+  unknown, on every cadence. Wrist rates still under-report by ~15% against
+  truth, because a 2-minute excursion that no sample lands inside cannot be
+  recovered from the series; the walking those minutes came with is charged on
+  the upright row instead, and inflating the HR row to cover them would be
+  inventing minutes rather than finding them. **And what the app SAW is charged
+  even when it saw little of the day** — `HR_COUNT_MIN_COVERAGE` (30) is the bar
+  for charging, `HR_MIN_COVERAGE` (120) stays the bar for calling the day well
+  covered and anchors `coverageFactor`'s ramp. One constant used to answer both,
+  and at two hours of wear the second answer was wrong: a watch put on for the
+  hard part of the day, holding 19 real minutes above the line, charged exactly
+  nothing. Counting watched minutes can never overstate a day — the integration
+  only ever charges time inside a covered gap — so the honest pair is to charge
+  them and let the coverage word say how thin the day was. **Widening it forced the charge to be INTERPOLATED**: an
   interval used to be billed whole whenever its two samples AVERAGED above the
   line, which is a step function on an estimate and biases upward as samples
   spread out — against one fixed day resampled at every rate it ran 15 to 31%

@@ -120,10 +120,48 @@ export const MULTIPLIER_CAP = 1.25;
  */
 export const HR_GAP_MIN = 5;
 
-/** The tolerance can never stretch past this, however sparse the day. Beyond
- *  twenty minutes nobody can say what a heart was doing, and a day whose
- *  samples are further apart than this should read as barely watched. */
-export const HR_GAP_MAX = 20;
+/** The ordinary ceiling on the tolerance: past half an hour of silence nobody
+ *  can say what a heart was doing. It is NOT a hard cap — see `GAP_KEEP`,
+ *  which stops it falling below the day's own cadence. */
+export const HR_GAP_MAX = 30;
+
+/**
+ * The tolerance may never be tighter than this multiple of the day's OWN
+ * sampling cadence, whatever `HR_GAP_MAX` says.
+ *
+ * Without it the ceiling is a cliff that a sparse day falls off entirely. A
+ * fixed five minutes was priced for a strap and `gapToleranceFor` was written
+ * to fix exactly that — but a fixed CEILING has the same shape one cadence
+ * further out, and at twenty minutes it sat right on top of a background
+ * wrist. Measured on one fixed day resampled at every rate: at a 20-minute
+ * cadence every ordinary interval exceeded the ceiling, so 66 real minutes
+ * above the line were reported as 7 and 16 hours of wear as 5½, and at a
+ * 30-minute cadence the day came back as never watched at all — no row, no
+ * minutes, and an envelope that called it low confidence. Meanwhile the
+ * drill-in drew the user's own spikes over the line above the number, which is
+ * the app telling somebody their hard day did not happen.
+ *
+ * So a day's ordinary spacing always counts, and a hole of more than
+ * `GAP_KEEP` times it never does. A charger break is a multiple of any
+ * cadence and stays unknown on every one of them. Note that the day is still
+ * stamped with `hrSampleGapMin`, so `typicalResolution` keeps a sparse day out
+ * of the ceiling's evidence statistic: counting it is not the same as fitting
+ * to it.
+ */
+export const GAP_KEEP = 1.5;
+
+/**
+ * The hard ceiling, which nothing may stretch past — not `GAP_KEEP`, not a
+ * cadence, not anything.
+ *
+ * `GAP_KEEP` reads the day's own spacing, and a day holding FOUR readings has
+ * a "cadence" of several hours; without this it would buy a five-hour
+ * tolerance and report itself as watched end to end, which is the invention
+ * this module exists to refuse. An hour is the number the rest of the file
+ * already uses for it: a charger break is an hour, and it stays unknown on
+ * every cadence.
+ */
+export const HR_GAP_HARD = 60;
 
 /** How many typical gaps a run of missing samples may span before the stretch
  *  is called uncovered. Three, so an ordinary cadence tolerates a couple of
@@ -150,8 +188,15 @@ export const GAP_PCT = 0.75;
  * So the tolerance is read off the day's own cadence, the same way the
  * standing band is now read off the day's own quiet level. A strap day's
  * typical gap is a second, so the FLOOR holds it at exactly what it was. A
- * background day's is a few minutes, so it stretches to cover them. Neither
- * can reach `HR_GAP_MAX`, and a charger break is an hour and stays unknown.
+ * background day's is a few minutes, so it stretches to cover them. A charger
+ * break is a multiple of either and stays unknown.
+ *
+ * `HR_GAP_MAX` caps how far the ordinary rule may stretch, and `GAP_KEEP` then
+ * stops that cap from ever landing BELOW the day's own spacing — a ceiling
+ * tighter than the cadence marks every ordinary interval uncovered and reports
+ * a fully worn day as one nobody watched. The cap binds on how far we will
+ * guess across silence; it may not decide that a regularly sampled day did not
+ * happen.
  *
  * Pure and deterministic, so the three consumers that ask it about one series
  * cannot disagree about what "covered" means for that day.
@@ -159,7 +204,8 @@ export const GAP_PCT = 0.75;
 export function gapToleranceFor(series: { t: number; bpm: number }[] | null | undefined): number {
   const typical = typicalGapMin(series);
   if (typical == null) return HR_GAP_MIN;
-  return Math.min(HR_GAP_MAX, Math.max(HR_GAP_MIN, typical * GAP_TOLERANCE_K));
+  const capped = Math.min(HR_GAP_MAX, typical * GAP_TOLERANCE_K);
+  return Math.min(HR_GAP_HARD, Math.max(HR_GAP_MIN, capped, typical * GAP_KEEP));
 }
 
 /**
@@ -193,10 +239,33 @@ export function typicalGapMin(series: { t: number; bpm: number }[] | null | unde
 /** Minutes a run above the line must last before it is called a stretch. */
 export const STRETCH_MIN_MIN = 2;
 
-/** Minutes of series a day needs before its heart-rate row is trusted at all. */
+/** Minutes of series a day needs before it is called WELL covered: the anchor
+ *  of `coverageFactor`'s ramp and of the coverage word the sheet prints. */
 export const HR_MIN_COVERAGE = 120;
 /** ...and before it is called full coverage rather than partial. */
 export const HR_FULL_COVERAGE = 600;
+
+/**
+ * Minutes of series a day needs before the minutes it DID see are charged.
+ *
+ * Deliberately far below `HR_MIN_COVERAGE`, because the two ask different
+ * questions and sharing one number answered the second one wrong. "Did we see
+ * enough of this day to say how well we saw it" is a statement about coverage
+ * and belongs on the ramp above. "Did we see enough to charge what we watched
+ * happen" is not: a minute above the line that the app WATCHED is real whether
+ * it saw two hours of the day or sixteen, and counting it can never overstate
+ * the day — the integration only ever charges time inside a covered gap.
+ *
+ * At 120 it silently threw those minutes away. A watch put on for the hard
+ * part of the day, worn two hours and holding 19 real minutes above the line,
+ * charged exactly nothing — no row, no effort, while the drill-in drew the
+ * spikes over the line. That is the understatement the whole module is meant
+ * to avoid, and it landed on the days that most needed counting.
+ *
+ * Below half an hour of series there is not enough to be a measurement of
+ * anything, and the row's own coverage sentence still says how thin it was.
+ */
+export const HR_COUNT_MIN_COVERAGE = 30;
 
 /** Some step providers write one record spanning the whole day. Charging that
  *  as 24 hours of walking would be absurd, so a single span is capped. */
@@ -748,7 +817,9 @@ export function buildBurn(input: BurnInput): Burn {
 
   /* --- heart rate above the line --- */
   let hrEffort = 0;
-  const hrTrusted = load?.hrAboveMin != null && (load.hrCoverageMin || 0) >= HR_MIN_COVERAGE;
+  // What we SAW is charged (the low bar); how well we saw the day is a
+  // separate question with its own bar, answered by `coverage` below.
+  const hrTrusted = load?.hrAboveMin != null && (load.hrCoverageMin || 0) >= HR_COUNT_MIN_COVERAGE;
   if (hrTrusted && load) {
     // Minutes a logged workout already paid for are not charged twice.
     const bands = load.hrBands && load.hrBands.length ? hrBandsLess(load.hrBands, parts.hrCoveredMin) : null;
@@ -884,9 +955,14 @@ export function buildBurn(input: BurnInput): Burn {
   const biggest = costs.length ? costs[0].effortMin : 1;
   const ordered = [...costs, ...creditRows].map((r) => ({ ...r, share: Math.min(1, Math.abs(r.effortMin) / biggest) }));
 
+  // NOT `hrTrusted`: that bar is now the low one that decides whether watched
+  // minutes are charged. The word here, and the confidence ramp it feeds, keep
+  // the old bar — a two-hour read charges its minutes and still says plainly
+  // that it only saw two hours.
+  const hrWellCovered = load?.hrAboveMin != null && (load.hrCoverageMin || 0) >= HR_MIN_COVERAGE;
   const coverage: BurnCoverage =
-    hrTrusted && (load?.hrCoverageMin || 0) >= HR_FULL_COVERAGE ? 'full'
-      : hrTrusted ? 'partial'
+    hrWellCovered && (load?.hrCoverageMin || 0) >= HR_FULL_COVERAGE ? 'full'
+      : hrWellCovered ? 'partial'
         : (day?.activities?.length || load?.steps != null) ? 'logged-only'
           : 'none';
 
