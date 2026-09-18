@@ -1314,7 +1314,16 @@ old web app so old `export.json` files import directly.
   only when the rounding really is 48-52%), the exact per-month division beside
   the yearly row, and the rounded one in the sentence, which is why that one
   says "about".
-- **The founding-member offer is the other one, and it lives for a single day.**
+- **The founding-member offer is the other one, and it lives for a single day.
+  IT IS CURRENTLY SWITCHED OFF** — `FOUNDER_ENABLED = false` in
+  `src/lib/upsell/founder.ts`, checked first in `founderVerdict` so even a phone
+  that had already claimed its day goes quiet. The rules are untouched and stay
+  under test through `founderRules` (nothing in the app may call that directly),
+  so turning it back on is that one constant. Being off SPENDS nothing: no
+  memory is stamped, no day claimed, and the shared 7-day offer cool-down is
+  never taken, so the half-off annual card below is unaffected and in fact freer
+  to appear. The rest of this bullet describes it as it will behave when it
+  returns.
   `src/lib/upsell/founder.ts` (pure + tested) + `founderMemory.ts` (flags MMKV),
   rendered by `<FounderOfferCard/>` under the Journal's Outlook. It fires on the
   first launch AFTER five days carrying the user's OWN entries (`engagedBefore`

@@ -29,6 +29,28 @@ import type { DaysMap } from '../scoring/day';
 import type { Tier } from '../tier';
 import { engagedDayCount } from '../review/eligibility';
 
+/**
+ * The offer is OFF.
+ *
+ * A deliberate, temporary switch rather than a deletion: the card, its copy,
+ * its memory and its tests all stay exactly as they are, and turning it back
+ * on is this one line. It is checked FIRST in `founderVerdict`, ahead of the
+ * claimed-day shortcut, so a phone that had already claimed its day goes quiet
+ * too rather than carrying the card until midnight.
+ *
+ * Nothing is SPENT while it is off. `founderVerdict` writes nothing on a
+ * refusal, so no memory is stamped, no day is claimed and the shared offer
+ * cool-down (./pacing) is never touched — which means the half-off annual card
+ * (./annual, at 30/90/180/365 days) is unaffected and, if anything, freer to
+ * appear, since this card can no longer take the clock from it.
+ *
+ * One asymmetry worth knowing before it is switched back on: a user who
+ * claimed a day BEFORE it was turned off still has `shownDk` set, so they read
+ * as 'day-passed' and will not be asked again. Their offer was already spent;
+ * this is not what spends it.
+ */
+export const FOUNDER_ENABLED = false;
+
 /** Days of the user's OWN content before the offer is due. */
 export const FOUNDER_MIN_DAYS = 5;
 
@@ -107,6 +129,17 @@ export type FounderVerdict =
  * "the milestone stays due" behaviour as ./annual.
  */
 export function founderVerdict(input: FounderInput): FounderVerdict {
+  // Before everything, including the claimed-day shortcut. See FOUNDER_ENABLED.
+  // The rules below are left whole and stay under test, so switching the offer
+  // back on is one constant and not an archaeology exercise.
+  if (!FOUNDER_ENABLED) return { ok: false, reason: 'disabled' };
+  return founderRules(input);
+}
+
+/** `founderVerdict`'s rules, with no regard for whether the offer is switched
+ *  on. The tests drive this so the logic keeps its coverage while the card is
+ *  off; nothing in the app may call it directly. */
+export function founderRules(input: FounderInput): FounderVerdict {
   const { days, dk, tier, memory } = input;
 
   if (memory.dismissed) return { ok: false, reason: 'dismissed' };

@@ -1,6 +1,6 @@
 import type { DaysMap } from '../../scoring/day';
 import {
-  FOUNDER_MIN_DAYS, discountPct, emptyFounderMemory, engagedBefore, founderVerdict,
+  FOUNDER_ENABLED, FOUNDER_MIN_DAYS, discountPct, emptyFounderMemory, engagedBefore, founderRules, founderVerdict,
 } from '../founder';
 
 /** A day carrying one entry the USER authored. */
@@ -16,8 +16,8 @@ const FIVE = days({
   '2026-03-04': own(), '2026-03-05': own(),
 });
 
-const ask = (over: Partial<Parameters<typeof founderVerdict>[0]> = {}) =>
-  founderVerdict({
+const ask = (over: Partial<Parameters<typeof founderRules>[0]> = {}) =>
+  founderRules({
     days: FIVE, dk: '2026-03-06', tier: 'trial', memory: emptyFounderMemory(), ...over,
   });
 
@@ -31,6 +31,29 @@ describe('engagedBefore', () => {
   it("doesn't count a health-store backfill as days of use", () => {
     const backfill = days({ '2026-03-01': imported(), '2026-03-02': imported(), '2026-03-03': imported() });
     expect(engagedBefore(backfill, '2026-03-06')).toBe(0);
+  });
+});
+
+/* The offer is switched off. The rules above stay under test through
+   `founderRules` so the card can be switched back on without re-deriving any
+   of it; what this pins is that nothing reaches the screen while it is off,
+   INCLUDING a phone that had already claimed its day, and that being off
+   spends nothing — no memory write, no claim, and the shared cool-down left
+   for the half-off annual card, which is unaffected. */
+describe('the founding-member offer is off', () => {
+  const eligible = {
+    days: FIVE, dk: '2026-03-06', tier: 'trial' as const, memory: emptyFounderMemory(),
+  };
+
+  it('never renders, however eligible the user', () => {
+    expect(FOUNDER_ENABLED).toBe(false);
+    expect(founderVerdict(eligible)).toEqual({ ok: false, reason: 'disabled' });
+    // ...and the same for a phone mid-offer when the switch landed.
+    expect(founderVerdict({ ...eligible, memory: { shownDk: '2026-03-06' } })).toEqual({ ok: false, reason: 'disabled' });
+  });
+
+  it('would still be due if it were switched back on', () => {
+    expect(founderRules(eligible)).toEqual({ ok: true, claim: true });
   });
 });
 

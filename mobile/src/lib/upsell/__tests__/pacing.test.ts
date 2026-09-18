@@ -2,7 +2,7 @@ import {
   OFFER_COOLDOWN_MS, emptyOfferPacing, noteOffer, offerAllowed, offerCooldownMsLeft,
 } from '../pacing';
 import { dueMilestone, emptyAnnualMemory, startOffer } from '../annual';
-import { emptyFounderMemory, founderVerdict } from '../founder';
+import { emptyFounderMemory, founderRules } from '../founder';
 import type { DaysMap } from '../../scoring/day';
 
 const NOW = Date.parse('2026-03-06T09:00:00Z');
@@ -48,7 +48,7 @@ describe('the two offers can never be raised together', () => {
     // The annual card just opened, which unlocks Pro and reports 'trial' —
     // exactly the state the founder card waits for.
     const clock = noteOffer(emptyOfferPacing(), 'annual', NOW);
-    const ask = (now: number) => founderVerdict({
+    const ask = (now: number) => founderRules({
       days: FIVE, dk: '2026-03-06', tier: 'trial', memory: emptyFounderMemory(),
       offerCooldown: !offerAllowed(now, clock),
     });
@@ -61,11 +61,11 @@ describe('the two offers can never be raised together', () => {
     // The state a phone reached before the shared clock shipped: both offers
     // claimed, both on screen. The live window wins and this card renders none.
     const claimed = { shownDk: '2026-03-06' };
-    expect(founderVerdict({
+    expect(founderRules({
       days: FIVE, dk: '2026-03-06', tier: 'trial', memory: claimed, annualOfferLive: true,
     })).toEqual({ ok: false, reason: 'annual-offer-live' });
     // …and comes back for the rest of its day once that window closes.
-    expect(founderVerdict({
+    expect(founderRules({
       days: FIVE, dk: '2026-03-06', tier: 'trial', memory: claimed,
     })).toEqual({ ok: true, claim: false });
   });
