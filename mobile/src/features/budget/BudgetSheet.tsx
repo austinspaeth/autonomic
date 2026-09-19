@@ -16,7 +16,7 @@
  *   zero. The absence is the information.
  */
 import React from 'react';
-import { Linking, Text, View } from 'react-native';
+import { Linking, Pressable, Text, View } from 'react-native';
 import { CardRow, InsightCard } from '../insights/Sections';
 import * as S from '../insights/style';
 import { useNotificationPermission } from '../Reminders';
@@ -30,9 +30,11 @@ import { clock, hm, type BudgetView, type SpendRow } from '../../lib/budget';
 import { EXERTION_RUN_MIN } from '../../lib/budget/alerts';
 import { LEARN_DAYS } from '../../lib/budget/baseline';
 import { BUDGET_HELP } from '../../lib/budget/help';
+import type { PauseReason } from '../../lib/budget/pause';
 import { MIN_EVALUATED, MIN_TREND_WEEKS, STRIP_DAYS, type AccuracyWeek } from '../../lib/budget/accuracy';
 import { healthAppName } from '../../lib/health';
 import { connectPacingHealth, useStepsMissing } from '../../store/budget';
+import { hideBudgetAgain, showBudgetAnyway } from '../../store/budgetPause';
 import { enablePacingNotifications } from '../../store/pacingAlerts';
 import { useAppState } from '../../store/store';
 import { BudgetBar } from './Bar';
@@ -52,6 +54,49 @@ function Action({ title, onPress }: { title: string; onPress: () => void }) {
       <Button title={title} variant="primary" onPress={onPress} />
     </View>
   );
+}
+
+/**
+ * The gold block that says the app would rather this day published nothing.
+ *
+ * Shared by the paused card and by a day showing its number anyway, which is
+ * the whole design: the override reveals a figure, it does not clear a
+ * warning, and using the same object in both states is what makes that
+ * legible without a sentence explaining it.
+ */
+function PauseNote({ text, children }: { text: string; children?: React.ReactNode }) {
+  const p = usePalette();
+  return (
+    <View style={{
+      flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4,
+      backgroundColor: hexA(CAUTION_GOLD, 0.08), borderWidth: 1, borderColor: hexA(CAUTION_GOLD, 0.22),
+      borderRadius: 15, padding: 13,
+    }}>
+      <View style={{ flexDirection: 'row', gap: 4 }}>
+        {[0, 1].map((i) => <View key={i} style={{ width: 3.4, height: 15, borderRadius: 2, backgroundColor: CAUTION_GOLD }} />)}
+      </View>
+      <Text style={{ flex: 1, fontSize: 13.5, fontWeight: '700', color: p.text }}>{text}</Text>
+      {children}
+    </View>
+  );
+}
+
+/** The paragraph under the note. One per reason: the card used to say "the
+ *  app had flagged a downturn" whatever the finding was. */
+function pauseReasonWhy(reason: PauseReason, past: boolean): string {
+  if (reason === 'strain-alert') {
+    return past
+      ? 'Several of the markers the app watches had moved away from your own baseline together, so it published no number.'
+      : 'Several of the markers the app watches have moved away from your own baseline together. That is an early warning, not a diagnosis, and the card below your Outlook has the detail.';
+  }
+  if (reason === 'crash') {
+    return past
+      ? 'That day scored well below your own recent days, so the app published no number.'
+      : 'Today is scoring well below your own recent days. This is about the drop, not the number itself: a day at your usual level always gets a budget.';
+  }
+  return past
+    ? 'The app had flagged a downturn, so it published no number.'
+    : 'Resumes when the warning card below your Outlook clears.';
 }
 
 function Tile({ value, label, color }: { value: string; label: string; color?: string }) {
@@ -167,25 +212,31 @@ function TodayCard({ dk, budget }: { dk: string; budget: BudgetView }) {
   const env = budget.envelope.effortMin;
 
   if (budget.state === 'suppressed') {
+    const reason = budget.pausedReason || 'downturn';
     return (
-      <InsightCard title={budget.past ? 'That day' : 'Today'} desc="No budget is published on a day the app sees a downturn, since a number here invites someone to spend it." bg={p.sunk}>
-        <View style={{
-          flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 4,
-          backgroundColor: hexA(CAUTION_GOLD, 0.08), borderWidth: 1, borderColor: hexA(CAUTION_GOLD, 0.22),
-          borderRadius: 15, padding: 13,
-        }}>
-          <View style={{ flexDirection: 'row', gap: 4 }}>
-            {[0, 1].map((i) => <View key={i} style={{ width: 3.4, height: 15, borderRadius: 2, backgroundColor: CAUTION_GOLD }} />)}
-          </View>
-          <Text style={{ flex: 1, fontSize: 13.5, fontWeight: '700', color: p.text }}>
-            {budget.past ? 'Budget was paused that day' : 'Budget paused for today'}
-          </Text>
-        </View>
+      <InsightCard
+        title={budget.past ? 'That day' : 'Today'}
+        desc="No budget is published on a day like this one, since a number here invites someone to spend it."
+        bg={p.sunk}
+      >
+        <PauseNote text={budget.figure} />
         <Text style={{ fontSize: 12.5, lineHeight: 18, color: p.textDim, marginTop: 12 }}>
-          {budget.past
-            ? 'The app had flagged a downturn, so it published no number.'
-            : 'Resumes when the warning card below your Outlook clears.'}
+          {pauseReasonWhy(reason, budget.past)}
         </Text>
+        {/* The way out, and it lives here rather than only on the strip so the
+            reader meets the reason before the number. It is a GHOST button:
+            the app would rather they rested, and a primary here would be the
+            app suggesting its own warning be ignored. */}
+        {!budget.past ? (
+          <View style={{ flexDirection: 'row', marginTop: 14 }}>
+            <Button
+              title="Show it anyway"
+              variant="ghost"
+              icon="play"
+              onPress={() => showBudgetAnyway(dk)}
+            />
+          </View>
+        ) : null}
       </InsightCard>
     );
   }
@@ -203,6 +254,34 @@ function TodayCard({ dk, budget }: { dk: string; budget: BudgetView }) {
         : "Today's estimate, and how much of it the day has used so far."}
       bg={p.sunk}
     >
+      {/* A paused day showing its number. The warning keeps the top of the
+          card — it is still the most important thing on this screen — and the
+          figure sits UNDER it rather than beside it, so the reader is never
+          handed the number first. */}
+      {budget.unpaused && budget.pausedReason ? (
+        <View style={{ marginBottom: 12 }}>
+          <PauseNote text={budget.unpaused === 'user' ? 'Shown at your request' : 'Shown after three paused days'}>
+            {/* Back to paused. Only the reader's own choice is reversible:
+                the run valve is the app's, and a button that re-hid the
+                budget for the rest of a week would just be the bug again. */}
+            {budget.unpaused === 'user' ? (
+              <Pressable
+                onPress={() => hideBudgetAgain(dk)}
+                accessibilityRole="button"
+                accessibilityLabel="Hide the budget again"
+                hitSlop={10}
+                style={({ pressed }) => [{ paddingHorizontal: 4 }, pressed && { opacity: 0.6 }]}
+              >
+                <Text style={{ fontSize: 12.5, fontWeight: '700', color: hexA(p.text, 0.7) }}>Hide</Text>
+              </Pressable>
+            ) : null}
+          </PauseNote>
+          <Text style={{ fontSize: 12.5, lineHeight: 18, color: p.textDim, marginTop: 10 }}>
+            {pauseReasonWhy(budget.pausedReason, budget.past)}
+          </Text>
+        </View>
+      ) : null}
+
       <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 8, marginTop: 6, marginBottom: 11 }}>
         <Text style={{
           fontFamily: fonts.numHeavy, fontSize: FIGURE_SIZE, lineHeight: FIGURE_SIZE + 2,

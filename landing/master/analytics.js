@@ -206,7 +206,7 @@ window.Analytics = (function () {
     S: 'Sleep', A: 'Activity', M: 'Med or supplement', Y: 'Symptom',
     W: 'Water', B: 'Bowel movement', P: 'Blood pressure', R: 'Resting heart rate'
   };
-  var FEATURE_NAME = { M: 'Milestones opened', P: 'Protocol saved', B: 'Pacing budget opened' };
+  var FEATURE_NAME = { M: 'Milestones opened', P: 'Protocol saved', B: 'Pacing budget opened', U: 'Pacing budget unpaused' };
   var FINDING_NAME = { E: 'Early signal', U: 'Unconfirmed pattern', C: 'Biggest change', R: 'Correlation' };
   var REPORT_NAME = { D: 'Data for prompt', H: 'Full health report', C: 'Doctor summary' };
 

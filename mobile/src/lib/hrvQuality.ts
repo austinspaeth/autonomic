@@ -72,6 +72,13 @@ export function hasHrvReading(days: AppState['days'] | undefined): boolean {
   return false;
 }
 
+/** Does this one day hold an HRV reading that counts? The morning reminder's
+ *  question: a day already measured is not reminded. */
+export function hasHrvReadingOn(day: DayRecord | undefined): boolean {
+  return !!day && Array.isArray(day.readings)
+    && day.readings.some((r) => HRV_TYPES.has(r.type) && isTrustedReading(r));
+}
+
 /** RR coverage in whole seconds for a beat-to-beat series (ms intervals). */
 export const rrCoverageSec = (rr: readonly number[] | undefined): number =>
   Math.round((rr || []).reduce((s, v) => s + v, 0) / 1000);

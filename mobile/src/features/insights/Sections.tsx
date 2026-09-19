@@ -35,8 +35,10 @@ import { resolveProtocol } from '../../lib/scoring/day';
 import { buildCorrelationsPrompt } from '../../lib/insights/prompt';
 import { INSIGHTS_HELP, VISIBLE_CORRELATIONS, groupCorrelations } from '../../lib/insights';
 import type { HelpContent } from '../../lib/help';
-import type { BiggestChange, ConfidencePart, Correlation, DataConfidence, DetailSeries, NoImpactItem, Observation, WatchItem } from '../../lib/insights';
-import { ChangeSheet, CorrelationSheet, WatchSheet } from './FindingSheet';
+import type { BiggestChange, ConfidencePart, Correlation, DataConfidence, DetailSeries, NoImpactItem, Observation, PressureInsight, WatchItem } from '../../lib/insights';
+import { pressureHeadline } from '../../lib/insights/pressureCopy';
+import { TREND_METRICS } from '../../lib/trends';
+import { ChangeSheet, CorrelationSheet, PressureSheet, WatchSheet } from './FindingSheet';
 import * as S from './style';
 
 const GOOD = S.GOOD;
@@ -247,6 +249,49 @@ export function FindingCard({ title, help, headline, tiles, pips, confidence, no
         </View>
       ) : null}
     </InsightCard>
+  );
+}
+
+/**
+ * The barometric pressure card: the Biggest change card's own shape, over the
+ * strongest pressure link, the whole card a button into `PressureSheet`.
+ *
+ * It exists only once a link has been found and it then stays (see
+ * `PressureInsight`), so unlike every other card here it is never a row in a list:
+ * it is one standing claim about this person, and it wears the object the app uses
+ * for its single most important claim. A "+N" line says when more than one measure
+ * moved, and the sheet stacks them all.
+ */
+export function PressureCard({ pressure, detail, onLayout }: {
+  pressure: PressureInsight;
+  detail: Record<string, DetailSeries>;
+  onLayout?: (e: LayoutChangeEvent) => void;
+}) {
+  const p = usePalette();
+  const { openSheet } = useSheets();
+  const lead = pressure.findings[0];
+  if (!lead) return null;
+  const c = lead.c;
+  const def = TREND_METRICS[c.outcome];
+  const color = c.good ? GOOD : p.accent;
+  const more = pressure.findings.length - 1;
+  return (
+    <FindingCard
+      title="Barometric pressure"
+      help="pressure"
+      headline={pressureHeadline(c)}
+      tiles={[
+        { value: def.fmt(c.high), unit: c.unit, label: 'Low pressure days', color },
+        { value: def.fmt(c.low), unit: c.unit, label: 'Other days' },
+        { value: c.deltaValue, unit: c.unit, label: 'Difference', color },
+      ]}
+      pips={c.pips}
+      confidence={c.confidence}
+      note={more > 0 ? `Linked to ${more} more ${more === 1 ? 'measure' : 'measures'}, shown inside` : undefined}
+      good={c.good}
+      onLayout={onLayout}
+      onPress={() => openSheet(() => <PressureSheet pressure={pressure} detail={detail} />)}
+    />
   );
 }
 

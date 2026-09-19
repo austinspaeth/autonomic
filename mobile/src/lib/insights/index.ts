@@ -35,13 +35,14 @@ import { addDays, dateFromKey } from '../dates';
 import type { ScoreContext } from '../scoring';
 import { detectDownturn } from '../scoring/downturn';
 import { resolveProtocol } from '../scoring/day';
-import { INSIGHT_OUTCOMES, keyRange } from '../trends';
+import { INSIGHT_OUTCOMES, OUTCOME_FAMILY, keyRange } from '../trends';
 import type { AppState } from '../types';
 import { WELCOME_CHANGE, findBiggestChange, type BiggestChange } from './change';
 import { changeSeries, correlationSeries, type DetailSeries } from './detail';
 import { dataConfidence, type DataConfidence } from './confidence';
-import { EARLY_MIN_FACTOR_DAYS, MIN_GROUP, MIN_PAIRS, findCorrelations, findEarlySignals, findNoImpact, type Correlation, type NoImpactItem } from './correlate';
-import { buildFactors, factorProgress, type FactorProgress } from './factors';
+import { EARLY_MIN_FACTOR_DAYS, MIN_GROUP, MIN_PAIRS, findCorrelations, findEarlySignals, findNoImpact, testFinding, type Correlation, type NoImpactItem } from './correlate';
+import { PRESSURE_FACTOR_ID, buildFactors, factorProgress, type FactorProgress } from './factors';
+import { lowPressureValue } from '../pressure';
 import { buildDayMatrix } from './matrix';
 import { findObservations, type Observation } from './observations';
 import { changeSinceStart, findWatchItems, overallDirection, type Overall, type SinceStart, type WatchItem } from './watch';
@@ -83,6 +84,41 @@ export { MAX_OBSERVATIONS } from './observations';
 export { MAX_WATCH_ITEMS } from './watch';
 export { MAX_CORRELATIONS, groupCorrelations, shortMetric } from './correlate';
 export { INSIGHTS_HELP } from './help';
+export { PRESSURE_FACTOR_ID } from './factors';
+
+/**
+ * The barometric pressure card: the one finding the app keeps on screen for good.
+ *
+ * Pressure is a factor like any other in the sweep, and it has to pass the same
+ * correction as everything else to be FOUND. What differs is what happens after:
+ * a supplement's row comes and goes with the evidence, but somebody who has been
+ * told the weather gets to them plans days around it, and a card that vanished
+ * the week the sweep's family re-formed would read as the app changing its mind
+ * about their body. So a pair found once is remembered (./pressureMemory, via
+ * ./cache) and re-tested on its own every build (`testFinding`), its numbers and
+ * confidence moving with the days. Pressure rows never appear in the correlation
+ * list, the weak tiers or the observations: this card is the one place they live.
+ */
+export interface PressureInsight {
+  /** Strongest first, one per outcome family. `stale` when the pair could not be
+   *  re-tested in this window and the card is showing the numbers it was last
+   *  seen with. */
+  findings: { c: Correlation; stale: boolean }[];
+  /** Finding ids the STRICT sweep produced this build, linking low pressure to a
+   *  worse outcome. What the shell adds to the memory. */
+  found: string[];
+  /** Days in the window the barometer could judge, and how many were low. */
+  knownDays: number;
+  lowDays: number;
+  /** First judged day in the window. */
+  since: string | null;
+}
+
+/** What the shell remembers: which pairs, and the last numbers each was seen with. */
+export interface PressureMemory {
+  ids: readonly string[];
+  snapshots: Record<string, Correlation>;
+}
 
 /**
  * How far back the engine looks.
@@ -137,6 +173,8 @@ export interface InsightReport {
   detail: Record<string, DetailSeries>;
   observations: Observation[];
   watch: WatchItem[];
+  /** The barometric pressure card, or null when no link has ever been found. */
+  pressure: PressureInsight | null;
   confidence: DataConfidence;
   /** Days in the journal with any record — the header's count. */
   daysLogged: number;
@@ -185,6 +223,8 @@ export function buildInsights(state: AppState, dk: string, opts: {
   /** Finding ids a previous real report showed, from ./findingMemory via the
    *  shell (./cache). See ./stability: strict to enter, looser to stay. */
   retain?: { correlations: readonly string[]; change: string | null };
+  /** Pressure links found by earlier builds, from ./pressureMemory via ./cache. */
+  pressure?: PressureMemory;
 } = {}): InsightReport {
   const started = Date.now();
   const ctx: ScoreContext = opts.ctx || {
@@ -220,7 +260,12 @@ export function buildInsights(state: AppState, dk: string, opts: {
   // is empty.
   const downturn = !!detectDownturn(state.days, dk, ctx, ctx.protocol, state.customTypes);
 
-  const correlations = findCorrelations(matrix, { retain: opts.retain?.correlations });
+  const swept = findCorrelations(matrix, { retain: opts.retain?.correlations });
+  // Pressure rows leave the list here and live on their own card (see
+  // PressureInsight). Only a link to a WORSE outcome is kept: "low pressure days
+  // show higher HRV" would be a real row, but not one this card was built to say.
+  const correlations = swept.filter((c) => c.factorId !== PRESSURE_FACTOR_ID);
+  const pressureFound = opts.demo ? [] : swept.filter((c) => c.factorId === PRESSURE_FACTOR_ID && !c.good);
   // On an empty journal the headline slot is the welcome card, unconditionally —
   // whatever the sample month happens to contain, the honest headline for someone
   // with no data is that they just arrived.
@@ -246,7 +291,8 @@ export function buildInsights(state: AppState, dk: string, opts: {
     // long, well-logged journal where the correction happened to clear the board —
     // those rows are short of evidence, not of days, and calling them "early"
     // would misdescribe why they are hedged.
-    early = findEarlySignals(matrix, { floors: { pairs: MIN_PAIRS, group: MIN_GROUP }, tier: 'unconfirmed' });
+    early = findEarlySignals(matrix, { floors: { pairs: MIN_PAIRS, group: MIN_GROUP }, tier: 'unconfirmed' })
+      .filter((c) => c.factorId !== PRESSURE_FACTOR_ID);
     early.forEach((c) => { const s = correlationSeries(matrix, c); if (s) detail[c.id] = s; });
 
     // Only if that found nothing does the young-journal variant run, on a second
@@ -255,7 +301,7 @@ export function buildInsights(state: AppState, dk: string, opts: {
     if (!early.length) {
       const earlyDefs = buildFactors(state, keys, { minDays: EARLY_MIN_FACTOR_DAYS });
       const earlyMatrix = buildDayMatrix(state, keys, INSIGHT_OUTCOMES, earlyDefs, ctx);
-      early = findEarlySignals(earlyMatrix);
+      early = findEarlySignals(earlyMatrix).filter((c) => c.factorId !== PRESSURE_FACTOR_ID);
       // Evidence columns from the EARLY matrix — the relaxed factors have no
       // columns in the main one.
       early.forEach((c) => { const s = correlationSeries(earlyMatrix, c); if (s) detail[c.id] = s; });
@@ -270,6 +316,35 @@ export function buildInsights(state: AppState, dk: string, opts: {
   });
 
   const observations = findObservations({ matrix, state, dk: analysisDk });
+
+  // The pressure card: every pair ever found, re-tested on this window.
+  let pressure: PressureInsight | null = null;
+  const pinned = Array.from(new Set([...pressureFound.map((c) => c.id), ...(opts.pressure?.ids || [])]));
+  if (!opts.demo && pinned.length) {
+    const byFamily = new Map<string, { c: Correlation; stale: boolean }>();
+    pinned.forEach((id) => {
+      const now = pressureFound.find((c) => c.id === id) || testFinding(matrix, id);
+      const entry = now ? { c: now, stale: false } : opts.pressure?.snapshots[id] ? { c: opts.pressure.snapshots[id], stale: true } : null;
+      if (!entry) return;
+      if (now) { const s = correlationSeries(matrix, now); if (s) detail[now.id] = s; }
+      // One per outcome family, as the correlation list does: RMSSD found one
+      // month and SDNN the next are one claim, not two.
+      const fam = OUTCOME_FAMILY[entry.c.outcome];
+      const held = byFamily.get(fam);
+      if (!held || rank(entry) > rank(held)) byFamily.set(fam, entry);
+    });
+    const findings = Array.from(byFamily.values()).sort((a, b) => rank(b) - rank(a));
+    if (findings.length) {
+      let knownDays = 0, lowDays = 0, since: string | null = null;
+      keys.forEach((k) => {
+        const v = lowPressureValue(state.pressure, k);
+        if (v == null) return;
+        knownDays++; if (v) lowDays++;
+        if (!since) since = k;
+      });
+      pressure = { findings, found: pressureFound.map((c) => c.id), knownDays, lowDays, since };
+    }
+  }
   const watch = findWatchItems(matrix, downturn);
   // NOT gated on the downturn. Trend Watch hides its five red rows during one, but
   // the header saying "Trending down" in a single calm line is the honest headline
@@ -300,6 +375,7 @@ export function buildInsights(state: AppState, dk: string, opts: {
     detail,
     observations,
     watch,
+    pressure,
     overall,
     since,
     confidence,
@@ -321,10 +397,15 @@ export function buildInsights(state: AppState, dk: string, opts: {
  */
 export function emptyReport(dk: string, failed = false): InsightReport {
   return {
-    dk, demo: false, change: null, correlations: [], early: [], progress: [], noImpact: [], detail: {}, observations: [], watch: [],
+    dk, demo: false, change: null, correlations: [], early: [], progress: [], noImpact: [], detail: {}, observations: [], watch: [], pressure: null,
     overall: { direction: 'unknown', label: null, detail: 'not enough to compare yet' },
     since: null,
     confidence: { pct: 0, parts: [], topFix: null, daysLogged: 0 },
     daysLogged: 0, downturn: false, windowDays: 0, ms: 0, failed,
   };
+}
+
+/** Live findings outrank remembered ones, then evidence, then size. */
+function rank(e: { c: Correlation; stale: boolean }): number {
+  return (e.stale ? 0 : 100) + e.c.pips * 10 + Math.abs(e.c.r);
 }

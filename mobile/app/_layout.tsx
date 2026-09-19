@@ -28,9 +28,10 @@ import { initGarminReceiver } from '../src/lib/garmin/receiver';
 import { repairWatchPairedAsStrap } from '../src/lib/watch/repair';
 import { initWatchReceiver } from '../src/lib/watch/receiver';
 import { runDailyBackup } from '../src/lib/backup';
-import { initCrashWatcher, syncReminder } from '../src/lib/reminders';
+import { initCrashWatcher, initMorningWatcher, syncReminder } from '../src/lib/reminders';
 import { initWidgetSync } from '../src/lib/widgets';
 import { initBudgetSync } from '../src/store/budget';
+import { initPressureWatch } from '../src/store/pressure';
 import { initPacingAlertWatcher } from '../src/store/pacingAlerts';
 import { initPacingBackground } from '../src/store/pacingBackground';
 import { initInsightsBadge } from '../src/store/insightsBadge';
@@ -111,6 +112,7 @@ export default function RootLayout() {
     // Reconcile the OS notification schedule with settings.reminder — covers a
     // reinstall, an imported journal, or permission revoked while we were away.
     syncReminder();
+    initMorningWatcher();
     // Crash warning: evaluate the trend now and after journal changes, firing
     // the "rest" notification when a slide is detected (once per day).
     initCrashWatcher();
@@ -129,6 +131,9 @@ export default function RootLayout() {
     // exactly while an alert could fire. The task itself is defined in index.js.
     initPacingAlertWatcher();
     initPacingBackground();
+    // Barometric pressure: one sample on launch and on foreground, read with
+    // whatever permission exists. Never prompts (see src/store/pressure).
+    initPressureWatch();
     // Pull any published EAS update in the background (preview + production
     // builds alike); a downloaded bundle applies on the next launch.
     (async () => {

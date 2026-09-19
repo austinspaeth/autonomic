@@ -286,13 +286,23 @@ export function logCode(kind: LogKind | string | undefined, type?: string): LogC
  * locked tap opens instead. One letter and the two counts would be
  * indistinguishable, which is the one comparison the pacing trial exists to be
  * judged on.
+ *
+ * `U` is the pacing budget UNPAUSED: a day the app declined to publish a
+ * number on, where the reader asked for it anyway. It is on this route rather
+ * than a new one because it is a flavour of "used a feature", not a phase of
+ * one — and it is worth counting because it is the only outside evidence that
+ * the pause rule is still too eager. Read against `use` B (budget opened): if
+ * a large share of the days somebody opens the budget are days they had to
+ * unpause it first, the suppressors are firing on days that are simply this
+ * person's normal.
  */
-export type FeatureCode = 'M' | 'P' | 'B';
+export type FeatureCode = 'M' | 'P' | 'B' | 'U';
 
 export function featureCode(feature: string | undefined): FeatureCode | undefined {
   if (feature === 'milestones') return 'M';
   if (feature === 'protocol') return 'P';
   if (feature === 'pacing') return 'B';
+  if (feature === 'unpause') return 'U';
   return undefined;
 }
 

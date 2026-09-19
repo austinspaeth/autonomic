@@ -34,7 +34,9 @@ import { usePalette, GRADE_COLORS, radius } from '../../theme';
 import { fmtShort } from '../../lib/dates';
 import { acBandZones, acScoreZones, onDay } from '../../lib/analysis/buckets';
 import { TREND_METRICS } from '../../lib/trends';
-import { markColumn, type BiggestChange, type Correlation, type DetailSeries, type WatchItem } from '../../lib/insights';
+import { markColumn, type BiggestChange, type Correlation, type DetailSeries, type PressureInsight, type WatchItem } from '../../lib/insights';
+import { pressureHeadline } from '../../lib/insights/pressureCopy';
+import { LOW_BELOW_INHG } from '../../lib/pressure';
 import { CorrelationsAiButton, FindingCard, type FindingTile } from './Sections';
 import * as S from './style';
 import { pingFinding } from '../../store/ping';
@@ -86,8 +88,11 @@ function CausationNote() {
  * also says whether the selected day was one of the shaded ones, which is the
  * question somebody scrubbing this chart is actually asking.
  */
-function EvidenceChart({ series, good, trendLine, desc }: {
+function EvidenceChart({ series, good, trendLine, desc, shaded }: {
   series: DetailSeries;
+  /** Overrides the legend under the chart. The pressure card's factor is not a
+   *  thing anybody "logged", so the default wording would be false. */
+  shaded?: string;
   good: boolean;
   /** Draw a straight least-squares fit over the whole range. Trend watch turns it
    *  on: its claim IS the direction of travel, and a 60-day trace of a noisy
@@ -116,11 +121,11 @@ function EvidenceChart({ series, good, trendLine, desc }: {
   const onThatDay = marks[at];
 
   const buckets = series.keys.map((k) => ({ label: fmtShort(k) }));
-  const shadedLabel = series.factorLabel
+  const shadedLabel = shaded ?? (series.factorLabel
     ? series.factorKind === 'continuous'
       ? `Shaded: days with more ${series.factorLabel.toLowerCase()} than usual`
       : `Shaded: days you logged ${series.factorLabel.toLowerCase()}`
-    : null;
+    : null);
 
   return (
     <Section>
@@ -186,6 +191,7 @@ interface BodyFinding {
   series: DetailSeries | null;
   trendLine?: boolean;
   chartDesc?: string;
+  shaded?: string;
 }
 
 function Body({ title, intro, findings, footer }: {
@@ -224,7 +230,7 @@ function Body({ title, intro, findings, footer }: {
             note={f.note}
             good={f.good}
           />
-          {f.series ? <EvidenceChart series={f.series} good={f.good} trendLine={f.trendLine} desc={f.chartDesc} /> : null}
+          {f.series ? <EvidenceChart series={f.series} good={f.good} trendLine={f.trendLine} desc={f.chartDesc} shaded={f.shaded} /> : null}
         </View>
       ))}
       {footer}
@@ -369,6 +375,66 @@ export function WatchSheet({ item }: { item: WatchItem }) {
         trendLine: true,
         chartDesc: 'Each point is one day. The dashed line is the overall direction across the range; the vertical rule is where last month begins.',
       }]}
+    />
+  );
+}
+
+/**
+ * The barometric pressure card, opened.
+ *
+ * A correlation sheet in all but its words: the two groups of days as tiles, the
+ * confidence strip, and the outcome day by day with the low pressure days shaded.
+ * The words differ because the factor does. Nobody "logged" low pressure, so the
+ * legend names the rule instead, and the coverage line says how much of the window
+ * the barometer could actually judge, which is the first thing a skeptical reader
+ * will want to know about a sensor they never knew was recording.
+ */
+export function PressureSheet({ pressure, detail }: { pressure: PressureInsight; detail: Record<string, DetailSeries> }) {
+  const p = usePalette();
+  const shaded = `Shaded: low pressure days, ${LOW_BELOW_INHG.toFixed(2)} inHg or more below your usual. ${pressure.lowDays} of ${pressure.knownDays} days.`;
+  const stale = pressure.findings.some((f) => f.stale);
+  return (
+    <Body
+      title="Barometric pressure"
+      findings={pressure.findings.map(({ c, stale: old }) => {
+        const def = TREND_METRICS[c.outcome];
+        const color = c.good ? GOOD : p.accent;
+        return {
+          headline: pressureHeadline(c),
+          tiles: [
+            { value: def.fmt(c.high), unit: c.unit, label: 'Low pressure days', color },
+            { value: def.fmt(c.low), unit: c.unit, label: 'Other days' },
+            { value: c.deltaValue, unit: c.unit, label: 'Difference', color },
+          ],
+          pips: c.pips,
+          confidence: c.confidence,
+          good: c.good,
+          series: old ? null : detail[c.id] || null,
+          shaded,
+          chartDesc: c.lag
+            ? 'Each point is one day. The link was found in the NEXT day, so a shaded day is the day before the one it moved.'
+            : 'Each point is one day.',
+        };
+      })}
+      footer={
+        <View style={{ marginTop: 4 }}>
+          {pressure.since ? (
+            <View style={{
+              flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12, paddingHorizontal: 14, marginBottom: 14,
+              borderRadius: radius.card, backgroundColor: p.surface2, borderWidth: 1, borderColor: p.border,
+            }}>
+              <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: p.textDim }} />
+              <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 17, color: p.textDim }}>
+                {`Pressure recorded on ${pressure.knownDays} days since ${fmtShort(pressure.since)}.`}
+                {stale ? ' Some of these numbers are from the last time there were enough days to check them.' : ''}
+              </Text>
+            </View>
+          ) : null}
+          <Text style={{ textAlign: 'center', fontSize: 12, lineHeight: 17, color: p.textDim, paddingHorizontal: 8 }}>
+            Linked, not proven. Patterns in your own log, not a cause.
+          </Text>
+        </View>
+      }
     />
   );
 }

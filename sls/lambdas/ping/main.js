@@ -262,8 +262,9 @@ const LOGS = {
 
 /** Which feature was used — the USE route. The first two are not gated, which
  *  is why they are not on SEE; `B` is the pacing budget actually opened, and is
- *  on both routes split by what the tap got (see VIEWS). */
-const FEATURES = { M: 'milestones-opened', P: 'protocol-saved', B: 'pacing-budget-opened' };
+ *  on both routes split by what the tap got (see VIEWS). `U` is the budget
+ *  revealed on a day the app had paused it, read against `B`. */
+const FEATURES = { M: 'milestones-opened', P: 'protocol-saved', B: 'pacing-budget-opened', U: 'pacing-budget-unpaused' };
 
 /** Which Insights finding was opened into its deep dive — the FND route. */
 const FINDINGS = { E: 'early-signal', U: 'unconfirmed-pattern', C: 'biggest-change', R: 'correlation' };

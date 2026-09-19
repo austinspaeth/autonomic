@@ -523,7 +523,7 @@ export function pingLogged(kind: LogKind, type?: string): void {
 /** A feature was used: `'milestones'` (the sheet opened), `'protocol'` (the
  *  clean-day protocol saved) or `'pacing'` (the budget sheet opened by somebody
  *  who can read it — the locked half of that same tap is `pingViewOpened`). */
-export function pingFeature(feature: 'milestones' | 'protocol' | 'pacing'): void {
+export function pingFeature(feature: 'milestones' | 'protocol' | 'pacing' | 'unpause'): void {
   pingPerLetter('use', KEY_LAST_USE, featureCode(feature));
 }
 

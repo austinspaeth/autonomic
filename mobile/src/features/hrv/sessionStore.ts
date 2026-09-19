@@ -32,7 +32,8 @@ import {
   noteRrSample, rrSupport, RR_WATCH_START, type RrSupport, type RrWatch,
 } from '../../lib/ble/rrSupport';
 import { ppg, type PpgSignal } from '../../lib/ppg/camera';
-import { correctArtifacts, hopelessCoverage, std } from '../../lib/hrv';
+import { computeHrv, correctArtifacts, hopelessCoverage, std } from '../../lib/hrv';
+import { readingDoneCopy } from '../../lib/notifications';
 import { notifyHrvComplete } from '../../lib/reminders';
 import { logError } from '../../lib/diagnostics/errorLog';
 import { getState } from '../../store/store';
@@ -501,8 +502,23 @@ export async function finishSession() {
   void completionBuzz();
   // Backgrounded (a BLE reading keeps running while the phone is set aside), iOS
   // never plays the buzz above — post a notification so completion is still
-  // felt. Foreground readings feel the buzz, so skip it there.
-  if (AppState.currentState !== 'active') void notifyHrvComplete();
+  // felt. Foreground readings feel the buzz, so skip it there. It says what the
+  // results card will say (saved, needs a decision, or unusable), so the verdict
+  // is taken here with the same pipeline; a watch reading's beats are still on
+  // the wrist, so it has none to judge.
+  if (AppState.currentState !== 'active') {
+    const cfg = snap.config;
+    const onWrist = cfg?.source === 'watch' || cfg?.source === 'garmin';
+    let result = null;
+    if (!onWrist && cfg) {
+      try {
+        result = computeHrv(rr, { style: cfg.style, source: cfg.source, durationSec: capturedSec, segmentStarts });
+      } catch (e) { logError('hrv.notify', e); }
+    }
+    if (onWrist || result) {
+      void notifyHrvComplete(readingDoneCopy(result, cfg?.source === 'garmin' ? 'Garmin' : 'Apple Watch'));
+    }
+  }
   await releaseCapture();
 }
 

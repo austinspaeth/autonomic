@@ -580,6 +580,30 @@ function describe(c: Candidate, q: number): Correlation {
 }
 
 /**
+ * One named pair, tested on its own: `factorId|outcome|lag`, the id every finding
+ * carries.
+ *
+ * For a finding the app has ALREADY made and keeps on screen (the barometric
+ * pressure card, ./index), which is why `q` is the raw p rather than a corrected
+ * one: once a pair has been found through the full sweep's correction, asking it
+ * again is a single pre-specified question, not a search, and there is no family
+ * to correct for. Its confidence pips therefore move with the evidence as days
+ * arrive, up or down, which is the honest way for a permanent card to age.
+ *
+ * Null when the pair can no longer be tested at all (its factor did not make the
+ * floor this window, or coverage failed).
+ */
+export function testFinding(matrix: DayMatrix, id: string): Correlation | null {
+  const [factorId, outcomeId, lagText] = id.split('|');
+  const factor = matrix.defs.find((f) => f.id === factorId);
+  const def = TREND_METRICS[outcomeId as TrendMetricId];
+  const lag = Number(lagText);
+  if (!factor || !def || !Number.isFinite(lag)) return null;
+  const c = test(matrix, factor, def, lag);
+  return c ? describe(c, c.p) : null;
+}
+
+/**
  * Every association in this journal that survives all four filters, strongest
  * first. An empty array is a completely normal and correct answer.
  *

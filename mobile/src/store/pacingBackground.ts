@@ -44,6 +44,7 @@ import { syncNotificationPermission } from '../lib/reminders';
 import { syncWidgetsNow } from '../lib/widgets';
 import { refreshDayLoad } from './budget';
 import { checkPacingAlerts } from './pacingAlerts';
+import { samplePressure } from './pressure';
 import { isPacingUnlocked } from './pacingTrial';
 import { flushSave, getState } from './store';
 
@@ -141,6 +142,13 @@ export function runPacingBackgroundCheck(): Promise<void> {
         await checkPacingAlerts();
       } catch (e) {
         logError('pacing.alert', e);
+      }
+      // The barometer rides the same wake-up: a low-pressure morning is only
+      // worth a notification if it can arrive before the app is opened.
+      try {
+        await samplePressure();
+      } catch (e) {
+        logError('pressure.sample', e);
       }
       await syncWidgetsNow();
       // The debounce timer may never fire before the process is suspended.

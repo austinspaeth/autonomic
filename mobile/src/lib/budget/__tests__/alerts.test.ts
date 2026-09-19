@@ -19,6 +19,7 @@ const view = (over: Partial<BudgetView> = {}): BudgetView => ({
   figure: '', figureSub: '', sub: '', flag: null, rightLabel: null,
   recommendation: null, ceilingMoved: null,
   learning: false, past: false, skeleton: false, stepsMissing: false,
+  pausedReason: null, unpaused: null,
   ...over,
 });
 

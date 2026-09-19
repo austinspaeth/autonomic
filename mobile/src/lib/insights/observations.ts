@@ -221,7 +221,10 @@ const bestDays: ObservationProbe = (input) => {
 
   let best: { label: string; hi: number; lo: number; lift: number } | null = null;
   input.matrix.defs.forEach((f) => {
-    if (f.kind !== 'binary' || f.group === 'symptom') return;
+    // Nor the weather: pressure speaks only through its own card, and only once
+    // the sweep has found it linked (lib/pressure). A crude lift here would be
+    // exactly the unearned claim that card exists to avoid.
+    if (f.kind !== 'binary' || f.group === 'symptom' || f.group === 'weather') return;
     const col = input.matrix.factors[f.id];
     if (!col) return;
     let hi = 0, hiN = 0, lo = 0, loN = 0;

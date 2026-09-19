@@ -2,6 +2,9 @@ import { addDays, todayKey } from '../../dates';
 import { demoDays } from '../../demo';
 import { scoreCat, type DaysMap } from '../../scoring/day';
 import { dayScore } from '../../trends/metrics';
+import { keyRange } from '../../trends/series';
+import { crashIsFall, CRASH_REL_WINDOW } from '../envelope';
+import { PAUSED_TODAY_SUB } from '../pause';
 import { buildBudget, hm } from '../index';
 import { outcomeOf } from '../outcome';
 import type { AppState, DayLoad, DayRecord, Entry } from '../../types';
@@ -83,15 +86,38 @@ describe('the demo journal, run through the real engine', () => {
     expect(rows).toHaveLength(keys.length);
   });
 
-  it('publishes NO number on a crash-grade day', () => {
+  /* A crash-grade day publishes nothing when it is a FALL, and publishes a
+     (small) number when it is this person's own floor. The demo journal holds
+     both: it opens in the crash band and climbs out, so its early crash days
+     sit among other crash days and its later ones would be a real drop.
+
+     This test used to assert suppression on EVERY crash-grade day, which is
+     the behaviour that switched the feature off permanently for the sickest
+     users — see ../envelope's `crashIsFall`. */
+  it('publishes no number on a crash-grade FALL, and a number at a crash-grade floor', () => {
+    let falls = 0;
+    let floors = 0;
     keys.forEach((dk) => {
       const s = dayScore(st.days[dk], dk, st.days, {});
       if (s == null || scoreCat(s).short !== 'Crash') return;
+      const recent = keyRange(addDays(dk, -1), CRASH_REL_WINDOW, addDays)
+        .map((k) => dayScore(st.days[k], k, st.days, {}))
+        .filter((x): x is number => x != null);
       const v = buildBudget(st, dk, {}, { ...OPTS, now: AT_2PM(), brief: true });
-      expect(v.state).toBe('suppressed');
-      expect(v.envelope.effortMin).toBeNull();
-      expect(v.leftMin).toBeNull();
+      if (crashIsFall(s, recent)) {
+        falls++;
+        expect(v.state).toBe('suppressed');
+        expect(v.envelope.effortMin).toBeNull();
+        expect(v.leftMin).toBeNull();
+      } else {
+        floors++;
+        expect(v.state).not.toBe('suppressed');
+        expect(v.envelope.effortMin).toBeGreaterThan(0);
+      }
     });
+    // The journal has to exercise both sides, or this asserts nothing.
+    expect(falls + floors).toBeGreaterThan(0);
+    expect(floors).toBeGreaterThan(0);
   });
 
   it('gives a bad day a smaller budget than a good one', () => {
@@ -327,7 +353,11 @@ describe('honesty rules', () => {
     Object.keys(st.days).forEach((k) => {
       const v = buildBudget(st, k, {}, { ...OPTS, now: AT_2PM(), brief: true });
       const copy = `${v.figure} ${v.figureSub} ${v.sub} ${v.rightLabel || ''}`;
-      expect(copy).not.toMatch(/you may|you can|you should|will cause|because you/i);
+      // `PAUSED_TODAY_SUB` is the one exemption, and only for "you can":
+      // it grants permission to LOOK at a withheld number, never to spend
+      // anything. See ../pause. Every other line is held to the full ban.
+      const scrubbed = copy.replace(PAUSED_TODAY_SUB, '');
+      expect(scrubbed).not.toMatch(/you may|you can|you should|will cause|because you/i);
       expect(copy).not.toContain('—');
     });
   });

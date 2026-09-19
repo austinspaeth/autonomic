@@ -23,7 +23,7 @@
  */
 import type { DayRecord, TypeDef } from '../types';
 import { fmtTime12 } from '../dates';
-import type { ImportedHrvQuality } from '../hrvQuality';
+import { isPoorImport, type ImportedHrvQuality } from '../hrvQuality';
 import type { ImportedMed, ImportedReading, ImportedWorkout, SleepImport } from './index';
 import { workoutCandidateOf, type WorkoutCandidate } from './workoutCandidate';
 
@@ -144,6 +144,32 @@ export function filterDeclined(set: HealthUpdateSet, declined: ReadonlySet<strin
     workouts: set.workouts.filter((w) => !gone(w.key, 'workout', w.type, w.time)),
     meds: set.meds.filter((m) => !gone(m.key, 'med', m.type, m.time)),
   };
+}
+
+/** An empty set for `dk` — the shape every filter returns when nothing survives. */
+export const emptyUpdateSet = (dk: string): HealthUpdateSet =>
+  ({ dk, sleep: null, readings: [], workouts: [], meds: [] });
+
+/**
+ * Split a set into what the app will file on the user's behalf and what it
+ * won't.
+ *
+ * The import pill writes as it finds — a health sample is a measurement that
+ * already happened, and asking permission to record it made every one of them a
+ * second decision. The exception is the same one capture makes: a reading the
+ * app has DECLINED to file is offered instead, because the alternative is
+ * recording a claim about somebody's body that nobody agreed to. `isPoorImport`
+ * is that line (the `confidence` ladder's own 'fair' edge), and poor-quality
+ * HRV is its only member today — nothing else the platform hands us carries a
+ * quality verdict at all.
+ *
+ * Sleep, workouts and meds never land in the review lane: there is no series
+ * behind them to grade, so there would be nothing to tell the user.
+ */
+export function splitForReview(set: HealthUpdateSet): { auto: HealthUpdateSet; review: UpdateReading[] } {
+  const review = set.readings.filter((r) => isPoorImport(r.quality));
+  if (!review.length) return { auto: set, review: [] };
+  return { auto: { ...set, readings: set.readings.filter((r) => !isPoorImport(r.quality)) }, review };
 }
 
 /** Stable id of a result set — lets the pill remember "already dismissed this

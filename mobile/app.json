@@ -2,7 +2,7 @@
   "expo": {
     "name": "Autonomic",
     "slug": "autonomic",
-    "version": "1.28.0",
+    "version": "1.29.0",
     "scheme": "autonomic",
     "orientation": "portrait",
     "icon": "./assets/autonomic-icon.png",
@@ -115,6 +115,12 @@
     },
     "plugins": [
       "expo-router",
+      [
+        "expo-sensors",
+        {
+          "motionPermission": "Autonomic reads your phone's barometer to see whether changes in air pressure line up with how you feel. Nothing leaves your phone."
+        }
+      ],
       [
         "react-native-ble-plx",
         {

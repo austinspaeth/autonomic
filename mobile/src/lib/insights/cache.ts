@@ -32,6 +32,7 @@
 import type { ScoreContext } from '../scoring';
 import type { AppState } from '../types';
 import { findingMemory, noteFindingsShown } from './findingMemory';
+import { notePressureShown, pressureMemory } from './pressureMemory';
 import { buildInsights, type InsightReport } from './index';
 
 interface Slot { key: string; report: InsightReport }
@@ -69,8 +70,13 @@ export function computeInsights(state: AppState, dk: string, opts: { demo?: bool
     report = buildInsights(state, dk, opts);
   } else {
     const mem = findingMemory();
-    report = buildInsights(state, dk, { ...opts, retain: { correlations: mem.correlationIds, change: mem.changeId } });
+    report = buildInsights(state, dk, {
+      ...opts,
+      retain: { correlations: mem.correlationIds, change: mem.changeId },
+      pressure: pressureMemory(),
+    });
     noteFindingsShown(report);
+    notePressureShown(report.pressure);
   }
   slot = { key, report };
   return report;

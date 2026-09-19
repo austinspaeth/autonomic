@@ -35,6 +35,7 @@ import { formatAppDiagnostics } from '../lib/diagnostics/appReport';
 // state. A second copy is a second thing to forget when it changes, and the one
 // the user is told to write to must be the one that is watched.
 import { SupportCard } from './SupportCard';
+import { disablePressure, enablePressure, usePressureStatus } from '../store/pressure';
 
 const PRIVACY_URL = 'https://autonomic.care/privacy-policy/';
 const TERMS_URL = 'https://autonomic.care/terms-of-service/';
@@ -75,6 +76,7 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
   const state = useAppState();
   const tier = useTier();
   const toast = useToast();
+  const pressure = usePressureStatus();
   // Row badge: `true` keeps the green "Connected" pill; a {text, color} pair
   // renders the same pill in any tint (e.g. the accent "Trial" state).
   const item = (icon: IconName, title: string, sub: string, onPress: () => void, badge?: boolean | { text: string; color: string }) => {
@@ -116,6 +118,10 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
       <NotificationsRow />
       {item('bluetooth', 'Devices', 'Heart-rate straps', () => openSheet(() => <DevicesScreen />), !!state.settings.lastBleDeviceId)}
       {item('heart', healthAppName(), 'Read & write health data', () => openSheet(() => <HealthScreen />), !!state.settings.healthEnabled)}
+      {pressure.available
+        ? item('gauge', 'Barometric pressure', 'See if weather changes affect you', () => openSheet((c) => <PressureSettingsSheet controls={c} />, { fitContent: true }),
+          pressure.on ? { text: 'On', color: '#22c55e' } : undefined)
+        : null}
       {item('star', 'Subscription', 'Manage plan or restore', () => openSheet((c) => <SubscriptionSheet controls={c} />),
         tier === 'trial' ? { text: 'Trial', color: p.accent } : tier === 'pro' ? { text: 'Pro', color: '#22c55e' } : undefined)}
       {item('download', 'Export data', 'Download everything as JSON', () => exportData())}
@@ -138,6 +144,35 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
         <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center', marginTop: 16 }}>Built in Charleston, South Carolina 🇺🇸</Text>
         <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center', marginTop: 4 }}>© 2026 DiscoveryMark LLC</Text>
       </View>
+    </View>
+  );
+}
+
+/** The barometer's on/off, with what it does said once. The only place it can be
+ *  switched OFF: the wizard row only ever turns it on. */
+function PressureSettingsSheet({ controls }: { controls: SheetControls }) {
+  const p = usePalette();
+  const toast = useToast();
+  const { on } = usePressureStatus();
+  const [busy, setBusy] = useState(false);
+  const turnOn = async () => {
+    setBusy(true);
+    const ok = await enablePressure();
+    setBusy(false);
+    if (ok) controls.close();
+    else toast('Allow Motion & Fitness for Autonomic in Settings');
+  };
+  return (
+    <View style={{ gap: 14 }}>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text }}>Barometric pressure</Text>
+      <Text style={{ fontSize: 15, lineHeight: 21, color: p.textDim }}>
+        Your phone has a barometer. With this on, Autonomic records air pressure when you open the app and checks
+        whether low pressure days line up with how you feel. You will only hear about it if they do.
+      </Text>
+      <Text style={{ fontSize: 15, lineHeight: 21, color: p.textDim }}>Nothing leaves your phone.</Text>
+      {on
+        ? <Button title="Turn off" variant="default" onPress={() => { disablePressure(); controls.close(); }} />
+        : <Button title={busy ? 'Turning on…' : 'Turn on'} variant="primary" onPress={turnOn} />}
     </View>
   );
 }

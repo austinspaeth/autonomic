@@ -27,6 +27,8 @@ import {
 } from '../lib/scoring/day';
 import { detectDownturn, type Downturn } from '../lib/scoring/downturn';
 import { buildBudget, type BudgetView } from '../lib/budget';
+import { PAUSE_ADVICE } from '../lib/budget/pause';
+import { notePausedShown, pauseOpts, showBudgetAnyway, usePauseVersion } from '../store/budgetPause';
 import { useStepsMissing } from '../store/budget';
 import { BudgetStrip } from './budget/Strip';
 import { useBudgetPulse, type BudgetPulse } from './budget/pulse';
@@ -40,7 +42,11 @@ import { addDays, todayKey } from '../lib/dates';
 import { hexA, mixHex } from '../lib/color';
 import { LEVEL_DELTA, scoreTrend, type ScoreTrend } from '../lib/scoring/scoreTrend';
 import { getState, useAppState } from '../store/store';
-import { setJournalSectionY } from '../store/nav';
+import { requestInsightsCard, setJournalSectionY } from '../store/nav';
+import { router } from 'expo-router';
+import { readPressure } from '../lib/pressure';
+import { pressureLink } from '../lib/insights/pressureMemory';
+import { pressureWarning } from '../lib/insights/pressureCopy';
 import { useTier } from '../store/tier';
 import { usePacingUnlocked } from '../store/pacingTrial';
 import { usePaywall } from './Paywall';
@@ -245,6 +251,21 @@ export function DaySummary({ dk }: { dk: string }) {
     [downturn, state.days, dk, ctx],
   );
 
+  // The third, quietest reason for the same card: the phone's barometer reads
+  // LOW today, and this person's own journal has already been found to run worse
+  // on low pressure days (lib/pressure, lib/insights/pressureMemory). Today only,
+  // since it is about the air right now, and only when neither detector above
+  // has anything to say: one warning card, ever. `lastUpdated` is in the deps
+  // because the link is written by the Insights build, outside `state`.
+  const pressureNote = useMemo(() => {
+    if (downturn || strain || dk !== todayKey()) return null;
+    const r = readPressure(state.pressure, dk);
+    if (!r || !r.low) return null;
+    const link = pressureLink();
+    return link ? pressureWarning(link) : null;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [downturn, strain, dk, state.pressure, state.meta.lastUpdated]);
+
   // The footer's trend line and its vs-window delta. Memoized for the same
   // reason `downturn` and `strain` are: a 'score' series runs a full scoreSet per
   // day, so a fortnight of them on every Journal render is not free.
@@ -265,6 +286,10 @@ export function DaySummary({ dk }: { dk: string }) {
   const isToday = dk === todayKey();
   const now = useNow(5 * 60_000, isToday);
   const stepsMiss = useStepsMissing(dk);
+  // The reader's own per-day "show it anyway", and the run of paused days
+  // behind it. `pauseVersion` is what puts the memo back through the build
+  // when either changes — the lists themselves live on disk, not in state.
+  const pauseVersion = usePauseVersion();
   const budget = useMemo(
     () => buildBudget(state, dk, ctx, {
       now: isToday ? now : new Date(`${dk}T23:59:00`),
@@ -273,9 +298,18 @@ export function DaySummary({ dk }: { dk: string }) {
       strain: strain ? strain.severity : null,
       past: !isToday,
       stepsGranted: !stepsMiss,
+      ...pauseOpts(dk),
     }),
-    [state, dk, ctx, now, isToday, downturn, strain, stepsMiss],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [state, dk, ctx, now, isToday, downturn, strain, stepsMiss, pauseVersion],
   );
+  // The run valve counts days the budget was actually PAUSED ON SCREEN, so it
+  // is recorded here rather than inside the engine, which is pure and is also
+  // run by the widgets, the alerts and every past day the accuracy strip
+  // walks. Today only, and idempotent.
+  useEffect(() => {
+    if (isToday && budget.state === 'suppressed') notePausedShown(dk);
+  }, [isToday, budget.state, dk]);
   // The bar narrates its own movement. Computed here, once, and handed to
   // whichever of the three heroes below is rendering the strip — a hook per
   // hero would keep three separate memories of the previous build and the two
@@ -312,6 +346,11 @@ export function DaySummary({ dk }: { dk: string }) {
       ) : strain ? (
         <WarningCard severity={strain.severity} headline={strain.headline}
           onPress={() => openSheet(() => <StrainExplain w={strain} dk={dk} />)} />
+      ) : pressureNote ? (
+        // No sheet of its own: the explanation IS the Insights card, so the tap
+        // goes there and asks it to scroll the card into view.
+        <WarningCard severity="watch" headline={pressureNote}
+          onPress={() => { requestInsightsCard('pressure'); router.navigate('/insights'); }} />
       ) : null}
       <TrendCard dk={dk} />
       <MilestoneProgressCard dk={dk} />
@@ -388,7 +427,7 @@ function BaselineWaitingCard({ dk, budget, pulse }: { dk: string; budget: Budget
             new user something real to look at and act on, wearing its own
             "Learning" label so the claim is honest. */}
         <View style={{ marginTop: -2, marginBottom: 16 }}>
-          <BudgetStrip budget={budget} locked={budgetLocked} pulse={pulse} onPress={() => openBudgetSheet(openSheet, dk, budget)} />
+          <BudgetStrip budget={budget} locked={budgetLocked} pulse={pulse} onPress={() => openBudgetSheet(openSheet, dk, budget)} onShowAnyway={() => showBudgetAnyway(dk)} />
         </View>
 
         <Pressable
@@ -467,7 +506,7 @@ function UnscoredHero({ dk, all, hasReadings, budget, pulse }: { dk: string; all
           one reading that would sharpen it. An empty slot here would mean the
           feature is invisible to exactly the user who most needs a way in. */}
       {future ? null : (
-        <BudgetStrip budget={budget} locked={budgetLocked} pulse={pulse} onPress={() => openBudgetSheet(openSheet, dk, budget)} />
+        <BudgetStrip budget={budget} locked={budgetLocked} pulse={pulse} onPress={() => openBudgetSheet(openSheet, dk, budget)} onShowAnyway={() => showBudgetAnyway(dk)} />
       )}
       {future ? null : <KeyFigures dk={dk} all={all} />}
       {/* The same offer the baseline card makes, on the one day it can be acted
@@ -696,6 +735,12 @@ function ScoredHero({ dk, readings, d, all, ctx, trend, budget, pulse, onExplain
   const delta = mornScore != null ? all.score! - mornScore : null;
   const mode = hasEvening ? (dk < today ? 'Day Complete' : 'Reflectance') : 'Autonomic Outlook';
 
+  /* The recovery advice follows the PAUSE, never the crash grade. It is drawn
+     inside the paused card by the strip itself; the only thing left for this
+     component to decide is the day after the reader has revealed the number,
+     where the advice becomes a caveat on it and so follows it down the card. */
+  const revealed = !!budget.unpaused && budget.state !== 'suppressed';
+
   let guide: string;
   if (hasEvening) {
     if (delta == null) guide = 'Evening reading logged. ' + (TOMORROW[cat.short] || '');
@@ -768,11 +813,35 @@ function ScoredHero({ dk, readings, d, all, ctx, trend, budget, pulse, onExplain
       {blueZone(readings, ctx) ? (
         <Flag color={SCORE_COLORS.warning} text="Blue-zone risk. High readiness may mask fragility, so do less today, not more." />
       ) : null}
-      {cat.short === 'Crash' ? <Flag color={SCORE_COLORS.crash} text="Mandatory recovery day. Full rest, hydration, and protocol." /> : null}
+      {/* Definite about the warning, never commanding about the person, and
+          SHORT. It read "Mandatory recovery day. Full rest, hydration, and
+          protocol." — an instruction, issued in three lines of red, to
+          somebody already having the worst day in their journal and who may
+          have no choice about the shape of it. Two lines at most here: a
+          paragraph of red is read as a wall rather than as advice.
+
+          It is no longer fired here at all, and no longer keyed on the crash
+          grade: the advice and the paused budget are one notice, so it lives
+          in `lib/budget/pause` and the strip renders it. Keyed on the grade,
+          each half could appear alone — a crash-grade day at the reader's own
+          floor is not paused (lib/budget/envelope's `crashIsFall`) and showed
+          advice over a live budget, while a downturn or strain alert pauses
+          days scoring up to 74 and showed a pause explaining nothing. */}
       {/* The pacing budget. Between the guidance paragraph and the three sunk
           tiles, which is where the design puts it: the gauge above stays the
           hero and the tiles below keep their own hairline. */}
-      <BudgetStrip budget={budget} locked={budgetLocked} pulse={pulse} onPress={() => openBudgetSheet(openSheet, dk, budget)} />
+      <BudgetStrip
+        budget={budget}
+        locked={budgetLocked}
+        pulse={pulse}
+        onPress={() => openBudgetSheet(openSheet, dk, budget)}
+        onShowAnyway={() => showBudgetAnyway(dk)}
+        tone={cat.color}
+      />
+      {/* Unpaused: the advice is now a caveat on a number the reader asked to
+          see, so it follows the number rather than leading it. Same colour as
+          the card it came out of, which is the day's own grade. */}
+      {revealed ? <Flag color={cat.color} text={PAUSE_ADVICE} /> : null}
       <KeyFigures dk={dk} all={all} />
     </Pressable>
   );

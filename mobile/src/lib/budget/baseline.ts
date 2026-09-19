@@ -119,7 +119,16 @@ export const RESOLUTION_OUTLIER_RATIO = 2;
  *
  * Low for the population on purpose. These are starting points, not claims:
  * the first evaluated outcome already moves them, and the strip never presents
- * them as measured. A Crash day is suppressed and never reaches this table.
+ * them as measured.
+ *
+ * A Crash row is REQUIRED, and the lack of one was a real hole. The comment
+ * here used to read "a Crash day is suppressed and never reaches this table",
+ * which was true only while the crash suppressor was an absolute band — and
+ * the consequence of being wrong was silent and backwards, because a missing
+ * key falls through to `PRIOR_DEFAULT` (200), which is HIGHER than Bad. Now
+ * that a crash-grade day at somebody's own floor publishes a number
+ * (./envelope's `crashIsFall`), that day is the one that most needs the
+ * smallest prior in the table.
  */
 export const PRIOR_BY_GRADE: Record<string, number> = {
   Excellent: 300,
@@ -127,6 +136,7 @@ export const PRIOR_BY_GRADE: Record<string, number> = {
   Moderate: 220,
   Compromised: 170,
   Bad: 120,
+  Crash: 80,
 };
 /** Used when the day has no score at all yet. */
 export const PRIOR_DEFAULT = 200;

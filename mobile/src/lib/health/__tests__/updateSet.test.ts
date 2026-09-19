@@ -4,7 +4,7 @@
  */
 import {
   allItemKeys, buildUpdateSet, dayAlreadyHas, filterDeclined, filterSeen, importFingerprint,
-  sleepItemKey, updateCount, updateSignature, type RawHealthDay,
+  sleepItemKey, splitForReview, updateCount, updateSignature, type RawHealthDay,
 } from '../updateSet';
 import type { ImportedReading, ImportedWorkout, SleepImport } from '../index';
 import { MED_TYPES } from '../../registry';
@@ -213,6 +213,53 @@ describe('buildUpdateSet', () => {
       // 60 minutes for a dose, 10 for everything else.
       expect(dayAlreadyHas(d, 'med', 'magnesium', '08:55')).toBe(true);
       expect(dayAlreadyHas(d, 'med', 'magnesium', '09:05')).toBe(false);
+    });
+  });
+
+  describe('splitForReview', () => {
+    const clean = { artifactPct: 3, confidence: 'high' as const, beatCount: 300 };
+    const poor = { artifactPct: 22, confidence: 'fair' as const, beatCount: 300 };
+
+    it('files everything when nothing is poor, and hands back the same set', () => {
+      const set = buildUpdateSet(DK, day(), raw({
+        imports: [hrvImport({ quality: clean })], workouts: [workout()], sleep: night,
+      }), MED_TYPES);
+      const { auto, review } = splitForReview(set);
+      expect(review).toEqual([]);
+      expect(auto).toBe(set);
+    });
+
+    it('holds back a poor reading and files the rest', () => {
+      const set = buildUpdateSet(DK, day(), raw({
+        imports: [
+          hrvImport({ quality: poor }),
+          hrvImport({ startMs: 9000, time: '12:30', quality: clean }),
+        ],
+        workouts: [workout()],
+        sleep: night,
+      }), MED_TYPES);
+      const { auto, review } = splitForReview(set);
+      expect(review.map((r) => r.time)).toEqual(['06:52']);
+      expect(auto.readings.map((r) => r.time)).toEqual(['12:30']);
+      // Only readings are ever held: nothing else carries a quality verdict.
+      expect(auto.sleep).toBe(set.sleep);
+      expect(auto.workouts).toHaveLength(1);
+    });
+
+    it('never holds a reading with no series to grade', () => {
+      // An SDNN-only sample has no beats behind it, so it cannot be called poor
+      // — unknown is not the same as bad (see isPoorImport).
+      const set = buildUpdateSet(DK, day(), raw({ imports: [hrvImport()] }), MED_TYPES);
+      expect(splitForReview(set).review).toEqual([]);
+    });
+
+    it('accounts for every item exactly once', () => {
+      const set = buildUpdateSet(DK, day(), raw({
+        imports: [hrvImport({ quality: poor }), hrvImport({ startMs: 9000, time: '12:30', quality: clean })],
+        workouts: [workout()], sleep: night,
+      }), MED_TYPES);
+      const { auto, review } = splitForReview(set);
+      expect(updateCount(auto) + review.length).toBe(updateCount(set));
     });
   });
 

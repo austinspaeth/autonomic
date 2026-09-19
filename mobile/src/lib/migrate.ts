@@ -14,6 +14,7 @@
  */
 import { addDays, todayKey, uid } from './dates';
 import { MED_TYPES } from './registry';
+import { isPlausibleHpa, type PressureMap } from './pressure';
 import type {
   AppState,
   DayLoad,
@@ -259,6 +260,21 @@ function cleanCustomTypes(v: unknown): AppState['customTypes'] {
   return out;
 }
 
+/** Barometer samples (lib/pressure): day key → hour → hPa. Anything that is not
+ *  a valid day, a two-digit hour or a plausible reading is dropped, and an empty
+ *  result is no field at all. */
+function cleanPressure(v: unknown): PressureMap | undefined {
+  if (!isPlainObject(v)) return undefined;
+  const out: PressureMap = {};
+  for (const [dk, day] of Object.entries(v)) {
+    if (!DATE_KEY_RE.test(dk) || !isPlainObject(day)) continue;
+    const hours: Record<string, number> = {};
+    for (const [hh, hpa] of Object.entries(day)) if (/^\d\d$/.test(hh) && isPlausibleHpa(hpa)) hours[hh] = hpa;
+    if (Object.keys(hours).length) out[dk] = hours;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 function cleanHiddenTypes(v: unknown): AppState['hiddenTypes'] {
   const out: AppState['hiddenTypes'] = {};
   if (!isPlainObject(v)) return out;
@@ -329,6 +345,14 @@ export function migrate(s: unknown): AppState {
     } else delete settings.pacingAlerts;
   }
   if (settings.pacingAlertsEnabled !== undefined && typeof settings.pacingAlertsEnabled !== 'boolean') delete settings.pacingAlertsEnabled;
+  if (settings.pressureEnabled !== undefined && typeof settings.pressureEnabled !== 'boolean') delete settings.pressureEnabled;
+  const pal = settings.pressureAlert as unknown;
+  if (pal !== undefined) {
+    if (isPlainObject(pal)) {
+      settings.pressureAlert = { enabled: !!pal.enabled };
+      if (typeof pal.lastFired === 'string' && DATE_KEY_RE.test(pal.lastFired)) settings.pressureAlert.lastFired = pal.lastFired;
+    } else delete settings.pressureAlert;
+  }
 
   const profile: Record<string, unknown> = isPlainObject(src.profile) ? src.profile : {};
   const meta: Record<string, unknown> = isPlainObject(src.meta) ? src.meta : {};
@@ -342,6 +366,7 @@ export function migrate(s: unknown): AppState {
     settings.protocolSetOn = DATE_KEY_RE.test(lu) ? lu : todayKey();
   }
 
+  const pressure = cleanPressure(src.pressure);
   const out: AppState = {
     version: SCHEMA_VERSION,
     settings,
@@ -367,6 +392,7 @@ export function migrate(s: unknown): AppState {
         : {}),
     },
     days: {},
+    ...(pressure ? { pressure } : {}),
   };
 
   // Retire catalog references to the removed upper/lower split. Hidden types

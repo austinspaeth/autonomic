@@ -14,8 +14,13 @@
  *      like it.
  *   3. NEVER SUGGEST DOING MORE. The budget is a ceiling, never a target. No
  *      copy anywhere may imply that unspent budget was wasted.
- *   4. SILENCE ON BAD DAYS. A downturn, a crash-grade day or a strain alert
- *      publishes no number at all.
+ *   4. SILENCE ON BAD DAYS, BUT SILENCE IS AN EVENT. A downturn, a crash-grade
+ *      FALL or a strain alert publishes no number at all. Each of the three is
+ *      measured against the person rather than a band, so none can latch on
+ *      for ever (./envelope's `crashIsFall` is what fixed the one that could);
+ *      ./pause is the backstop for the rest, with a run valve and the reader's
+ *      own per-day override. A feature that has shown nothing for three days
+ *      is not being careful with somebody, it is broken as far as they know.
  *   5. UNDERSHOOT. Where the model is uncertain it errs low.
  *   6. THE OUTCOME WINDOW IS +1 AND +2, never "tomorrow".
  *   7. SAY WHEN IT WAS WRONG. The accuracy readout reports misses as readily
@@ -38,6 +43,7 @@ import { buildAccuracy, type Accuracy } from './accuracy';
 import { ceilingMove } from './calibrate';
 import { makeScoreLookup, makeSetLookup } from './outcome';
 import { nextRecommendation, type Recommendation } from './recommend';
+import { PAUSED_TODAY_SUB, pauseReasonText, pauseRunBefore, unpausedBy, unpausedText, type Unpaused } from './pause';
 import { uprightSignature } from './upright';
 
 /** The states the BAR can be in. Confidence is deliberately not one of them —
@@ -115,6 +121,13 @@ export interface BudgetView {
    *  the sheet leads with the ask. Only ever true on today: it is an offer to
    *  fix something, and there is nothing to fix about last Tuesday. */
   stepsMissing: boolean;
+  /** Why the app would rather this day published nothing. Set on a paused day
+   *  AND on one showing its number anyway, which is the whole point: the
+   *  warning is not what the override takes away. */
+  pausedReason: Envelope['suppressed'];
+  /** Non-null when a paused day is showing its number: 'user' if the reader
+   *  asked, 'run' if ./pause's valve opened it. */
+  unpaused: Unpaused;
 }
 
 export interface BuildBudgetOpts {
@@ -133,6 +146,14 @@ export interface BuildBudgetOpts {
   /** Skip the expensive history passes: the Progress card builds one of these
    *  per day and does not render an accuracy strip or a ceiling sentence. */
   brief?: boolean;
+  /** The reader tapped "Show it anyway" on this day (./pauseMemory). */
+  userUnpaused?: boolean;
+  /** Days the budget was paused on, for ./pause's run valve. Passed in rather
+   *  than read, because this module is pure and the callers that care about
+   *  the valve are the ones with a screen. `src/store/pacingAlerts.ts`
+   *  deliberately passes NEITHER: an override is a decision to LOOK at a
+   *  number, never a licence for the app to volunteer one unprompted. */
+  pausedDays?: string[];
 }
 
 export function buildBudget(
@@ -183,10 +204,17 @@ export function buildBudgetAt(
   // confidence, and it needs nothing from the envelope in return (the credit
   // cap is a share of the day's own gross spend, not of the budget).
   const burn = buildBurn({ day: days[dk], types, lineBpm, multiplier: opts.multiplier, past: !!opts.past });
+  // Whether a paused day shows its number anyway. Decided here rather than in
+  // the envelope so the reason survives into the view: the sheet says a
+  // different sentence for "you asked" than for "the app stopped waiting".
+  const unpaused = unpausedBy({
+    userAsked: !!opts.userUnpaused,
+    run: pauseRunBefore(dk, opts.pausedDays || [], addDays),
+  });
   const envelope = buildEnvelope({
     days, dk, ctx, addDays, types, lineBpm,
     downturn: opts.downturn, strain: opts.strain, coverage: burn.coverage, scoreAt, setAt, spendAt,
-    past: !!opts.past,
+    past: !!opts.past, unpaused: !!unpaused,
   });
 
   const accuracy = opts.brief
@@ -203,13 +231,18 @@ export function buildBudgetAt(
   // something that has already happened.
   const stepsMissing = !past && opts.stepsGranted === false;
 
-  /* ---------- suppressed: no number, and nothing that implies one ---------- */
-  if (envelope.suppressed || envelope.effortMin == null) {
+  /* ---------- suppressed: no number, and nothing that implies one ----------
+     The test is the NUMBER, not the reason. `envelope.suppressed` stays set
+     on a day the reader has revealed — it is what every surface below reads
+     to keep the warning on screen — so branching on it here sent an
+     overridden day straight back to the paused card and made the play button
+     look dead. */
+  if (envelope.effortMin == null) {
     const view: BudgetView = {
       state: 'suppressed', envelope, burn, pace: null, accuracy,
       leftMin: null, overByMin: null, fill: 0,
       figure: past ? 'Budget was paused' : 'Budget paused for today', figureSub: '',
-      sub: past ? 'The app saw a downturn that day' : 'Take it easy, resume tomorrow',
+      sub: past ? pauseReasonText(envelope.suppressed || 'downturn', true) : PAUSED_TODAY_SUB,
       flag: null, rightLabel: null, lowConfidence: false,
       recommendation: null,
       ceilingMoved: null,
@@ -217,6 +250,8 @@ export function buildBudgetAt(
       past,
       stepsMissing,
       skeleton,
+      pausedReason: envelope.suppressed,
+      unpaused: null,
     };
     return nows.map(() => view);
   }
@@ -232,6 +267,8 @@ export function buildBudgetAt(
       lowConfidence: false,
       recommendation: null, ceilingMoved: null, learning, past, stepsMissing,
       skeleton,
+      pausedReason: envelope.suppressed,
+      unpaused,
     };
     return nows.map(() => view);
   }
@@ -358,6 +395,17 @@ export function buildBudgetAt(
       sub = `Pacing well for ${clock(nowMin)}, with some in reserve`;
     }
 
+    /* A day the app would rather had published nothing, publishing anyway.
+       The standing advice outranks every pacing line above: the reader has
+       one line of subtext and on this day it belongs to the warning, not to
+       how evenly they are spending. The exception is `over`, whose own copy
+       already says to rest and says it in red, which is the louder of the
+       two — replacing it would trade a stronger sentence for a weaker one. */
+    if (unpaused && envelope.suppressed && !past && !over) {
+      sub = unpausedText(envelope.suppressed, unpaused);
+      flag = 'amber';
+    }
+
     return {
       state: view, envelope, burn, pace, accuracy,
       // Set on a finished day too: "over by 45m" is what that day's record
@@ -372,6 +420,8 @@ export function buildBudgetAt(
       past,
       stepsMissing,
       skeleton,
+      pausedReason: envelope.suppressed,
+      unpaused,
     };
   });
 }

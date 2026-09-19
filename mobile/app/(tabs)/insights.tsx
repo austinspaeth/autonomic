@@ -50,7 +50,7 @@
  * a locked view is a dead end, not an upsell.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { InteractionManager, Pressable, Text, View, type LayoutChangeEvent } from 'react-native';
+import { InteractionManager, Pressable, Text, View, type LayoutChangeEvent, type ScrollView } from 'react-native';
 import { useIsFocused } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen, headerHeight } from '../../src/components/Header';
@@ -66,7 +66,7 @@ import { AskAiPill } from '../../src/features/insights/AskAi';
 import { InsightsEmpty, InsightsSkeleton } from '../../src/features/insights/InsightsSkeleton';
 import { InsightsFailed } from '../../src/features/insights/BuildFailed';
 import {
-  BiggestChangeCard, ConfidenceRing, ConfidenceSheet, Correlations, EarlySignals, InsightsFooter, NoImpact, TrendWatch, WorthALook,
+  BiggestChangeCard, ConfidenceRing, ConfidenceSheet, Correlations, EarlySignals, InsightsFooter, NoImpact, PressureCard, TrendWatch, WorthALook,
 } from '../../src/features/insights/Sections';
 import { SinceExplain } from '../../src/features/insights/SinceExplain';
 import { todayKey } from '../../src/lib/dates';
@@ -79,6 +79,7 @@ import { type CardHeights, type RowHeights, type RowKey } from '../../src/lib/in
 import { insightsShape, noteInsightsShape } from '../../src/lib/insights/shapeMemory';
 import { insightsAnchor } from '../../src/lib/insights/anchorMemory';
 import { markInsightsSeen } from '../../src/store/insightsBadge';
+import { peekInsightsCard, takeInsightsCard, useInsightsCardSignal } from '../../src/store/nav';
 
 /**
  * How long after interactions finish before the real content mounts.
@@ -360,6 +361,22 @@ export default function InsightsScreen() {
 
   const view = settled ? shown.current : null;
 
+  /**
+   * Arriving from the Journal's pressure warning: bring the pressure card into
+   * view. The request waits (peek, not take) until the card has actually laid out,
+   * since the warning is usually tapped before this screen has built anything.
+   */
+  const scrollRef = useRef<ScrollView>(null);
+  const pressureY = useRef<number | null>(null);
+  const cardSignal = useInsightsCardSignal();
+  const scrollToCard = useCallback(() => {
+    if (peekInsightsCard() !== 'pressure' || pressureY.current == null) return;
+    takeInsightsCard();
+    const y = Math.max(0, pressureY.current - headerH - 8);
+    requestAnimationFrame(() => scrollRef.current?.scrollTo({ y, animated: true }));
+  }, [headerH]);
+  useEffect(() => { scrollToCard(); }, [cardSignal, scrollToCard]);
+
   // Looking at the screen is what makes its findings "seen": stamp them and
   // clear the tab bar's dot. Keyed on the report so a rebuild that surfaces a
   // new finding WHILE the user is here is stamped too, not left lighting the
@@ -381,7 +398,7 @@ export default function InsightsScreen() {
    * finding is. The countdown holds the screen until the engine genuinely has
    * something; the early tier is the one card allowed to appear above it.
    */
-  const hasFindings = !!view && (!!view.change || view.correlations.length > 0);
+  const hasFindings = !!view && (!!view.change || view.correlations.length > 0 || !!view.pressure);
   /**
    * The weak tier has two homes, because its two variants answer two different
    * screens (see `EarlySignals`). `'early'` is a young journal's only finding and
@@ -437,8 +454,8 @@ export default function InsightsScreen() {
    * made here, in the order the cards are actually rendered, and every other card
    * falls under the mask.
    */
-  const topCard: 'early' | 'change' | 'correlations' =
-    earlyAbove.length ? 'early' : view?.change ? 'change' : 'correlations';
+  const topCard: 'early' | 'pressure' | 'change' | 'correlations' =
+    earlyAbove.length ? 'early' : view?.pressure ? 'pressure' : view?.change ? 'change' : 'correlations';
   /** `reveal` for the one spared card, pass-through for the rest. `reveal` is
    *  already a no-op when the screen isn't gated. */
   const revealIf = (which: typeof topCard) => (gated && topCard === which ? reveal : asIs);
@@ -454,6 +471,7 @@ export default function InsightsScreen() {
       // the revealed card out from under a mask anchored to the header.
       scrollEnabled={!!view && !gated}
       onHeaderHeight={setHeaderH}
+      scrollRef={scrollRef}
       header={
         <View style={{ paddingHorizontal: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
           <HeaderClaim head={head} onExplain={openSince} />
@@ -530,6 +548,14 @@ export default function InsightsScreen() {
               {/* Each card measures ITSELF, not a wrapper: a wrapper's frame includes the
                   card's 12pt bottom margin and the card's own frame does not, so
                   measuring the wrapper made every skeleton card 12pt too tall. */}
+              {/* The barometric pressure card, once a link has ever been found. First
+                  of the findings: it is the one claim this screen keeps for good, and
+                  the Journal's pressure warning lands the reader here to read it. */}
+              {view.pressure ? revealIf('pressure')(
+                <View onLayout={(e) => { pressureY.current = e.nativeEvent.layout.y; scrollToCard(); }}>
+                  <PressureCard pressure={view.pressure} detail={view.detail} />
+                </View>,
+              ) : null}
               {view.change ? revealIf('change')(
                 <BiggestChangeCard change={view.change} series={view.detail[view.change.id] || null} onLayout={measure('change')} />,
               ) : null}

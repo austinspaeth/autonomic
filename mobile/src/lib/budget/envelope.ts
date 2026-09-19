@@ -11,10 +11,19 @@
  * bad one can halve it. Erring low costs a good day under-used, erring high
  * costs a crash, and those are not the same price (honesty rule 5).
  *
- * And on the worst days it publishes NOTHING. A downturn, a crash-grade day or
- * a fired strain alert suppresses the number entirely rather than showing a
+ * And on the worst days it publishes NOTHING. A downturn, a CRASH-GRADE FALL
+ * or a fired strain alert suppresses the number entirely rather than showing a
  * small one, because a small budget on a bad day is still an invitation to
  * spend it.
+ *
+ * A CRASH IS A FALL, NOT AN ADDRESS — see `crashIsFall`. The other two
+ * suppressors are already relative to the person (a downturn is a slide, a
+ * strain alert is this user's own 7-day medians against their own previous
+ * 42), so neither can latch on for ever. Crash-grade was the odd one out: an
+ * absolute band at score < 25, which for a severely ill user is not an event
+ * but where they live. It switched the whole feature off for exactly the
+ * population it was built for, every morning, under copy promising it would
+ * resume tomorrow.
  *
  * Pure: no store, no native, no React.
  */
@@ -44,6 +53,51 @@ const CARRY_CAP = 0.3;
 
 /** A strain WATCH narrows the day. A strain ALERT suppresses it entirely. */
 const STRAIN_FACTOR = 0.8;
+
+/* ---- what makes a crash-grade day a crash rather than a Tuesday ---- */
+
+/** How far below their own recent median today has to sit for a crash-grade
+ *  score to read as a FALL. The same size as ./outcome's `DECLINE_PTS`, and
+ *  for the same reason: below a full grade band, a 9-point wobble is noise in
+ *  a score built from a handful of readings. */
+export const CRASH_DROP_PTS = 10;
+/** How far back the comparison median is read. */
+export const CRASH_REL_WINDOW = 28;
+/** Scored days needed before the journal can answer "is this unusual for
+ *  you". Under this the old absolute rule stands and the day is suppressed:
+ *  honesty rule 5, where the model cannot tell, it errs low. */
+export const CRASH_REL_MIN_DAYS = 10;
+
+/**
+ * Is today's crash-grade score a FALL for this person, or their floor?
+ *
+ * `recent` is the scored days before today, most recent `CRASH_REL_WINDOW`.
+ * A user whose median day is 20 and whose today is 22 has not crashed, they
+ * are at home, and the question the budget answers — how much can today
+ * absorb — is the only question they have. Suppressing it hands them nothing
+ * on every day they own. A user whose median is 60 and whose today is 22 has
+ * had something happen, and a number there is an invitation to spend.
+ *
+ * Note it is deliberately one-sided: this can only ever DECLINE to suppress a
+ * day the absolute rule would have suppressed. A day above the crash band is
+ * never reached by this function at all.
+ */
+export function crashIsFall(today: number, recent: number[]): boolean {
+  if (recent.length < CRASH_REL_MIN_DAYS) return true;
+  return median(recent) - today >= CRASH_DROP_PTS;
+}
+
+/** The scored days before `dk`, for the comparison above. */
+function recentScores(
+  days: DaysMap,
+  dk: string,
+  addDays: (k: string, n: number) => string,
+  scoreAt: ScoreLookup,
+): number[] {
+  return keyRange(addDays(dk, -1), CRASH_REL_WINDOW, addDays)
+    .map(scoreAt)
+    .filter((s): s is number => s != null);
+}
 
 /** Confidence weights. HRV is what everything downstream is built from. */
 const W_HRV = 3;
@@ -125,7 +179,7 @@ export interface EnvelopeInput {
 }
 
 export interface Envelope {
-  /** Effort minutes. Null only when suppressed. */
+  /** Effort minutes. Null only when suppressed and not overridden. */
   effortMin: number | null;
   confidence: Confidence;
   inputs: EnvelopeInput[];
@@ -228,6 +282,9 @@ export interface EnvelopeOpts {
   spendAt?: SpendLookup;
   /** A finished day. The arithmetic is identical; only the tense changes. */
   past?: boolean;
+  /** The reader has asked to see this day's number anyway, or the run valve
+   *  has opened it. `suppressed` keeps its reason either way. */
+  unpaused?: boolean;
 }
 
 export function buildEnvelope(opts: EnvelopeOpts): Envelope {
@@ -327,10 +384,11 @@ export function buildEnvelope(opts: EnvelopeOpts): Envelope {
 
   /* ---- the days that publish no number at all ---- */
   const score = scoreAt(dk);
+  const crashGrade = score != null && scoreCat(score).short === 'Crash';
   const suppressed: Envelope['suppressed'] =
     downturn ? 'downturn'
       : strain === 'alert' ? 'strain-alert'
-        : score != null && scoreCat(score).short === 'Crash' ? 'crash'
+        : crashGrade && crashIsFall(score, recentScores(days, dk, addDays, scoreAt)) ? 'crash'
           : null;
 
   /* ---- confidence ---- */
@@ -346,7 +404,10 @@ export function buildEnvelope(opts: EnvelopeOpts): Envelope {
   const confidence: Confidence = raw < CONF_LOW ? 'low' : raw < CONF_MED ? 'medium' : 'high';
 
   return {
-    effortMin: suppressed ? null : Math.max(30, Math.round(effortMin)),
+    // The override does not change the VERDICT, only whether the number is
+    // published: `suppressed` still names the reason, so every surface can go
+    // on saying the app advises resting while showing what it would have said.
+    effortMin: suppressed && !opts.unpaused ? null : Math.max(30, Math.round(effortMin)),
     confidence,
     inputs,
     reduced,

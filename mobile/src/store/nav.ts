@@ -109,6 +109,32 @@ export function useProgressRangeSignal(): number {
   );
 }
 
+/* Insights card request: the Journal's barometric pressure warning switches to
+ * the Insights tab and asks it to bring the pressure card into view, since that
+ * card is where the warning's claim is explained. Same shape as the Progress
+ * request above; the screen consumes it once the card has laid out. */
+let requestedCard: string | null = null;
+let cardSeq = 0;
+const cardListeners = new Set<() => void>();
+export function requestInsightsCard(card: string) {
+  requestedCard = card;
+  cardSeq++;
+  cardListeners.forEach((l) => l());
+}
+export function peekInsightsCard(): string | null { return requestedCard; }
+export function takeInsightsCard(): string | null {
+  const c = requestedCard;
+  requestedCard = null;
+  return c;
+}
+export function useInsightsCardSignal(): number {
+  return useSyncExternalStore(
+    (cb) => { cardListeners.add(cb); return () => cardListeners.delete(cb); },
+    () => cardSeq,
+    () => cardSeq,
+  );
+}
+
 export function useCurrentKey(): string {
   return useSyncExternalStore(
     (cb) => { listeners.add(cb); return () => listeners.delete(cb); },

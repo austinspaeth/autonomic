@@ -19,12 +19,14 @@ import { addDays, fmtTime12, todayKey } from '../lib/dates';
 import { exertionLine } from '../lib/budget';
 import { EXERTION_RUN_MIN, NEARLY_SHARE, alertsEnabled, type PacingAlertKind } from '../lib/budget/alerts';
 import {
-  DEFAULT_REMINDER_TIME, canAskForReminders, disableReminder, enableReminder, readNotificationPermission, setCrashAlert,
+  DEFAULT_REMINDER_TIME, canAskForReminders, disableReminder, enableReminder, readNotificationPermission, setCrashAlert, setPressureAlert,
   type NotificationPermission,
 } from '../lib/reminders';
 import { usePalette } from '../theme';
 import { setPacingAlert, setPacingAlertsEnabled } from '../store/pacingAlerts';
 import { usePacingUnlocked } from '../store/pacingTrial';
+import { usePressureStatus } from '../store/pressure';
+import { pressureLink } from '../lib/insights/pressureMemory';
 import { useAppState } from '../store/store';
 
 const PICKER_NOTE = 'Pick a time you are usually awake but still resting, before coffee or exercise. Readings taken under the same conditions each day are the ones you can actually compare.';
@@ -149,6 +151,29 @@ export function useCrashAlertToggle() {
   return { on, toggle };
 }
 
+/** The low-pressure notification. Undefined reads as on (it can only fire on a
+ *  link found in this journal), so the box is checked until somebody unchecks it. */
+function PressureAlertRow({ granted }: { granted: boolean }) {
+  const state = useAppState();
+  const toast = useToast();
+  const on = granted && state.settings.pressureAlert?.enabled !== false;
+  const linked = !!pressureLink();
+  const toggle = async () => {
+    if (on) {
+      await setPressureAlert(false);
+      toast('Low pressure notifications off');
+      return;
+    }
+    if (!(await guardCanAsk())) return;
+    const ok = await setPressureAlert(true);
+    toast(ok ? 'Low pressure notifications on' : 'Notification permission denied');
+  };
+  const sub = !on ? 'Only if low pressure affects you'
+    : linked ? 'On low pressure days, since they affect you'
+    : 'Waits until your journal shows it affects you';
+  return <NotifRow icon="gauge" title="Low pressure" sub={sub} on={on} onToggle={toggle} />;
+}
+
 /** One opt-in row in the Notifications view: icon + title/sub + checkbox, the
  *  same silhouette as the Settings list rows. */
 function NotifRow({ icon, title, sub, on, onToggle }: { icon: IconName; title: string; sub: string; on: boolean; onToggle: () => void }) {
@@ -268,6 +293,8 @@ export function NotificationsSheet() {
   const daily = useReminderToggle();
   const crash = useCrashAlertToggle();
   const pacingUnlocked = usePacingUnlocked();
+  const pressure = usePressureStatus();
+  const perm = useNotificationPermission();
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 4 }}>Notifications</Text>
@@ -291,6 +318,7 @@ export function NotificationsSheet() {
       <Text style={{ color: p.textDim, fontSize: 12.5, lineHeight: 18, marginTop: 14 }}>
         Crash warnings watch your recovery score for a clear slide, the same signal as the Outlook card. At most one per day, and only while the app has fresh data.
       </Text>
+      {pressure.on ? <PressureAlertRow granted={perm.status === 'granted'} /> : null}
       {pacingUnlocked ? <PacingAlertRows /> : null}
       <View style={{ height: 20 }} />
     </View>

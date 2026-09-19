@@ -1,4 +1,5 @@
 /** Data model — identical shape to the PWA (`autonomic.journal.v1`). */
+import type { PressureMap } from './pressure';
 
 export type ThemeSetting = 'light' | 'dark' | 'system';
 
@@ -313,6 +314,16 @@ export interface AppState {
      *  kind without touching `pacingAlerts`, so turning it back on restores
      *  the per-kind choices. */
     pacingAlertsEnabled?: boolean;
+    /** Record barometric pressure from the phone's own sensor (lib/pressure).
+     *  Undefined is ON where no permission stands in the way (Android) and OFF
+     *  where one does (iOS asks for Motion & Fitness, so it waits for a tap in
+     *  the wizard or Settings). `false` is an explicit off on both. */
+    pressureEnabled?: boolean;
+    /** The low-pressure notification (lib/reminders `checkPressureAlert`).
+     *  Undefined reads as ON: it can only ever fire on a link the Insights
+     *  sweep has found in this journal, so there is nothing to opt into until
+     *  then. `lastFired` is the day key, one a day. */
+    pressureAlert?: { enabled: boolean; lastFired?: string };
   };
   profile: Profile;
   /** User-defined types layered on top of the registry maps (pure JSON defs). */
@@ -331,6 +342,9 @@ export interface AppState {
     healthHistoryImported?: string;
   };
   days: Record<string, DayRecord>;
+  /** Barometer samples by day (lib/pressure). Top level, never on a day record:
+   *  an automatic reading is not a day the user logged. */
+  pressure?: PressureMap;
 }
 
 export type ScoreCat = 'great' | 'good' | 'ok' | 'bad' | 'crash' | 'concerning' | 'warning';

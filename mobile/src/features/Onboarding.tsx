@@ -32,14 +32,16 @@
  * app/_layout.tsx), so the app is already live underneath when the reveal runs.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { readNotificationPermission, requestReminderPermission, type NotificationPermission } from '../lib/reminders';
 import Animated, {
   Easing, FadeIn, FadeInLeft, FadeInRight, FadeOut, FadeOutLeft, FadeOutRight,
   interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withDelay, withTiming,
 } from 'react-native-reanimated';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { BrandMark } from '../components/Icon';
+import { BrandMark, Icon } from '../components/Icon';
+import { enablePressure, usePressureStatus } from '../store/pressure';
 import { Button } from '../components/ui';
 import { uid } from '../lib/dates';
 import { SheetControls, SheetPill, SheetPillButton, useSheets } from '../components/Sheet';
@@ -371,6 +373,12 @@ function Onboarding({ onDone }: { onDone: () => void }) {
   const [step, setStep] = useState(0);
   const [dir, setDir] = useState(1);
   const [healthBusy, setHealthBusy] = useState(false);
+  const [pressureBusy, setPressureBusy] = useState(false);
+  const pressure = usePressureStatus();
+  // Notifications: read on mount, never requested until the row is tapped.
+  const [notif, setNotif] = useState<NotificationPermission | null>(null);
+  const [notifBusy, setNotifBusy] = useState(false);
+  useEffect(() => { void readNotificationPermission().then(setNotif); }, []);
   const [finishing, setFinishing] = useState(false);
   // The last step's sensor choice, seeded exactly the way the HRV setup sheet
   // seeds its own (a paired strap wins, else the camera).
@@ -499,6 +507,29 @@ function Onboarding({ onDone }: { onDone: () => void }) {
     // Offer the one-time historical backfill right after connecting (once only).
     if (!getState().meta.healthHistoryImported) offerHistory();
   };
+  /** The barometer: one tap, which on iOS is the Motion & Fitness prompt. Already
+   *  on, the row has nothing left to do, so a second tap is a no-op rather than a
+   *  way to switch it off from inside a welcome flow; Settings owns that. */
+  const connectPressure = async () => {
+    if (pressure.on || pressureBusy) return;
+    setPressureBusy(true);
+    const ok = await enablePressure();
+    setPressureBusy(false);
+    if (!ok) toast('Motion & Fitness access is needed');
+  };
+  /** Notifications: the OS prompt, whose grant turns on every notification never
+   *  chosen (morning reminder, crash warnings, pacing alerts; see
+   *  `applyNotificationDefaults`). A permission iOS will no longer ask for can
+   *  only be changed in system settings, so the row goes there instead. */
+  const connectNotifications = async () => {
+    if (notif === 'granted' || notifBusy) return;
+    if (notif === 'blocked') { void Linking.openSettings(); return; }
+    setNotifBusy(true);
+    const ok = await requestReminderPermission().catch(() => false);
+    setNotifBusy(false);
+    setNotif(await readNotificationPermission());
+    if (!ok) toast('Notifications are off');
+  };
   // Pairing a strap there closes that card (its `controls.close`) and selects
   // the strap here; its ✕ backs out without changing anything — the HRV
   // picker's `setUpStrap`, line for line.
@@ -598,16 +629,17 @@ function Onboarding({ onDone }: { onDone: () => void }) {
           <Glyph size={34} d={['M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71', 'M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71']} />
         </View>
         <View>
-          <Text style={st.h2}>Connect your data</Text>
-          {/* What connecting BUYS, not that it can be deferred: the Skip in the
+          <Text style={st.h2}>Give permission</Text>
+          {/* What each grant BUYS, not that it can be deferred: the Skip in the
               header already says that, and saying it twice is the friction this
-              step was meant to lose. The second sentence is the reason, and it
-              deliberately avoids the word "baseline" — in this app that means
-              the first HRV reading, which is the NEXT step's job and the one
-              thing a history import cannot supply. */}
+              step was meant to lose. One clause per row below, in their order,
+              and the weather clause only where the barometer row exists. Avoids
+              the word "baseline", which in this app means the first HRV reading,
+              the NEXT step's job. */}
           <Text style={st.para}>
-            Brings in your sleep, workouts and heart-rate history. You start with real
-            context behind you instead of an empty journal.
+            {pressure.available
+              ? `Bring in your ${healthAppName()} history, see if the weather affects you, and get reminders and crash warnings. Everything stays on your phone.`
+              : `Bring in your ${healthAppName()} history and get reminders and crash warnings. Everything stays on your phone.`}
           </Text>
         </View>
         {/* One row, because a strap is not data — it is a sensor for a reading
@@ -615,11 +647,12 @@ function Onboarding({ onDone }: { onDone: () => void }) {
             (and detours into the devices card when nothing is paired). Asking
             here made the same request twice, the first time with no reason
             attached. */}
+        <View style={{ gap: 10 }}>
         <ConnectRow
           glyph={<Glyph size={22} d={['M12 21c-5-3.5-8-6.6-8-10.3A4.7 4.7 0 0 1 12 7a4.7 4.7 0 0 1 8 3.7C20 14.4 17 17.5 12 21z']} />}
-          // Once connected the row drops the imperative: a button reading
-          // "Connect Apple Health · Connected" contradicts itself.
-          title={healthOn ? healthAppName() : `Connect ${healthAppName()}`}
+          // Always the imperative, connected or not: the check and the sub-line
+          // carry the state, and the title names the permission being given.
+          title={`Connect ${healthAppName()}`}
           // The backfill is OFFERED, not automatic, so "data imported" is a
           // claim and `meta.healthHistoryImported` is the only thing that can
           // make it. Declining the offer says so rather than staying silent:
@@ -632,6 +665,32 @@ function Onboarding({ onDone }: { onDone: () => void }) {
           busy={healthBusy}
           onPress={connectHealth}
         />
+        {/* The barometer, on phones that have one. Not health data and not read
+            from anywhere: the phone's own sensor, sampled when the app opens. It
+            says nothing on its own and only ever shows up once the Insights sweep
+            has found low pressure days linked to one of this person's measures. */}
+        {pressure.available ? (
+          <ConnectRow
+            glyph={<Icon name="gauge" size={22} color={ACCENT} />}
+            title={pressure.on ? 'Barometric pressure' : 'Watch barometric pressure'}
+            sub={pressure.on ? 'On · recorded when you open the app' : 'See if weather changes affect you'}
+            on={pressure.on}
+            busy={pressureBusy}
+            onPress={connectPressure}
+          />
+        ) : null}
+        {notif ? (
+          <ConnectRow
+            glyph={<Icon name="bell" size={22} color={ACCENT} />}
+            title={notif === 'granted' ? 'Notifications' : 'Turn on notifications'}
+            sub={notif === 'granted' ? 'On · reminders and crash warnings'
+              : notif === 'blocked' ? 'Turn on in Settings' : 'Morning reminder and crash warnings'}
+            on={notif === 'granted'}
+            busy={notifBusy}
+            onPress={connectNotifications}
+          />
+        ) : null}
+        </View>
       </ScrollView>
     );
     return (

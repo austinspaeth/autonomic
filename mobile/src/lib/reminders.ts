@@ -2,9 +2,10 @@
  * The app's notifications, all local (no push, no server, nothing leaves the
  * device):
  *
- * - Daily reminder: a single repeating notification nudging the user to take
- *   their reading at the same time each morning, which is what makes a
- *   baseline comparable day to day.
+ * - Daily reminder: a nudge to take the reading at the same time each morning,
+ *   which is what makes a baseline comparable day to day. Armed as a week of
+ *   one-shots rather than one repeating trigger, so a morning that already
+ *   holds a reading is skipped (initMorningWatcher).
  * - Crash warning: fired when the trailing-week trend flags a likely crash
  *   (detectDownturn — the same engine behind the Outlook card), telling the
  *   user to rest. Evaluated whenever the app is running: on launch and after
@@ -24,15 +25,22 @@
  * `applyNotificationDefaults()` switches on every notification the user has
  * not decided about. An explicit off is never overridden.
  */
-import { Platform } from 'react-native';
+import { AppState, Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { MMKV } from 'react-native-mmkv';
 import { todayKey } from './dates';
+import { hasHrvReadingOn } from './hrvQuality';
+import { MORNING_AHEAD, morningFireTimes, type NotificationCopy } from './notifications';
 import { logError } from './diagnostics/errorLog';
 import { alertsEnabled } from './budget/alerts';
 import { pingNotifyEnabled } from '../store/ping';
 import { resolveProtocol } from './scoring/day';
 import { detectDownturn } from './scoring/downturn';
+import { detectStrain } from './scoring/strain';
+import { readPressure } from './pressure';
+import { pressureLink } from './insights/pressureMemory';
+import { pressureNotificationBody } from './insights/pressureCopy';
+import { pressureAlertVerdict } from './notifications';
 import { getState, save, subscribeStore } from '../store/store';
 
 /** Stable id so scheduling twice replaces rather than stacks. */
@@ -43,6 +51,7 @@ const ID = 'morning-reminder';
 const CHANNEL = 'reminders';
 const CRASH_CHANNEL = 'crash-warnings';
 const HRV_CHANNEL = 'hrv-complete';
+const PRESSURE_CHANNEL = 'pressure';
 
 /** 8:00 AM — late enough to be awake, early enough to be pre-coffee. */
 export const DEFAULT_REMINDER_TIME = '08:00';
@@ -56,14 +65,6 @@ Notifications.setNotificationHandler({
     shouldSetBadge: false,
   }),
 });
-
-const parse = (hhmm: string): { hour: number; minute: number } => {
-  const [h, m] = (hhmm || DEFAULT_REMINDER_TIME).split(':').map(Number);
-  return {
-    hour: Number.isFinite(h) ? Math.min(23, Math.max(0, h)) : 8,
-    minute: Number.isFinite(m) ? Math.min(59, Math.max(0, m)) : 0,
-  };
-};
 
 /* ---------- the last permission answer we saw ---------- */
 
@@ -136,16 +137,12 @@ async function ensureHrvChannel() {
  * without notification permission, mirroring the crash warning — never prompt
  * mid-reading.
  */
-export async function notifyHrvComplete(): Promise<void> {
+export async function notifyHrvComplete(copy: NotificationCopy): Promise<void> {
   try {
     if (!(await Notifications.getPermissionsAsync()).granted) return;
     await ensureHrvChannel();
     await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Reading complete',
-        body: 'Your HRV reading is done. Open Autonomic to save it.',
-        sound: 'default',
-      },
+      content: { ...copy, sound: 'default' },
       trigger: Platform.OS === 'android' ? { channelId: HRV_CHANNEL } : null,
     });
   } catch {
@@ -257,29 +254,73 @@ export async function syncNotificationPermission(): Promise<boolean> {
   }
 }
 
-/** Replace any scheduled reminder with one firing daily at `hhmm`. */
+/** The one-shot ids, one per morning ahead. `ID` itself is kept only so the
+ *  old repeating trigger is cancelled on every phone that still carries it. */
+const morningId = (i: number) => `${ID}-${i}`;
+
+/**
+ * Arm the next mornings at `hhmm`, replacing whatever was armed. Today's is
+ * skipped once today already holds a reading that counts: this reminder is a
+ * nudge to measure, and nudging somebody who has measured is the fastest way
+ * to teach them to ignore it. See `morningFireTimes`.
+ */
 export async function scheduleMorningReminder(hhmm: string): Promise<void> {
-  const { hour, minute } = parse(hhmm);
   await ensureChannel();
   await cancelMorningReminder();
-  await Notifications.scheduleNotificationAsync({
-    identifier: ID,
-    content: {
-      title: 'Good morning',
-      body: 'Take your morning reading while your body is still at rest.',
-      sound: 'default',
-    },
-    trigger: {
-      type: Notifications.SchedulableTriggerInputTypes.DAILY,
-      hour,
-      minute,
-      channelId: CHANNEL,
-    },
-  });
+  const readingToday = hasHrvReadingOn(getState().days[todayKey()]);
+  const times = morningFireTimes(new Date(), hhmm || DEFAULT_REMINDER_TIME, readingToday);
+  for (let i = 0; i < times.length; i++) {
+    await Notifications.scheduleNotificationAsync({
+      identifier: morningId(i),
+      content: {
+        title: 'Good morning',
+        body: 'Take your morning reading while your body is still at rest.',
+        sound: 'default',
+      },
+      trigger: {
+        type: Notifications.SchedulableTriggerInputTypes.DATE,
+        date: times[i],
+        channelId: CHANNEL,
+      },
+    });
+  }
+  plannedFor = planKey(hhmm, readingToday);
 }
 
 export async function cancelMorningReminder(): Promise<void> {
-  await Notifications.cancelScheduledNotificationAsync(ID).catch(() => {});
+  plannedFor = null;
+  const ids = [ID];
+  for (let i = 0; i <= MORNING_AHEAD; i++) ids.push(morningId(i));
+  await Promise.all(ids.map((id) => Notifications.cancelScheduledNotificationAsync(id).catch(() => {})));
+}
+
+/** What the armed plan was built from, so a journal change that does not move
+ *  it (most of them) costs nothing. */
+let plannedFor: string | null = null;
+const planKey = (hhmm: string, readingToday: boolean) => `${todayKey()}|${hhmm}|${readingToday ? 1 : 0}`;
+
+let morningWatcherArmed = false;
+/**
+ * Re-plan the mornings when the answer changes: a reading landing today drops
+ * today's reminder, and a new day (seen on foreground) rolls the week forward.
+ * Debounced like the crash watcher, and a no-op when the plan is unchanged.
+ */
+export function initMorningWatcher(): void {
+  if (morningWatcherArmed) return;
+  morningWatcherArmed = true;
+  const replan = () => {
+    const r = getState().settings.reminder;
+    if (!r?.enabled) return;
+    const hhmm = r.time || DEFAULT_REMINDER_TIME;
+    if (planKey(hhmm, hasHrvReadingOn(getState().days[todayKey()])) === plannedFor) return;
+    void syncReminder();
+  };
+  let t: ReturnType<typeof setTimeout> | null = null;
+  subscribeStore(() => {
+    if (t) clearTimeout(t);
+    t = setTimeout(() => { t = null; replan(); }, 2000);
+  });
+  AppState.addEventListener('change', (s) => { if (s === 'active') replan(); });
 }
 
 /**
@@ -367,6 +408,72 @@ export async function checkCrashRisk(): Promise<void> {
     save();
   } catch {
     // Warnings are best-effort — never let them break logging.
+  }
+}
+
+/* ---------- low barometric pressure ---------- */
+
+async function ensurePressureChannel() {
+  if (Platform.OS !== 'android') return;
+  await Notifications.setNotificationChannelAsync(PRESSURE_CHANNEL, {
+    name: 'Low pressure',
+    importance: Notifications.AndroidImportance.DEFAULT,
+    sound: 'default',
+    vibrationPattern: [0, 250],
+    lockscreenVisibility: Notifications.AndroidNotificationVisibility.PRIVATE,
+  });
+}
+
+/** Turn the low-pressure notification on/off. Undefined already reads as on,
+ *  so this only ever records a choice. */
+export async function setPressureAlert(on: boolean): Promise<boolean> {
+  if (on && !(await requestReminderPermission())) return false;
+  const prev = getState().settings.pressureAlert;
+  getState().settings.pressureAlert = { ...(prev || {}), enabled: on };
+  save();
+  if (on) void checkPressureAlert();
+  return true;
+}
+
+/**
+ * Today's pressure reads low AND this person's own journal has been found to
+ * run worse on low days: say so, once a day, in the Journal card's own words.
+ * Called after every pressure sample, foreground or background.
+ *
+ * With the app OPEN the Journal is already showing that card, so the day is
+ * stamped and nothing is posted: the card was the delivery, and a banner over
+ * the screen that says the same thing is noise.
+ */
+export async function checkPressureAlert(): Promise<void> {
+  try {
+    const s = getState();
+    const dk = todayKey();
+    const pa = s.settings.pressureAlert;
+    if (pa?.enabled === false || pa?.lastFired === dk) return;
+    // Cheap questions first: most days are not low, and most journals hold no link.
+    const low = !!readPressure(s.pressure, dk)?.low;
+    const link = low ? pressureLink() : null;
+    if (!link) return;
+    const ctx = { sex: s.profile.sex, height: s.profile.height };
+    const downturn = detectDownturn(s.days, dk, ctx, resolveProtocol(s.settings.protocol), s.customTypes);
+    const otherWarning = s.settings.crashAlert?.lastFired === dk || !!downturn || !!detectStrain(s.days, dk, ctx);
+    const verdict = pressureAlertVerdict({
+      enabled: pa?.enabled, lastFired: pa?.lastFired, dk, hour: new Date().getHours(),
+      low, linked: true, otherWarning,
+    });
+    if (verdict !== 'fire') return;
+    if (AppState.currentState !== 'active') {
+      if (!(await Notifications.getPermissionsAsync()).granted) return;
+      await ensurePressureChannel();
+      await Notifications.scheduleNotificationAsync({
+        content: { title: 'Barometric pressure is low today', body: pressureNotificationBody(link), sound: 'default' },
+        trigger: Platform.OS === 'android' ? { channelId: PRESSURE_CHANNEL } : null,
+      });
+    }
+    getState().settings.pressureAlert = { enabled: pa?.enabled ?? true, lastFired: dk };
+    save();
+  } catch (e) {
+    logError('pressure.alert', e);
   }
 }
 

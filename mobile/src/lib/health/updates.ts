@@ -16,15 +16,16 @@ import { addDays, todayKey, uid } from '../dates';
 import { typesFor } from '../typeCatalog';
 import { rrCoverageSec } from '../hrvQuality';
 import { logError } from '../diagnostics/errorLog';
-import { ensureDay, getState, save, storeSleepSeries, storeWaveform, upsertEntry } from '../../store/store';
+import { deleteEntry, ensureDay, getState, save, storeSleepSeries, storeWaveform, upsertEntry } from '../../store/store';
 import { health, healthAppName, type ImportedMed, type ImportedReading, type ImportedWorkout } from './index';
 import {
-  allItemKeys, buildUpdateSet, filterDeclined, filterSeen, updateCount, updateSignature,
+  allItemKeys, buildUpdateSet, emptyUpdateSet, filterDeclined, filterSeen, splitForReview,
+  updateCount, updateSignature,
   type HealthUpdateSet, type UpdateMed, type UpdateReading,
 } from './updateSet';
 import { withAuthTimeout } from './askedAuth';
 
-export { allItemKeys, filterDeclined, filterSeen, updateCount, updateSignature };
+export { allItemKeys, emptyUpdateSet, filterDeclined, filterSeen, splitForReview, updateCount, updateSignature };
 export { getDeclinedKeys, markDeclinedKeys } from './declined';
 export type { HealthUpdateSet, UpdateMed, UpdateReading };
 
@@ -165,6 +166,37 @@ export function importUpdates(set: HealthUpdateSet, selected: Set<string> | null
   }
 
   return { added, workouts };
+}
+
+/**
+ * Undo an auto-import: delete the entries carrying these health item keys.
+ *
+ * The receipt's checkboxes mean REMOVE, and this is what they commit. It goes
+ * through `deleteEntry`, which is the whole point — that path already records
+ * the sample in the permanent declined list (./declined), so unticking a row
+ * both takes the entry back out of the journal and guarantees the same sample
+ * is never imported again. Settings → Apple Health still finds it, exactly as
+ * it finds anything else the user once deleted.
+ *
+ * Sleep is not here: it is a field on the day rather than an entry, so there is
+ * no entry to delete and nothing to record a decline against. The receipt shows
+ * the night without a checkbox for that reason.
+ */
+export function undoImports(dk: string, keys: readonly string[]): number {
+  const day = getState().days[dk];
+  if (!day || !keys.length) return 0;
+  const wanted = new Set(keys);
+  let removed = 0;
+  for (const arrKey of ['readings', 'activities', 'meds'] as const) {
+    // Snapshot first: deleteEntry rewrites the array as we walk it.
+    for (const e of [...(day[arrKey] || [])]) {
+      if (typeof e.healthKey === 'string' && wanted.has(e.healthKey)) {
+        deleteEntry(dk, arrKey, e.id);
+        removed++;
+      }
+    }
+  }
+  return removed;
 }
 
 /* ---------- "already shown" memory ---------- */

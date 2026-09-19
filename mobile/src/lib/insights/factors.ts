@@ -30,12 +30,13 @@ import { ACTIVITY_TYPES, MED_TYPES, SYMPTOM_TYPES, TRIGGER_TYPES } from '../regi
 import { DEFAULT_PROTOCOL, activityGrade, dayCleanliness, sleepHours, waterGoalL, type DaysMap } from '../scoring/day';
 import type { ScoreContext } from '../scoring';
 import type { AppState, DayRecord, TypeDef } from '../types';
+import { lowPressureValue, type PressureMap } from '../pressure';
 
 export type FactorKind = 'binary' | 'continuous';
 
 export type FactorGroup =
   | 'supplement' | 'medication' | 'trigger' | 'activity' | 'symptom'
-  | 'sleep' | 'hydration' | 'digestion' | 'protocol' | 'note';
+  | 'sleep' | 'hydration' | 'digestion' | 'protocol' | 'note' | 'weather';
 
 /**
  * How to tell whether a day carries any information about this factor.
@@ -390,7 +391,43 @@ export function buildFactors(state: AppState, keys: string[], opts: {
     });
 
   out.push(...derivedFactors());
+  const pressure = pressureFactor(state.pressure, keys, floor);
+  if (pressure) out.push(pressure);
   return out;
+}
+
+/** The one factor nobody logs. See ../pressure for what "low" means and why the
+ *  app says nothing about it until this column has been tested and found linked. */
+export const PRESSURE_FACTOR_ID = 'pressure:low';
+
+/**
+ * Low barometric pressure, from the phone's own sensor.
+ *
+ * No `presence` probe: the column is null on every day the barometer has no
+ * verdict for (no samples, no baseline yet, a trip up a mountain), which is the
+ * stricter test, and it has nothing to do with what the user logged. Lags 0 and
+ * 1, because "the day after the pressure drops" is exactly the shape people
+ * describe. Blocks nothing: no outcome is arithmetic on the weather.
+ *
+ * Built only when the window holds enough low AND ordinary days to be a
+ * comparison, the same floor every other factor meets.
+ */
+function pressureFactor(map: PressureMap | undefined, keys: string[], floor: number): FactorDef | null {
+  if (!map) return null;
+  let low = 0, known = 0;
+  keys.forEach((dk) => { const v = lowPressureValue(map, dk); if (v == null) return; known++; if (v) low++; });
+  if (low < floor || known - low < floor) return null;
+  return {
+    id: PRESSURE_FACTOR_ID,
+    label: 'Low barometric pressure',
+    driver: 'Low pressure',
+    subject: 'Low pressure days',
+    group: 'weather',
+    kind: 'binary',
+    lags: [0, 1],
+    blocks: [],
+    value: (d, dk) => lowPressureValue(map, dk),
+  };
 }
 
 /**

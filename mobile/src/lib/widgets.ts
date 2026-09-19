@@ -121,6 +121,12 @@ export interface WidgetOpts {
   /** A free install: the pacing widgets show the Pro line, never a number. */
   locked?: boolean;
   stepsGranted?: boolean;
+  /** The pause override, forwarded verbatim to `buildBudgetAt`. The home
+   *  screen and the wrist follow the Journal here: a reader who has revealed
+   *  today's number has revealed it, and a widget still showing the pause
+   *  would be the same feature answering two ways on one phone. */
+  userUnpaused?: boolean;
+  pausedDays?: string[];
 }
 
 const DIM = '#8a8a92';
@@ -415,6 +421,8 @@ function buildPacing(state: AppState, days: DaysMap, dk: string, ctx: ScoreConte
     strain: strain ? strain.severity : null,
     past: !isToday,
     stepsGranted: opts.stepsGranted,
+    userUnpaused: opts.userUnpaused,
+    pausedDays: opts.pausedDays,
     brief: true,
   }, nows);
 
@@ -541,7 +549,12 @@ export function liveWidgetOpts(): WidgetOpts {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     stepsGranted = !(require('../store/budget') as typeof import('../store/budget')).stepsMissing();
   } catch { /* unknown: the engine treats undefined as granted */ }
-  return { locked, stepsGranted };
+  let pause: { userUnpaused: boolean; pausedDays: string[] } | null = null;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    pause = (require('../store/budgetPause') as typeof import('../store/budgetPause')).pauseOpts(todayKey());
+  } catch { /* no override: the day pauses as the engine decided */ }
+  return { locked, stepsGranted, ...(pause || {}) };
 }
 
 /** The payload for right now, from the live store. */

@@ -13,7 +13,7 @@
  */
 import type { HelpContent } from '../help';
 
-export const INSIGHTS_HELP: Record<'change' | 'correlations' | 'early' | 'observations' | 'noImpact' | 'watch' | 'confidence', HelpContent> = {
+export const INSIGHTS_HELP: Record<'change' | 'correlations' | 'early' | 'observations' | 'noImpact' | 'watch' | 'confidence' | 'pressure', HelpContent> = {
   change: {
     what: 'The single largest shift in your log over the last few months. Either something you started showing a before and after, or a metric that has plainly moved month against month.',
     why: 'It is the one finding most likely to be worth acting on, which is why it sits first. The order of events is real: the numbers before and after are yours. What caused it is still an open question, and this card is not the answer to it.',
@@ -43,6 +43,11 @@ export const INSIGHTS_HELP: Record<'change' | 'correlations' | 'early' | 'observ
     what: 'Metrics that have genuinely moved over the last month compared with the month before it. Only changes large enough to be worth telling you about appear, and each row shows the run of days behind the claim.',
     why: 'A single reading says almost nothing; a month against a month says something. Green is moving the healthy way and red is not, and a decline here is information rather than a verdict. This section stays quiet while a crash warning is active.',
     learnMore: '/insights/app/how-autonomic-scores-your-readings/',
+  },
+  pressure: {
+    what: 'Your phone has a barometer, and the app has been quietly recording air pressure on the days you open it. A low pressure day is one sitting 0.20 inHg or more under your own usual for the last month, so it works wherever you live. This card only appeared because low pressure days turned out to be linked to one of your own measures, checked the same way as every correlation.',
+    why: 'If the weather really does get to you, knowing it lets you plan a lighter day when the pressure drops rather than wondering what you did wrong. It is linked, not proven: a stormy week can change your routine too. Once found, this card stays, and its numbers keep updating as days arrive.',
+    learnMore: '/insights/recovery/find-your-triggers-symptom-journal/',
   },
   confidence: {
     what: 'How much of the recent past this screen actually had to work with. It weighs how many days you logged, how many carry a full HRV reading, how many nights were recorded, how current the log is, and how far back it goes.',

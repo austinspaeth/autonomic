@@ -50,6 +50,15 @@ export function fmtReleaseDate(iso: string): string {
 
 export const RELEASES: Release[] = [
   {
+    version: '1.29',
+    date: '2026-09-18',
+    notes: [
+      'Your pacing budget pauses itself on a genuinely bad day, and you can unpause it whenever you want to see it anyway. It also no longer stays paused just because your usual days run low.',
+      'Your health data now imports itself. No more approving each item. Tap the pill to see what was added, and remove anything you did not want.',
+      'NEW: Barometric pressure. Your phone can now track air pressure, and if low pressure days affect you, Insights will show you how.',
+    ],
+  },
+  {
     version: '1.28',
     date: '2026-09-09',
     notes: [

@@ -428,12 +428,28 @@ old web app so old `export.json` files import directly.
   imported journal, or permission revoked in system settings). It schedules under one
   stable id, so re-scheduling replaces rather than stacks. iOS **throws** from
   `scheduleNotificationAsync` when unauthorized — always request permission first and
-  only persist `enabled: true` once the schedule actually succeeded. (2) The crash
+  only persist `enabled: true` once the schedule actually succeeded. It is armed as a
+  WEEK OF ONE-SHOTS (`morningFireTimes` in `src/lib/notifications.ts`, pure + tested),
+  not one repeating DAILY trigger, because a repeating trigger cannot skip a day and
+  told somebody who had measured at 7:30 to take their morning reading at 8:00.
+  `initMorningWatcher()` re-plans on journal change and foreground, dropping today's
+  once `hasHrvReadingOn(today)`. The legacy `morning-reminder` id is still cancelled
+  on every sync so the old repeating trigger dies on phones that carry it. (2) The crash
   warning (`settings.crashAlert`): `checkCrashRisk()` runs `detectDownturn` on today —
   on launch and, debounced, after journal changes via `initCrashWatcher()` — and fires
   an immediate notification reusing the Outlook downturn copy, at most once per day
   (`crashAlert.lastFired`). (3) Reading complete (`notifyHrvComplete`), for a reading
-  that finished while backgrounded. **A grant turns on everything never chosen**:
+  that finished while backgrounded. It runs `computeHrv` first and says what the
+  results card will (`readingDoneCopy`): the reading's own RMSSD and heart rate when
+  it was filed, "needs a decision" with its artifact rate when salvageable, "could not
+  be used" when refused. It never says "save it" (a reading is SAVED, not offered).
+  (4) Low pressure (`checkPressureAlert`, `settings.pressureAlert`, undefined = on):
+  only on a day that reads LOW and only on a link the Insights sweep FOUND
+  (`pressureLink`), the Journal card's own rule, in its own words; once a day,
+  7am-8pm, never beside a downturn, strain or crash alert. With the app open it
+  stamps the day and posts nothing, because the card is already on screen. It runs
+  after every pressure sample, and the pacing background wake-up now samples the
+  barometer so it can arrive before the app is opened. **A grant turns on everything never chosen**:
   when `requestReminderPermission` produces a fresh grant it runs
   `applyNotificationDefaults()`, and `syncNotificationPermission()` (launch +
   foreground, last answer remembered as `notifPermissionSeen` in `autonomic.flags`)
@@ -1570,6 +1586,28 @@ old web app so old `export.json` files import directly.
   written before the counter existed announces no activations at all, or the
   first refresh after the deploy would report the whole back catalogue as news.
   Details in `sls/README.md` and `MASTER_DASHBOARD.md`.
+- **Barometric pressure is recorded silently and SHOWN only once it is found to
+  matter.** `src/lib/pressure.ts` (pure + tested) defines a LOW day against the
+  user's OWN last 30 days (median day ≥ 0.20 inHg under it; a jump past
+  `ALTITUDE_JUMP_HPA` is a trip, so unknown), and `src/store/pressure.ts` samples
+  the phone's barometer (`expo-sensors`) on launch and foreground, one sample per
+  hour at most, into TOP-LEVEL `state.pressure` (never a day record, or an automatic
+  reading would count as a logged day). Android needs no permission and is on by
+  default; iOS sits behind Motion & Fitness, so it is only ever asked from a tap
+  (the wizard's "Watch barometric pressure" row, Settings → Barometric pressure) and
+  the launch path only reads status. In the sweep it is one more generated factor
+  (`pressure:low`, `insights/factors.ts`), held to the same correction as
+  everything else; its rows are then pulled OUT of the correlation list, the weak
+  tiers and the observations, and a strict link to a WORSE outcome becomes the
+  Insights "Barometric pressure" card (`PressureInsight`). Once found it STAYS:
+  `insights/pressureMemory.ts` (flags MMKV, reset by Clear all data and imports)
+  remembers the pair and its last numbers, and every build re-tests it on its own
+  (`testFinding`, raw p, since it is now one pre-specified question) so the card
+  ages honestly. The Journal's `WarningCard` (⚠️) fires on TODAY only, when today
+  reads low, a link is remembered, and neither the downturn nor strain card has
+  anything to say; its tap switches to Insights and scrolls to the card
+  (`requestInsightsCard`). Copy lives in `insights/pressureCopy.ts`, US units.
+  Needs a native build (new module + NSMotionUsageDescription via the plugin).
 - **Home-screen widgets render one shared JSON payload** built by
   `buildWidgetPayload()` (`src/lib/widgets.ts`, pure — unit-tested) and pushed by
   `initWidgetSync()` on launch, debounced journal changes, and foreground. iOS:
