@@ -19,7 +19,7 @@
  *   exact nag lib/health/askedAuth exists to prevent.
  */
 import { useSyncExternalStore } from 'react';
-import { AppState as RNAppState } from 'react-native';
+import { AppState as RNAppState, Platform } from 'react-native';
 import { addDays, todayKey } from '../lib/dates';
 import { health, type HealthAuthStatus } from '../lib/health';
 import { stepsAskDue } from '../lib/budget/stepsAsk';
@@ -30,9 +30,11 @@ import { BASELINE_DAYS, recoveryLine } from '../lib/budget/baseline';
 import { loadWaveformId } from '../lib/waveforms';
 import { RECOVERY_MIN } from '../lib/budget/upright';
 import { noteStepsSeen, stepsEverSeen } from '../lib/budget/stepsMemory';
-import { RESTORE_MAX_ATTEMPTS, erasedLoadDays, readHasEvidence, readLosesEvidence } from '../lib/budget/restore';
+import {
+  RESTORE_MAX_ATTEMPTS, STEP_READ_VERSION, erasedLoadDays, misreadStepDays, readHasEvidence, readLosesEvidence,
+} from '../lib/budget/restore';
 import { CURVE_MAX, PRICE_VERSION, repriceAction } from '../lib/budget/reprice';
-import { noteRestoreAttempt, restoreAttempts } from '../lib/budget/restoreMemory';
+import { noteRestepAttempt, noteRestoreAttempt, restepAttempts, restoreAttempts } from '../lib/budget/restoreMemory';
 import type { DayLoad, Entry } from '../lib/types';
 import { blankDay } from '../lib/migrate';
 import { getState, getWaveform, mutate, save, storeWaveform, subscribeStore } from './store';
@@ -177,6 +179,7 @@ export async function refreshDayLoad(
 
       const next: DayLoad = {
         steps: read.steps,
+        stepsVersion: STEP_READ_VERSION,
         walkingMin: walkMin,
         standMin: read.standMin,
         stillUprightMin: still ? still.stillMin : null,
@@ -299,6 +302,44 @@ export async function restoreErasedDays(dk: string = todayKey()): Promise<void> 
     }
   } catch (e) {
     logError('budget.restore', e);
+  }
+}
+
+let restepTried = false;
+
+/**
+ * Read back the days whose steps were SUMMED across every app writing them
+ * (see lib/budget/restore `STEP_READ_VERSION`).
+ *
+ * Android only: the iOS read has always merged its sources, so its stored days
+ * are correct and forty-two pointless queries are not a repair. They stay
+ * unstamped and this never has anything to do there.
+ *
+ * It is `restoreErasedDays`' shape — once a launch, foreground only, a capped
+ * number of attempts — and for the same reasons, with one difference. That
+ * repair asks the health store for days the journal LOST, so it requires
+ * evidence and leaves a day it cannot read as unknown. This one is correcting
+ * a number the journal HAS: a day it cannot re-read keeps the inflated count,
+ * which is wrong but is what the reader has been looking at, and inventing a
+ * quiet day in its place would be worse. So the stamp is only ever moved by a
+ * read that actually landed, and a day that never re-reads stays due.
+ */
+export async function restepDays(dk: string = todayKey()): Promise<void> {
+  if (restepTried || Platform.OS !== 'android') return;
+  try {
+    const state = getState();
+    if (!state.settings?.healthEnabled || !health().available) return;
+    if (inBackground()) return;
+    const todo = misreadStepDays(state.days, dk, addDays);
+    if (!todo.length || restepAttempts() >= RESTORE_MAX_ATTEMPTS) return;
+    restepTried = true;
+    noteRestepAttempt();
+    for (const k of todo) {
+      if (inBackground()) break;
+      await refreshDayLoad(k, { force: true, requireEvidence: true });
+    }
+  } catch (e) {
+    logError('budget.restep', e);
   }
 }
 
@@ -518,7 +559,7 @@ export function initBudgetSync(): () => void {
   // about which pass owns a day.
   repriceStoredDays();
   backfillHrBands();
-  void refreshDayLoad(undefined, { maxAgeMin: LOAD_FOCUS_STALE_MIN }).then(() => sealYesterday()).then(() => restoreErasedDays());
+  void refreshDayLoad(undefined, { maxAgeMin: LOAD_FOCUS_STALE_MIN }).then(() => sealYesterday()).then(() => restoreErasedDays()).then(() => restepDays());
 
   let timer: ReturnType<typeof setInterval> | null = null;
   const stop = () => { if (timer) { clearInterval(timer); timer = null; } };
@@ -530,7 +571,7 @@ export function initBudgetSync(): () => void {
 
   const sub = RNAppState.addEventListener('change', (st) => {
     if (st === 'active') {
-      void refreshDayLoad(undefined, { maxAgeMin: LOAD_FOCUS_STALE_MIN }).then(() => sealYesterday()).then(() => restoreErasedDays());
+      void refreshDayLoad(undefined, { maxAgeMin: LOAD_FOCUS_STALE_MIN }).then(() => sealYesterday()).then(() => restoreErasedDays()).then(() => restepDays());
       start();
     } else {
       stop();

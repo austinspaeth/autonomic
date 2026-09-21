@@ -357,6 +357,7 @@ describe('migrate: idempotence', () => {
 describe('migrate: day load', () => {
   const load = {
     steps: 8432,
+    stepsVersion: 2,
     walkingMin: 74,
     standMin: null,
     stillUprightMin: 121,

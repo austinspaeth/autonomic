@@ -202,6 +202,7 @@ function cleanLoad(v: unknown): DayLoad | undefined {
     : null;
   return {
     steps: n(v.steps),
+    stepsVersion: n(v.stepsVersion),
     walkingMin: n(v.walkingMin),
     standMin: n(v.standMin),
     stillUprightMin: n(v.stillUprightMin),

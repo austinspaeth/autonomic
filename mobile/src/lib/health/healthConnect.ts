@@ -22,6 +22,7 @@ import {
 import { INTERRUPTED_AWAKE_MIN, NIGHT_END_HOUR, NIGHT_START_HOUR, nightKeyOf, type StageSpan } from './sleepSummary';
 import { thinSeries, type HrPoint, type RespPoint } from '../sleep/night';
 import { activityTypeFromHc, workoutHrSeries } from './workoutMap';
+import { stepTotalFromRecords } from './stepTotal';
 import { HISTORY_SLEEP_MIN_MIN, NIGHT_SERIES_MAX, emptyHistory } from './index';
 import type {
   HealthApi, HealthDaySamples, ImportedReading, ImportedWorkout, SleepImport,
@@ -54,6 +55,12 @@ interface HcModule {
   readRecords: (recordType: string, opts: {
     timeRangeFilter: TimeRangeFilter; pageSize?: number; pageToken?: string; ascendingOrder?: boolean;
   }) => Promise<{ records: unknown[]; pageToken?: string }>;
+  /** Health Connect's own aggregation, which MERGES SOURCES by app priority —
+   *  the same total the Health Connect app itself displays, and the Android
+   *  twin of HealthKit's HKStatisticsQuery. Optional so a stub module (or an
+   *  older library) still satisfies this interface; `stepTotal` falls back. */
+  aggregateRecord?: (req: { recordType: string; timeRangeFilter: TimeRangeFilter })
+    => Promise<Record<string, unknown>>;
   insertRecords: (records: Record<string, unknown>[]) => Promise<string[]>;
   SdkAvailabilityStatus: { SDK_AVAILABLE: number };
 }
@@ -99,6 +106,7 @@ function dateAt(dk: string, time?: string): Date {
 
 const isOwnRecord = (meta?: Metadata): boolean => meta?.dataOrigin === OWN_PACKAGE;
 
+
 const durMs = (s: SleepRecord): number =>
   new Date(s.endTime).getTime() - new Date(s.startTime).getTime();
 
@@ -134,6 +142,21 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
       } while (pageToken && out.length < cap);
     } catch { /* type unavailable or permission missing — treat as empty */ }
     return out;
+  }
+
+  /**
+   * A merged cumulative total, the Android answer to iOS's `sumQ`. Health
+   * Connect de-duplicates across writing apps during aggregation, which is
+   * what its own UI shows; raw records must never be summed (see
+   * `stepTotalFromRecords`). Null means the aggregation could not be run.
+   */
+  async function aggregate(recordType: string, metric: string, from: Date, to: Date): Promise<number | null> {
+    if (!mod.aggregateRecord || !(await ensureInit())) return null;
+    try {
+      const res = await mod.aggregateRecord({ recordType, timeRangeFilter: between(from, to) });
+      const v = Number(res?.[metric]);
+      return Number.isFinite(v) ? v : null;
+    } catch { return null; }
   }
 
   const avgOf = (values: number[]): number | null =>
@@ -391,18 +414,22 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
       const now = new Date();
       const to = now < dayEnd ? now : dayEnd;
 
-      const [stepRecords, hrRecords] = await Promise.all([
+      // The records are read for their SPANS (when the walking happened); the
+      // TOTAL comes from the aggregation, which merges the several apps
+      // writing steps for the same minutes. Summing the records instead is
+      // the double-count `stepTotalFromRecords` describes.
+      const [stepRecords, hrRecords, stepAgg] = await Promise.all([
         readAll<StepsRecord>('Steps', from, to),
         readAll<HrRecord>('HeartRate', from, to),
+        aggregate('Steps', 'COUNT_TOTAL', from, to),
       ]);
 
       const baseMs = from.getTime();
-      let steps = 0;
+      const steps = stepAgg != null ? Math.round(stepAgg) : stepTotalFromRecords(stepRecords);
       const stepSpans: { startMin: number; endMin: number }[] = [];
       stepRecords.forEach((r) => {
         const n = Number(r.count);
         if (!Number.isFinite(n) || n <= 0) return;
-        steps += n;
         const a = Math.floor((new Date(r.startTime).getTime() - baseMs) / 60000);
         const b = Math.ceil((new Date(r.endTime).getTime() - baseMs) / 60000);
         if (Number.isFinite(a) && Number.isFinite(b) && b > a) stepSpans.push({ startMin: a, endMin: b });
@@ -421,7 +448,7 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
       hr.sort((a, b) => a.t - b.t);
 
       return {
-        steps: stepRecords.length ? Math.round(steps) : null,
+        steps: stepRecords.length ? steps : null,
         stepSpans: stepSpans.length ? stepSpans : null,
         standMin: null,
         standByHour: null,

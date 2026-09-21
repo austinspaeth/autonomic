@@ -83,7 +83,10 @@ jest.mock('../../../store/store', () => ({
     customTypes: { meds: { 'custom-mag': {} } },
     hiddenTypes: { symptoms: ['nausea'] },
     meta: { lastUpdated: '2026-08-04T00:00:00.000Z', lastImport: { name: 'secret-name.json', at: '2026-07-20T00:00:00.000Z' }, onboarded: '2026-06-01T00:00:00.000Z' },
-    days: { '2026-08-04': DAY, '2026-07-04': DAY },
+    days: {
+      '2026-08-04': { ...DAY, load: { readAt: '2026-08-04T20:00:00.000Z', steps: 14217, hrCoverageMin: 700, stepsVersion: 2 } },
+      '2026-07-04': DAY,
+    },
   }),
 }));
 
@@ -104,6 +107,24 @@ describe('collectAppDiagnostics', () => {
     expect(text).not.toContain('2026-07-20');
     expect(text).toMatch(/last import\s+\d+ days ago/);
     expect(text).toMatch(/profile fields set\s+sex, height/);
+  });
+
+  it('reports the last read\'s step count, which is the one value it may carry', async () => {
+    const d = await collectAppDiagnostics();
+    // "The pacing budget is wrong" is the question no count can answer, and an
+    // Android read that summed every app's steps is what made it a real one.
+    expect(d.journal['steps (latest)']).toBe('14,217');
+    expect(d.journal['hr coverage (latest)']).toBe('700 min');
+    expect(d.journal['steps read']).toBe('v2');
+    // Bounded to the last two days: a fortnight of them is a health record.
+    expect(Object.keys(d.journal).filter((k) => k.startsWith('steps ('))).toHaveLength(1);
+  });
+
+  it('says nothing about steps for a day the budget never read', async () => {
+    const d = await collectAppDiagnostics();
+    // The older fixture day has no `load`, so it contributes no row at all
+    // rather than a zero, which would read as a day that cost nothing.
+    expect(d.journal['steps (previous)']).toBeUndefined();
   });
 
   it('counts the journal without sampling it, and excludes short imported HRV', async () => {

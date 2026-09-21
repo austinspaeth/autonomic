@@ -32,6 +32,52 @@ export const RESTORE_DAYS = BASELINE_DAYS;
  *  reads on every launch. */
 export const RESTORE_MAX_ATTEMPTS = 3;
 
+/**
+ * Which step read produced a stored day's count.
+ *
+ * 1 — Android summed every writing app's Steps records. A user with a Garmin
+ *     had Garmin's day, the phone provider's day and any third tracker's day
+ *     added together: 39,355 steps for a day Garmin called 14,217. Because the
+ *     count is a FLOOR under the budget (`STEP_EFFORT`), such a day's spend was
+ *     that floor and the measured estimate was discarded, and the day then fed
+ *     the ceiling as though the person had absorbed it.
+ * 2 — The merged total, from Health Connect's own aggregation (and iOS's
+ *     HKStatisticsQuery, which always did this).
+ *
+ * Unlike `pricedVersion` this cannot be recomputed from the sidecar curve —
+ * steps were never in it — so a stored day is repaired by READING IT AGAIN.
+ */
+export const STEP_READ_VERSION = 2;
+
+/**
+ * The past days whose step count came from the summing read, NEWEST first.
+ *
+ * Newest first for `restoreErasedDays`' reason: the read can be cut short by a
+ * background, and the recent days are the ones the strip, the accuracy row and
+ * the ceiling's medians are actually built from.
+ *
+ * Only days that HOLD a count are listed: a day with no steps has nothing
+ * mis-summed, and re-reading it would be inventing a record for a day nobody
+ * watched. Every other field is left to the ordinary read, which recomputes
+ * the whole record anyway.
+ */
+export function misreadStepDays(
+  days: Record<string, DayRecord | undefined>,
+  dk: string,
+  addDays: (dk: string, n: number) => string,
+  lookback: number = RESTORE_DAYS,
+): string[] {
+  const out: string[] = [];
+  for (let i = 1; i <= lookback; i++) {
+    const k = addDays(dk, -i);
+    const load = days[k]?.load;
+    if (!load?.readAt || load.steps == null) continue;
+    if ((load.stepsVersion ?? 1) >= STEP_READ_VERSION) continue;
+    out.push(k);
+  }
+  return out;
+}
+
 /** Did this read bring back anything at all? */
 export function readHasEvidence(r: DayLoadRead): boolean {
   return r.steps != null || r.standMin != null || !!(r.hr && r.hr.length);

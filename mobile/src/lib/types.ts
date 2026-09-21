@@ -183,8 +183,15 @@ export interface DayRecord {
  * spent on the charger reports low coverage rather than a restful day.
  */
 export interface DayLoad {
-  /** Whole-day step count so far. */
+  /** Whole-day step count so far, MERGED ACROSS SOURCES. */
   steps: number | null;
+  /** Which read produced `steps` (budget/restore.ts `STEP_READ_VERSION`).
+   *  Absent means 1: the Android read that SUMMED every app's Steps records
+   *  instead of aggregating them, which triple-counted a day for anyone with
+   *  a wearable writing to Health Connect alongside the phone. Stored so those
+   *  days can be read back once (`misreadStepDays`), and on the DAY rather
+   *  than in the flags store for the reason `pricedVersion` is. */
+  stepsVersion: number | null;
   /** Minutes holding any steps, merged from the sample timestamps. Works on a
    *  phone with no wearable — every phone counts its own steps. */
   walkingMin: number | null;

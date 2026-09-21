@@ -2,7 +2,7 @@ import type { DayLoad } from '../../types';
 import { CURVE_MAX, PRICE_VERSION, repriceAction } from '../reprice';
 
 const load = (over: Partial<DayLoad> = {}): DayLoad => ({
-  steps: 3000, walkingMin: 30, standMin: null, stillUprightMin: null, stillFloorBpm: null,
+  steps: 3000, stepsVersion: null, walkingMin: 30, standMin: null, stillUprightMin: null, stillFloorBpm: null,
   uprightSpans: null, uprightByHour: null, hrAboveMin: 12, hrBands: null, hrBelowMin: null,
   hrBelowByHour: null, hrCoverageMin: 140, hrSampleGapMin: null, hrStretches: 1,
   longestStretch: null, peakBpm: 104, lineBpm: 96, readAt: '2026-03-14T20:00:00.000Z',

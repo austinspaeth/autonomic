@@ -1,10 +1,12 @@
 import { addDays } from '../../dates';
-import { RESTORE_DAYS, erasedLoadDays, readHasEvidence, readLosesEvidence } from '../restore';
+import {
+  RESTORE_DAYS, STEP_READ_VERSION, erasedLoadDays, misreadStepDays, readHasEvidence, readLosesEvidence,
+} from '../restore';
 import type { DayLoadRead } from '../../health';
 import type { DayLoad, DayRecord } from '../../types';
 
 const load = (over: Partial<DayLoad>): DayLoad => ({
-  steps: null, walkingMin: null, standMin: null, stillUprightMin: null, stillFloorBpm: null,
+  steps: null, stepsVersion: null, walkingMin: null, standMin: null, stillUprightMin: null, stillFloorBpm: null,
   uprightSpans: null, uprightByHour: null, hrAboveMin: null, hrBands: null, hrBelowMin: null, hrBelowByHour: null, hrCoverageMin: null, hrSampleGapMin: null, hrStretches: null,
   longestStretch: null, peakBpm: null, lineBpm: null, readAt: null, pricedVersion: null,
   ...over,
@@ -75,5 +77,49 @@ describe('erasedLoadDays', () => {
 
   it('leaves a fresh install alone: days before steps ever landed stay unknown', () => {
     expect(erasedLoadDays({}, DK, addDays, false)).toEqual([]);
+  });
+});
+
+describe('misreadStepDays', () => {
+  const summed = (steps: number) => load({ steps, readAt: '2026-09-09T22:00:00Z' });
+  const merged = (steps: number) =>
+    load({ steps, readAt: '2026-09-09T22:00:00Z', stepsVersion: STEP_READ_VERSION });
+
+  it('lists the unstamped past days holding a count, newest first', () => {
+    const days = {
+      '2026-09-09': day({ load: summed(39355) }),
+      '2026-09-08': day({ load: summed(10125) }),
+    };
+    expect(misreadStepDays(days, DK, addDays)).toEqual(['2026-09-09', '2026-09-08']);
+  });
+
+  it('leaves today alone: the live read stamps it', () => {
+    const days = { [DK]: day({ load: summed(39355) }) };
+    expect(misreadStepDays(days, DK, addDays)).toEqual([]);
+  });
+
+  it('skips a day already read by the merging query', () => {
+    const days = { '2026-09-09': day({ load: merged(14217) }) };
+    expect(misreadStepDays(days, DK, addDays)).toEqual([]);
+    // And a later version than this build's is not re-read backwards.
+    const ahead = { '2026-09-09': day({ load: load({ steps: 1, readAt: 'x', stepsVersion: STEP_READ_VERSION + 1 }) }) };
+    expect(misreadStepDays(ahead, DK, addDays)).toEqual([]);
+  });
+
+  it('never invents a record: a day with no count, or none read at all, is not due', () => {
+    const days = {
+      '2026-09-09': day({ load: load({ steps: null, readAt: '2026-09-09T22:00:00Z' }) }),
+      '2026-09-08': day({ load: load({ steps: 900, readAt: null }) }),
+      '2026-09-07': day(),
+    };
+    expect(misreadStepDays(days, DK, addDays)).toEqual([]);
+  });
+
+  it('reaches back as far as the ceiling own history', () => {
+    const days: Record<string, ReturnType<typeof day>> = {};
+    for (let i = 1; i <= RESTORE_DAYS + 5; i++) days[addDays(DK, -i)] = day({ load: summed(20000) });
+    const out = misreadStepDays(days, DK, addDays);
+    expect(out).toHaveLength(RESTORE_DAYS);
+    expect(out[out.length - 1]).toBe(addDays(DK, -RESTORE_DAYS));
   });
 });

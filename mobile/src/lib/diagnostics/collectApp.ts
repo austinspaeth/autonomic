@@ -16,6 +16,8 @@
  * never their values. An import reports that it happened, not the file name.
  * The saved strap keeps its name (a product model, e.g. "Polar H10") because
  * that is the whole diagnostic value and the Bluetooth dump already shows it.
+ * The pacing rows below are the ONE place a measured value is reported rather
+ * than counted, and the exception is argued where they are built.
  */
 import { Platform } from 'react-native';
 import { appInfo, describeError, platformInfo } from './env';
@@ -134,8 +136,40 @@ function journalRows(s: AppState): Rows {
     // "the pacing budget is wrong" are different support questions and this is
     // the only row that tells them apart.
     'days with load read': loadDays,
+    ...pacingReadRows(s, keys),
     'imported entries': imported,
   };
+}
+
+/**
+ * The last two days' step counts and heart-rate coverage — the only VALUES in
+ * this report, and the exception is deliberate.
+ *
+ * "The pacing budget is wrong" is the one support question a count cannot
+ * answer. It was asked for real: an Android user's budget was charging them
+ * three times over because the Health Connect read SUMMED every app writing
+ * steps (see lib/health/stepTotal), and the only way to see it was to ask them
+ * to send a full data export and compare it against their watch by hand. A
+ * step count is not identifying, it is not a diagnosis, and it is the number
+ * in dispute — whereas nothing else here would have moved by one.
+ *
+ * Two days, not the history: enough to tell a sane read from an inflated one,
+ * and a fortnight of them would be a health record in a support email.
+ * `steps read` is the bookkeeping half — version 1 is the summing read, so a
+ * phone still holding uncorrected days says so without anyone doing arithmetic.
+ */
+function pacingReadRows(s: AppState, keys: string[]): Rows {
+  const out: Rows = {};
+  const recent = keys.slice(-2).reverse();
+  recent.forEach((k, i) => {
+    const load = s.days[k]?.load;
+    if (!load?.readAt) return;
+    const when = i === 0 ? 'latest' : 'previous';
+    out[`steps (${when})`] = load.steps != null ? Math.round(load.steps).toLocaleString('en-US') : 'none read';
+    out[`hr coverage (${when})`] = load.hrCoverageMin != null ? `${Math.round(load.hrCoverageMin)} min` : 'none read';
+    if (i === 0) out['steps read'] = `v${load.stepsVersion ?? 1}`;
+  });
+  return out;
 }
 
 /** Which settings are set, and to what — all product configuration, no content.
