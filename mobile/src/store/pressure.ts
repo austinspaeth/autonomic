@@ -33,9 +33,22 @@ import { logError } from '../lib/diagnostics/errorLog';
 
 type SensorsModule = typeof import('expo-sensors');
 
-/** Optional native module: a JS bundle running on a binary built before it was
- *  added (an OTA onto an older build) has no ExpoBarometer, and must degrade to
- *  "no barometer" rather than crash on import. */
+/**
+ * Optional native module: a JS bundle running on a binary built before it was
+ * added (an OTA onto an older build) has no ExpoBarometer, and must degrade to
+ * "no barometer" rather than crash on import.
+ *
+ * `Barometer` is the ONLY thing this app takes from expo-sensors, and it needs
+ * no Android permission. The library's own manifest nonetheless declares
+ * `ACTIVITY_RECOGNITION` unconditionally, for the `Pedometer` API nothing here
+ * calls — Android steps come from Health Connect's READ_STEPS, which is a
+ * separate namespace and does not require it. Play asks for a written
+ * justification for every manifest permission, so that one is listed in
+ * `android.blockedPermissions` (app.json) and prebuild strips it with
+ * `tools:node="remove"`. **Do not reach for `Pedometer` here without unblocking
+ * it**: the call would compile, ship and then be denied at runtime on any
+ * device, since the permission would no longer be in the manifest to grant.
+ */
 let sensors: SensorsModule | null | undefined;
 function mod(): SensorsModule | null {
   if (sensors !== undefined) return sensors;

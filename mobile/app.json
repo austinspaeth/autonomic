@@ -110,7 +110,8 @@
         "android.permission.health.WRITE_BLOOD_PRESSURE"
       ],
       "blockedPermissions": [
-        "android.permission.RECORD_AUDIO"
+        "android.permission.RECORD_AUDIO",
+        "android.permission.ACTIVITY_RECOGNITION"
       ]
     },
     "plugins": [
