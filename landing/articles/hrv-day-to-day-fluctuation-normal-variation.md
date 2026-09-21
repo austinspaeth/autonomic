@@ -8,7 +8,7 @@ keywords: "HRV change day to day, HRV fluctuation, why does my HRV vary so much,
 date: 2026-09-19
 updated: 2026-09-19
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "https://images.unsplash.com/photo-1713426225330-014fbfd04aa0?q=80&w=1632&auto=format&fit=crop"
 photoAttribution: "Unsplash"
 tldr: "Heart rate variability is supposed to change from day to day. It is a live readout of last night's sleep, stress, hydration, hormones, and how you measured, so a swing of 10 to 20 percent (and often more) around your own average is completely normal. A single low morning is almost always just yesterday, not a decline. The signal you actually want is the direction over one to two weeks, not any single reading, so measure the same way each morning, watch the rolling trend, and only act when several readings in a row move together."
 categories:

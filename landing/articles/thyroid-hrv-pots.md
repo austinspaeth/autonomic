@@ -8,8 +8,8 @@ keywords: "thyroid and HRV, hyperthyroidism POTS, thyroid heart rate variability
 date: 2026-09-20
 updated: 2026-09-20
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Brooke Lark / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1769029174099-30d43d3e86b1?q=80&w=1740&auto=format&fit=crop"
+photoAttribution: "Unsplash"
 tldr: "Thyroid hormone is one of the strongest regulators of heart rate and autonomic balance. Too much of it (hyperthyroidism) speeds the heart, drives palpitations and lowers heart rate variability, which can look almost identical to POTS or inappropriate sinus tachycardia. Too little (hypothyroidism) tends to slow the heart but can still blunt HRV and leave you exhausted. Because thyroid problems are common, more common in women, often triggered or worsened after a viral illness, and usually treatable, a simple blood panel (TSH, free T4, free T3, and thyroid antibodies) is one of the first things worth ruling out when your resting heart rate is high or your HRV keeps reading low. Thyroid labs are a clinician's job to order and interpret; at-home tracking shows the pattern, not the diagnosis."
 categories:
   - pots

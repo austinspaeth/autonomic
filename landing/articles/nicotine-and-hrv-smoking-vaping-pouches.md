@@ -8,8 +8,8 @@ keywords: "nicotine and HRV, does nicotine lower HRV, vaping HRV, nicotine heart
 date: 2026-09-21
 updated: 2026-09-21
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1641907173006-6b8930ae1191?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "engin akyurt / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1580691179247-aa36daf766c9?q=80&w=928&auto=format&fit=crop"
+photoAttribution: "Unsplash"
 tldr: "Nicotine is a sympathomimetic stimulant, so it reliably raises heart rate and lowers HRV by tilting your autonomic balance toward fight-or-flight. Unlike caffeine, that direction is consistent across the research. The size of each hit depends on delivery (a cigarette's fast bolus is sharper than a patch's steady release), and for POTS it pushes an already-fast, adrenaline-heavy system harder. The reassuring part: HRV starts climbing within days of quitting, with clear gains over the following weeks. Track your resting heart rate, HRV, and a stand test against your own baseline."
 categories:
   - hrv
