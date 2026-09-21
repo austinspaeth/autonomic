@@ -7,6 +7,80 @@ in the app's "What's new" card are a separate, deliberately plainer log in
 `mobile/src/lib/whatsNew.ts` — update it whenever `version` in `mobile/app.json`
 crosses to a new `x.x` (a unit test fails if the shipping minor has no entry).
 
+## 1.29.0
+
+**The pacing pause became an event rather than an address.** Three things
+suppressed the budget: a downturn, a fired strain alert, and a crash-grade day.
+The first two are measured against the person (a slide; this user's own 7-day
+medians against their own previous 42) and so expire on their own. The third
+was an absolute band, `score < 25` in `scoring/day.ts` — which for a severely
+ill user is not an event but where they live, so the feature switched itself
+off permanently for exactly the population it was built for, every morning,
+under copy promising it would resume tomorrow.
+
+- **`crashIsFall` (`budget/envelope.ts`)** makes the third suppressor relative
+  like its siblings: a crash-grade day pauses only when it sits `CRASH_DROP_PTS`
+  (10, the size of `outcome.ts`'s `DECLINE_PTS`) below the median of the user's
+  own last 28 scored days. Under `CRASH_REL_MIN_DAYS` (10) scored days the old
+  absolute rule stands, since a journal that cannot say what usual means for
+  this person must err low. It is one-sided: it can only ever DECLINE to
+  suppress a day the old rule would have suppressed.
+- **`PRIOR_BY_GRADE` had no `Crash` row**, a hole the old rule hid. A missing
+  key falls through to `PRIOR_DEFAULT` (200), which is HIGHER than Bad's 120, so
+  the first crash-grade day to publish would have started from the largest prior
+  in the table. Now 80.
+- **`budget/pause.ts` + `pauseMemory.ts`**: a run valve and the reader's own
+  override. A strain alert reads a 7-day window against the previous 42 and can
+  hold for a week while that window rolls off, and a feature that has shown
+  nothing for `PAUSE_RUN_MAX` (3) days is not paused, it is broken as far as the
+  user can tell. The override is PER DAY with no memory beyond it, the rule
+  `features/hrv/Results.tsx` already follows for a salvageable reading: a
+  "stop warning me" setting gets flipped once on a bad morning and then quietly
+  removes the rail for every real crash afterwards. Both lists are reset by
+  "Clear all data" — they name days in the erased journal.
+- **The override reveals a number, it never clears a warning.**
+  `Envelope.suppressed` stays set and becomes `BudgetView.pausedReason`, so the
+  strip keeps an amber mark and "Rest still advised.", the sheet keeps the gold
+  block, and the day's own crash card is untouched. The engine's guard is
+  therefore `envelope.effortMin == null`, not `envelope.suppressed`; branching
+  on the reason sent a revealed day back to the paused card and made the play
+  button look dead.
+- **Reason-specific copy.** The card hardcoded "the app saw a downturn" for all
+  three findings, so a strain alert reported a downturn the app had not
+  detected, and every reason promised "resume tomorrow" — a forecast the app
+  cannot make and one that was false every morning for anyone the pause latched
+  on. `PAUSED_TODAY_SUB` is the one line in the module exempt from the honesty
+  test's ban on "you can", and the test names the constant so no other line can
+  reach for the phrasing.
+- **Pacing alerts deliberately do NOT honour the override** (the widgets and the
+  wrist do, or the Journal and the home screen would disagree). Revealing a
+  number is a decision to look at one, never a licence for the app to volunteer
+  one unprompted.
+- The crash-day flag softened from "Mandatory recovery day. Full rest,
+  hydration, and protocol." — an instruction, in three lines of red, to somebody
+  already having the worst day in their journal. Ping `use` letter `U` counts a
+  reveal, which is the only outside evidence that the pause rule is still too
+  eager; read against `use` `B`.
+- The strip's confidence label is flush to the card's right edge rather than
+  inset under the chevron.
+
+**Health data imports itself.** The pill used to offer what Apple Health and
+Health Connect held and wait to be approved item by item; a user asked why. A
+sample is a measurement that already happened, so it is filed on arrival and
+the pill is the RECEIPT for it — the rule the HRV results card already follows.
+
+- `splitForReview` (`health/updateSet.ts`, pure + tested) holds back the one
+  thing the app will not file unasked: poor-quality HRV (`isPoorImport`), since
+  nothing downstream refuses it. Its only member; nothing else carries a
+  quality verdict.
+- The receipt's checkboxes are the old ones inverted — a tick means REMOVE, via
+  `undoImports` → `deleteEntry`, which already declines the sample permanently.
+  Rows that cannot be removed carry no checkbox: the night is a field on the
+  day, and a review row is not written yet, so it gets an Import link.
+- The pill stands until tapped or dismissed (it is the only notice of a silent
+  write); an empty check still fades. Still today only, so Settings keeps the
+  24-hour sweep and its hand-picked sheet.
+
 ## 1.28.0
 
 **The pacing budget.** Each morning the app estimates how much effort the day

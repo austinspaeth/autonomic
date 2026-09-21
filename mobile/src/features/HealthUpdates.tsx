@@ -412,7 +412,12 @@ const styles = StyleSheet.create({
     borderRadius: 999, paddingHorizontal: 7, paddingVertical: 2,
   },
   tagText: { color: CAUTION_GOLD, fontSize: 10.5, fontWeight: '800', letterSpacing: 0.2 },
-  dismiss: { width: 24, height: 24, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
+  // Pulled in against the row's 16pt padding: the ✕ glyph is 13pt inside a 24pt
+  // circle, so without this it sits ~21pt off the pill's edge while the badge
+  // opposite it sits at 16 — the right side reads heavier than the left. Trimming
+  // 6 puts the GLYPH at the same inset as the badge. It lives on the button
+  // rather than on `row`, which the symmetric "Checking…" state shares.
+  dismiss: { width: 24, height: 24, marginRight: -6, borderRadius: 999, backgroundColor: 'rgba(255,255,255,0.08)', alignItems: 'center', justifyContent: 'center' },
 });
 
 /* ---------- the grouped import sheet ---------- */
