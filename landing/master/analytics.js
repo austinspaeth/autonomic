@@ -2462,6 +2462,83 @@ window.Analytics = (function () {
   }
 
   /**
+   * One day, read three ways: everything that failed, and the CRASHES on their
+   * own, each with the store split underneath.
+   *
+   * This exists for the two cards in App usage, which have to put a number
+   * beside yesterday, beside the same weekday a week back and beside the
+   * range's own average — three baselines over one pass rather than three
+   * sweeps of the fault table per day drawn.
+   *
+   * A crash is a row the app never caught: it reached the global handler and
+   * took the app down in front of somebody. It is a different severity from a
+   * swallowed error and is never pooled with one, which is why it is counted
+   * here rather than inferred from a total.
+   *
+   * `installs` is install-days and `occurrences` is how many times — the two
+   * numbers this data always reports together, because one phone in a retry
+   * loop is one install-day and can be hundreds of occurrences. The platform
+   * splits follow the same division: `platforms` is install-days (it sums to
+   * `installs`) and `occPlatforms` is occurrences. A filter narrows both
+   * together, never one against the other's denominator.
+   */
+  function faultDay(report, platform, day) {
+    var only = platformFilter(platform);
+    var out = {
+      installs: 0, occurrences: 0, signatures: 0,
+      crashInstalls: 0, crashOccurrences: 0, crashSignatures: 0,
+      platforms: {}, crashPlatforms: {}
+    };
+    ((report && report.faults) || []).forEach(function (raw) {
+      var r = faultRow(raw);
+      if (r.day !== day) return;
+      var installs = only ? splitTotal(r.platforms, only) : r.installs;
+      var occ = only ? splitTotal(r.occPlatforms, only) : r.occurrences;
+      if (!installs && !occ) return;
+      out.installs += installs;
+      out.occurrences += occ;
+      out.signatures += 1;
+      mergeSplit(out.platforms, r.platforms, only);
+      if (r.fatal) {
+        out.crashInstalls += installs;
+        out.crashOccurrences += occ;
+        out.crashSignatures += 1;
+        mergeSplit(out.crashPlatforms, r.platforms, only);
+      }
+    });
+    return out;
+  }
+
+  /** The same over a span of days, pooled. Install-days ADD across days by
+   *  construction — a signature is reported at most once per install per day,
+   *  so two days of one phone is two install-days and that is what the number
+   *  claims to be. It is never a phone count and this is why. */
+  function faultDaysOver(report, platform, days) {
+    var out = {
+      installs: 0, occurrences: 0, signatures: 0,
+      crashInstalls: 0, crashOccurrences: 0, crashSignatures: 0,
+      platforms: {}, crashPlatforms: {}
+    };
+    (days || []).forEach(function (d) {
+      var one = faultDay(report, platform, d);
+      out.installs += one.installs;
+      out.occurrences += one.occurrences;
+      out.signatures += one.signatures;
+      out.crashInstalls += one.crashInstalls;
+      out.crashOccurrences += one.crashOccurrences;
+      out.crashSignatures += one.crashSignatures;
+      mergeSplit(out.platforms, one.platforms);
+      mergeSplit(out.crashPlatforms, one.crashPlatforms);
+    });
+    return out;
+  }
+
+  /** One day's crashing installs, the fatal half of `faultsOn`. */
+  function crashesOn(report, platform, day) {
+    return faultDay(report, platform, day).crashInstalls;
+  }
+
+  /**
    * The headline: how many distinct failures, how many install-days, how many
    * times in total, how many are fatal, and how many are NEW — first seen on
    * the range's last day.
@@ -2575,6 +2652,7 @@ window.Analytics = (function () {
 
     // faults — not a counter; see the block above `export`
     faultGroups: faultGroups, faultsOn: faultsOn, faultSummary: faultSummary,
+    faultDay: faultDay, faultDaysOver: faultDaysOver, crashesOn: crashesOn,
     faultTopVersion: faultTopVersion, faultIntensity: faultIntensity,
 
     slotName: function (kind, letter) {

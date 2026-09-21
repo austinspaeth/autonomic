@@ -539,6 +539,40 @@
       </div>
     </div>
 
+    <!-- ===================== CRASHES AND FAILURES =====================
+         The two numbers from the fault reporter that belong beside usage
+         rather than in the crash list: how many installs the app went down
+         in front of, and how many hit anything at all. WHAT broke is the
+         Failures tab; this is only whether it is getting better or worse,
+         which is a question about days and is why the three baselines are
+         here and not there. -->
+    <div class="section-head" style="margin-top:22px">
+      <h2 class="section-title">Crashes and failures</h2>
+      <span class="section-note" id="pgFaultHeadNote"></span>
+    </div>
+    <div class="grid cards">
+      <div class="tile-group" id="pgFaultTiles"></div>
+    </div>
+
+    <div class="grid two-col" style="margin-bottom:14px">
+      <div class="card">
+        <header><h2>Crashes a day, by store</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgCrashDaily">Table</button></header>
+        <p class="hint">Installs that hit an <b>uncaught</b> failure that day — one that reached the global handler rather than a catch block, which is to say the app went down in front of somebody. Stacked by the store the build runs on, because a crash on one platform and not the other is usually a platform bug and the split is the first thing that says so. Counted in <b>install-days</b>: the app reports a failure at most once per install per day, so a phone stuck in a loop counts once here and its real volume is in the Failures tab.</p>
+        <div id="pgCrashDaily"></div>
+        <div id="pgCrashDaily-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgCrashNote"></div>
+      </div>
+      <div class="card">
+        <header><h2>Failures a day, by store</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="pgFaultDaily">Table</button></header>
+        <p class="hint">The same, for <b>every</b> reported failure — the crashes above plus everything the app caught and handled. A handled failure is not nothing: it is a health import that silently did not run, a strap that never connected, a waveform that was lost. Same install-day counting and the same store split. There is no device id anywhere in this system, so nine install-days may be nine phones once each or one phone for nine days.</p>
+        <div id="pgFaultDaily"></div>
+        <div id="pgFaultDaily-table" class="hidden" style="margin-top:12px"></div>
+        <div id="pgFaultNote"></div>
+      </div>
+    </div>
+
     <div class="card" style="margin-bottom:14px">
       <header><h2>iOS vs Android, day by day</h2><span class="spacer"></span>
         <button class="btn sm" data-table-toggle="pgPlatforms">Table</button></header>
@@ -816,6 +850,21 @@
       <header><h2>Plan mix</h2></header>
       <p class="hint">What sold in the selected range, and what is live now.</p>
       <div id="slMix"></div>
+    </div>
+
+    <!-- Every purchase in the range, unaggregated. Every chart above this one
+         is a grouping of these rows, and grouping is where a single refund, a
+         cancellation two days after the sale or an annual plan bought on the
+         last day of the month stops being visible. This is the ledger the
+         numbers came from, so a figure that looks wrong can be read back to
+         the row that made it — which is also why it carries every field a row
+         holds rather than the four a table usually shows. -->
+    <div class="card" style="margin-top:14px">
+      <header><h2>Every purchase in this range</h2><span class="spacer"></span>
+        <span class="section-note" id="slLedgerCount"></span>
+        <button class="btn sm" id="slLedgerExport">Export CSV</button></header>
+      <p class="hint">One row per purchase, newest first, with everything recorded against it: the day it landed, the store, the plan, the price, how many it covers, the monthly recurring revenue it adds (an annual plan counts as a twelfth of its price), the buyer's install date and how many days they took to buy, whether it has been cancelled or refunded, and any note. Rows come from the ledger under <b>Edit data</b> and are filtered by the date range and store filter above; edit one there.</p>
+      <div class="table-scroll" id="slLedger"></div>
     </div>
   </section>
 

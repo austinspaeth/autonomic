@@ -914,7 +914,15 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var
   background: var(--surface-2); border: 1px solid var(--border-strong);
   color: var(--text-primary); padding: 10px 16px; border-radius: 10px;
   box-shadow: 0 10px 30px rgba(0,0,0,.6); z-index: 100;
-  max-width: calc(100vw - 24px);
+  max-width: min(680px, calc(100vw - 24px));
+  /* The HEIGHT cap is set in `toast()` from the header's own measured bottom:
+     a toast may grow all the way up to the bar and no further. Beyond that it
+     scrolls rather than clipping — it used to have a width cap and nothing
+     else, so a long message wrapped off the top of the screen and showed the
+     END of a sentence whose beginning said what had happened. `overflow-wrap`
+     is what keeps a long unbroken token inside the width instead of widening
+     the box past it. */
+  overflow-y: auto; overflow-wrap: anywhere; line-height: 1.45;
   opacity: 0; pointer-events: none; transition: opacity .2s, transform .2s;
 }
 .toast.on { opacity: 1; transform: translateX(-50%) translateY(-4px); }

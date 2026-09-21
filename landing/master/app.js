@@ -1814,6 +1814,7 @@
       'pgActivationRates', 'pgMethodNote', 'pgMeasureNote', 'pgMeasureRates', 'pgReadMethodNote',
       'pgPayNote', 'pgSurfaceNote', 'pgTierNote', 'pgBuildNote', 'pgBuildShareNote',
       'pgFunnelNote', 'pgOfferNote', 'pgEventNote', 'pgLogNote', 'pgDigNote',
+      'pgFaultTiles', 'pgFaultHeadNote', 'pgCrashNote', 'pgFaultNote',
       'pgWeekdayRetention', 'pgPlatformNote', 'pgFilterNote'];
     if (!ready || blank) hosts.forEach(function (id) {
       var n = document.getElementById(id);
@@ -1868,6 +1869,7 @@
         'pgActivationAge', 'pgMethods', 'pgMeasureDaily', 'pgMeasureCurve', 'pgReadMethods',
         'pgPayDaily', 'pgSurfaces', 'pgTiers', 'pgBuilds', 'pgBuildShare',
         'pgFunnel', 'pgOffers', 'pgEvents', 'pgLogs', 'pgDig',
+        'pgCrashDaily', 'pgFaultDaily',
         'pgPlatforms', 'pgWeekday'].forEach(function (id) {
         drawChart(id, { x: [], series: [], emptyText: 'Waiting for the first ping.' });
       });
@@ -1896,6 +1898,7 @@
     renderOffers(scoped, days);
     renderEvents(scoped, days);
     renderUsage(scoped, days);
+    renderFaultUsage(scoped, days, r);
     renderTierBuild(scoped, days);
     /* The one card that stays on the FULL index by design: it is what the
        platform filter is a slice of, so filtering it would leave nothing to
@@ -4339,6 +4342,180 @@
     renderSlotLines(ix, days, DIG_LINES, 'pgDig', 'pgDigNote', 'Nothing opened in this range.');
   }
 
+  /* ------------------------------------------- 5f. crashes and failures
+
+     The fault reporter, read as a daily count rather than as a crash list.
+
+     WHAT broke is the Failures tab and stays there — this is whether it is
+     getting better or worse, which is a question about DAYS, and the reason
+     the three baselines live here: a raw "4 crashes" says nothing at all, and
+     the same 4 against yesterday's 1, against last Tuesday's 9 and against the
+     range's own 2.3 a day is three different stories depending which one you
+     read. The weekday baseline is not a nicety here either — the population
+     that could crash is the population that opened the app, and that swings by
+     a third across the week on its own.
+
+     Both numbers are INSTALL-DAYS, the same unit the Failures tab ranks by: a
+     signature is reported at most once per install per Eastern day, so a phone
+     in a retry loop is 1 here and its real volume is the occurrences figure in
+     the meta line. Mixing the two would let one looping device read as an
+     outage. And a crash is counted SEPARATELY rather than inferred from the
+     total: it reached the global handler instead of a catch block, so the app
+     went down in front of somebody, which is a different severity from a
+     health import that quietly did not run. */
+
+  function renderFaultUsage(ix, days, r) {
+    var day = ix.last;
+    var crashOn = function (d) { return A.crashesOn(pings.report, pingPlatform(), d); };
+    var faultOn = function (d) { return A.faultsOn(pings.report, pingPlatform(), d); };
+    var today = A.faultDay(pings.report, pingPlatform(), day);
+    var over = A.faultDaysOver(pings.report, pingPlatform(), days);
+    var actives = A.activeOn(ix, day);
+
+    /* The store split, always drawn from the day's or range's own map so a
+       platform filter narrows it rather than leaving a total under one store's
+       name. `U` is only shown when there is one — a build too old to name its
+       store is a real population and never folded into either side. */
+    function split(map) {
+      var out = [
+        { name: 'iOS', color: ENTITY.ios, value: fmtInt(map.I || 0) },
+        { name: 'Android', color: ENTITY.android, value: fmtInt(map.A || 0) }
+      ];
+      if (map.U) out.push({ name: 'No store', color: COLOR.muted, value: fmtInt(map.U) });
+      return out;
+    }
+
+    function timesNote(n, occ) {
+      if (!n) return '';
+      return fmtInt(occ) + ' time' + (occ === 1 ? '' : 's') + ' · install-days, not phones';
+    }
+
+    document.getElementById('pgFaultTiles').innerHTML = [
+      tile({
+        label: 'Crashes on ' + labelDay(day),
+        value: fmtInt(today.crashInstalls),
+        color: today.crashInstalls ? COLOR.red : COLOR.muted,
+        meta: today.crashInstalls
+          ? timesNote(today.crashInstalls, today.crashOccurrences) +
+            (actives ? ' · ' + fmtPct((today.crashInstalls / actives) * 100) + ' of the ' +
+              fmtInt(actives) + ' in the app' : '')
+          : 'the app went down for nobody that day',
+        split: split(today.crashPlatforms),
+        /* More is worse, so the arrow's colour is flipped: a rise here is red
+           however green an upward move is everywhere else on this page. */
+        invertDelta: true,
+        deltas: dayDeltas(day, days, crashOn)
+      }),
+      tile({
+        label: 'Failures on ' + labelDay(day),
+        value: fmtInt(today.installs),
+        color: today.installs ? COLOR.gold : COLOR.muted,
+        meta: today.installs
+          ? timesNote(today.installs, today.occurrences) + ' · ' +
+            fmtInt(today.signatures) + ' distinct'
+          : 'nothing reported that day',
+        split: split(today.platforms),
+        invertDelta: true,
+        deltas: dayDeltas(day, days, faultOn)
+      }),
+      tile({
+        label: 'Crashes in range',
+        value: fmtInt(over.crashInstalls),
+        color: over.crashInstalls ? COLOR.red : COLOR.muted,
+        meta: over.crashInstalls
+          ? fmtInt(over.crashOccurrences) + ' time' + (over.crashOccurrences === 1 ? '' : 's') +
+            ' over ' + fmtInt(days.length) + ' day' + (days.length === 1 ? '' : 's')
+          : 'no uncaught failure in this range',
+        split: split(over.crashPlatforms),
+        invertDelta: true,
+        delta: rangeDelta(ix, days, crashOn)
+      }),
+      tile({
+        label: 'Failures in range',
+        value: fmtInt(over.installs),
+        color: over.installs ? COLOR.gold : COLOR.muted,
+        meta: over.installs
+          ? fmtInt(over.occurrences) + ' time' + (over.occurrences === 1 ? '' : 's') +
+            ' over ' + fmtInt(days.length) + ' day' + (days.length === 1 ? '' : 's')
+          : 'nothing reported in this range',
+        split: split(over.platforms),
+        invertDelta: true,
+        delta: rangeDelta(ix, days, faultOn)
+      })
+    ].join('');
+
+    var headNote = document.getElementById('pgFaultHeadNote');
+    if (headNote) {
+      headNote.textContent = over.installs
+        ? 'Install-days, not phones · what broke is in Failures'
+        : 'Nothing reported in this range';
+    }
+
+    /* Stacked by store, because a failure on one platform and not the other is
+       usually a platform bug and the split is the first thing that says so. A
+       day the counter was not running is not drawn as a quiet day: the fault
+       table simply has no row for it, which is the same shape as zero here and
+       is why the note below states the range it covers. */
+    function daily(hostId, pick, empty) {
+      var per = days.map(function (d) {
+        return A.faultDay(pings.report, pingPlatform(), d)[pick];
+      });
+      var totals = { I: 0, A: 0, U: 0 };
+      per.forEach(function (m) {
+        totals.I += m.I || 0; totals.A += m.A || 0; totals.U += m.U || 0;
+      });
+      var series = [
+        { key: 'I', name: 'iOS', color: ENTITY.ios, type: 'area',
+          values: per.map(function (m) { return m.I || 0; }) },
+        { key: 'A', name: 'Android', color: ENTITY.android, type: 'area',
+          values: per.map(function (m) { return m.A || 0; }) }
+      ];
+      if (totals.U) {
+        series.push({ key: 'U', name: 'No store recorded', color: COLOR.muted, type: 'area',
+          values: per.map(function (m) { return m.U || 0; }) });
+      }
+      drawChart(hostId, {
+        x: days.map(dayX), stacked: true, height: 240, format: fmtInt, xLabel: 'Day',
+        series: series, emptyText: empty,
+        /* Against the people who were in the app, because a count of failures
+           is not a rate: ten on a day with ten actives is a broken release and
+           ten on a day with a thousand is background. */
+        tooltipNote: function (i) {
+          var act = A.activeOn(ix, days[i]);
+          var n = (per[i].I || 0) + (per[i].A || 0) + (per[i].U || 0);
+          return act ? fmtPct((n / act) * 100) + ' of the ' + fmtInt(act) + ' in the app'
+            : 'nobody opened the app that day';
+        }
+      });
+    }
+
+    daily('pgCrashDaily', 'crashPlatforms', 'No crashes in this range.');
+    daily('pgFaultDaily', 'platforms', 'No failures reported in this range.');
+
+    /* The one sentence each chart cannot draw: how much of it is one store.
+       A split that is 90% Android on an even userbase is the finding, and it
+       is stated rather than left to be eyeballed off two bands. */
+    function storeNote(hostId, map, noun) {
+      var host = document.getElementById(hostId);
+      if (!host) return;
+      var known = (map.I || 0) + (map.A || 0);
+      if (!known) { host.innerHTML = ''; return; }
+      var top = (map.I || 0) >= (map.A || 0) ? 'I' : 'A';
+      var share = (map[top] / known) * 100;
+      host.innerHTML = '<p class="note" style="margin-top:10px">' +
+        (share >= 80
+          ? '<b>' + fmtPct(share) + '</b> of these ' + noun + ' are on ' +
+            (top === 'I' ? 'iOS' : 'Android') + ' alone — worth reading as a platform bug until ' +
+            'the store split of the userbase above says otherwise.'
+          : 'Split ' + fmtPct(share) + ' / ' + fmtPct(100 - share) + ' between the two stores.') +
+        (map.U ? ' ' + fmtInt(map.U) + ' came from builds too old to name a store.' : '') +
+        '</p>';
+    }
+
+    storeNote('pgCrashNote', over.crashPlatforms, 'crashes');
+    storeNote('pgFaultNote', over.platforms, 'failures');
+  }
+
   /* ------------------------------------------------- 5g. tier and build
 
      Two fields every route carries, so both of these can be read off any
@@ -4842,6 +5019,33 @@
     segment('tlMetric', 'tlMetric', renderTimelineView);
     segment('pgRawKind', 'rawKind', renderPings);
     segment('fltSort', 'fltSort', renderFaults);
+
+    /* The whole filtered set, never the capped rows the table draws — the cap
+       is a rendering budget, and an export that inherited it would be the same
+       lie the table's footnote exists to avoid. */
+    var slLedgerExport = document.getElementById('slLedgerExport');
+    if (slLedgerExport) slLedgerExport.addEventListener('click', function () {
+      var ix = salesIndex();
+      var r = activeRange();
+      var rows = ledgerRows(ix, r);
+      if (!rows.length) { toast('Nothing to export yet.'); return; }
+      var cols = ['date', 'platform', 'plan', 'price', 'qty', 'bookings', 'mrr',
+        'cohort', 'days_to_buy', 'cancelled', 'refunded', 'note'];
+      var out = [cols.join(',')];
+      rows.forEach(function (s) {
+        var age = Sales.cohortDayOf(s);
+        out.push(csvLine(cols, {
+          date: s.date, platform: s.platform, plan: s.plan,
+          price: s.price, qty: s.qty,
+          bookings: Sales.bookingsOf(s),
+          mrr: Sales.isRecurring(s.plan) && !s.refunded ? Sales.mrrOf(s) * s.qty : '',
+          cohort: s.cohort || '', days_to_buy: age === null ? '' : age,
+          cancelled: s.cancelled || '', refunded: s.refunded ? 'yes' : '',
+          note: s.note || ''
+        }));
+      });
+      download('autonomic-purchases-' + r.from + '-to-' + r.to + '.csv', out.join('\n'), 'text/csv');
+    });
 
     var fltExport = document.getElementById('fltExport');
     if (fltExport) fltExport.addEventListener('click', function () {
@@ -5437,6 +5641,88 @@
     renderPurchaseAges(ix, r);
     renderInstallCohorts(ix);
     renderPlanMix(s);
+    renderSalesLedger(ix, r);
+  }
+
+  /* ------------------------------------------------------- the ledger
+
+     Every purchase in the range, unaggregated.
+
+     Everything above this on the tab is a grouping of these rows, and grouping
+     is where a single refund, a cancellation two days after the sale, or an
+     annual plan bought on the last day of the month stops being visible. This
+     is the ledger those numbers came from, so a figure that looks wrong can be
+     read back to the row that made it — which is why it carries every field a
+     row holds rather than the four a sales table usually shows.
+
+     It reads the same index the charts do, so the store filter and the date
+     range apply exactly as they do above and there is no second definition of
+     "in range" to drift. Editing is deliberately NOT here: purchases are owned
+     by the form under Edit data, and two places to change one row is how a
+     ledger stops agreeing with itself. */
+
+  var LEDGER_MAX_ROWS = 500;
+
+  function ledgerRows(ix, r) {
+    return ix.rows.filter(function (s) {
+      return s.date >= r.from && s.date <= r.to;
+    }).slice().reverse();
+  }
+
+  function renderSalesLedger(ix, r) {
+    var host = document.getElementById('slLedger');
+    if (!host) return;
+    var rows = ledgerRows(ix, r);
+    var count = document.getElementById('slLedgerCount');
+    if (count) {
+      count.textContent = rows.length
+        ? fmtInt(rows.length) + ' purchase' + (rows.length === 1 ? '' : 's')
+        : '';
+    }
+    if (!rows.length) {
+      host.innerHTML = '<div class="empty">No purchases in this range. Widen the dates, or add one under Edit data.</div>';
+      return;
+    }
+
+    var shown = rows.slice(0, LEDGER_MAX_ROWS);
+    host.innerHTML = '<table><thead><tr>' +
+      '<th>Date</th><th>Store</th><th>Plan</th>' +
+      '<th class="money">Price</th><th class="money">Count</th>' +
+      '<th class="money">Bookings</th><th class="money">MRR</th>' +
+      '<th>Installed</th><th class="money">Days to buy</th>' +
+      '<th>Status</th><th>Note</th>' +
+      '</tr></thead><tbody>' +
+      shown.map(function (s) {
+        var age = Sales.cohortDayOf(s);
+        /* Three states, and they are not the same thing. A refund took the
+           money back, so its bookings are zero and it never reached MRR; a
+           cancellation kept the money and stopped the recurrence on its own
+           date; a live row is one nothing has happened to, which on this
+           ledger is an assumption rather than something a store told us. */
+        var status = s.refunded ? '<span class="pill red">refunded</span>'
+          : s.cancelled ? '<span class="pill warn">cancelled</span> <span class="note">' + esc(labelDay(s.cancelled)) + '</span>'
+          : !Sales.isRecurring(s.plan) ? '<span class="note">one-off</span>'
+          : Sales.isLiveOn(s, r.to) ? '<span class="pill green">live</span>'
+          : '<span class="note">ended</span>';
+        return '<tr>' +
+          '<td>' + esc(labelFull(s.date)) + '</td>' +
+          '<td><span class="pill ' + s.platform + '">' + PLATFORMS[s.platform] + '</span></td>' +
+          '<td><span class="swatch" style="background:' + planColor(s.plan) + '"></span> ' + esc(planLabel(s.plan)) + '</td>' +
+          '<td class="money">' + fmtMoney(s.price) + '</td>' +
+          '<td class="money">' + fmtInt(s.qty) + '</td>' +
+          '<td class="money">' + fmtMoney(Sales.bookingsOf(s)) + '</td>' +
+          '<td class="money">' + (Sales.isRecurring(s.plan) && !s.refunded
+            ? fmtMoney(Sales.mrrOf(s) * s.qty) : '<span class="na">–</span>') + '</td>' +
+          '<td>' + (s.cohort ? esc(labelDay(s.cohort)) : '<span class="na">–</span>') + '</td>' +
+          '<td class="money">' + (age === null ? '<span class="na">–</span>' : fmtInt(age) + 'd') + '</td>' +
+          '<td>' + status + '</td>' +
+          '<td>' + (s.note ? esc(s.note) : '<span class="na">–</span>') + '</td>' +
+          '</tr>';
+      }).join('') + '</tbody></table>' +
+      (rows.length > shown.length
+        ? '<p class="hint">Showing the newest ' + fmtInt(shown.length) + ' of ' + fmtInt(rows.length) +
+          ' — the export carries all of them.</p>'
+        : '');
   }
 
   function renderSalesTiles(ix, s, prev, r) {
@@ -9924,13 +10210,41 @@
 
   /* -------------------------------------------------------------- toast */
 
+  /* A toast grows UPWARD, and it is allowed to grow until it reaches the
+     header.
+
+     It used to have a width cap and nothing else, so a long message — a paste
+     that rejected nine rows, a storage failure naming what it could not write —
+     wrapped past the top of the viewport and had its first lines clipped off
+     the screen, which is to say the toast showed the END of a sentence whose
+     beginning said what had happened. The ceiling is the sticky header's own
+     bottom edge measured at the moment the toast opens (it moves with the safe
+     area and with the tab row wrapping on a phone, so it is read rather than
+     assumed), and a message too long even for that scrolls inside the toast
+     instead of being cut. Scrolling needs the pointer back, so a toast that
+     overflows takes its own events; a short one stays transparent to them, or
+     it would eat a click on the card underneath for two and a half seconds. */
+  var TOAST_BOTTOM = 22;   // matches .toast's bottom in styles.css
+  var TOAST_GAP = 12;      // clear air under the header
+
   var toastTimer;
   function toast(msg) {
     var t = document.getElementById('toast');
     t.textContent = msg;
+    var head = document.querySelector('.app-head');
+    var top = head ? head.getBoundingClientRect().bottom : 0;
+    var room = Math.max(80, window.innerHeight - Math.max(0, top) - TOAST_BOTTOM - TOAST_GAP);
+    t.style.maxHeight = Math.round(room) + 'px';
     t.classList.add('on');
+    /* Measured after the height cap is in force, so this asks the question the
+       reader will actually meet. */
+    t.style.pointerEvents = t.scrollHeight > t.clientHeight + 1 ? 'auto' : 'none';
+    t.scrollTop = 0;
     clearTimeout(toastTimer);
-    toastTimer = setTimeout(function () { t.classList.remove('on'); }, 2600);
+    toastTimer = setTimeout(function () {
+      t.classList.remove('on');
+      t.style.pointerEvents = 'none';
+    }, 2600);
   }
 
   /* ------------------------------------------------------ notifications
