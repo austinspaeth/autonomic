@@ -30,26 +30,27 @@ import type { Tier } from '../tier';
 import { engagedDayCount } from '../review/eligibility';
 
 /**
- * The offer is OFF.
+ * The offer is ON.
  *
- * A deliberate, temporary switch rather than a deletion: the card, its copy,
- * its memory and its tests all stay exactly as they are, and turning it back
- * on is this one line. It is checked FIRST in `founderVerdict`, ahead of the
- * claimed-day shortcut, so a phone that had already claimed its day goes quiet
- * too rather than carrying the card until midnight.
+ * A deliberate switch rather than a deletion, so the card, its copy, its memory
+ * and its tests stay whole and turning it off again is this one line. It is
+ * checked FIRST in `founderVerdict`, ahead of the claimed-day shortcut, so a
+ * phone that had already claimed its day goes quiet too rather than carrying
+ * the card until midnight.
  *
- * Nothing is SPENT while it is off. `founderVerdict` writes nothing on a
- * refusal, so no memory is stamped, no day is claimed and the shared offer
- * cool-down (./pacing) is never touched — which means the half-off annual card
- * (./annual, at 30/90/180/365 days) is unaffected and, if anything, freer to
- * appear, since this card can no longer take the clock from it.
+ * Nothing was SPENT while it was off. `founderVerdict` writes nothing on a
+ * refusal, so no memory was stamped, no day was claimed and the shared offer
+ * cool-down (./pacing) was never touched — the half-off annual card
+ * (./annual, at 30/90/180/365 days) ran unaffected throughout.
  *
- * One asymmetry worth knowing before it is switched back on: a user who
- * claimed a day BEFORE it was turned off still has `shownDk` set, so they read
- * as 'day-passed' and will not be asked again. Their offer was already spent;
- * this is not what spends it.
+ * One asymmetry that survives being switched back on: a user who claimed a day
+ * BEFORE it was turned off still has `shownDk` set, so they read as
+ * 'day-passed' and are not asked again. Their offer was already spent, and the
+ * off period is not what spent it — so the first cohort to meet the new
+ * `FOUNDER_YEARLY_SKU` price is users who had not yet earned the card, never
+ * those who saw it at the old one.
  */
-export const FOUNDER_ENABLED = false;
+export const FOUNDER_ENABLED = true;
 
 /** Days of the user's OWN content before the offer is due. */
 export const FOUNDER_MIN_DAYS = 5;

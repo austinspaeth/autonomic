@@ -3,9 +3,12 @@
  *
  * Raised in the Journal under the Autonomic Outlook on the ONE day after a user
  * has logged five days of their own content, while the install trial is still
- * running. It sells the first year of Pro at the introductory price
- * (`annual_founder_first_year` on iOS, the promo year on Play — see
- * FOUNDER_SKU in src/store/iap.ts).
+ * running. It sells its own discounted year of Pro, `FOUNDER_YEARLY_SKU`
+ * (`com.autonomic.journal.yearly.founder`, Play base plan `yearly-founder` —
+ * see FOUNDER_SKU in src/store/iap.ts). That year renews at its own price, so
+ * the discount is permanent rather than first-year only, and it is a DIFFERENT,
+ * dearer product from the promo year the annual card sells at the far
+ * milestones — the two offers are no longer the same plan at two moments.
  *
  * The card LEADS WITH THE PRICE. The old version opened with a paragraph and
  * put the number in the last line of it, which asked the reader to work out

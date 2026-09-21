@@ -34,26 +34,37 @@ describe('engagedBefore', () => {
   });
 });
 
-/* The offer is switched off. The rules above stay under test through
-   `founderRules` so the card can be switched back on without re-deriving any
-   of it; what this pins is that nothing reaches the screen while it is off,
-   INCLUDING a phone that had already claimed its day, and that being off
-   spends nothing — no memory write, no claim, and the shared cool-down left
-   for the half-off annual card, which is unaffected. */
-describe('the founding-member offer is off', () => {
+/* The offer is switched ON. What this pins is that the switch is genuinely a
+   pass-through in that state — `founderVerdict` must answer exactly what
+   `founderRules` answers, for an eligible user and for a refusal alike, so the
+   kill switch can never become a second set of rules that drifts from the one
+   the tests below drive. `founderRules` stays the thing those tests call, so
+   switching the card off again costs one constant and no coverage. */
+describe('the founding-member offer is on', () => {
   const eligible = {
     days: FIVE, dk: '2026-03-06', tier: 'trial' as const, memory: emptyFounderMemory(),
   };
 
-  it('never renders, however eligible the user', () => {
-    expect(FOUNDER_ENABLED).toBe(false);
-    expect(founderVerdict(eligible)).toEqual({ ok: false, reason: 'disabled' });
-    // ...and the same for a phone mid-offer when the switch landed.
-    expect(founderVerdict({ ...eligible, memory: { shownDk: '2026-03-06' } })).toEqual({ ok: false, reason: 'disabled' });
+  it('renders for an eligible user', () => {
+    expect(FOUNDER_ENABLED).toBe(true);
+    expect(founderVerdict(eligible)).toEqual({ ok: true, claim: true });
   });
 
-  it('would still be due if it were switched back on', () => {
-    expect(founderRules(eligible)).toEqual({ ok: true, claim: true });
+  it('defers to the rules rather than adding any of its own', () => {
+    // Eligible, refused, and a phone that already claimed its day: the switch
+    // changes none of them while it is on.
+    for (const input of [
+      eligible,
+      { ...eligible, memory: { shownDk: '2026-03-06' } },
+      { ...eligible, memory: { dismissed: true } },
+      { ...eligible, tier: 'free' as const },
+    ]) {
+      expect(founderVerdict(input)).toEqual(founderRules(input));
+    }
+  });
+
+  it('never answers "disabled" while it is on', () => {
+    expect(founderVerdict(eligible)).not.toEqual({ ok: false, reason: 'disabled' });
   });
 });
 

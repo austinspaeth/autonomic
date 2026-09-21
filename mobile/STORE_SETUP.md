@@ -18,7 +18,8 @@ places repeat that boundary (paywall, Settings, Free-vs-Pro sheet,
 | Yearly SKU | `com.autonomic.journal.yearly` — $49.99 |
 | Monthly SKU | `com.autonomic.journal.monthly` — $7.99 |
 | Promo yearly SKU | `com.autonomic.journal.yearly.promo` — $24.99 (see Part 6) |
-| Subscription group (Apple) | one group, all three plans |
+| Founder yearly SKU | `com.autonomic.journal.yearly.founder` — $35.99, Play base plan `yearly-founder` (see Part 7) |
+| Subscription group (Apple) | one group, all four plans |
 | App version | 1.9.0 (freemium) |
 | Terms | https://autonomic.care/terms-of-service/ |
 | Privacy | https://autonomic.care/privacy-policy/ |
@@ -378,18 +379,51 @@ that is the promotional-offer project, and it starts with a `sls/` endpoint.
 
 ---
 
-## Part 7 — The founding-member offer
+## Part 7 — The founding-member offer (`com.autonomic.journal.yearly.founder`)
 
 The card in `src/features/FounderOffer.tsx`, raised in the Journal on the ONE
 day after a user has logged five days of their own content (`FOUNDER_MIN_DAYS`),
 while the local 14-day trial is still running. It never returns and the ✕
 retires it permanently — see `src/lib/upsell/founder.ts` for the rules.
 
-**It sells `com.autonomic.journal.yearly.promo`** — the same discounted year the
-annual offer card sells (Part 6), on both stores. `FOUNDER_SKU` is that SKU with
-no platform branch, so there is nothing extra to create in either console.
+**It is switched ON** (`FOUNDER_ENABLED = true`). That constant is checked first
+in `founderVerdict`, so switching it off again is one line and costs no test
+coverage — the rules stay under test through `founderRules` either way.
 
-### Why not an introductory offer on the yearly plan (the previous design)
+### The product
+
+| | |
+| --- | --- |
+| Product id (both stores) | `com.autonomic.journal.yearly.founder` |
+| Play base plan | `yearly-founder` |
+| Price | **$35.99/yr**, renewing at $35.99 |
+| Apple subscription group | the same one as the other three |
+| Listed on the paywall? | **No** — the founder card is its only door |
+
+It is in `PRO_SKUS` purely so `fetchProducts` returns its localized price and so
+an existing subscriber on it is recognised as Pro. `FOUNDER_SKU` points at it
+with no platform branch.
+
+### It is its OWN product, not the promo year
+
+It used to be `com.autonomic.journal.yearly.promo` — the same product Part 6's
+annual card sells. That made the two cards the same offer at two different
+moments, which they are not:
+
+- **This card** sells INSIDE the install trial, to someone who has logged five
+  days and is still deciding.
+- **The annual card** (Part 6) sells at the far milestones (30/90/180/365 days),
+  to someone whose access lapsed months ago.
+
+A lapsed user is harder to win back, so the promo year is the deeper cut. The
+consequence to keep in mind: **the founder year is DEARER than the promo year**
+($35.99 vs $24.99), so the founding-member card is not the cheapest door into
+Pro, and a user who declines it at day five can meet a lower price at day
+thirty. That is intended. Nothing in the card's copy may claim it is the best
+price available — it claims only that it is locked for as long as you stay
+subscribed, which is true.
+
+### Why not an introductory offer on the yearly plan (the original design)
 
 An introductory offer belongs to the PRODUCT, not to the card. Apple applies it
 automatically to every eligible subscriber, so anyone who reached the ordinary
@@ -405,13 +439,16 @@ subscribed:
   nothing, so a promotional offer here would never be redeemable.
 - **Win-back offers** are also aimed at lapsed subscribers.
 - A **separate SKU** is the only exclusive discount available, which is what
-  this now is.
+  this is.
 
 The trade: a separate SKU **renews at its own price**. This is a permanently
 discounted year, not a discounted first one, which is why the card reads
-"you keep 50% off for as long as you stay" over "$24.99/yr, cancel anytime"
-rather than "first year, then $49.99/yr". Every number is derived from the two
-prices the store returned, in whatever currency it returned them.
+"Locked at 28% off for as long as you're subscribed" over
+"Unlock Pro for $35.99/yr" rather than "first year, then $49.99/yr". Every
+number on the card — the strike-through, the percentage and the button — is
+derived from the two prices the store returned, in whatever currency it
+returned them (`discountPct`). Nothing is hardcoded from either console, so a
+territory priced differently states its own real discount.
 
 ### If `annual_founder_first_year` was already created in App Store Connect
 
@@ -421,15 +458,24 @@ first year whether or not they ever saw the founding-member card, and it
 occupies the one introductory-offer slot on that SKU. Nothing in the app reads
 it any more.
 
-### Both stores
+### Before the release that turns this on
 
-Nothing to set up beyond Part 6's `com.autonomic.journal.yearly.promo` existing
-and being active in each console. Because the founder card and the annual offer
-card now sell the same product, the two can never be due on the same day by
-design (`src/lib/upsell/founder.ts` fires during the install trial; the annual
-window opens at 30/90/180/365 days for a free user), but a user who declines the
-founding card CAN meet the same price again later at an annual milestone. If
-that matters, the founding card needs its own SKU at its own price.
+Both consoles are configured and go to review with the next release. The thing
+to confirm on that build, because the app degrades quietly if it is wrong:
+
+- The product is **Ready to Submit** (App Store Connect) and the
+  `yearly-founder` base plan is **active** (Play), in every territory you sell
+  in. If `fetchProducts` does not return it, `offerPrice` is null, `pct` is
+  null, and the card silently drops the strike-through and the percentage and
+  reads "The founding member price, for as long as you're subscribed". That is
+  a safe degrade, not the intended card.
+- A simulator/emulator proves nothing here — it returns no products, so the
+  card renders `FALLBACK_PRICE` (`$35.99`) from `src/store/iap.ts` and looks
+  correct whether or not the store is set up. Verify on TestFlight / internal
+  testing.
+- Buy it once in the sandbox and confirm the entitlement resolves to Pro
+  (`isProSku` covers it via `PRO_SKUS`) and that the Play deep link to manage
+  subscriptions still resolves.
 
 ---
 
@@ -444,5 +490,6 @@ Before you call it done:
 - [ ] "Restore purchase" works on a second device
 - [ ] Annual offer card shows a **real localized $24.99**, not the fallback, and "Claim half off" completes a purchase on both stores
 - [ ] `FORCE_TIER` is `null`, `FORCE_ANNUAL_OFFER` is `null`, `FORCE_FOUNDER_OFFER` is `false` and `PREVIEW_PAYWALL` is `false` in the shipped commit
-- [ ] Founding-member card: five logged days, then the next day's launch shows it once, the price line reads a **real** localized introductory price, and "No thanks" retires it permanently
+- [ ] Founding-member card: five logged days, then the next day's launch shows it once, the price reads a **real** localized $35.99 (a `$35.99` fallback means the product or the `yearly-founder` base plan is not live), the strike-through and "Locked at 28% off" are both present, and the ✕ retires it permanently
+- [ ] The founder card and the annual card are never on screen together, and a user who dismisses the founder card can still reach the $24.99 annual card at a later milestone
 - [ ] Fresh install → 14 days full access with no store call and no account

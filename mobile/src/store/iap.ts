@@ -59,32 +59,54 @@ export const MONTHLY_SKU = 'com.autonomic.journal.monthly';
  * Never listed on the paywall — the offer card is its only door.
  */
 export const PROMO_YEARLY_SKU = 'com.autonomic.journal.yearly.promo';
-export const PRO_SKUS = [YEARLY_SKU, MONTHLY_SKU, PROMO_YEARLY_SKU];
+/**
+ * The founding-member year (src/lib/upsell/founder), Play base plan
+ * `yearly-founder`. Its OWN product, deliberately not PROMO_YEARLY_SKU.
+ *
+ * The two discounted years are aimed at different people and are priced
+ * differently on purpose: this one is sold INSIDE the install trial, to someone
+ * who has logged five days and is still deciding, and it renews at its own
+ * price. PROMO_YEARLY_SKU is the deeper cut the annual card offers at the far
+ * milestones (30/90/180/365 days), to someone whose access lapsed months ago.
+ * Sharing one product made the two cards the same offer at two moments; they
+ * are not, so they are two products.
+ *
+ * Note it is DEARER than the promo year, which is intended — a lapsed user is
+ * harder to win back than one mid-trial — but it means the founder card is not
+ * the cheapest door into Pro. Nothing in its copy may claim that it is.
+ *
+ * Never listed on the paywall: the founder card is its only door, the same way
+ * the promo year's only door is the annual card. Both are in PRO_SKUS purely so
+ * `fetchProducts` returns their localized prices and an existing subscriber on
+ * one is recognised as Pro.
+ */
+export const FOUNDER_YEARLY_SKU = 'com.autonomic.journal.yearly.founder';
+export const PRO_SKUS = [YEARLY_SKU, MONTHLY_SKU, PROMO_YEARLY_SKU, FOUNDER_YEARLY_SKU];
 
 /**
- * The founding-member card's product.
+ * The founding-member card's product — its own year, `FOUNDER_YEARLY_SKU`.
  *
- * It is the SAME discounted year the annual offer card sells
- * (`PROMO_YEARLY_SKU`), on both platforms, and that is a deliberate retreat
- * from an iOS introductory offer on the standard yearly plan. An introductory
- * offer belongs to the PRODUCT, not to the card: every StoreKit-eligible user
- * would have been given the same first year from the ordinary paywall, so the
- * card could prompt but never hold something back. Apple has no mechanism that
- * targets a never-subscribed user — promotional and win-back offers are for
- * current or lapsed subscribers, and both need a server-signed key this app
- * has no endpoint for. A separate SKU is the only exclusive discount there is.
+ * A separate SKU rather than a discount on YEARLY_SKU, and that is a deliberate
+ * retreat from an iOS introductory offer. An introductory offer belongs to the
+ * PRODUCT, not to the card: every StoreKit-eligible user would have been given
+ * the same first year from the ordinary paywall, so the card could prompt but
+ * never hold something back. Apple has no mechanism that targets a
+ * never-subscribed user — promotional and win-back offers are for current or
+ * lapsed subscribers, and both need a server-signed key this app has no
+ * endpoint for. A separate SKU is the only exclusive discount there is.
  *
  * The trade is that a separate SKU RENEWS at its own price rather than
  * reverting to $49.99, so this is a permanently discounted year rather than a
  * discounted first one. The card's copy says so, and `FounderOffer` derives
  * every number from the two prices the store actually returned.
  */
-export const FOUNDER_SKU = PROMO_YEARLY_SKU;
+export const FOUNDER_SKU = FOUNDER_YEARLY_SKU;
 const isProSku = (id?: string) => !!id && PRO_SKUS.includes(id);
 
 /** Fallback prices shown before the store returns the localized ones. */
 export const FALLBACK_PRICE: Record<string, string> = {
   [YEARLY_SKU]: '$49.99', [MONTHLY_SKU]: '$7.99', [PROMO_YEARLY_SKU]: '$24.99',
+  [FOUNDER_YEARLY_SKU]: '$35.99',
 };
 
 /** User-facing store name for UI copy. */
