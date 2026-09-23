@@ -8,8 +8,8 @@ keywords: "internal tremors, internal vibrations, long COVID tremors, internal t
 date: 2026-09-23
 updated: 2026-09-23
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1596643668590-dba023ede5ce?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Jason Mavrommatis / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1595178156906-2396ef837b0f?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+photoAttribution: "Unsplash"
 tldr: "Internal tremors are a felt vibration or shaking inside the body, often in the chest, torso, or limbs, with little or no movement anyone can see. In long COVID, POTS, and dysautonomia they are usually a form of enhanced physiological tremor: everyone has a faint background tremor, and adrenaline and a revved sympathetic nervous system amplify it until you can feel it from the inside. They tend to spike on waking, on an empty stomach, after poor sleep, and during a crash. They are usually not dangerous, but because thyroid problems, low blood sugar, B12 deficiency, medications, stimulants, and neurological conditions can also cause tremor, a new or one-sided or visibly worsening tremor should be checked by a clinician. Track when yours happens beside your heart rate and HRV, ease the sympathetic load, and bring the pattern to an appointment."
 categories:
   - postviral
