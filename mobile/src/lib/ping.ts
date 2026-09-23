@@ -284,7 +284,7 @@ export function logCode(kind: LogKind | string | undefined, type?: string): LogC
  * `B` is the exception and is deliberately on BOTH routes, split by what the
  * tap actually got: `use` B is the budget opened, `see` B is the pitch card a
  * locked tap opens instead. One letter and the two counts would be
- * indistinguishable, which is the one comparison the pacing trial exists to be
+ * indistinguishable, which is the one comparison the pacing wall exists to be
  * judged on.
  *
  * `U` is the pacing budget UNPAUSED: a day the app declined to publish a

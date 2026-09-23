@@ -48,7 +48,7 @@ import { readPressure } from '../lib/pressure';
 import { pressureLink } from '../lib/insights/pressureMemory';
 import { pressureWarning } from '../lib/insights/pressureCopy';
 import { useTier } from '../store/tier';
-import { usePacingUnlocked } from '../store/pacingTrial';
+import { usePacingUnlocked } from '../store/pacingAccess';
 import { usePaywall } from './Paywall';
 
 import type { AppState, Band, ScoreCat } from '../lib/types';

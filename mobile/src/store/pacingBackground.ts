@@ -45,7 +45,7 @@ import { syncWidgetsNow } from '../lib/widgets';
 import { refreshDayLoad } from './budget';
 import { checkPacingAlerts } from './pacingAlerts';
 import { samplePressure } from './pressure';
-import { isPacingUnlocked } from './pacingTrial';
+import { isPacingUnlocked } from './pacingAccess';
 import { flushSave, getState } from './store';
 
 export const PACING_TASK = 'autonomic.pacing.refresh';

@@ -16,7 +16,6 @@ import { useInsightsUnseen } from '../../src/store/insightsBadge';
 import { usePaywall } from '../../src/features/Paywall';
 import { MONTHLY_SKU, priceOf, useIap } from '../../src/store/iap';
 import { getTrialDaysLeft, useTier } from '../../src/store/tier';
-import { usePacingTrial } from '../../src/store/pacingTrial';
 
 /**
  * The Journal is where the app opens, always.
@@ -324,18 +323,10 @@ function PlanStatusTab({ trial, width, overlap }: { trial: boolean; width?: numb
   }, []);
 
   const days = getTrialDaysLeft();
-  const pacing = usePacingTrial();
   const headline = trial ? `${days} day${days === 1 ? '' : 's'} left` : 'Free plan';
-  // A free install inside its seven-day pacing window is told what it has and
-  // for how long, in place of the price. The countdown lives here rather than
-  // on the pacing strip itself because the strip is the feature working: a
-  // number counting down beside it turns every glance at the budget into a
-  // reminder that it is about to be taken away.
   const detail = trial
     ? 'of Pro trial'
-    : pacing.active
-      ? `· Pacing free for ${pacing.daysLeft} more day${pacing.daysLeft === 1 ? '' : 's'}`
-      : `· ${priceOf(products.find((s) => s.productId === MONTHLY_SKU), MONTHLY_SKU)}/mo for Pro`;
+    : `· ${priceOf(products.find((s) => s.productId === MONTHLY_SKU), MONTHLY_SKU)}/mo for Pro`;
   const cta = trial ? 'Keep it' : 'Upgrade Now';
 
   const shell = {

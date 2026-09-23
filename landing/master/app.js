@@ -4187,7 +4187,7 @@
     /* The locked half of a pacing tap. Its unlocked half is on the usage card
        next door as "Opened the pacing budget", and the two are deliberately not
        on one line: together they are just "somebody tapped the strip", which is
-       the one thing about the pacing trial that was never in question. */
+       the one thing about the pacing wall that was never in question. */
     { kind: 'see', slot: 'B', name: 'Pacing budget, locked', color: COLOR.s5 },
     { kind: 'pot', slot: 'T', name: 'Stand test', color: COLOR.s3 },
     { kind: 'pot', slot: 'E', name: 'POTS episode', color: COLOR.s8 },

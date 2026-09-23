@@ -24,7 +24,7 @@ import {
 } from '../lib/reminders';
 import { usePalette } from '../theme';
 import { setPacingAlert, setPacingAlertsEnabled } from '../store/pacingAlerts';
-import { usePacingUnlocked } from '../store/pacingTrial';
+import { usePacingUnlocked } from '../store/pacingAccess';
 import { usePressureStatus } from '../store/pressure';
 import { pressureLink } from '../lib/insights/pressureMemory';
 import { useAppState } from '../store/store';

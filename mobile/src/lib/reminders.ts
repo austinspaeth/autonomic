@@ -228,7 +228,7 @@ export async function applyNotificationDefaults(): Promise<void> {
 function pacingUnlocked(): boolean {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return (require('../store/pacingTrial') as typeof import('../store/pacingTrial')).isPacingUnlocked();
+    return (require('../store/pacingAccess') as typeof import('../store/pacingAccess')).isPacingUnlocked();
   } catch {
     return false;
   }

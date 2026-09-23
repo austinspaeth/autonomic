@@ -31,7 +31,7 @@
   ];
   const proRows: { label: string; free?: string; pro?: string }[] = [
     { label: 'Progress charts', free: '14 days', pro: 'All views' },
-    { label: 'Daily pacing budget', free: '1 week' },
+    { label: 'Daily pacing budget' },
     { label: 'Full historical metric analysis' },
     { label: 'POTS test & episode results' },
     { label: 'AI insights & doctor reports' }
@@ -1396,7 +1396,7 @@
     </div>
     <div class="faq">
       <details><summary>How much does it cost, and is my data private?<span class="fq-i">+</span></summary><p>The app is free to download and your journal is free forever, with no account and no ads. Autonomic Pro is {monthly}/month or {yearly}/year and unlocks the deep-analysis tools. Every install opens with {pricing.trialDays} days of Pro, no card, so you can try all of it first. Your data is always private: stored on your device, never sold, never sent to a server.</p></details>
-      <details><summary>What’s free, and what needs Pro?<span class="fq-i">+</span></summary><p>Free covers the daily journal, your manual readings, your daily Autonomic Outlook, unlimited live HRV capture with no daily cap, POTS stand tests and episode captures, the Apple Watch heart-rate monitor, backups and export, plus 14 days of charts and one free week of the pacing budget. Pro adds your daily pacing budget, your full history, Insights, POTS test and episode results, and AI insight and doctor reports. There’s a full breakdown in <a href="#pricing">the pricing table</a>, and the same table lives inside the app.</p></details>
+      <details><summary>What’s free, and what needs Pro?<span class="fq-i">+</span></summary><p>Free covers the daily journal, your manual readings, your daily Autonomic Outlook, unlimited live HRV capture with no daily cap, POTS stand tests and episode captures, the Apple Watch heart-rate monitor, backups and export, plus 14 days of charts. Pro adds your daily pacing budget, your full history, Insights, POTS test and episode results, and AI insight and doctor reports. There’s a full breakdown in <a href="#pricing">the pricing table</a>, and the same table lives inside the app.</p></details>
       <details><summary>Does it really work offline?<span class="fq-i">+</span></summary><p>Completely. It’s a fully offline app on both iOS and Android. Scoring, trends and reports are computed locally, so it works anywhere, no signal required.</p></details>
       <details><summary>Which conditions is it built for?<span class="fq-i">+</span></summary><p>POTS, dysautonomia, long COVID and post-viral or post-illness recovery, anywhere daily HRV, heart-rate and orthostatic patterns matter.</p></details>
       <details><summary>Is Autonomic available on Android?<span class="fq-i">+</span></summary><p>Yes. Autonomic is available now on both iPhone (App Store) and Android (Google Play), at the same price, with the same private, offline design. One honest difference: the Apple Watch companion app is iPhone-only. On Android the stand test, episode capture and HRV readings all run in the app itself, using a Bluetooth chest strap or your phone’s camera, and it reads your sleep and workouts from Health Connect the way the iPhone build reads Apple Health.</p></details>

@@ -358,8 +358,7 @@ const SHARED_ROWS: string[] = [
 
 const PRO_ROWS: { label: string; freeText?: string; proText?: string }[] = [
   { label: 'Progress charts', freeText: '14 days', proText: 'All views' },
-  // One free week per install (src/lib/pacingTrial.ts), stated like Progress's 14 days.
-  { label: 'Daily pacing budget', freeText: '1 week' },
+  { label: 'Daily pacing budget' },
   { label: 'Full historical metric analysis' },
   { label: 'POTS test & episode results' },
   { label: 'AI insights & doctor reports' },

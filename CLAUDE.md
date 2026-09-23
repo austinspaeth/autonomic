@@ -561,32 +561,20 @@ old web app so old `export.json` files import directly.
   places state the same boundary and drift apart silently if one moves.
   Reactive only: `usePaywall()` is raised by tapping a locked thing, never on
   launch (`SubscriptionGate` is long gone).
-- **The pacing budget is the one Pro feature with a trial of its own.**
-  `src/lib/pacingTrial.ts` (pure + tested) + `src/store/pacingTrial.ts` (flags
-  MMKV shell, `pacingTrialStartedAt`): a free install gets ONE seven-day window
-  in which the budget is simply on. A budget in minutes is not a thing anybody
-  can judge from a lock card — it only means something after a few of the
-  reader's own afternoons — so the pitch is the feature itself. It is NOT the
-  14-day install trial: that one is stamped the first time the app ever runs, so
-  an install updating into the pacing release had spent it months earlier and
-  would never see pacing at all. This window is stamped LAZILY, at the first
-  launch where the tier is actually `'free'` (`initPacingTrial()`, after
-  `initTier()`), which is the update's first launch for an existing user and the
-  day the full trial lapses for a new one; stamping at first launch regardless
-  would burn it underneath the install trial, where it grants nothing. One
-  window per install ever — a lapsed subscriber does not earn a fresh week each
-  time they cancel — and it survives "Clear all data" for the same reason every
-  other flag there does. **`isPacingUnlocked()` is the single question**, asked
-  at tap time by `isBudgetLocked` (`features/budget/open.tsx`), by
-  `liveWidgetOpts` (so the Journal and the home screen can never disagree) and
-  as `usePacingUnlocked()` by the strip; nothing else may compose the tier and
-  the window itself. The countdown is said in ONE place, the nav bar's plan tab
-  ("Free plan · Pacing free for 5 more days"), never beside the strip: a number
-  counting down next to the feature turns every glance at the budget into a
-  reminder that it is being taken away. When the window is spent the pitch card
-  says so once, plainly, because a feature that worked last week and is gone
-  today otherwise reads as a fault. The support dump carries a `pacing trial`
-  row for the same reason.
+- **The pacing budget is Pro, and has NO free window of its own.** It is on
+  during the 14-day install trial and locks with everything else when that
+  lapses. **`isPacingUnlocked()` (`src/store/pacingAccess.ts`) is the single
+  question** — `getTier() !== 'free'` — asked at tap time by `isBudgetLocked`
+  (`features/budget/open.tsx`), by `liveWidgetOpts` (so the Journal and the home
+  screen can never disagree), by the pacing alerts and background wake-up, and
+  as `usePacingUnlocked()` by the strip; nothing else may compose it from the
+  tier itself. It used to carry a separate seven-day window for free installs
+  (`pacingTrial.ts`, removed after 1.29): for a new install that meant pacing
+  outlived the rest of the trial by a week and then vanished on its own — two
+  losses, the second reading as a fault. Its old `pacingTrialStartedAt` flag
+  may still sit in the flags MMKV and is read by nothing. **Nothing in the
+  paywall, the store listing or the landing site may promise a free week of
+  pacing.**
 - **The app raises exactly TWO offers on its own initiative, and each owns its
   own rules.** `src/lib/upsell/` holds only `annual.ts` + `annualMemory.ts`,
   `founder.ts` + `founderMemory.ts` and the one thing they SHARE,

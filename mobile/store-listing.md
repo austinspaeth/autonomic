@@ -24,7 +24,7 @@ went with them.
 
 **App Store Connect** — needs a version submission, so it rides the 1.28.0 build:
 
-- [ ] **Description** → replace wholesale with the block below (3,965/4,000).
+- [ ] **Description** → replace wholesale with the block below (3,905/4,000).
       **The Terms of Use / Privacy Policy lines at the end are not optional and
       never get trimmed for space.** 1.25.1 was rejected (Guideline 3.1.2) by
       Apple's automated metadata check because a wholesale description paste
@@ -41,9 +41,9 @@ went with them.
 - [ ] **App Information → License Agreement** → unchanged: `mobile/EULA.md` as a
       Custom License Agreement for all countries, `[LEGAL NAME]` /
       `[MAILING ADDRESS]` / `[PHONE]` filled in.
-- [ ] **App Review notes** → the block below, updated for the pacing budget and
-      its one-week window (a reviewer on a fresh install sees the budget live,
-      which is what you want them to see, but the note has to say why).
+- [ ] **App Review notes** → the block below, updated for the pacing budget (a
+      reviewer on a fresh install sees the budget live, because it is inside the
+      14-day trial, and the note says so).
 - [ ] **Screenshots** → see the plan at the end of this section. Three new
       phone shots and one new watch shot; this is the part with real work in it.
 
@@ -52,7 +52,7 @@ went with them.
 - [ ] **Short description** → replace (80/80). Names pacing, keeps ME/CFS,
       carries no price or promotional wording (Play rejected a previous line for
       the word "Free").
-- [ ] **Full description** → replace wholesale (3,965/4,000).
+- [ ] **Full description** → replace wholesale (3,905/4,000).
 - [ ] **Release notes** → the 1.28 Play variant below (497/500).
 - [ ] **Feature graphic** → optional, but the current one predates the budget.
 
@@ -67,11 +67,10 @@ and nothing is written back that was not written back before.
 are the same boundary `CLAUDE.md` says five places state, so moving one moves
 all of them):
 
-- **"Every install gets a free week of the pacing budget."** That is
-  `src/lib/pacingTrial.ts`: ONE seven-day window per install, stamped lazily at
-  the first launch where the tier is actually free. If that window is ever
-  removed, this sentence comes out of both descriptions and the App Review note
-  on the same day.
+- **The pacing budget is Pro, and has no free window of its own.** It is
+  included in the 14-day install trial and locks with everything else when the
+  trial ends (`src/store/pacingAccess.ts`). It used to carry a separate free
+  week; nothing here may promise one again.
 - **Nothing here promises unlimited capture as a Pro benefit.** Capture is free
   on every tier; Pro is what the app makes of the readings.
 
@@ -129,7 +128,7 @@ there and is wasted here (on Play the app name is
 equivalent field); do **not** add "free", Apple indexes the price separately.
 The next terms worth buying if space frees up are `cfs`, `vagus` and `energy`.
 
-## What's New (1.28, App Store — 1,203/4,000 chars)
+## What's New (1.28, App Store — 1,165/4,000 chars)
 
 NEW: your daily pacing budget.
 
@@ -137,7 +136,7 @@ Your readings set a budget for today in minutes of effort, fitted to your own hi
 
 A pace marker on your Outlook card shows where you are in the day, so what is left means something at 9am and at 6pm. It tells you how often its estimate held, week by week, so you can judge it for yourself. And on a day it reads as a downturn it publishes no number at all, because a small budget on a bad day is still an invitation to spend it.
 
-It is on your Journal, in two new home screen widgets, and on your Apple Watch. Every install gets a free week of it.
+It is on your Journal, in two new home screen widgets, and on your Apple Watch.
 
 Also in this release:
 • A redesigned Autonomic Outlook card: your score now shows how it is trending against your own recent days
@@ -219,7 +218,7 @@ Also:
 • Medication doses accept units again
 • Keyboard and Progress scrolling fixes
 
-## Description (3,965/4,000 chars)
+## Description (3,905/4,000 chars)
 
 See your nervous system actually recover.
 
@@ -282,7 +281,7 @@ YOUR DATA NEVER LEAVES YOUR PHONE
 
 WHAT'S FREE, WHAT'S PRO
 
-Free forever: unlimited live HRV captures, POTS stand tests and episodes, journaling, manual readings, your daily score and outlook, the Apple Watch HR monitor, 14 days of charts and full export. Every install also gets one free week of the pacing budget.
+Free forever: unlimited live HRV captures, POTS stand tests and episodes, journaling, manual readings, your daily score and outlook, the Apple Watch HR monitor, 14 days of charts and full export.
 
 Autonomic Pro adds the pacing budget, week / month / year progress, full historical analysis, Insights, POTS results and AI doctor reports. It is $7.99/month or $49.99/year, billed to your Apple ID and renewing automatically until cancelled. Cancel anytime in your App Store settings.
 
@@ -309,9 +308,9 @@ IMPORTANT: Autonomic is a personal journal and education tool, not a medical dev
 > card.
 >
 > New in this version, and worth knowing for review: the **pacing budget** on the
-> Journal's Outlook card. It is a Pro feature with its own one-week free window
-> per install (local, no store product), so a fresh install sees it working
-> rather than locked. It estimates how much activity the day can absorb, in
+> Journal's Outlook card. It is a Pro feature, included in the 14-day local
+> full-access window, so a fresh install sees it working rather than locked. It
+> estimates how much activity the day can absorb, in
 > minutes of effort, from the user's own logged activity, steps and heart rate,
 > and it is presented as a personal journal estimate, not medical advice or an
 > activity prescription.
@@ -405,7 +404,7 @@ subscription price is stated in the full description, which is where Play wants
 it. This line trades "symptom journal" for "pacing" and "ME/CFS", the two terms
 this release is worth being found for.
 
-## Full description (3,965/4,000 chars)
+## Full description (3,905/4,000 chars)
 
 See your nervous system actually recover.
 
@@ -469,7 +468,7 @@ YOUR DATA NEVER LEAVES YOUR PHONE
 
 WHAT'S FREE, WHAT'S PRO
 
-Free forever: unlimited live HRV captures, POTS stand tests and episodes from a chest strap, journaling, manual readings, your daily Autonomic Score and outlook, 14 days of progress charts, and backup and export. Every install also gets one free week of the pacing budget.
+Free forever: unlimited live HRV captures, POTS stand tests and episodes from a chest strap, journaling, manual readings, your daily Autonomic Score and outlook, 14 days of progress charts, and backup and export.
 
 Autonomic Pro adds the pacing budget, week / month / year progress, full historical analysis, Insights, POTS results and AI doctor reports. It is $7.99 per month or $49.99 per year, billed through Google Play. Subscriptions renew automatically until cancelled; manage or cancel anytime in Google Play > Subscriptions.
 
