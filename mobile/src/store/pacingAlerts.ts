@@ -24,7 +24,7 @@ import { resolveProtocol } from '../lib/scoring/day';
 import { detectDownturn } from '../lib/scoring/downturn';
 import { detectStrain } from '../lib/scoring/strain';
 import { loadWaveformId } from '../lib/waveforms';
-import { isPacingUnlocked } from './pacingTrial';
+import { isPacingUnlocked } from './pacingAccess';
 import { pingNotifyEnabled } from './ping';
 import { getState, getWaveform, save, subscribeStore } from './store';
 

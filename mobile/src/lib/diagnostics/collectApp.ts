@@ -26,7 +26,6 @@ import type { AppDiagnostics, Rows } from './appReport';
 import { getState, loadIssue, storageStats } from '../../store/store';
 import { getIapState } from '../../store/iap';
 import { getTier, getTrialDaysLeft } from '../../store/tier';
-import { pacingTrial } from '../../store/pacingTrial';
 import { reviewMemory } from '../review';
 import { liveOffer } from '../upsell/annual';
 import { annualMemory } from '../upsell/annualMemory';
@@ -206,18 +205,8 @@ function subscriptionRows(): Rows {
     'active plan': iap.activeSku ?? null,
     'products loaded': iap.products.map((p) => p.productId).join(', ') || 'none',
     'trial days left': tier === 'trial' ? getTrialDaysLeft() : null,
-    // "Pacing is locked" and "Pacing is gone since last week" are the same
-    // report without this row (src/lib/pacingTrial.ts).
-    'pacing trial': pacingTrialRow(),
     'purchase in flight': iap.purchasing ?? false,
   };
-}
-
-/** The pacing budget's seven-day free window, in the three states it has. */
-function pacingTrialRow(): string {
-  const t = pacingTrial();
-  if (t.active) return `${t.daysLeft} day${t.daysLeft === 1 ? '' : 's'} left`;
-  return t.spent ? 'ended' : 'not started';
 }
 
 function distributionRows(): Rows {

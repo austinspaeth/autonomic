@@ -131,7 +131,7 @@ describe('cohort ping wire format', () => {
     // The pacing budget, opened by somebody who can read it. The locked half of
     // that same tap is `see` B, and the two must stay separate letters on
     // separate routes: pooled they are only "somebody tapped the strip", which
-    // is the one thing about the pacing trial nobody was asking.
+    // is the one thing about the pacing wall nobody was asking.
     expect(featureCode('pacing')).toBe('B');
     expect(featureCode('settings')).toBeUndefined();
     expect(findingCode('early')).toBe('E');

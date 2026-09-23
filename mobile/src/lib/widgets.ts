@@ -534,16 +534,15 @@ export function buildWidgetPayload(state: AppState, dk = todayKey(), opts: Widge
  * The store-backed half of `WidgetOpts`. An answer that cannot be read locks
  * the pacing widgets rather than unlocking them: a Pro user briefly seeing the
  * Pro line is a smaller wrong than a free install being shown the budget. The
- * question is `isPacingUnlocked`, not the tier — a free install inside its
- * seven-day pacing window gets the real widget, or the phone would be showing
- * the budget on the Journal and a lock on the home screen.
+ * question is `isPacingUnlocked`, the same one the Journal strip asks, so the
+ * phone can never show the budget on the Journal and a lock on the home screen.
  */
 export function liveWidgetOpts(): WidgetOpts {
   let locked = true;
   let stepsGranted: boolean | undefined;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    locked = !(require('../store/pacingTrial') as typeof import('../store/pacingTrial')).isPacingUnlocked();
+    locked = !(require('../store/pacingAccess') as typeof import('../store/pacingAccess')).isPacingUnlocked();
   } catch { /* stays locked */ }
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports

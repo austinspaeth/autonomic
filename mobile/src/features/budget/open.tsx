@@ -4,11 +4,10 @@
  * `isBudgetLocked` reads the answer at TAP TIME rather than from a hook, the
  * same rule `isPotsResultLocked` follows: a user who upgrades from the card
  * this opens must not have to close the Journal for the answer to change. It
- * asks src/store/pacingTrial, not the tier, because a free install also sees
- * the budget during its seven-day pacing window.
+ * asks src/store/pacingAccess rather than reading the tier itself.
  */
 import React from 'react';
-import { isPacingUnlocked } from '../../store/pacingTrial';
+import { isPacingUnlocked } from '../../store/pacingAccess';
 import { pingFeature, pingViewOpened } from '../../store/ping';
 import type { BudgetView } from '../../lib/budget';
 import type { OpenSheet } from '../forms';

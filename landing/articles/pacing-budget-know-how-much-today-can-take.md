@@ -26,7 +26,7 @@ faq:
   - q: "Is my health data sent anywhere?"
     a: "No. The budget is computed on your phone from data on your phone. There is no account and no cloud sync, and your health data never leaves the device unless you export it yourself."
   - q: "Do I need Pro for the pacing budget?"
-    a: "The pacing budget is part of Autonomic Pro. Every new install starts with 14 days of Pro, and the pacing budget comes with a free week of its own, so you can see what it makes of your own days before you decide."
+    a: "The pacing budget is part of Autonomic Pro. Every new install starts with 14 days of Pro, pacing budget included, so you can see what it makes of your own days before you decide."
 social:
   linkedin: |
     Today we are launching the biggest feature Autonomic has ever shipped: the pacing budget.
@@ -61,7 +61,7 @@ social:
     - Its ceiling only goes down when a dip gives it a reason, so a quiet week where your phone saw nothing does not shrink it.
     - Optional alerts with the app closed (heart rate above your line for a while, nearly out of budget, ran over yesterday). Max three a day.
 
-    It is on iPhone and Android, with widgets and an Apple Watch view. Nothing leaves your phone. Pacing is part of Pro, but every install gets 14 days of Pro and pacing has its own free week, so you can see what it makes of your own days first.
+    It is on iPhone and Android, with widgets and an Apple Watch view. Nothing leaves your phone. Pacing is part of Pro, and every install gets 14 days of Pro, so you can see what it makes of your own days first.
 
     Not medical advice, and it is not a prescribed limit. I would genuinely like to hear from people who try it, especially where it gets your days wrong. Full write-up with the research behind it: https://autonomic.care/insights/app/pacing-budget-know-how-much-today-can-take/?utm_source=reddit&utm_medium=social&utm_campaign=pacing-budget-know-how-much-today-can-take
   x: |
@@ -509,7 +509,7 @@ Postural orthostatic tachycardia syndrome is defined by what happens on standing
 Many people with chronic illness already think of energy as a limited daily allowance, thanks to Christine Miserandino's [spoon theory](https://www.butyoudontlooksick.com/articles/written-by-christine/the-spoon-theory/). The pacing budget keeps that intuition and gives it a unit, a pace and a way to check itself.
 
 <div class="callout callout-tip">
-  <strong>Try it on your own days.</strong> The pacing budget is available now in Autonomic for iPhone and Android, with widgets on both and the watch app on Apple Watch. Every new install starts with 14 days of Pro, and pacing has a free week of its own. <a href="/#download" data-dl-cta>Download Autonomic →</a>
+  <strong>Try it on your own days.</strong> The pacing budget is available now in Autonomic for iPhone and Android, with widgets on both and the watch app on Apple Watch. Every new install starts with 14 days of Pro, pacing budget included. <a href="/#download" data-dl-cta>Download Autonomic →</a>
 </div>
 
 ## How to get started

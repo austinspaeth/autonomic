@@ -28,7 +28,7 @@ import { hexA } from '../../lib/color';
 import { SCORE_COLORS } from '../../lib/scoring';
 import { fonts, usePalette } from '../../theme';
 import { MONTHLY_SKU, YEARLY_SKU, priceOf, useIap } from '../../store/iap';
-import { PACING_TRIAL_DAYS, usePacingTrial, usePacingUnlocked } from '../../store/pacingTrial';
+import { usePacingUnlocked } from '../../store/pacingAccess';
 import { usePaywall } from '../Paywall';
 
 /** The sample strip's numbers. Fixed, and deliberately not the reader's. */
@@ -45,7 +45,6 @@ export function BudgetPitchCard({ controls }: { controls: SheetControls }) {
   const p = usePalette();
   const { products } = useIap();
   const unlocked = usePacingUnlocked();
-  const { spent } = usePacingTrial();
   const openPaywall = usePaywall('pacing');
 
   const closeRef = React.useRef(controls.close);
@@ -70,16 +69,6 @@ export function BudgetPitchCard({ controls }: { controls: SheetControls }) {
       <Text style={{ fontSize: 13.5, lineHeight: 21, color: hexA(p.text, 0.62), marginBottom: 16 }}>
         Each morning your readings set a budget in minutes. The app tracks what the day uses and tells you where you stand against it.
       </Text>
-
-      {/* Said once, plainly, and only to somebody who actually had the window:
-          a feature that was on last week and is off today reads as a fault
-          unless the card names what happened. It is a statement of fact, not a
-          second pitch, so it carries no price and no button of its own. */}
-      {spent ? (
-        <Text style={{ fontSize: 12.5, lineHeight: 19, color: p.textDim, marginBottom: 16 }}>
-          {`Your ${PACING_TRIAL_DAYS} free days of Pacing have ended.`}
-        </Text>
-      ) : null}
 
       <View style={{ backgroundColor: p.sunk, borderRadius: 18, paddingHorizontal: 14, paddingTop: 14, paddingBottom: 13, marginBottom: 16 }}>
         <View style={{ flexDirection: 'row', alignItems: 'baseline', gap: 7, marginBottom: 10 }}>
