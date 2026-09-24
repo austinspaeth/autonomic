@@ -270,6 +270,11 @@ export function DatePickerSheet({ label, value, onChange, controls }: { label: s
   // Draft the spinner value locally so nothing commits until "Save".
   const [draft, setDraft] = useState(isNaN(base.getTime()) ? new Date(1990, 0, 1) : base);
   const [dialogOpen, setDialogOpen] = useState(Platform.OS === 'android');
+  // An explicit floor is REQUIRED on Android: given a maximumDate and no
+  // minimumDate, the library clamps to a minimum of epoch 0, so the dialog
+  // snapped every birthday before 1970 back to 31 Dec 1969. A hundred years
+  // back covers anyone up to 99.
+  const minimumDate = new Date(new Date().getFullYear() - 100, 0, 1);
   // Same late-event write-through as TimePickerSheet: a wheel change event that
   // lands after "Save" (settle animation) must not be dropped.
   const saved = useRef(false);
@@ -288,6 +293,7 @@ export function DatePickerSheet({ label, value, onChange, controls }: { label: s
           value={draft}
           mode="date"
           display="spinner"
+          minimumDate={minimumDate}
           maximumDate={new Date()}
           textColor="#ffffff"
           themeVariant="dark"
@@ -302,6 +308,7 @@ export function DatePickerSheet({ label, value, onChange, controls }: { label: s
               value={draft}
               mode="date"
               display="spinner"
+              minimumDate={minimumDate}
               maximumDate={new Date()}
               onChange={(e, date) => { setDialogOpen(false); if (e.type === 'set' && date) setDraft(date); }}
             />
