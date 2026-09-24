@@ -14,6 +14,7 @@ import { AppState } from 'react-native';
 import { useSheets } from '../components/Sheet';
 import { maybeAskForReview } from '../lib/review';
 import { subscribeStore } from '../store/store';
+import { getSessionSnapshot } from './hrv/sessionStore';
 
 /** Quiet period after launch — never prompt into a still-settling first screen. */
 const LAUNCH_QUIET_MS = 25000;
@@ -35,6 +36,10 @@ export function ReviewPrompt() {
   attempt.current = () => {
     if (asked.current || !pending.current) return;
     if (depthRef.current > 0) return;              // stays pending; retried when the stack clears
+    // A MINIMIZED reading leaves the stack empty, and the OS sheet landing on a
+    // paced reading ruins it. Stays pending: the results card that follows
+    // raises the stack, and its close retries.
+    if (getSessionSnapshot().status !== 'idle') return;
     if (AppState.currentState !== 'active') return;
     pending.current = false;
     void maybeAskForReview().then((did) => { asked.current = asked.current || did; });
