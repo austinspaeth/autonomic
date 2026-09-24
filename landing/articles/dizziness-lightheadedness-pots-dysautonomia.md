@@ -8,7 +8,7 @@ keywords: "dizziness POTS, lightheadedness when standing, presyncope, orthostati
 date: 2026-09-24
 updated: 2026-09-24
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1519643381401-22c77e60520e?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "https://images.unsplash.com/photo-1514906689926-25ba6dcb584b?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Kinga Howard / Unsplash"
 tldr: "Dizziness in POTS and dysautonomia is usually presyncope: the light, floaty, about-to-faint feeling that comes from your brain getting slightly less blood while you are upright. It is different from vertigo, the spinning sensation that comes from the inner ear. It tends to build with standing, heat, meals, and dehydration, and it eases when you sit or lie down. It is worth tracking beside a stand test so you can see the pattern rather than fear it, and worth discussing any new, severe, or spinning dizziness with your clinician."
 categories:
