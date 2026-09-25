@@ -301,7 +301,7 @@ check('the trial tile still quotes how many started one',
 const activeTile = tiles[Object.keys(tiles).find((k) => k.startsWith('Active on'))];
 check('active today is 4', activeTile.value.startsWith('4'));
 
-check('purchases counted', tiles['Purchases in range'].value === '3', tiles['Purchases in range'].value);
+check('purchases counted', tiles['Subscriptions reported in range'].value === '3', tiles['Subscriptions reported in range'].value);
 
 /* ------------------------------------------------------- installs + deltas */
 
@@ -338,13 +338,13 @@ check('a comparison whose baseline is too small is dropped, not printed',
   !activeTile.deltas.some((d) => /last week|range average/.test(d)),
   activeTile.deltas.join(' | '));
 check('and a tile with three tiny baselines carries no comparisons at all',
-  tiles[Object.keys(tiles).find((k) => k.startsWith('Purchases on'))].deltas.length === 0,
-  tiles[Object.keys(tiles).find((k) => k.startsWith('Purchases on'))].deltas.join(' | '));
+  tiles[Object.keys(tiles).find((k) => k.startsWith('Subscriptions reported on'))].deltas.length === 0,
+  tiles[Object.keys(tiles).find((k) => k.startsWith('Subscriptions reported on'))].deltas.join(' | '));
 
 /* A subscribe ping carries the buyer's store in the same cohort key an open
    ping does, so both purchase tiles say which store paid. In range: T(2) sold
    one on each store, T(0) sold one on iOS. On the newest day alone: 1 iOS. */
-const rangeSplit = splitOfTile('pgTilesRange', 'Purchases in range');
+const rangeSplit = splitOfTile('pgTilesRange', 'Subscriptions reported in range');
 check('purchases in range are split by store', /iOS 2/.test(rangeSplit) && /Android 1/.test(rangeSplit), rangeSplit);
 
 /* Every purchase as its own row, which is what a book with three of them can
@@ -370,9 +370,9 @@ check('and it collapses in one press',
   $('pgPurchaseRows').querySelector('#pgPurchaseRowsTable').classList.contains('hidden'));
 $('pgPurchaseRowsToggle').click();
 
-const buysToday = tiles[Object.keys(tiles).find((k) => k.startsWith('Purchases on'))];
+const buysToday = tiles[Object.keys(tiles).find((k) => k.startsWith('Subscriptions reported on'))];
 check('a purchases tile covers the newest day only', buysToday && buysToday.value === '1', buysToday && buysToday.value);
-const todaySplit = splitOfTile('pgTilesToday', 'Purchases on');
+const todaySplit = splitOfTile('pgTilesToday', 'Subscriptions reported on');
 check('and splits that day by store too', /iOS 1/.test(todaySplit) && /Android 0/.test(todaySplit), todaySplit);
 // conversion by D7 is measurable only for Z: 1 of its 8 bought within 7 days? no — it
 // bought on D10, so within-7 is 0 of 8.

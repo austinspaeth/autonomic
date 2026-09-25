@@ -26,13 +26,14 @@ import {
   requestPurchase, finishTransaction, deepLinkToSubscriptions,
   purchaseUpdatedListener, purchaseErrorListener,
   type ProductSubscription, type ProductSubscriptionAndroidOfferDetails,
-  type ExpoPurchaseError,
+  type ExpoPurchaseError, type Purchase,
 } from 'expo-iap';
 import { isSideloadedAndroidBuild, isTestFlightBuild } from '../../modules/app-env';
 import { blockedMessage, classifyPlayCode, inappVerdict } from '../lib/billingCodes';
 import { logError } from '../lib/diagnostics/errorLog';
 import { describeError } from '../lib/diagnostics/format';
 import type { PurchaseOutcome } from '../lib/ping';
+import { isNewPurchase } from '../lib/subscriberPing';
 
 /** Product IDs — identical in App Store Connect and the Play Console. On the
  *  App Store: one subscription group holding both plans. On Google Play: two
@@ -240,6 +241,11 @@ type IapState = {
   isPro: boolean;
   products: IapProduct[];   // yearly + monthly, in that order
   activeSku?: string;       // which plan is currently entitled (if any)
+  /** Epoch ms of the last time the store actually ANSWERED the entitlement
+   *  question. `ready` is also set when the connection failed, with `isPro`
+   *  still at its default, so "ready and not Pro" can be a store that never
+   *  answered; this cannot. The lapse ping reads it. */
+  answeredAt?: number;
   purchasing: boolean;
   /** Last purchase failure, in the user's words. Cleared when a purchase
    *  starts. Never set for a user cancellation — that isn't a failure. */
@@ -505,9 +511,19 @@ async function connect() {
       // Android can deliver PENDING purchases (e.g. cash top-up pending);
       // don't grant Pro or acknowledge until it completes.
       if (purchase.purchaseState === 'pending') { settleAttempt('pending'); return; }
-      try { await finishTransaction({ purchase, isConsumable: false }); } catch { /* already finished */ }
+      // Decided BEFORE the acknowledgement, which is what flips Play's flag.
+      const fresh = isNewPurchase({
+        platform: Platform.OS,
+        tappedSku: recentTap(),
+        productId: purchase.productId,
+        isAcknowledgedAndroid: (purchase as { isAcknowledgedAndroid?: boolean | null }).isAcknowledgedAndroid,
+        transactionId: purchase.transactionId ?? purchase.id,
+        originalTransactionId: (purchase as { originalTransactionIdentifierIOS?: string | null }).originalTransactionIdentifierIOS,
+      });
+      const acked = await acknowledge(purchase, 'iap.ack');
       set({ isPro: true, activeSku: purchase.productId, purchasing: false, error: undefined });
       settleAttempt('purchased');
+      if (fresh) noteNewPurchase(purchase.productId, acked);
     });
   }
   if (!errorSub) {
@@ -603,7 +619,16 @@ export async function refreshEntitlement(): Promise<boolean> {
       Platform.OS === 'ios' ? { onlyIncludeActiveItemsIOS: true } : undefined,
     ));
     const hit = (active || []).find((p) => isProSku(p.productId) && p.purchaseState !== 'pending');
-    set({ isPro: !!hit, activeSku: hit?.productId });
+    set({ isPro: !!hit, activeSku: hit?.productId, answeredAt: Date.now() });
+    // Play refunds a purchase left unacknowledged for three days, and the
+    // listener's own acknowledgement can fail (or never run: the app killed
+    // the moment the sheet closed). Every entitlement check retries it, and an
+    // unacknowledged purchase is by definition one no install has processed,
+    // so it is also reported as the new purchase it is.
+    if (Platform.OS === 'android' && hit
+      && (hit as { isAcknowledgedAndroid?: boolean | null }).isAcknowledgedAndroid === false) {
+      noteNewPurchase(hit.productId, await acknowledge(hit, 'iap.ackRetry'));
+    }
   } catch (e) { logError('iap.entitlement', iapDetail(e)); /* keep last known entitlement */ }
   return state.isPro;
 }
@@ -695,6 +720,60 @@ export type PurchaseOutcomeEvent = {
 };
 
 let attempt: { sku: string; origin?: PurchaseOrigin } | undefined;
+
+/**
+ * The last buy tap, kept PAST its attempt's settlement: an attempt the
+ * watchdog timed out, or one Play delivered minutes later, still ends in a
+ * purchase somebody just made. Only a hint — the store's own evidence decides
+ * first (see `isNewPurchase`) — so a generous window costs nothing.
+ */
+let lastTap: { sku: string; at: number } | undefined;
+const TAP_WINDOW_MS = 30 * 60_000;
+const recentTap = () => (lastTap && Date.now() - lastTap.at < TAP_WINDOW_MS ? lastTap.sku : undefined);
+
+/* ---------- new purchases ----------
+ * A purchase THIS install made, told to whoever asked. The cohort ping is the
+ * one listener: it reports `sub` for these and `rst` for an entitlement with no
+ * purchase behind it, which is how a reinstall stopped counting as a sale. */
+export type NewPurchaseEvent = { sku: string; acknowledged: boolean };
+const newPurchaseListeners = new Set<(e: NewPurchaseEvent) => void>();
+export function onNewPurchase(cb: (e: NewPurchaseEvent) => void): () => void {
+  newPurchaseListeners.add(cb);
+  return () => newPurchaseListeners.delete(cb);
+}
+function noteNewPurchase(sku: string, acknowledged: boolean) {
+  newPurchaseListeners.forEach((l) => {
+    try { l({ sku, acknowledged }); } catch { /* a reporter must never break a purchase */ }
+  });
+}
+
+/**
+ * Finish a transaction; resolves whether the purchase now stands acknowledged.
+ *
+ * Android is the platform where this MATTERS: Play refunds an unacknowledged
+ * purchase after three days, so a failure here is a sale that will undo itself
+ * and is logged. An already-acknowledged purchase is not asked again. On iOS a
+ * failure only means StoreKit replays the transaction next launch, and
+ * finishing one twice throws routinely, so it stays silent and counts as done.
+ */
+const ackedThisSession = new Set<string>();
+async function acknowledge(purchase: Purchase, tag: string): Promise<boolean> {
+  const android = Platform.OS === 'android';
+  if (android && (purchase as { isAcknowledgedAndroid?: boolean | null }).isAcknowledgedAndroid === true) return true;
+  // The listener and an entitlement check can hold the same purchase at once,
+  // and the second must not ask Play again (or log its refusal as a fault).
+  const token = purchase.purchaseToken || undefined;
+  if (android && token && ackedThisSession.has(token)) return true;
+  try {
+    await withBilling(() => finishTransaction({ purchase, isConsumable: false }));
+    if (token) ackedThisSession.add(token);
+    return true;
+  } catch (e) {
+    if (!android) return true;
+    logError(tag, iapDetail(e));
+    return false;
+  }
+}
 const outcomeListeners = new Set<(o: PurchaseOutcomeEvent) => void>();
 
 export function onPurchaseOutcome(cb: (o: PurchaseOutcomeEvent) => void): () => void {
@@ -722,6 +801,7 @@ const outcomeOf = (e: unknown): PurchaseOutcome => (PENDING_CODES.has(codeOf(e))
 export async function subscribe(sku: string = YEARLY_SKU, origin?: PurchaseOrigin): Promise<boolean> {
   if (state.purchasing) return false;
   attempt = { sku, origin };
+  lastTap = { sku, at: Date.now() };
   // Already known impossible on this device. Say so without touching the store,
   // so the answer is the remedy rather than another failed round trip.
   if (state.blocked) {

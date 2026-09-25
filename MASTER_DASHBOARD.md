@@ -663,9 +663,16 @@ the UI, each of them deliberate:
   collapsing it twice.
 - **A subscribe ping carries the buyer's store in the same cohort key an open
   ping does**, so "which store paid" needs no second source: `subPlatformsOn` /
-  `purchasePlatformsOver` read it back, and both **Purchases on <day>** (the
-  newest day alone, beside *Active on <day>*) and **Purchases in range** show
-  the iOS / Android split under their number. Those splits follow the same rule
+  `purchasePlatformsOver` read it back, and both **Subscriptions reported on
+  <day>** (the newest day alone, beside *Active on <day>*) and **Subscriptions
+  reported in range** show the iOS / Android split under their number. Those
+  two were called *Purchases* and were renamed because they are what the app
+  REPORTED, unverified — the imported sales ledger is the source of truth for
+  revenue. Their meta line adds the day's or range's `rst` (restored onto a new
+  install) and `lap` (lapsed) counts beside the number and never inside it, and
+  says older builds' counts may include restores. The per-purchase list gained
+  a **Plan** column; the raw Pings tab lists `rst` / `lap` as routes of their
+  own, with tiles, and names the plan letter in its label column. Those splits follow the same rule
   as the platform tile — always unfiltered, `no store` broken out and disclosed
   in the meta line rather than folded into either store.
 - **The active tile splits its day TWICE**: returning / first run, and then
@@ -964,7 +971,17 @@ a CSV paste would be an alert about your own typing.
 | Activations | a rise in activation pings — an install saved its **first HRV reading** | two-note settling chime, a card + a toast + a notification naming the sensor(s). **No confetti.** |
 | Readings | a rise in daily reading pings — an install measured **today** | one struck note, a card + a toast + a notification naming the sensor(s). **No confetti**, and it yields every channel to anything above it in this table — it is the app being used, which is what this dashboard hopes to see all day |
 | Downloads | a rise in **first runs** — an open ping whose cohort key IS the day it arrived on | three-note rising chime, **ten seconds** of SILVER glitter falling from the top, a card + a toast + a notification naming the store(s) |
-| Sales | a rise in subscribe pings | brass fanfare, **twenty seconds** of GOLD glitter from the top AND the bottom, a card + a toast + a notification naming the store(s) that paid |
+| Sales | a rise in subscribe pings (`sub`), with or without a plan letter | brass fanfare, **twenty seconds** of GOLD glitter from the top AND the bottom, a card + a toast + a notification naming the store(s) that paid. Each row wears its **plan** (Yearly / Monthly / Promo year / Founder year) so it can be matched to a store order; a letterless row is an older build and reads "Plan unknown", with a footer saying it may be a reinstall or restore |
+| Restores / lapses | a rise in `rst` (an existing subscription arriving on a new install) or `lap` (a subscription that lapsed) | a card each naming store, plan, tier and age; a toast only when nothing else wants the slot. **No sound, no confetti, no notification, never counted as a sale** |
+
+`sub` changed meaning with the plan letter: new builds send it only for a
+purchase made on that install and always carry the plan, while reinstalls and
+Restore purchases go to `rst`. A letterless `sub` row is the old ping, which
+meant "found a subscription", and is still announced and counted exactly as it
+was — history is not reclassified. The plan joined a sale's row key, and
+`rst` / `lap` joined the snapshot, so `SNAP_V` is 3: a stored v2 baseline keeps
+its counts, skips detail for one refresh, and (the activation rule) announces
+none of the `rst` / `lap` back catalogue.
 
 A return gets a CARD because it is the event that fires most often, which used to
 mean it was announced only in a slot it almost never won: one toast element

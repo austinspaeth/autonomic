@@ -1359,7 +1359,9 @@ old web app so old `export.json` files import directly.
 - **The only thing the app sends anywhere is an anonymous cohort ping.**
   `src/store/ping.ts` (shell) over `src/lib/ping.ts` (pure + tested) GETs
   `api.autonomic.care/ping/open/D{MMDDYY}{P}` on launch and on foreground,
-  `/ping/sub/D{MMDDYY}{P}` once the store reports an entitlement,
+  `/ping/sub/D{MMDDYY}{P}{L}` when this install MAKES a purchase, `/ping/rst/…{L}`
+  when it finds a subscription that already existed, `/ping/lap/…{L}` when one
+  it held lapses (see the subscriber paragraph below),
   `/ping/act/D{MMDDYY}{P}{M}` the first time an HRV reading ever COMPLETES
   (`pingActivation` from `features/hrv/sessionStore.ts`, once per install ever),
   `/ping/cap/D{MMDDYY}{P}{M}` when a reading STARTS and
@@ -1508,14 +1510,46 @@ old web app so old `export.json` files import directly.
   de-duplicate and the CLIENT must: one open ping per install per **US Eastern**
   day (the server's bucket — `easternDay` is duplicated verbatim on both sides
   and DST-aware; move one and you must move the other, or one install lands
-  twice in a row), one subscribe ping per install ever, flags written
+  twice in a row), one subscriber ping per event, flags written
   only on a successful send so an offline launch retries. Dev builds send
-  nothing; the subscribe ping also skips any build made Pro by the
+  nothing; the subscriber pings also skip any build made Pro by the
   dev/TestFlight/sideload bypass (`paywallBypassed()` in `src/store/iap.ts`),
-  since nobody paid there. Failures are silent and NOT sent to `logError` —
+  since nobody paid there. **A device can be excluded outright**: the Settings
+  support dump (8-second hold on the brand card) carries an "Exclude this device
+  from analytics" switch (`setPingExcluded`, flags MMKV, shown as `analytics
+  excluded` in the dump), and `send()` then drops every ping. It exists for the
+  owner's and testers' phones — a Play license tester's purchase is free and
+  real to the store, and nothing else keeps it off the dashboard. It does not
+  cover `/fault`.
+  **`sub` means somebody just PAID, and it used to mean something else.** It
+  fired the first time an install saw itself entitled, so a reinstall, a second
+  phone, a Restore purchases tap and a tester's purchase were all counted and
+  celebrated as sales. `src/lib/subscriberPing.ts` (pure + tested) now splits the
+  one fact into three routes: `sub` for a purchase this install made
+  (`isNewPurchase`: an UNACKNOWLEDGED Play purchase, a StoreKit transaction that
+  is its own original, or a buy tap in the last 30 minutes, the store's evidence
+  first), `rst` for an entitlement with nothing reported behind it (once per
+  entitlement, and only `RESTORE_SETTLE_MS` after the store answered, because an
+  unfinished StoreKit transaction is replayed a moment after launch and would
+  otherwise read as a restore), and `lap` when the store answers "not
+  subscribed" on TWO different Eastern days to an install that had reported one
+  (Play has answered an empty list on a dropped binding; `ready` alone is never
+  an answer, which is why `IapState.answeredAt` exists). A lapse resets the
+  memory, so a resubscribe on the same install is a sale again. A purchase is
+  held on disk as pending until it is acknowledged: `purchaseUpdatedListener`
+  no longer swallows a failed `finishTransaction` (`iap.ack`), every
+  entitlement check re-acknowledges an unacknowledged Play purchase
+  (`iap.ackRetry`) because Play refunds one after three days, and a pending
+  purchase the store stops reporting is dropped unreported. All three routes
+  carry the PLAN letter (`planCode`: `Y` yearly, `M` monthly, `P` promo year,
+  `F` founder year), which is also the generation marker — new builds always
+  send one and older builds never did, so a letterless `sub` row is the old
+  ambiguous count and the dashboard reads it exactly as before. None of it is
+  revenue; the imported sales ledger is. Renewals are not pinged: Play never
+  tells the app, and iOS only while it is open. Failures are silent and NOT sent to `logError` —
   being offline is a phone's normal state, and it would flush the 40-entry
   support log. Storage is **one DynamoDB row per day** holding a map of
-  cohort+platform(+method) → count (`PK PING#OPEN` / `PING#SUB` / `PING#ACT` /
+  cohort+platform(+method) → count (`PK PING#OPEN` / `PING#SUB` / `PING#RST` / `PING#LAP` / `PING#ACT` /
   `PING#HRV`,
   `SK 2026-08-21`, `cohorts: { '082126I': 12 }`, readings `'082126IB'`) — a map, not a list, because the nested bump is
   atomic and appending to a list would lose concurrent pings.
@@ -1523,8 +1557,8 @@ old web app so old `export.json` files import directly.
   (shared key, `PING_REPORT_KEY`, injected by CodeBuild from SSM) or the `PINGS`
   action on the authenticated `/master` API; both return
   `{ day, total, cohorts: [{ key, cohortDate, cohort, platform, slot, method,
-  surface, tier, count }], builds: [{ key, platform, tier, version, count }] }`
-  rows under `open` / `sub` / `act` / `hrv` / `pay`. The 8th character is reported
+  surface, plan, tier, count }], builds: [{ key, platform, tier, version, count }] }`
+  rows under `open` / `sub` / `rst` / `lap` / `act` / `hrv` / `pay`. The 8th character is reported
   under both the generic name (`slot`) and the name its route gives it, so a
   consumer can tell "this kind of ping has no sensor" from "a sensor we could not
   read" without knowing which kind it holds. The

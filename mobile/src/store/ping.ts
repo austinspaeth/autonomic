@@ -8,7 +8,9 @@
  * arrives. Two routes, no body, no response worth reading:
  *
  *   GET /ping/open/D082126I   opened today by an install from that cohort
- *   GET /ping/sub/D082126I    an install from that cohort became a subscriber
+ *   GET /ping/sub/D082126IY   an install from that cohort just PAID (plan letter)
+ *   GET /ping/rst/D082126IY   ...found a subscription that already existed
+ *   GET /ping/lap/D082126IY   ...held one that has lapsed
  *   GET /ping/act/D082126IB   an install from that cohort took its FIRST reading
  *   GET /ping/hrv/D082126IG   an install from that cohort took a reading today
  *
@@ -62,8 +64,9 @@
  *
  * Because there is no identifier, the server cannot de-duplicate, so THIS side
  * has to: at most one open ping per install per Eastern day (the server's own
- * bucket — see easternDay in ../lib/ping), and exactly one subscribe ping per
- * install, ever.
+ * bucket — see easternDay in ../lib/ping), and one subscriber ping per event:
+ * a `sub` per purchase this install made, an `rst` per subscription it found
+ * already existing, a `lap` per confirmed lapse (../lib/subscriberPing).
  *
  * Bookkeeping lives in the plaintext `autonomic.flags` MMKV, the same instance
  * as the trial stamp and the review-prompt memory. That placement is the point:
@@ -81,18 +84,26 @@ import { AppState as RNAppState, Platform } from 'react-native';
 import { MMKV } from 'react-native-mmkv';
 import {
   easternDay, featureCode, findingCode, logCode, methodCode, notifyCode, offerCode,
-  offerFailureBody, pingUrl, platformCode, reportCode, resolveCohort, shouldPingDaily,
-  surfaceCode, tierCode,
+  offerFailureBody, pingUrl, planCode, platformCode, reportCode, resolveCohort, shouldPingDaily,
+  surfaceCode, tierCode, type PlanCode,
   type LogKind, type OfferFailureBody, type PingKind, type PotsCode, type PurchaseOutcome,
   type SlotCode, type ViewCode,
 } from '../lib/ping';
-import { getIapState, onPurchaseOutcome, paywallBypassed, subscribeIap } from './iap';
+import {
+  afterSend, notePurchase, RESTORE_SETTLE_MS, subscriberStep, type SubscriberMemory,
+} from '../lib/subscriberPing';
+import { getIapState, onNewPurchase, onPurchaseOutcome, paywallBypassed, subscribeIap } from './iap';
 import { getTier } from './tier';
 
 const FLAGS_ID = 'autonomic.flags';
 const KEY_COHORT = 'pingCohort';        // ISO date — this install's cohort, frozen once
 const KEY_LAST_OPEN = 'pingLastOpen';   // ISO date (Eastern) of the last open ping sent
-const KEY_SUB_SENT = 'pingSubSent';     // '1' once the subscribe ping landed
+const KEY_SUB_SENT = 'pingSubSent';     // '1' once a sub landed for the current entitlement
+const KEY_RST_SENT = 'pingRstSent';     // '1' once an rst landed for the current entitlement
+const KEY_SUB_PENDING = 'pingSubPending'; // JSON { plan, acked } — a purchase not yet reported
+const KEY_LAPSE_SEEN = 'pingLapseSeen'; // ISO date (Eastern) the store first said "not subscribed"
+const KEY_LAST_PLAN = 'pingLastPlan';   // the plan letter this install was last seen holding
+const KEY_EXCLUDED = 'pingExcluded';    // '1' — this device sends nothing (owner / tester phones)
 const KEY_ACT_SENT = 'pingActSent';     // '1' once the activation ping landed
 const KEY_LAST_CAP = 'pingLastCap';     // ISO date (Eastern) of the last capture-started ping
 const KEY_LAST_HRV = 'pingLastHrv';     // ISO date (Eastern) of the last capture-completed ping
@@ -128,6 +139,29 @@ function read(key: string): string | undefined {
 }
 function write(key: string, value: string) {
   try { store()?.set(key, value); } catch { /* nothing to do; retries next launch */ }
+}
+function remove(key: string) {
+  try { store()?.delete(key); } catch { /* nothing to do */ }
+}
+
+/* ------------------------------------------------------------ exclusion */
+
+/**
+ * Is this device excluded from every ping? A hidden switch in the Settings
+ * support dump, for the owner's and testers' own phones: a Play license
+ * tester's purchase is free and real as far as the store is concerned, and
+ * nothing else can keep it off the dashboard. Survives "Clear all data" (it is
+ * about the phone, not the journal) and not a reinstall.
+ *
+ * Covers every counter here, the offer fall-through reports included. It does
+ * NOT cover `/fault`: a tester's crash is exactly the one worth hearing about.
+ */
+export function isPingExcluded(): boolean {
+  return read(KEY_EXCLUDED) === '1';
+}
+export function setPingExcluded(on: boolean): void {
+  if (on) write(KEY_EXCLUDED, '1');
+  else remove(KEY_EXCLUDED);
 }
 
 function cohortDate(nowMs: number): string {
@@ -167,6 +201,9 @@ function appVersion(): string | undefined {
  * is what makes a cohort's drift from F to P a conversion curve.
  */
 async function send(kind: PingKind, cohort: string, slot?: SlotCode): Promise<boolean> {
+  // Reported as delivered so no caller retries it forever: the event did
+  // happen, this phone just does not count.
+  if (isPingExcluded()) return true;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   const url = pingUrl(
@@ -190,11 +227,11 @@ async function send(kind: PingKind, cohort: string, slot?: SlotCode): Promise<bo
  * The "sent" flag is written only on success, so between the check and the
  * write there is a window in which a second caller reads a flag that is not
  * there yet and sends the same ping again. `pingOpen` is called from two places
- * and has always been guarded; `pingSub` was not, and Android found the hole:
+ * and has always been guarded; the subscribe ping was not, and Android found the hole:
  * Play's purchase sheet is a separate ACTIVITY, so completing a purchase
  * backgrounds and re-foregrounds the app, and within the same second the
  * purchase listener, the AppState handler here and the entitlement refresh in
- * ./iap all call pingSub — three calls, one flag, written last. iOS renders
+ * ./iap all call it — three calls, one flag, written last. iOS renders
  * StoreKit in-process, never leaves the foreground, and so only ever made the
  * one call, which is why a real Android purchase counted twice and an iOS one
  * did not. Since there is no identifier the server cannot de-duplicate, so a
@@ -226,7 +263,7 @@ const inFlight: Record<string, boolean> = {};
  * The in-flight guard is keyed the same way, and every route needs one: the
  * "sent" flag is written only on success, so between the check and the write
  * there is a window where a second caller reads a flag that is not there yet and
- * sends the same ping again. `pingSub` learned this the hard way — Play's
+ * sends the same ping again. The subscribe ping learned this the hard way — Play's
  * purchase sheet is a separate ACTIVITY, so a completed purchase backgrounds and
  * re-foregrounds the app, and the purchase listener, the AppState handler and
  * the entitlement refresh all called it inside one second. iOS renders StoreKit
@@ -275,25 +312,89 @@ async function pingOpen(): Promise<void> {
   }
 }
 
-/**
- * Send the one-per-install subscribe ping, once the store says this install is
- * entitled — whichever CTA got them there, since every path ends in the same
- * entitlement. Waits for `ready` so the cold-start guess in ./tier.ts (which
- * trusts a persisted flag before the store answers) can't trigger it, and
- * skips builds whose Pro status came from a paywall bypass: nobody paid in a
- * dev, TestFlight or sideloaded build.
- */
-async function pingSub(): Promise<void> {
-  if (inFlight.sub) return;
-  if (read(KEY_SUB_SENT) === '1') return;
-  if (paywallBypassed()) return;
-  const { ready, isPro } = getIapState();
-  if (!ready || !isPro) return;
-  inFlight.sub = true;
+/* ------------------------------------------------------------ subscribers */
+
+const PLANS = new Set<string>(['Y', 'M', 'P', 'F']);
+
+function readSubscriberMemory(): SubscriberMemory {
+  let pending: SubscriberMemory['pending'];
   try {
-    if (await send('sub', cohortDate(Date.now()))) write(KEY_SUB_SENT, '1');
+    const raw = read(KEY_SUB_PENDING);
+    const v = raw ? JSON.parse(raw) : undefined;
+    if (v && typeof v === 'object') pending = { plan: PLANS.has(v.plan) ? v.plan : undefined, acked: !!v.acked };
+  } catch { pending = undefined; }
+  return {
+    pending,
+    subSent: read(KEY_SUB_SENT) === '1',
+    rstSent: read(KEY_RST_SENT) === '1',
+    lapseSeen: read(KEY_LAPSE_SEEN) || undefined,
+    lastPlan: PLANS.has(read(KEY_LAST_PLAN) || '') ? read(KEY_LAST_PLAN) as PlanCode : undefined,
+  };
+}
+
+function writeSubscriberMemory(m: SubscriberMemory) {
+  if (m.pending) write(KEY_SUB_PENDING, JSON.stringify(m.pending));
+  else remove(KEY_SUB_PENDING);
+  if (m.subSent) write(KEY_SUB_SENT, '1'); else remove(KEY_SUB_SENT);
+  if (m.rstSent) write(KEY_RST_SENT, '1'); else remove(KEY_RST_SENT);
+  if (m.lapseSeen) write(KEY_LAPSE_SEEN, m.lapseSeen); else remove(KEY_LAPSE_SEEN);
+  if (m.lastPlan) write(KEY_LAST_PLAN, m.lastPlan);
+}
+
+/** A purchase this install made, from ./iap. Remembered on disk before
+ *  anything is sent, so a phone killed between the store sheet and the ping
+ *  still reports it on its next launch. */
+function onPurchased(e: { sku: string; acknowledged: boolean }) {
+  if (paywallBypassed()) return;
+  writeSubscriberMemory(notePurchase(readSubscriberMemory(), planCode(e.sku), e.acknowledged));
+  void pingSubscriber();
+}
+
+/** When the store's current answer arrived, for the restore settle window. */
+let answeredSeen: number | undefined;
+let settleTimer: ReturnType<typeof setTimeout> | undefined;
+
+/**
+ * Send whichever subscriber ping this install owes (../lib/subscriberPing
+ * decides), once the store has actually answered. Skips builds whose Pro
+ * status came from a paywall bypass: nobody paid in a dev, TestFlight or
+ * sideloaded build. One in-flight guard for all three routes: they share a
+ * memory, and Android's purchase sheet is a separate activity whose return
+ * calls this three times inside a second.
+ */
+async function pingSubscriber(): Promise<void> {
+  if (inFlight.subscriber) return;
+  if (paywallBypassed()) return;
+  const iap = getIapState();
+  if (!iap.ready) return;
+  const now = Date.now();
+  const plan = planCode(iap.activeSku);
+  if (iap.isPro && plan && read(KEY_LAST_PLAN) !== plan) write(KEY_LAST_PLAN, plan);
+  const answered = !!iap.answeredAt;
+  if (answered && answeredSeen === undefined) {
+    answeredSeen = now;
+    // Come back once the replay window has passed; nothing else may call.
+    if (!settleTimer) settleTimer = setTimeout(() => { void pingSubscriber(); }, RESTORE_SETTLE_MS + 500);
+  }
+  const memory = readSubscriberMemory();
+  const step = subscriberStep(memory, {
+    answered,
+    isPro: iap.isPro,
+    plan,
+    settled: answeredSeen !== undefined && now - answeredSeen >= RESTORE_SETTLE_MS,
+    today: easternDay(now),
+  });
+  if (!step) return;
+  if (step.kind === 'lapse-seen') { writeSubscriberMemory({ ...memory, lapseSeen: step.day }); return; }
+  if (step.kind === 'lapse-clear') { writeSubscriberMemory({ ...memory, lapseSeen: undefined }); return; }
+  if (step.kind === 'drop-pending') { writeSubscriberMemory({ ...memory, pending: undefined }); return; }
+  inFlight.subscriber = true;
+  try {
+    if (await send(step.kind, cohortDate(now), step.plan)) {
+      writeSubscriberMemory(afterSend(readSubscriberMemory(), step.kind, step.plan));
+    }
   } finally {
-    inFlight.sub = false;
+    inFlight.subscriber = false;
   }
 }
 
@@ -677,6 +778,7 @@ export function reportOfferOutcome(o: { origin?: string; outcome: PurchaseOutcom
   // A bypassed build cannot reach the store at all, so every attempt there
   // "fails" with the bypass's own message. That is not a funnel.
   if (paywallBypassed()) return;
+  if (isPingExcluded()) return;
   if (oflCreated >= OFL_MAX_PER_LAUNCH) return;
   oflCreated += 1;
   try {
@@ -729,15 +831,16 @@ export function initPing(): void {
   if (started || __DEV__) return;   // a dev build's opens are not users
   started = true;
   void pingOpen();
-  void pingSub();
-  subscribeIap(() => { void pingSub(); });
+  void pingSubscriber();
+  subscribeIap(() => { void pingSubscriber(); });
+  onNewPurchase(onPurchased);
   onPurchaseOutcome(reportOfferOutcome);
   void flushOfferFailures();
   try {
     RNAppState.addEventListener('change', (s) => {
       if (s !== 'active') return;
       void pingOpen();
-      void pingSub();
+      void pingSubscriber();
       void flushOfferFailures();
     });
   } catch { /* no AppState here (jest / bare node) */ }

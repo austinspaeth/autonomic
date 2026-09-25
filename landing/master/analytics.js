@@ -14,7 +14,10 @@
  *
  *     open[day].cohorts[cohort] = how many installs born on `cohort`
  *                                 opened the app on `day`
- *     sub[day].cohorts[cohort]  = ...and how many first showed a subscription
+ *     sub[day].cohorts[cohort]  = ...and how many reported a purchase (older
+ *                                 builds: first showed ANY subscription)
+ *     rst[day] / lap[day]       = ...a subscription restored onto the install /
+ *                                 one that lapsed. Never counted as sales
  *     act[day].cohorts[cohort]  = ...and how many saved their FIRST HRV reading
  *     hrv[day].cohorts[cohort]  = ...and how many saved ANY reading that day
  *
@@ -209,6 +212,11 @@ window.Analytics = (function () {
   var FEATURE_NAME = { M: 'Milestones opened', P: 'Protocol saved', B: 'Pacing budget opened', U: 'Pacing budget unpaused' };
   var FINDING_NAME = { E: 'Early signal', U: 'Unconfirmed pattern', C: 'Biggest change', R: 'Correlation' };
   var REPORT_NAME = { D: 'Data for prompt', H: 'Full health report', C: 'Doctor summary' };
+  /* The subscription product, on `sub` / `rst` / `lap` alike — the lambda's
+     PLANS. A `sub` row with NO letter is not an unknown plan in the usual
+     sense: it is a build older than the letter, whose `sub` meant "found a
+     subscription" rather than "paid", and it is still counted as one. */
+  var PLAN_NAME = { Y: 'Yearly', M: 'Monthly', P: 'Promo year', F: 'Founder year' };
 
   /**
    * Which alphabet each route speaks, and in what order to draw it.
@@ -222,7 +230,8 @@ window.Analytics = (function () {
     act: METHOD_NAME, cap: METHOD_NAME, hrv: METHOD_NAME,
     pay: SURFACE_NAME, not: NOTIFY_NAME, pot: POTS_NAME, see: VIEW_NAME,
     osh: OFFER_NAME, odm: OFFER_NAME, oac: OFFER_NAME,
-    log: LOG_NAME, use: FEATURE_NAME, fnd: FINDING_NAME, rpt: REPORT_NAME
+    log: LOG_NAME, use: FEATURE_NAME, fnd: FINDING_NAME, rpt: REPORT_NAME,
+    sub: PLAN_NAME, rst: PLAN_NAME, lap: PLAN_NAME
   };
   var SLOT_ORDER = {
     act: METHOD_ORDER, cap: METHOD_ORDER, hrv: METHOD_ORDER,
@@ -230,13 +239,16 @@ window.Analytics = (function () {
     not: ['M', 'C', 'P', '?'], pot: ['T', 'E', '?'], see: ['I', 'P', 'B', '?'],
     osh: ['A', 'F', '?'], odm: ['A', 'F', '?'], oac: ['A', 'F', '?'],
     log: ['S', 'A', 'M', 'Y', 'W', 'B', 'P', 'R', '?'],
-    use: ['M', 'P', 'B', '?'], fnd: ['E', 'U', 'C', 'R', '?'], rpt: ['D', 'H', 'C', '?']
+    use: ['M', 'P', 'B', '?'], fnd: ['E', 'U', 'C', 'R', '?'], rpt: ['D', 'H', 'C', '?'],
+    sub: ['Y', 'M', 'P', 'F', '?'], rst: ['Y', 'M', 'P', 'F', '?'], lap: ['Y', 'M', 'P', 'F', '?']
   };
 
   /* Every route the report can carry, in the order the UI reads them. `open`,
      `sub` and `act` predate this list and keep their own bespoke accessors; the
-     rest are read through the generic ones below. */
-  var KINDS = ['open', 'sub', 'act', 'cap', 'hrv', 'pay', 'not', 'pot', 'see', 'err',
+     rest are read through the generic ones below. `rst` and `lap` are the
+     two subscription events that are NOT purchases (a subscription arriving
+     on a new install, one going away) and are never folded into `sub`. */
+  var KINDS = ['open', 'sub', 'rst', 'lap', 'act', 'cap', 'hrv', 'pay', 'not', 'pot', 'see', 'err',
     'osh', 'odm', 'oac', 'log', 'use', 'fnd', 'rpt'];
 
   /* The report's platform letters, and the names the filter bar speaks. */
@@ -1739,7 +1751,7 @@ window.Analytics = (function () {
   /**
    * Every subscribe ping, one row each, newest first.
    *
-   *   { day, cohort, platform, count, age }
+   *   { day, cohort, platform, plan, count, age }
    *
    * The histogram above answers "when do people decide" and needs a population
    * to mean anything. This answers "what happened", and at the volumes a new
@@ -1779,6 +1791,8 @@ window.Analytics = (function () {
           cohort: c.cohort || null,
           key: c.key || null,
           platform: PLATFORM_NAME[c.platform] ? c.platform : 'U',
+          /* The plan, when the build sent one; null is an older build. */
+          plan: PLAN_NAME[c.plan || c.slot] ? (c.plan || c.slot) : null,
           count: n,
           age: (age === null || age < 0) ? null : age
         });
@@ -2666,6 +2680,7 @@ window.Analytics = (function () {
     surfacesOn: surfacesOn, surfacesOver: surfacesOver, paySurfaceKnown: paySurfaceKnown,
     payKnown: payKnown, paywallShare: paywallShare,
     surfaceName: function (letter) { return SURFACE_NAME[letter] || 'Unknown surface'; },
+    planName: function (letter) { return PLAN_NAME[letter] || 'Plan unknown'; },
     SURFACE_ORDER: SURFACE_ORDER, WALL_ORDER: WALL_ORDER,
 
     // tier + build, carried by every counter

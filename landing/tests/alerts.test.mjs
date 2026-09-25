@@ -482,6 +482,68 @@ check('an activation with no reading beside it is kept and counted as extra',
 check('nothing at all merges to nothing, not to a crash',
   AL.mergeFirsts(null, null).rows.length === 0 && AL.mergeFirsts(null, null).extra === 0);
 
+/* ----------------------------------------------- subscriptions: sub/rst/lap */
+
+/* A subscription row carries a PLAN letter in the slot from the plan-letter
+   release on. `sub` now means a purchase made on this install; `rst` is an
+   existing subscription arriving on a new one; `lap` is one going away. Only
+   `sub` may ever be a sale — and a letterless `sub` (an older build, whose ping
+   meant "found a subscription") must still be one, exactly as before. */
+const prow = (day, cohorts) => ({
+  day,
+  total: cohorts.reduce((a, c) => a + c[3], 0),
+  cohorts: cohorts.map(([cohort, platform, plan, count]) =>
+    ({ cohort, platform, plan, slot: plan, tier: 'P', count }))
+});
+const SUB0 = { open: [], sub: [], rst: [], lap: [] };
+const sBase = AL.snapshot(SUB0);
+
+const dPlanned = AL.diff(sBase, AL.snapshot({ ...SUB0, sub: [prow(D2, [[D1, 'I', 'Y', 1], [D1, 'A', 'F', 1]])] }));
+check('a planned sub row is a sale',
+  dPlanned.sales === 2 && dPlanned.any === true, JSON.stringify({ s: dPlanned.sales }));
+check('and each sale row carries its plan, not a sensor',
+  dPlanned.rows.sales.map((r) => r.plan).sort().join() === 'F,Y' &&
+    dPlanned.rows.sales.every((r) => r.slot === '?'),
+  JSON.stringify(dPlanned.rows.sales));
+check('the plan names read the way a store order does',
+  AL.planLine(dPlanned.rows.sales) === '1 Yearly · 1 Founder year', AL.planLine(dPlanned.rows.sales));
+check('two sales differing only in plan are two rows, not one ×2',
+  AL.diff(sBase, AL.snapshot({ ...SUB0, sub: [prow(D2, [[D1, 'I', 'Y', 1], [D1, 'I', 'M', 1]])] })).rows.sales.length === 2);
+
+const dLegacySub = AL.diff(sBase, AL.snapshot({ ...SUB0, sub: [prow(D2, [[D1, 'I', null, 1]])] }));
+check('a letterless (legacy) sub row is still a sale',
+  dLegacySub.sales === 1 && dLegacySub.salesBy.I === 1, JSON.stringify(dLegacySub.salesBy));
+check('which says it cannot name the plan, and why',
+  dLegacySub.rows.sales[0].plan === '?' && /older build/.test(dLegacySub.notes.sales) &&
+    AL.planLine(dLegacySub.rows.sales) === '1 plan unknown',
+  JSON.stringify({ row: dLegacySub.rows.sales[0], note: dLegacySub.notes.sales }));
+
+const dRst = AL.diff(sBase, AL.snapshot({ ...SUB0, rst: [prow(D2, [[D1, 'I', 'Y', 2]])] }));
+check('a restore is news but never a sale',
+  dRst.any === true && dRst.restores === 2 && dRst.sales === 0 && dRst.rows.sales.length === 0,
+  JSON.stringify({ r: dRst.restores, s: dRst.sales }));
+check('and its rows carry the plan',
+  dRst.rows.restores.length === 1 && dRst.rows.restores[0].plan === 'Y', JSON.stringify(dRst.rows.restores));
+const dLap = AL.diff(sBase, AL.snapshot({ ...SUB0, lap: [prow(D2, [[D1, 'A', 'M', 1]])] }));
+check('a lapse is news but never a sale',
+  dLap.any === true && dLap.lapses === 1 && dLap.sales === 0 && dLap.lapsesBy.A === 1,
+  JSON.stringify({ l: dLap.lapses, s: dLap.sales }));
+
+/* A baseline written before rst/lap were counted must not announce their whole
+   history on the first refresh after the deploy — the activation rule. */
+const preRst = AL.snapshot(SUB0);
+delete preRst.restores; delete preRst.lapses;
+const HIST = { ...SUB0, rst: [prow(D1, [[D1, 'I', 'Y', 3]])], lap: [prow(D1, [[D1, 'I', 'M', 2]])] };
+const dHist = AL.diff(preRst, AL.snapshot(HIST));
+check('a baseline without rst/lap announces none of their history',
+  dHist.restores === 0 && dHist.lapses === 0 && dHist.any === false &&
+    dHist.rows.restores.length === 0 && dHist.rows.lapses.length === 0,
+  JSON.stringify({ r: dHist.restores, l: dHist.lapses }));
+const oldShape = AL.snapshot(HIST); oldShape.v = 2;
+const dShape = AL.diff(oldShape, AL.snapshot({ ...HIST, sub: [prow(D2, [[D1, 'I', 'Y', 1]])] }));
+check('a baseline in the old key shape keeps the sale count but draws no rows for one refresh',
+  dShape.sales === 1 && dShape.rows.sales.length === 0, JSON.stringify(dShape.rows.sales));
+
 /* ---------------------------------------------------- history headings */
 
 check('a day heading reads as a date a person would write',

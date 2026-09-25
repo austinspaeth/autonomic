@@ -20,7 +20,14 @@ const openRows = [
   { day: T(0), total: 4, cohorts: [
       { key: cd(T(0))+'I', cohortDate: cd(T(0)), cohort: T(0), platform: 'I', method: null, count: 4 } ] },
 ];
-const subRows = [{ day: T(0), total: 1, cohorts: [{ key: cd(T(10))+'I', cohortDate: cd(T(10)), cohort: T(10), platform: 'I', method: null, count: 1 }] }];
+/* One legacy letterless subscribe (an older build) and one carrying the plan
+   letter the new builds always send, plus the two routes that split off it:
+   a restore and a lapse, each with its plan. */
+const subRows = [{ day: T(0), total: 2, cohorts: [
+  { key: cd(T(10))+'I', cohortDate: cd(T(10)), cohort: T(10), platform: 'I', method: null, slot: null, plan: null, count: 1 },
+  { key: cd(T(3))+'IP', cohortDate: cd(T(3)), cohort: T(3), platform: 'I', method: null, slot: 'P', plan: 'P', count: 1 } ] }];
+const rstRows = [{ day: T(0), total: 1, cohorts: [{ key: cd(T(40))+'AY', cohortDate: cd(T(40)), cohort: T(40), platform: 'A', method: null, slot: 'Y', plan: 'Y', count: 1 }] }];
+const lapRows = [{ day: T(0), total: 1, cohorts: [{ key: cd(T(60))+'IM', cohortDate: cd(T(60)), cohort: T(60), platform: 'I', method: null, slot: 'M', plan: 'M', count: 1 }] }];
 const actRows = [{ day: T(0), total: 2, cohorts: [{ key: cd(T(0))+'IB', cohortDate: cd(T(0)), cohort: T(0), platform: 'I', method: 'B', count: 2 }] }];
 /* The daily reading route. It carries NO sensor letter — once a day could only
    ever name whichever reading came first — so its rows must render a dash in
@@ -39,7 +46,7 @@ window.fetch = (url, opts) => {
   if (target==='RespondToAuthChallenge') return reply({AuthenticationResult:{IdToken:idToken,AccessToken:'at',RefreshToken:'rt'}});
   // A LEGACY settings record: the old two-boundary build's 7-day trial.
   if (body.action==='LOAD') return reply({ entries:[{date:T(4),platform:'ios',downloads:20,impressions:1000,pageViews:100,sales:1}], events:[], settings:{trialDays:7,wallDays:14,currency:'$'}, ui:{view:'overview'} });
-  if (body.action==='PINGS') return reply({ open:openRows, sub:subRows, act:actRows, hrv:hrvRows });
+  if (body.action==='PINGS') return reply({ open:openRows, sub:subRows, rst:rstRows, lap:lapRows, act:actRows, hrv:hrvRows });
   return reply({ok:true});
 };
 const errors=[]; window.addEventListener('error',(e)=>errors.push(String(e.error||e.message)));
@@ -67,19 +74,32 @@ tab.click();
 await new Promise(r=>setTimeout(r,400));
 const table=$('pgRawTable');
 const rows=table.querySelectorAll('tbody tr');
-// 2 open rows on T-1 + 1 open on T-0 + 1 subscribe + 1 activation + 1 reading
-ok('pings table renders one row per stored cohort key', rows.length===6, String(rows.length));
+// 2 open rows on T-1 + 1 open on T-0 + 2 subscribe + 1 restore + 1 lapse + 1 activation + 1 reading
+ok('pings table renders one row per stored cohort key', rows.length===9, String(rows.length));
 const txt=table.textContent;
 ok('shows all four routes', /Open/.test(txt)&&/Subscribe/.test(txt)&&/Activation/.test(txt)&&/Reading/.test(txt), txt.slice(0,160));
 ok('names the sensor on an activation row', /Chest strap/.test(txt), txt.slice(0,200));
+ok('lists the restore and lapse routes', /Restored/.test(txt)&&/Lapsed/.test(txt), txt.slice(0,300));
+ok('names the plan on subscription rows', /Promo year/.test(txt)&&/Yearly/.test(txt)&&/Monthly/.test(txt), txt.slice(0,400));
+ok('and says a letterless subscribe is an older build', /Plan unknown \(older build\)/.test(txt), txt.slice(0,400));
 ok('shows the raw cohort key', new RegExp(cd(T(0))+'IB').test(txt), txt.slice(0,200));
 ok('ages the D10 open ping correctly', /D9|D10/.test(txt), txt.slice(0,200));
+ok('tiles count restore and lapse pings apart from subscribes',
+  /Restore pings\s*1/.test($('pgRawTiles').textContent) && /Lapse pings\s*1/.test($('pgRawTiles').textContent) &&
+  /Subscribe pings\s*2/.test($('pgRawTiles').textContent), $('pgRawTiles').textContent.slice(0,300));
 const tiles=$('pgRawTiles').textContent;
 ok('tiles count open pings', /9/.test(tiles), tiles.slice(0,160));
 // route filter
 const btn=[...$('pgRawKind').querySelectorAll('button')].find(b=>b.dataset.v==='act');
 btn.click(); await new Promise(r=>setTimeout(r,250));
 ok('route filter narrows to activations', $('pgRawTable').querySelectorAll('tbody tr').length===1, String($('pgRawTable').querySelectorAll('tbody tr').length));
+for (const k of ['rst','lap']) {
+  const b=[...$('pgRawKind').querySelectorAll('button')].find(x=>x.dataset.v===k);
+  ok('route filter offers '+k, !!b, 'no button');
+  if (!b) continue;
+  b.click(); await new Promise(r=>setTimeout(r,250));
+  ok('route filter narrows to '+k, $('pgRawTable').querySelectorAll('tbody tr').length===1, String($('pgRawTable').querySelectorAll('tbody tr').length));
+}
 const hrvBtn=[...$('pgRawKind').querySelectorAll('button')].find(b=>b.dataset.v==='hrv');
 hrvBtn.click(); await new Promise(r=>setTimeout(r,250));
 const hrvTxt=$('pgRawTable').textContent;

@@ -11,7 +11,7 @@ import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
 import { SheetControls, useSheets } from '../components/Sheet';
 import { Button } from '../components/ui';
-import { DateField, HeightField, TextField, onlyNumeric } from '../components/Field';
+import { CheckField, DateField, HeightField, TextField, onlyNumeric } from '../components/Field';
 import { BrandMark, Icon, IconName } from '../components/Icon';
 import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
@@ -36,6 +36,7 @@ import { formatAppDiagnostics } from '../lib/diagnostics/appReport';
 // the user is told to write to must be the one that is watched.
 import { SupportCard } from './SupportCard';
 import { disablePressure, enablePressure, usePressureStatus } from '../store/pressure';
+import { isPingExcluded, setPingExcluded } from '../store/ping';
 
 const PRIVACY_URL = 'https://autonomic.care/privacy-policy/';
 const TERMS_URL = 'https://autonomic.care/terms-of-service/';
@@ -63,11 +64,28 @@ async function runAppDiagnostics(
         rangeText="App diagnostics"
         subtitle="A snapshot of this app's current state: version, permissions, connected services, subscription, storage and recent errors. Send it to support. It contains no health data and nothing that identifies you."
         prompt={formatAppDiagnostics(report)}
+        header={<ExcludeDeviceSwitch />}
       />
     ));
   } catch {
     toast('Could not collect diagnostics');
   }
+}
+
+/** The owner's and testers' switch: this phone sends no analytics pings, so a
+ *  test purchase (free and real to Play) never reaches the dashboard as a sale.
+ *  Lives here rather than in Settings proper because nobody else needs it. */
+function ExcludeDeviceSwitch() {
+  const [on, setOn] = useState(isPingExcluded());
+  return (
+    <View style={{ marginTop: 12 }}>
+      <CheckField
+        label="Exclude this device from analytics"
+        value={on}
+        onChange={(v) => { setPingExcluded(v); setOn(v); }}
+      />
+    </View>
+  );
 }
 
 export function MenuSheet({ controls }: { controls: SheetControls }) {

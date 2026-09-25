@@ -1,11 +1,16 @@
 /**
  * Cohort ping — the only endpoint the mobile app itself talks to.
  *
- * Eighteen routes. Seventeen public writers, no auth, no response payload, and no
+ * Twenty routes. Nineteen public writers, no auth, no response payload, and no
  * body on any of them but the one POST:
  *
  *   GET /ping/open/D082126I   the app was opened today by an install from that cohort
- *   GET /ping/sub/D082126I    an install from that cohort became a paid subscriber
+ *   GET /ping/sub/D082126IY   an install from that cohort just PAID (Y yearly, M monthly,
+ *                             P promo year, F founder year); no letter = an older build,
+ *                             whose sub meant "found a subscription" (see below)
+ *   GET /ping/rst/D082126IY   an install found a subscription that ALREADY existed
+ *                             (reinstall, second phone, Restore purchases)
+ *   GET /ping/lap/D082126IY   a subscription this install held has LAPSED
  *   GET /ping/act/D082126IB   an install from that cohort took its FIRST HRV reading
  *   GET /ping/cap/D082126IG   an install STARTED a reading today
  *   GET /ping/hrv/D082126IG   an install COMPLETED one today
@@ -98,6 +103,29 @@
  * curl a write URL and inflate a number. That is accepted — the alternative is
  * an identifier, which is the thing we are refusing to collect.
  *
+ * ------------------------------------------------------------ subscribers
+ *
+ * `sub` used to fire when an install first FOUND itself entitled, which is not
+ * the same event as somebody paying: a reinstall, a second phone, a Restore
+ * purchases tap and a license tester's free purchase all found an entitlement,
+ * and every one of them was counted and celebrated as a sale. So the one fact
+ * is now three routes, because they are three different events a consumer must
+ * never pool: `sub` is a purchase this install just made (the app decides that
+ * from the store's own evidence — an unacknowledged Play purchase, a first
+ * StoreKit transaction, or a buy tap in this session), `rst` is an existing
+ * subscription arriving on this install, and `lap` is one going away, confirmed
+ * on two separate Eastern days so a store that briefly answers empty is not a
+ * cancellation.
+ *
+ * All three carry the PLAN letter, from the product id, so a ping can be
+ * matched to an order in the store's own ledger. The letter is also what tells
+ * the two generations of `sub` apart: a build that sends the new meaning always
+ * sends a plan, and no older build ever did, so a letterless `sub` row is the
+ * old, ambiguous one and is read the way it always was.
+ *
+ * None of this is revenue. The imported sales ledger is; these are what the
+ * app REPORTED, unverified, and a curl can inflate them like any other count.
+ *
  * ------------------------------------------------------------------ faults
  *
  * `/fault` is the one route here that is NOT a counter, and it lives under its
@@ -170,7 +198,7 @@ const EPOCH = '2025-01-01';
 const SKEW_MS = 36 * 60 * 60 * 1000;
 
 const KINDS = {
-  open: 'OPEN', sub: 'SUB', act: 'ACT',
+  open: 'OPEN', sub: 'SUB', rst: 'RST', lap: 'LAP', act: 'ACT',
   cap: 'CAP', hrv: 'HRV',
   pay: 'PAY', not: 'NOT', pot: 'POT', see: 'SEE', err: 'ERR',
   osh: 'OSH', odm: 'ODM', oac: 'OAC', ofl: 'OFL',
@@ -179,6 +207,9 @@ const KINDS = {
 
 /** The routes whose slot letter is a capture SENSOR. */
 const READING_KINDS = { ACT: 1, CAP: 1, HRV: 1 };
+
+/** The routes whose slot letter is a subscription PLAN. */
+const PLAN_KINDS = { SUB: 1, RST: 1, LAP: 1 };
 
 /* ------------------------------------------------------------------ dates */
 
@@ -266,6 +297,13 @@ const LOGS = {
  *  revealed on a day the app had paused it, read against `B`. */
 const FEATURES = { M: 'milestones-opened', P: 'protocol-saved', B: 'pacing-budget-opened', U: 'pacing-budget-unpaused' };
 
+/**
+ * Which subscription product — the SUB / RST / LAP routes, one alphabet across
+ * all three so new, restored and lapsed read against each other per plan. It is
+ * the product id reduced to a letter: it names a price list, never an order.
+ */
+const PLANS = { Y: 'yearly', M: 'monthly', P: 'promo-yearly', F: 'founder-yearly' };
+
 /** Which Insights finding was opened into its deep dive — the FND route. */
 const FINDINGS = { E: 'early-signal', U: 'unconfirmed-pattern', C: 'biggest-change', R: 'correlation' };
 
@@ -287,6 +325,7 @@ const ALPHABET = {
   PAY: SURFACES, NOT: NOTIFY, POT: POTS, SEE: VIEWS,
   OSH: OFFERS, ODM: OFFERS, OAC: OFFERS, OFL: OFFER_FAILS,
   LOG: LOGS, USE: FEATURES, FND: FINDINGS, RPT: REPORTS,
+  SUB: PLANS, RST: PLANS, LAP: PLANS,
 };
 
 /**
@@ -538,6 +577,7 @@ const readDays = async (kind, since) => {
               slot,
               method: reading ? slot : null,
               surface: kind === 'PAY' ? slot : null,
+              plan: PLAN_KINDS[kind] ? slot : null,
               tier,
               count: Number(cohorts[key]) || 0,
             };
@@ -1232,7 +1272,7 @@ const handler = async (event) => {
 
 module.exports = {
   handler, decodeCohort, cohortKey, buildKey, easternDay, report, ALPHABET, KINDS,
-  LOGS, FEATURES, FINDINGS, REPORTS,
+  LOGS, FEATURES, FINDINGS, REPORTS, PLANS,
   redactFault, safeTag, faultKey, hash8, FAULT_MSG_MAX, FAULT_TTL_DAYS, FAULT_MAX_N,
   readOfferFailure, offerFailKey, OUTCOMES, OFFER_FAIL_TTL_DAYS,
 };

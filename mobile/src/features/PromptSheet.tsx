@@ -14,7 +14,7 @@ import { SheetControls, SheetFooter } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
 
-export function PromptSheet({ title, rangeText, prompt, controls, subtitle }: { title: string; rangeText: string; prompt: string; controls: SheetControls; subtitle?: string }) {
+export function PromptSheet({ title, rangeText, prompt, controls, subtitle, header }: { title: string; rangeText: string; prompt: string; controls: SheetControls; subtitle?: string; header?: React.ReactNode }) {
   const p = usePalette();
   const toast = useToast();
   const copy = async () => {
@@ -37,6 +37,7 @@ export function PromptSheet({ title, rangeText, prompt, controls, subtitle }: { 
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text }}>{title}</Text>
       <Text style={{ color: p.textDim, fontSize: 14, marginTop: 4 }}>{subtitle || 'Copy this prompt and paste it into Claude, ChatGPT, Gemini, or your AI of choice.'}</Text>
+      {header}
       <Text style={{ color: p.textDim, fontSize: 12, marginTop: 6, marginBottom: 10, fontVariant: ['tabular-nums'] }}>{`${rangeText} · ${prompt.length.toLocaleString()} characters`}</Text>
       <View style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12 }}>
         <Text selectable style={{ color: p.text, fontFamily: 'Menlo', fontSize: 11, lineHeight: 16 }}>{prompt}</Text>

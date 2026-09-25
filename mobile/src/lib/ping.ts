@@ -83,7 +83,8 @@ export const PING_BASE = 'https://api.autonomic.care/ping';
  * letter: sensors, walls, which offer, which view.
  */
 export type PingKind =
-  | 'open' | 'sub' | 'act'          // install lifecycle
+  | 'open' | 'act'                  // install lifecycle
+  | 'sub' | 'rst' | 'lap'           // a purchase MADE · an existing one FOUND · one LAPSED
   | 'cap' | 'hrv'                   // a reading started · completed
   | 'pay'                           // met the paywall
   | 'not'                           // turned a notification on
@@ -342,6 +343,30 @@ export function reportCode(report: string | undefined): ReportCode | undefined {
 }
 
 /**
+ * Which subscription product: `Y` yearly, `M` monthly, `P` the promo year the
+ * annual card sells, `F` the founder year. Carried by all three subscriber
+ * routes (`sub`, `rst`, `lap`), so new, restored and lapsed read against each
+ * other per plan and a `sub` can be matched to an order in the store's own
+ * ledger by day and product. It names a price list, never an order.
+ *
+ * It is also the generation marker: a build that sends `sub` with its current
+ * meaning (a purchase this install just made) always sends a plan, and older
+ * builds, whose `sub` meant "found a subscription", never did.
+ */
+export type PlanCode = 'Y' | 'M' | 'P' | 'F';
+
+/** Map a product id onto its plan letter. Suffixes are checked before the bare
+ *  yearly id, since both the promo and founder ids begin with it. */
+export function planCode(sku: string | undefined): PlanCode | undefined {
+  if (!sku) return undefined;
+  if (sku.endsWith('.yearly.promo')) return 'P';
+  if (sku.endsWith('.yearly.founder')) return 'F';
+  if (sku.endsWith('.yearly')) return 'Y';
+  if (sku.endsWith('.monthly')) return 'M';
+  return undefined;
+}
+
+/**
  * The 8th-character slot, whatever the route calls it: a sensor on the capture
  * routes, a surface on the paywall route, a notification, a POTS kind, a view or
  * an offer on the rest. One slot, one letter, and the ROUTE says which alphabet
@@ -350,7 +375,7 @@ export function reportCode(report: string | undefined): ReportCode | undefined {
  */
 export type SlotCode =
   | MethodCode | SurfaceCode | NotifyCode | PotsCode | ViewCode | OfferCode
-  | LogCode | FeatureCode | FindingCode | ReportCode;
+  | LogCode | FeatureCode | FindingCode | ReportCode | PlanCode;
 
 /**
  * What this install could do at the moment it pinged: `F` free, `T` trial (the

@@ -2198,6 +2198,13 @@
     var subsRange = 0;
     days.forEach(function (d) { subsRange += A.purchasesOn(ix, d); });
     var rangeBuys = A.purchasePlatformsOver(ix, days);
+    /* The two subscription events that are NOT purchases, read beside the
+       purchase count and never into it — see subscriberNote. */
+    var rstRange = 0, lapRange = 0;
+    days.forEach(function (d) {
+      rstRange += A.eventsOn(ix, 'rst', d);
+      lapRange += A.eventsOn(ix, 'lap', d);
+    });
     var conv7 = A.conversion(ix, ix.cohorts, 7);
     var conv30 = A.conversion(ix, ix.cohorts, 30);
     /* Activation on the install day is the onboarding's own number: everything
@@ -2324,8 +2331,9 @@
         record: recFresh
       }),
       tile({
-        label: 'Purchases on ' + labelDay(ix.last), color: PC.subs, value: fmtInt(A.purchasesOn(ix, ix.last)),
-        meta: 'subscribe pings on the newest day' + storeSplitNote(ix, A.subPlatformsOn(ix, ix.last)),
+        label: 'Subscriptions reported on ' + labelDay(ix.last), color: PC.subs, value: fmtInt(A.purchasesOn(ix, ix.last)),
+        meta: 'subscribe pings on the newest day, unverified' + storeSplitNote(ix, A.subPlatformsOn(ix, ix.last)) +
+          subscriberNote(ix, [ix.last], A.eventsOn(ix, 'rst', ix.last), A.eventsOn(ix, 'lap', ix.last)),
         deltas: dayDeltas(ix.last, days, function (d) { return A.purchasesOn(ix, d); }),
         split: storeSplit(A.subPlatformsOn(ix, ix.last)),
         record: recBuys
@@ -2425,9 +2433,11 @@
         split: storeSplit(rangeFresh)
       }),
       tile({
-        label: 'Purchases in range', color: PC.subs, value: fmtInt(subsRange),
+        label: 'Subscriptions reported in range', color: PC.subs, value: fmtInt(subsRange),
         delta: rangeDelta(ix, days, function (d) { return A.purchasesOn(ix, d); }),
-        meta: 'subscribe pings, not store receipts' + storeSplitNote(ix, rangeBuys),
+        meta: 'reported by the app, unverified: the sales ledger is the source of truth for revenue. ' +
+          'Restores are counted apart from the plan-letter release on; older builds may include them' +
+          storeSplitNote(ix, rangeBuys) + subscriberNote(ix, days, rstRange, lapRange),
         split: storeSplit(rangeBuys)
       }),
       tile({
@@ -2628,6 +2638,16 @@
   /* Appended to a tile's meta only when there is something to disclose: pings
      that named no store are in NEITHER half of the split, and with a filter on
      they are also counted into the filtered number the split sits under. */
+  /* " · 2 restored onto a new install · 1 lapsed", beside a subscription
+     count and never inside it. `rst` and `lap` shipped with the plan letter, so
+     a window the counters had not reached yet says nothing rather than "0
+     restored" — before that release a restore was counted AS a subscribe. */
+  function subscriberNote(ix, days, rst, lap) {
+    var known = (days || []).some(function (d) { return A.kindKnown(ix, 'rst', d) || A.kindKnown(ix, 'lap', d); });
+    if (!known && !rst && !lap) return '';
+    return ' · ' + fmtInt(rst) + ' restored onto a new install · ' + fmtInt(lap) + ' lapsed (neither counted here)';
+  }
+
   function storeSplitNote(ix, split) {
     if (!split.U) return '';
     return ' · ' + fmtInt(split.U) +
@@ -3336,6 +3356,7 @@
         '<td>' + esc(x.cohort ? labelFull(x.cohort) : '–') + '</td>' +
         '<td>' + (x.age === null ? '–' : 'D' + fmtInt(x.age)) + '</td>' +
         '<td>' + esc(STORE_LABEL[x.platform] || STORE_LABEL.U) + '</td>' +
+        '<td>' + (x.plan ? esc(A.planName(x.plan)) : '<span class="na" title="A build older than the plan letter, whose ping meant any subscription found">older build</span>') + '</td>' +
         '<td>' + fmtInt(x.count) + '</td>' +
         '<td>' + (suspect ? '<span class="warn-small">seen twice?</span>' : '') + '</td>' +
         '</tr>';
@@ -3348,14 +3369,16 @@
       '</div>' +
       '<div id="pgPurchaseRowsTable" class="' + (open ? '' : 'hidden') + '" style="margin-top:10px">' +
         '<div class="table-scroll"><table><thead><tr>' +
-          '<th>Paid</th><th>Installed</th><th>Age</th><th>Store</th><th>Count</th><th></th>' +
+          '<th>Paid</th><th>Installed</th><th>Age</th><th>Store</th><th>Plan</th><th>Count</th><th></th>' +
         '</tr></thead><tbody>' + body + '</tbody></table></div>' +
         (Object.keys(flagged).length
           ? '<p class="note" style="margin-top:8px">A row marked <b>seen twice?</b> shares its install day with a purchase one day either side of it. ' +
             'That is what a ping looks like when the server counted it and the reply was lost on the way back, so the app sent it again — ' +
             'the one way this counter can overstate a sale. It is a suspicion, not a correction: nothing above has been adjusted.</p>'
           : '') +
-        '<p class="note" style="margin-top:8px">Subscribe pings, not store receipts. <b>Store</b> comes off the ping\'s own cohort key, so ' +
+        '<p class="note" style="margin-top:8px">Subscribe pings, not store receipts: the sales ledger is the source of truth. ' +
+          '<b>Plan</b> matches a row to a store order; <b>older build</b> is a ping from before the plan letter, when this ' +
+          'counter also caught reinstalls and restores (counted separately now, as restore pings). <b>Store</b> comes off the ping\'s own cohort key, so ' +
           '"no store" means a build that shipped before the platform marker rather than a third platform. This list is never filtered by ' +
           'the platform selector — the store is one of its columns.</p>' +
       '</div>';
@@ -5084,6 +5107,7 @@
          inherited it would be the same lie the table's footnote exists to
          avoid. */
       var out = ['route,arrived,cohort,age_days,platform,sensor,surface,label,tier,key,count'];
+      /* `label` carries the plan on the subscription routes (see slotLabel). */
       rows.forEach(function (x) {
         out.push([
           x.kind, x.arrived, x.cohort, x.age,
@@ -9498,7 +9522,9 @@
 
   var RAW_KINDS = [
     { key: 'open', label: 'Open', color: PC.active, note: 'app launched' },
-    { key: 'sub', label: 'Subscribe', color: PC.subs, note: 'entitlement seen' },
+    { key: 'sub', label: 'Subscribe', color: PC.subs, note: 'a purchase (older builds: any entitlement seen)' },
+    { key: 'rst', label: 'Restored', color: PC.subs, note: 'an existing subscription on a new install' },
+    { key: 'lap', label: 'Lapsed', color: COLOR.muted, note: 'a subscription this install held lapsed' },
     { key: 'act', label: 'Activation', color: PC.activation, note: 'first HRV reading saved' },
     { key: 'hrv', label: 'Reading', color: PC.reading, note: 'a reading saved that day' },
     { key: 'cap', label: 'Started', color: PC.active, note: 'a reading begun that day' },
@@ -9526,6 +9552,19 @@
    * worth keeping straight, because the two windows genuinely disagree (a ping
    * that arrived today can belong to a cohort from March).
    */
+  /* The letter on a route that is neither a capture nor a paywall, in words.
+     On the three subscription routes it is the PLAN, and a `sub` row with none
+     is an older build's ping (which meant "found a subscription") — said as
+     such rather than as a blank, since the blank is the interesting part. */
+  function slotLabel(kind, c) {
+    if (c.method || c.surface) return '';
+    if (kind === 'sub' || kind === 'rst' || kind === 'lap') {
+      var plan = c.plan || c.slot;
+      return plan ? A.planName(plan) : (kind === 'sub' ? 'Plan unknown (older build)' : '');
+    }
+    return c.slot ? A.slotName(kind, c.slot) : '';
+  }
+
   function rawPingRows(r) {
     var letter = { ios: 'I', android: 'A' }[state.platform] || null;
     var out = [];
@@ -9552,7 +9591,7 @@
             /* Whatever the letter is called on this route — the endpoint
                resolves it, so the table can print a name without holding a copy
                of every alphabet. */
-            label: c.label,
+            label: c.label || slotLabel(k.key, c),
             tier: c.tier,
             /* Age can legitimately be negative by a day: the cohort date is the
                install's own local day and the arrival day is stamped US
@@ -9605,7 +9644,10 @@
         meta: r ? labelFull(r.from) + ' → ' + labelFull(r.to) : 'all time'
       }),
       tile({ label: 'Open pings', color: PC.active, value: fmtInt(byKind.open), meta: 'app launches counted' }),
-      tile({ label: 'Subscribe pings', color: PC.subs, value: fmtInt(byKind.sub), meta: 'once per install, ever' }),
+      tile({ label: 'Subscribe pings', color: PC.subs, value: fmtInt(byKind.sub),
+        meta: 'purchases reported by the app, unverified; older builds sent one per install ever, restores included' }),
+      tile({ label: 'Restore pings', color: PC.subs, value: fmtInt(byKind.rst), meta: 'an existing subscription arriving on a new install — not a sale' }),
+      tile({ label: 'Lapse pings', color: COLOR.muted, value: fmtInt(byKind.lap), meta: 'a subscription this install held lapsed' }),
       tile({ label: 'Activation pings', color: PC.activation, value: fmtInt(byKind.act), meta: 'first HRV reading saved' }),
       tile({ label: 'Reading pings', color: PC.reading, value: fmtInt(byKind.hrv), meta: 'once per install per day' }),
       tile({ label: 'Paywall pings', color: PC.wall, value: fmtInt(byKind.pay), meta: 'once per install per day' }),
@@ -9614,6 +9656,7 @@
         meta: 'cohort day + platform'
           + (pingUI.rawKind === 'act' || pingUI.rawKind === 'hrv' ? ' + sensor' : '')
           + (pingUI.rawKind === 'pay' ? ' + surface' : '')
+          + (pingUI.rawKind === 'sub' || pingUI.rawKind === 'rst' || pingUI.rawKind === 'lap' ? ' + plan' : '')
           + ' + tier'
       })
     ].join('');
@@ -9634,7 +9677,7 @@
     host.innerHTML =
       '<div class="table-scroll"><table><thead><tr>' +
       '<th style="text-align:left">Route</th><th>Arrived</th><th>Cohort</th><th>Age</th>' +
-      '<th style="text-align:left">Platform</th><th style="text-align:left">Sensor / surface</th>' +
+      '<th style="text-align:left">Platform</th><th style="text-align:left">Sensor / surface / plan</th>' +
       '<th style="text-align:left">Tier</th><th style="text-align:left">Key</th><th>Count</th>' +
       '</tr></thead><tbody>' +
       shown.map(function (x) {

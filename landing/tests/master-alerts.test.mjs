@@ -296,6 +296,57 @@ check('a partly-first refresh counts them all and tags only the first',
   (cardText('reading').match(/First/g) || []).length === 1,
   cardText('reading'));
 
+/* A restore and a lapse are TOLD, never celebrated: a card each, and nothing
+   else a sale gets — no canvas, no notification. They are exactly the events
+   the old `sub` route used to celebrate as sales by mistake. */
+$('alertClear').click();
+await new Promise((r) => setTimeout(r, 400));
+const pushed = [];
+const realNotify = window.Pwa && window.Pwa.notify;
+if (window.Pwa) window.Pwa.notify = (o) => { pushed.push(o); };
+const planRow = (cohort, platform, plan, n, age) =>
+  ({ cohort, platform, tier: 'P', slot: '?', plan, n, age, day: T(0), version: '1.30.0' });
+AL.announce({
+  visitors: 0, downloads: 0, sales: 0, activations: 0, readings: 0, restores: 1, lapses: 1,
+  downloadsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {},
+  restoresBy: { I: 1 }, lapsesBy: { A: 1 },
+  rows: {
+    downloads: [], returns: [], sales: [], activations: [], readings: [],
+    restores: [planRow('2026-08-01', 'I', 'Y', 1, 40)],
+    lapses: [planRow('2026-07-01', 'A', 'M', 1, 70)],
+  },
+});
+await new Promise((r) => setTimeout(r, 30));
+check('a restore raises its own quiet card, naming store and plan',
+  /returning subscriber on a new install/.test(cardText('restore')) &&
+    /iOS/.test(cardText('restore')) && /Yearly/.test(cardText('restore')),
+  cardText('restore'));
+check('a lapse raises its own quiet card, naming the plan',
+  /1 subscription lapsed/.test(cardText('lapse')) && /Monthly/.test(cardText('lapse')),
+  cardText('lapse'));
+check('neither is a sale card', !cards().some((c) => c.classList.contains('sale')), text());
+check('neither sets off the confetti', canvasEl.width === 0, String(canvasEl.width));
+check('neither sends a notification', pushed.length === 0, JSON.stringify(pushed));
+
+/* And a sale row now wears its plan, so a ping can be matched to a store
+   order; a legacy letterless one says it cannot. */
+AL.announce({
+  visitors: 0, downloads: 0, sales: 2, activations: 0, readings: 0,
+  downloadsBy: {}, salesBy: { I: 2 }, activationsBy: {}, readingsBy: {},
+  rows: {
+    downloads: [], returns: [], activations: [], readings: [],
+    sales: [planRow('2026-08-20', 'I', 'P', 1, 5), planRow('2026-08-21', 'I', '?', 1, 4)],
+  },
+});
+await new Promise((r) => setTimeout(r, 30));
+check('a sale row names its plan, and a legacy one admits it has none',
+  /Promo year/.test(cardText('sale')) && /Plan unknown/.test(cardText('sale')),
+  cardText('sale'));
+if (window.Pwa) window.Pwa.notify = realNotify;
+$('alertClear').click();
+await new Promise((r) => setTimeout(r, 400));
+canvasEl.width = 0;
+
 /* The same fake surface, so the negative above is a real one: an arrival still
    celebrates on exactly this page. */
 AL.announce({

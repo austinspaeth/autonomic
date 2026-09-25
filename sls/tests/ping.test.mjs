@@ -115,14 +115,22 @@ test('each route validates the slot against ITS OWN alphabet', () => {
   assert.ok(['D', 'H', 'C'].every((l) => speaks('RPT', l)));
   assert.ok(!speaks('RPT', 'E'));
 
+  // The three subscriber routes share ONE plan alphabet, so new, restored and
+  // lapsed can be read against each other per plan.
+  ['Y', 'M', 'P', 'F'].forEach((l) => assert.ok(speaks('SUB', l) && speaks('RST', l) && speaks('LAP', l)));
+  assert.deepEqual(ALPHABET.SUB, ALPHABET.RST);
+  assert.deepEqual(ALPHABET.SUB, ALPHABET.LAP);
+  assert.ok(!speaks('SUB', 'G'));     // a sensor is not a plan
+  assert.ok(!speaks('SUB', 'A'));     // ...and neither is an offer card
+
   // And the routes that carry nothing accept nothing.
-  ['OPEN', 'SUB', 'ERR'].forEach((k) => assert.equal(ALPHABET[k], undefined));
+  ['OPEN', 'ERR'].forEach((k) => assert.equal(ALPHABET[k], undefined));
 });
 
 test('every route name the client can send has a storage kind', () => {
   // The handler resolves a route by name, so a route added to serverless.yml
   // but not here answers 204 and counts nothing — silently.
-  ['open', 'sub', 'act', 'cap', 'hrv', 'pay', 'not', 'pot', 'see', 'err', 'osh', 'odm', 'oac', 'ofl',
+  ['open', 'sub', 'rst', 'lap', 'act', 'cap', 'hrv', 'pay', 'not', 'pot', 'see', 'err', 'osh', 'odm', 'oac', 'ofl',
     'log', 'use', 'fnd', 'rpt']
     .forEach((k) => assert.ok(KINDS[k], `no storage kind for /ping/${k}`));
 });
@@ -134,4 +142,17 @@ test('the build key is a complete partition, so unknowns are named', () => {
   // becomes a share of the builds new enough to answer.
   assert.equal(buildKey('I', null, null), 'I-?-?');
   assert.equal(buildKey(null, null, null), 'U-?-?');
+});
+
+test('an old letterless sub and a new planned one land under different keys', () => {
+  // The plan letter is also the generation marker: a build that sends the new
+  // meaning of `sub` (a purchase just made) always sends a plan, and no older
+  // build ever did. So the old ambiguous rows keep their old key and can be
+  // read the old way, and nothing is reclassified after the fact.
+  const legacy = decodeCohort('D082126A-TP-V1.29.0');
+  const fresh = decodeCohort('D082126AY-TP-V1.30.0');
+  assert.equal(legacy.slot, null);
+  assert.equal(fresh.slot, 'Y');
+  assert.equal(cohortKey(legacy.iso, legacy.platform, null, legacy.tier), '082126A-P');
+  assert.equal(cohortKey(fresh.iso, fresh.platform, 'Y', fresh.tier), '082126AY-P');
 });

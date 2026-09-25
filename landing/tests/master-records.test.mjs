@@ -202,7 +202,7 @@ check('a day that only MATCHES the best is not called a high',
    20" is true and reads as nonsense: it names whichever day happened to be
    first among a run of identical zeros, as though that day were the thing
    being beaten. */
-const buys = byPrefix(today, 'Purchases on');
+const buys = byPrefix(today, 'Subscriptions reported on');
 check('a first sale is a record, off a floor of nothing',
   buys && buys.ath === true, buys && (buys.value + ' | ' + buys.meta));
 check('and a floor of nothing is said as such, never as a day that was beaten',

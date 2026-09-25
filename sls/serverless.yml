@@ -166,9 +166,19 @@ functions:
       - httpApi:
           method: GET
           path: /ping/open/{cohort}
+      # A purchase this install just MADE. Its two siblings split out what the
+      # old /ping/sub also counted: /rst an existing subscription arriving on
+      # this install (reinstall, second phone, restore), /lap one lapsing. All
+      # three carry the plan letter (Y yearly / M monthly / P promo / F founder).
       - httpApi:
           method: GET
           path: /ping/sub/{cohort}
+      - httpApi:
+          method: GET
+          path: /ping/rst/{cohort}
+      - httpApi:
+          method: GET
+          path: /ping/lap/{cohort}
       # First HRV reading ever saved by an install. The code carries one extra
       # letter for the sensor it used (W watch / B strap / F finger / G Garmin).
       - httpApi:
@@ -402,7 +412,7 @@ resources:
       Description: Mobile app daily open ping (cohort is D{MMDDYY}{platform})
       Value: !Sub https://${param:apiDomain}/ping/open/{cohort}
     SubPingEndpoint:
-      Description: Mobile app subscribe ping (cohort is D{MMDDYY}{platform})
+      Description: Mobile app new-purchase ping (cohort is D{MMDDYY}{platform}{plan})
       Value: !Sub https://${param:apiDomain}/ping/sub/{cohort}
     ActPingEndpoint:
       Description: Mobile app activation ping (cohort is D{MMDDYY}{platform}{method})

@@ -609,6 +609,31 @@ const rslice = A.index({
 check('the list ignores the platform filter, since store is a column of it',
   A.purchaseRows(rslice).length === 2, String(A.purchaseRows(rslice).length));
 
+/* Plans. From the plan-letter release `sub` is a purchase made on this install
+   and carries its plan; a letterless row is an older build's `sub` and still
+   counts exactly as it always did. `rst` / `lap` are their own routes and never
+   reach the purchase counters. */
+const planIx = A.index({
+  open: [],
+  sub: [rrow(R1, [{ cohort: '2026-08-01', platform: 'I', slot: 'Y', plan: 'Y', count: 1 },
+                  { cohort: '2026-07-01', platform: 'I', count: 1 }])],
+  rst: [rrow(R1, [{ cohort: '2026-06-01', platform: 'A', slot: 'M', plan: 'M', count: 3 }])],
+  lap: [rrow(R1, [{ cohort: '2026-05-01', platform: 'I', slot: 'Y', plan: 'Y', count: 2 }])],
+});
+check('planned and legacy subscribes both count as purchases, restores and lapses do not',
+  A.purchasesOn(planIx, R1) === 2, String(A.purchasesOn(planIx, R1)));
+check('restores and lapses are counted on their own routes',
+  A.eventsOn(planIx, 'rst', R1) === 3 && A.eventsOn(planIx, 'lap', R1) === 2,
+  A.eventsOn(planIx, 'rst', R1) + '/' + A.eventsOn(planIx, 'lap', R1));
+const pr = A.purchaseRows(planIx);
+check('a purchase row carries its plan, a legacy one carries none',
+  pr.some((r) => r.plan === 'Y') && pr.some((r) => r.plan === null) && pr.length === 2,
+  JSON.stringify(pr.map((r) => r.plan)));
+check('the plan letters have names on all three routes',
+  A.planName('P') === 'Promo year' && A.slotName('rst', 'M') === 'Monthly' &&
+    A.slotName('lap', 'F') === 'Founder year' && A.planName(null) === 'Plan unknown');
+check('the report routes include rst and lap', A.KINDS.includes('rst') && A.KINDS.includes('lap'));
+
 /* ---------------------------------------------------------- activation */
 
 /* Activation is the one counter whose rows really do count people, since the

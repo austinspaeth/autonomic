@@ -12,7 +12,9 @@ Authorization: Bearer <Cognito id token>
 { "action": "LOAD" | "SYNC" | "REPLACE_ALL" | "PINGS" | "LINKS_REPUBLISH", ... }
 
 GET  https://api.autonomic.care/ping/open/D082126I    (public, no auth)
-GET  https://api.autonomic.care/ping/sub/D082126I
+GET  https://api.autonomic.care/ping/sub/D082126IY   (a purchase just MADE: Y yearly, M monthly, P promo, F founder)
+GET  https://api.autonomic.care/ping/rst/D082126IY   (an EXISTING subscription found on this install)
+GET  https://api.autonomic.care/ping/lap/D082126IY   (a subscription this install held has lapsed)
 GET  https://api.autonomic.care/ping/act/D082126IB
 GET  https://api.autonomic.care/ping/cap/D082126IG   (a reading started)
 GET  https://api.autonomic.care/ping/hrv/D082126IG   (...and completed)
@@ -66,7 +68,9 @@ per user, which would eventually meet DynamoDB's 400KB item ceiling.
 | `DASH#<email>` | `SETTINGS` | trial/wall lengths, currency, store commission |
 | `DASH#<email>` | `UI` | view and filter preferences |
 | `PING#OPEN` | `<day>` | that day's opens, counted per cohort |
-| `PING#SUB` | `<day>` | that day's new subscribers, counted per cohort |
+| `PING#SUB` | `<day>` | that day's new purchases, per cohort+plan (letterless = older build, meaning "found a subscription") |
+| `PING#RST` | `<day>` | that day's existing subscriptions arriving on an install, per cohort+plan |
+| `PING#LAP` | `<day>` | that day's confirmed lapses, per cohort+plan |
 | `PING#ACT` | `<day>` | that day's activations (first HRV reading), per cohort+method |
 | `PING#HRV` | `<day>` | that day's measuring installs (any HRV reading), per cohort+method |
 | `PING#CAP` | `<day>` | that day's installs that STARTED a reading, per cohort+sensor |
@@ -648,14 +652,14 @@ Two doors onto the same function, because they have different callers:
   the dashboard, which already holds a Cognito token and shouldn't also carry
   the shared key. The email allowlist guards it like everything else there.
 
-Both answer one key per route — `{ since, open, sub, act, cap, hrv, pay, not,
+Both answer one key per route — `{ since, open, sub, rst, lap, act, cap, hrv, pay, not,
 pot, see, err, osh, odm, oac, ofl, log, use, fnd, rpt }` — each row
 
 ```jsonc
 {
   day: '2026-08-21',
   total: 137,
-  cohorts: [{ key, cohortDate, cohort, platform, slot, method, surface, tier, count }],
+  cohorts: [{ key, cohortDate, cohort, platform, slot, method, surface, plan, tier, count }],
   builds:  [{ key, platform, tier, version, count }]
 }
 ```
@@ -663,7 +667,9 @@ pot, see, err, osh, odm, oac, ofl, log, use, fnd, rpt }` — each row
 Rows stored before the platform marker existed report `platform: "U"`. The 8th
 character of a cohort key is reported three ways so a consumer never has to know
 which kind it is holding: `slot` is it raw, `method` is it on the two reading
-kinds and `null` elsewhere, `surface` is it on `pay` and `null` elsewhere.
+kinds and `null` elsewhere, `surface` is it on `pay` and `null` elsewhere, `plan`
+is it on `sub` / `rst` / `lap` (`Y` yearly, `M` monthly, `P` promo year, `F`
+founder year) and `null` elsewhere.
 Sensors are `W` Apple Watch, `B` Bluetooth strap, `F` finger on the camera, `G`
 Garmin watch; surfaces are `R`/`I`/`P`/`O`/`M`/`N`/`S` as above; the rest are
 `M`/`C` notifications, `T`/`E` POTS, `I`/`P` views, `A`/`F` offers. Every row also
@@ -691,8 +697,9 @@ did. A cohort date is shared by every install born that day, so it names a day,
 not a person. Two consequences follow and neither is a bug:
 
 - **The server cannot de-duplicate**, so the client does: at most one open ping
-  and one reading ping per install per Eastern day, exactly one subscribe ping
-  and one activation ping per install, ever (`mobile/src/store/ping.ts`). One
+  and one reading ping per install per Eastern day, one activation ping per
+  install ever, and one `sub` per purchase the install actually made
+  (`mobile/src/store/ping.ts`). One
   open ping == one active install that day; one reading ping == one install that
   measured that day.
 - **Counts are trusted, not verified.** Anyone can curl the URL and inflate a
@@ -700,9 +707,25 @@ not a person. Two consequences follow and neither is a bug:
   If it is ever abused, the answer is a WAF rate limit on the route, not a
   token.
 
-The subscribe ping is skipped in builds whose Pro status comes from the
+**`sub` means somebody just paid; it used to mean "an install found a
+subscription".** Older builds sent `sub` the first time an install saw
+itself entitled, so a reinstall, a second phone, a Restore purchases tap and a
+license tester's free purchase were all counted (and celebrated) as sales. Now
+the app decides from the store's own evidence — an unacknowledged Play
+purchase, a StoreKit transaction that is its own original, or a buy tap in this
+session — and sends `sub` only for that, once the purchase is acknowledged. An
+existing subscription arriving on the install is `rst` instead (once per
+install per entitlement), and one going away is `lap`, sent only after the
+store has answered "not subscribed" on two different Eastern days. All three
+carry the PLAN letter, which is also the generation marker: new builds always
+send one, older builds never did, so a letterless `sub` row is the old ambiguous
+count and is read exactly as before. None of it is revenue: the imported sales
+ledger is the source of truth, these are what the app reported.
+
+The subscriber pings are skipped in builds whose Pro status comes from the
 dev/TestFlight/sideload paywall bypass — nobody paid there. Dev builds send
-nothing at all.
+nothing at all, and neither does a phone whose owner switched on "Exclude this
+device" in the Settings support dump (the owner's and testers' own phones).
 
 ## Background alerts (Web Push)
 

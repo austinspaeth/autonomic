@@ -26,6 +26,7 @@ import type { AppDiagnostics, Rows } from './appReport';
 import { getState, loadIssue, storageStats } from '../../store/store';
 import { getIapState } from '../../store/iap';
 import { getTier, getTrialDaysLeft } from '../../store/tier';
+import { isPingExcluded } from '../../store/ping';
 import { reviewMemory } from '../review';
 import { liveOffer } from '../upsell/annual';
 import { annualMemory } from '../upsell/annualMemory';
@@ -214,6 +215,10 @@ function distributionRows(): Rows {
   return {
     'ios sandbox receipt': Platform.OS === 'ios' ? isTestFlightBuild() : null,
     'android sideload': Platform.OS === 'android' ? isSideloadedAndroidBuild() : null,
+    // The owner/tester switch in this very sheet. A phone that sends no pings
+    // is invisible on the dashboard, which is the point — and a support
+    // question if it was switched on by accident.
+    'analytics excluded': isPingExcluded(),
     'review asked': review.lastAskedAtMs ? daysAgo(review.lastAskedAtMs) : 'never',
     'review asked on version': review.askedVersion ?? null,
     // The half-off annual offer: which milestone was awarded and whether its

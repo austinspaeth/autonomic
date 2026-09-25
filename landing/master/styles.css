@@ -997,6 +997,11 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var
 /* House blue, the same colour its confetti puff is drawn in: somebody who
    already had the app opening it again. */
 .alert-card.visit { border-left: 3px solid var(--series-1); }
+/* The two subscription events that are not sales. A restore is the paid
+   violet DASHED — a subscription, but not a new one; a lapse is muted, since
+   it is information and not an alarm. */
+.alert-card.restore { border-left: 3px dashed var(--series-7); }
+.alert-card.lapse { border-left: 3px solid var(--text-muted); }
 .alert-head { display: flex; align-items: center; gap: 10px; }
 .alert-mark { font-size: 19px; line-height: 1; flex: none; }
 .alert-title { font-size: 14px; font-weight: 700; min-width: 0; flex: 1 1 auto; }
@@ -1072,6 +1077,10 @@ input[type="range"]:focus-visible::-webkit-slider-thumb { outline: 2px solid var
 .alert-chip.plat.and i { background: var(--android); }
 .alert-chip.plat.unk i { background: var(--text-muted); }
 .alert-chip.sensor { color: var(--text-secondary); background: rgba(255,255,255,.055); border-color: var(--border); }
+/* The plan on a subscription row, plain like the sensor; a sale from a build
+   too old to send one wears the dashed "unknown" outline the tier uses. */
+.alert-chip.plan { color: var(--text-secondary); background: rgba(255,255,255,.055); border-color: var(--border); }
+.alert-chip.plan.unk { background: none; color: var(--text-muted); border-style: dashed; }
 
 /* Violet is Pro everywhere else on this page, and the trial teal is the same
    --stage-trial the lifecycle charts use. Free is an outline: it is the

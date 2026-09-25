@@ -25,6 +25,13 @@
  *                                               card + a toast + a notification
  *                                               naming the store that paid
  *
+ * Two more are TOLD and never celebrated, because neither is money arriving:
+ * `rst`, a subscription that already existed turning up on a new install
+ * (reinstall, second phone, Restore purchases), and `lap`, one going away.
+ * Each gets a card, and a toast only when nothing else wants the slot — no
+ * sound, no canvas, no notification. They exist because the old `sub` route
+ * could not tell a restore from a purchase and celebrated both; see `planOf`.
+ *
  * A first reading is NOT a fifth event, and that is a correction rather than a
  * simplification: `act` fires once per install ever and `hrv` once per install
  * per Eastern day, both from the moment a reading completes, so an install's
@@ -151,6 +158,23 @@
      say the same words on purpose, and a change to one belongs in both. */
   var TIER = { F: 'Free', T: 'Trial', P: 'Pro' };
 
+  /* The plan letter the three subscription routes carry (`sub`, `rst`,
+     `lap`), from the product id, so a card row can be matched to an order in
+     the store's own ledger. The lambda's PLANS, in words.
+
+     Its ABSENCE is a fact too, and only on `sub`: a build that sends the new
+     meaning of `sub` (a purchase made on this install) always sends a plan,
+     and no older build ever did — so a letterless sale is the OLD ping, which
+     meant "found a subscription" and could have been a reinstall or a Restore.
+     It is still a sale here, exactly as it always was; history is not
+     reclassified. It just says it cannot name the plan, and why. */
+  var PLAN = { Y: 'Yearly', M: 'Monthly', P: 'Promo year', F: 'Founder year' };
+  function planOf(x) {
+    var l = x && (x.plan || x.slot);
+    return PLAN[l] ? l : '?';
+  }
+  function planName(letter) { return PLAN[letter] || 'Plan unknown'; }
+
   function storeName(letter) { return STORE[letter] || STORE.U; }
   function letterOf(p) { return (p === 'I' || p === 'A') ? p : 'U'; }
   function sensorOf(m) { return SENSOR[m] ? m : '?'; }
@@ -169,8 +193,10 @@
      row: two pings that agree on all four are the same fact twice and are
      shown as one row with a count, where two that differ are two events.
 
-     The slot letter is the sensor on a reading route and is absent elsewhere;
-     it rides in the key regardless, so one shape answers for every kind. */
+     The slot letter is the sensor on a reading route, the PLAN on the three
+     subscription routes, and absent elsewhere; it rides in the key regardless,
+     so one shape answers for every kind. A legacy letterless sale keys as `?`,
+     exactly the key it had before plans existed. */
   function whoKey(cohort, platform, tier, slot) {
     return cohort + '|' + letterOf(platform) + '|' + tierOf(tier) + '|' + (slot || '?');
   }
@@ -200,8 +226,10 @@
      of history as news. So the shape is stamped, and a baseline that does not
      carry this exact number keeps its COUNTS (which never changed shape) and
      is skipped for detail, for exactly one refresh. Bump it whenever the key
-     shape below changes. */
-  var SNAP_V = 2;
+     shape below changes.
+
+     3: a sale's key gained its plan letter, and `rst` / `lap` gained maps. */
+  var SNAP_V = 3;
 
   /* How many rows a card in the CORNER STACK draws before it stops and counts
      the rest. The dock is a fixed corner of the screen holding several cards at
@@ -233,8 +261,8 @@
   /**
    * Fold a PINGS report into the three running totals we alert on.
    *
-   *   { opens, downloads, sales, activations, readings,
-   *     downloadsBy: {I,A,U}, salesBy: {I,A,U},
+   *   { opens, downloads, sales, restores, lapses, activations, readings,
+   *     downloadsBy: {I,A,U}, salesBy: {I,A,U}, restoresBy, lapsesBy,
    *     activationsBy: {W,G,B,F,?}, readingsBy: {W,G,B,F,?} }
    *
    * `activationsBy` is keyed by SENSOR rather than by store, because that is
@@ -250,14 +278,15 @@
   function snapshot(report) {
     var out = {
       v: SNAP_V,
-      opens: 0, downloads: 0, returns: 0, sales: 0, activations: 0, readings: 0,
-      downloadsBy: {}, returnsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {}, days: {},
+      opens: 0, downloads: 0, returns: 0, sales: 0, restores: 0, lapses: 0, activations: 0, readings: 0,
+      downloadsBy: {}, returnsBy: {}, salesBy: {}, restoresBy: {}, lapsesBy: {},
+      activationsBy: {}, readingsBy: {}, days: {},
     };
 
     /* The newest day in the report, which is what "recent" is measured from
        for the per-cohort maps below. */
     var newest = '';
-    ['open', 'sub', 'act', 'hrv'].forEach(function (k) {
+    ['open', 'sub', 'rst', 'lap', 'act', 'hrv'].forEach(function (k) {
       ((report && report[k]) || []).forEach(function (r) {
         if (r && r.day && r.day > newest) newest = r.day;
       });
@@ -266,8 +295,9 @@
     function day(d) {
       if (out.days[d]) return out.days[d];
       var bucket = out.days[d] = {
-        opens: 0, downloads: 0, returns: 0, sales: 0, activations: 0, readings: 0,
-        downloadsBy: {}, returnsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {},
+        opens: 0, downloads: 0, returns: 0, sales: 0, restores: 0, lapses: 0, activations: 0, readings: 0,
+        downloadsBy: {}, returnsBy: {}, salesBy: {}, restoresBy: {}, lapsesBy: {},
+        activationsBy: {}, readingsBy: {},
       };
       /* WHO arrived, keyed by everything the ping can say about ONE install:
          its cohort, its store, its tier and (on a reading route) its sensor.
@@ -286,8 +316,9 @@
          not pretending otherwise. See `versionFor`. */
       var age = ageDays(d, newest);
       if (age !== null && age <= COHORT_DAYS) {
-        bucket.who = { downloads: {}, returns: {}, sales: {}, activations: {}, readings: {} };
-        bucket.builds = { open: {}, sub: {}, act: {}, hrv: {} };
+        bucket.who = { downloads: {}, returns: {}, sales: {}, restores: {}, lapses: {},
+                       activations: {}, readings: {} };
+        bucket.builds = { open: {}, sub: {}, rst: {}, lap: {}, act: {}, hrv: {} };
       }
       return bucket;
     }
@@ -356,9 +387,33 @@
         out.salesBy[p] = (out.salesBy[p] || 0) + n;
         bucket.sales += n;
         bucket.salesBy[p] = (bucket.salesBy[p] || 0) + n;
-        bump(bucket.who && bucket.who.sales, whoKey(x.cohort, x.platform, x.tier), n);
+        bump(bucket.who && bucket.who.sales, whoKey(x.cohort, x.platform, x.tier, planOf(x)), n);
       });
     });
+
+    /* The two subscription events that are NOT sales, counted in their own
+       fields so nothing downstream can pool them into `sales` by accident —
+       the fanfare, the gold and the sale count read `sales` and only `sales`. */
+    function planRoute(rows, kind, field) {
+      (rows || []).forEach(function (row) {
+        if (!row || !row.day) return;
+        var bucket = day(row.day);
+        builds(bucket, kind, row.builds);
+        ((row.cohorts) || []).forEach(function (x) {
+          if (!x || !x.cohort) return;
+          var n = Number(x.count) || 0;
+          if (!(n > 0)) return;
+          var p = letterOf(x.platform);
+          out[field] += n;
+          out[field + 'By'][p] = (out[field + 'By'][p] || 0) + n;
+          bucket[field] += n;
+          bucket[field + 'By'][p] = (bucket[field + 'By'][p] || 0) + n;
+          bump(bucket.who && bucket.who[field], whoKey(x.cohort, x.platform, x.tier, planOf(x)), n);
+        });
+      });
+    }
+    planRoute(report && report.rst, 'rst', 'restores');
+    planRoute(report && report.lap, 'lap', 'lapses');
 
     /* Activation fires once per install, ever, so unlike the open rows above
        these really do count people — no de-duplication is being skipped here. */
@@ -543,9 +598,39 @@
       .map(function (k) { return whoMap[k]; })
       .filter(function (e) { return e && e.n > 0; });
     list.sort(rowSort);
-    list.forEach(function (e) { e.version = versionFor(bd, kind, e.platform, e.tier); });
+    list.forEach(function (e) {
+      e.version = versionFor(bd, kind, e.platform, e.tier);
+      /* On a subscription route the slot is the PLAN, and it moves to a field
+         of that name: the row would otherwise hand `F` (founder year) to the
+         sensor chip, which would draw it as "Phone camera". */
+      if (PLAN_KINDS[kind]) { e.plan = e.slot; e.slot = '?'; }
+    });
     return list;
   }
+
+  var PLAN_KINDS = { sub: 1, rst: 1, lap: 1 };
+
+  /** "1 Yearly · 1 Monthly", for the sentence a toast carries. A legacy sale
+   *  reads "plan unknown", never a guess. */
+  function planLine(rows) {
+    var by = {};
+    (rows || []).forEach(function (r) { var k = r.plan || '?'; by[k] = (by[k] || 0) + r.n; });
+    return ['Y', 'M', 'P', 'F', '?'].filter(function (k) { return by[k] > 0; })
+      .map(function (k) { return by[k] + ' ' + (k === '?' ? 'plan unknown' : PLAN[k]); })
+      .join(' \u00b7 ');
+  }
+
+  /** The admission a sale card owes when some of its rows came from a build
+   *  older than the plan letter: on those builds the ping meant "found a
+   *  subscription", so it may be a reinstall or a Restore rather than a new
+   *  purchase. Counted as a sale all the same, as it always was. */
+  function legacyNote(rows) {
+    var n = (rows || []).reduce(function (a, r) { return a + (r.plan === '?' ? r.n : 0); }, 0);
+    if (!n) return '';
+    return n + ' from an older build \u2014 may be a reinstall or restore, not a new purchase';
+  }
+
+  function joinNotes(a, b) { return [a, b].filter(function (x) { return !!x; }).join(' \u00b7 '); }
 
   function addInto(into, from) {
     Object.keys(from || {}).forEach(function (k) {
@@ -581,7 +666,8 @@
    * counter it never knew is the honest reading of it, and the snapshot it is
    * replaced with knows about it from then on. The reading counter is newer
    * still and gets its own gate for the same reason — one flag cannot answer
-   * for two counters that shipped on different days.
+   * for two counters that shipped on different days. `rst` and `lap` get one
+   * each, on the same rule.
    */
   function diff(prev, next) {
     var p = prev || snapshot(null);
@@ -593,21 +679,25 @@
        subtraction it always was; only the platform split is unavailable, and an
        empty `returnsBy` renders as no store line rather than as a wrong one. */
     var retKnown = typeof p.returns === 'number';
+    var rstKnown = typeof p.restores === 'number';
+    var lapKnown = typeof p.lapses === 'number';
     /* The detail maps are keyed in a shape the baseline has to agree with, or
        every row in them reads as a rise from nothing — see SNAP_V. A baseline
        from before the shape changed keeps its counts and is skipped for
        detail, which costs one refresh of rows and cannot invent one. */
     var detail = p.v === SNAP_V && n.v === SNAP_V;
-    var bd = { open: {}, sub: {}, act: {}, hrv: {} };
+    var bd = { open: {}, sub: {}, rst: {}, lap: {}, act: {}, hrv: {} };
     var d;
 
     if (p.days && n.days) {
-      d = { visitors: 0, downloads: 0, returns: 0, sales: 0, activations: 0, readings: 0,
-            downloadsBy: {}, returnsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {},
-            who: { downloads: {}, returns: {}, sales: {}, activations: {}, readings: {} } };
+      d = { visitors: 0, downloads: 0, returns: 0, sales: 0, restores: 0, lapses: 0, activations: 0, readings: 0,
+            downloadsBy: {}, returnsBy: {}, salesBy: {}, restoresBy: {}, lapsesBy: {},
+            activationsBy: {}, readingsBy: {},
+            who: { downloads: {}, returns: {}, sales: {}, restores: {}, lapses: {}, activations: {}, readings: {} } };
       Object.keys(n.days).forEach(function (key) {
-        var a = p.days[key] || { opens: 0, downloads: 0, returns: 0, sales: 0, activations: 0, readings: 0,
-                                 downloadsBy: {}, returnsBy: {}, salesBy: {}, activationsBy: {}, readingsBy: {} };
+        var a = p.days[key] || { opens: 0, downloads: 0, returns: 0, sales: 0, restores: 0, lapses: 0,
+                                 activations: 0, readings: 0, downloadsBy: {}, returnsBy: {}, salesBy: {},
+                                 restoresBy: {}, lapsesBy: {}, activationsBy: {}, readingsBy: {} };
         var b = n.days[key];
         /* Who arrived. A baseline day that exists but carries no cohort map
            (written before this shipped, or too old to keep one) would make every
@@ -618,6 +708,8 @@
           whoGain(d.who.downloads, aw.downloads, b.who.downloads, key);
           whoGain(d.who.returns, aw.returns, b.who.returns, key);
           whoGain(d.who.sales, aw.sales, b.who.sales, key);
+          if (rstKnown) whoGain(d.who.restores, aw.restores, b.who.restores, key);
+          if (lapKnown) whoGain(d.who.lapses, aw.lapses, b.who.lapses, key);
           if (actKnown) whoGain(d.who.activations, aw.activations, b.who.activations, key);
           if (readKnown) whoGain(d.who.readings, aw.readings, b.who.readings, key);
         }
@@ -642,6 +734,14 @@
           d.readings += rise(a.readings, b.readings);
           addInto(d.readingsBy, gain(a.readingsBy, b.readingsBy));
         }
+        if (rstKnown) {
+          d.restores += rise(a.restores, b.restores);
+          addInto(d.restoresBy, gain(a.restoresBy, b.restoresBy));
+        }
+        if (lapKnown) {
+          d.lapses += rise(a.lapses, b.lapses);
+          addInto(d.lapsesBy, gain(a.lapsesBy, b.lapsesBy));
+        }
         if (!actKnown) return;
         d.activations += rise(a.activations, b.activations);
         addInto(d.activationsBy, gain(a.activationsBy, b.activationsBy));
@@ -652,14 +752,18 @@
         downloads: rise(p.downloads, n.downloads),
         returns: retKnown ? rise(p.returns, n.returns) : 0,
         sales: rise(p.sales, n.sales),
+        restores: rstKnown ? rise(p.restores, n.restores) : 0,
+        lapses: lapKnown ? rise(p.lapses, n.lapses) : 0,
         activations: actKnown ? rise(p.activations, n.activations) : 0,
         readings: readKnown ? rise(p.readings, n.readings) : 0,
         downloadsBy: gain(p.downloadsBy, n.downloadsBy),
         returnsBy: retKnown ? gain(p.returnsBy, n.returnsBy) : {},
         salesBy: gain(p.salesBy, n.salesBy),
+        restoresBy: rstKnown ? gain(p.restoresBy, n.restoresBy) : {},
+        lapsesBy: lapKnown ? gain(p.lapsesBy, n.lapsesBy) : {},
         activationsBy: actKnown ? gain(p.activationsBy, n.activationsBy) : {},
         readingsBy: readKnown ? gain(p.readingsBy, n.readingsBy) : {},
-        who: { downloads: {}, returns: {}, sales: {}, activations: {}, readings: {} }
+        who: { downloads: {}, returns: {}, sales: {}, restores: {}, lapses: {}, activations: {}, readings: {} }
       };
     }
 
@@ -677,18 +781,23 @@
       downloads: rowList(d.who.downloads, bd, 'open'),
       returns: rowList(d.who.returns, bd, 'open'),
       sales: rowList(d.who.sales, bd, 'sub'),
+      restores: rowList(d.who.restores, bd, 'rst'),
+      lapses: rowList(d.who.lapses, bd, 'lap'),
       activations: rowList(d.who.activations, bd, 'act'),
       readings: rowList(d.who.readings, bd, 'hrv'),
     };
     d.notes = {
       downloads: buildNote(bd, 'open', d.rows.downloads),
       returns: buildNote(bd, 'open', d.rows.returns),
-      sales: buildNote(bd, 'sub', d.rows.sales),
+      sales: joinNotes(buildNote(bd, 'sub', d.rows.sales), legacyNote(d.rows.sales)),
+      restores: buildNote(bd, 'rst', d.rows.restores),
+      lapses: buildNote(bd, 'lap', d.rows.lapses),
       activations: buildNote(bd, 'act', d.rows.activations),
       readings: buildNote(bd, 'hrv', d.rows.readings),
     };
 
-    d.any = d.visitors > 0 || d.downloads > 0 || d.sales > 0 || d.activations > 0 || d.readings > 0;
+    d.any = d.visitors > 0 || d.downloads > 0 || d.sales > 0 || d.activations > 0 || d.readings > 0 ||
+      d.restores > 0 || d.lapses > 0;
     return d;
   }
 
@@ -1402,7 +1511,8 @@
 
   /* One glyph per kind, so a card is identified before it is read — the left
      edge carries the same distinction in colour (styles.css). */
-  var MARK = { sale: '💸', download: '📲', activation: '💓', reading: '🫀', visit: '👋' };
+  var MARK = { sale: '💸', download: '📲', activation: '💓', reading: '🫀', visit: '👋',
+               restore: '🔁', lapse: '💤' };
 
   /* The chip classes the two install facts wear. Kept as maps rather than
      built from the letter, so an unrecognised letter lands on the `unk`
@@ -1462,6 +1572,10 @@
         '<span class="alert-chip tier ' + (TIER_CLASS[r.tier] || 'unk') + '">' +
           esc(tierName(r.tier)) + '</span>' +
         (SENSOR_CHIP[r.slot] ? '<span class="alert-chip sensor">' + esc(SENSOR_CHIP[r.slot]) + '</span>' : '') +
+        /* The plan, on a subscription row only (`plan` is undefined elsewhere).
+           An unknown one wears the dashed outline the unknown tier does. */
+        (r.plan ? '<span class="alert-chip plan' + (PLAN[r.plan] ? '' : ' unk') + '">' +
+          esc(planName(r.plan)) + '</span>' : '') +
         (r.first ? '<span class="alert-chip first">First</span>' : '') +
         /* The install date and the build travel together: when a row is too
            wide to fit, it has to break between the CHIPS and the meta, never
@@ -1816,7 +1930,7 @@
     if (d.sales > 0) {
       var saleTitle = d.sales + ' new ' + plural(d.sales, 'sale') + '!';
       var saleLine = summaryLine([
-        storeLine(d.salesBy), cohortLine(who.sales),
+        storeLine(d.salesBy), planLine(rows.sales), cohortLine(who.sales),
         tierLine(rows.sales), buildLine(rows.sales),
       ]);
       card('sale', { title: saleTitle, line: saleLine, rows: rows.sales, note: notes.sales });
@@ -1844,6 +1958,31 @@
          both. Only the sound ranks. */
       celebrate('download', d.downloads);
     }
+    /* A subscription arriving on a new install, and one going away. Told, and
+       nothing more: a card each, no sound, no canvas, no notification — neither
+       is money arriving, and `rst` in particular is exactly the event the old
+       `sub` route used to celebrate by mistake. Their toast (below, once every
+       louder line has had its chance) is the only other channel they get. */
+    var quiet = [];
+    if (d.restores > 0) {
+      var rstTitle = d.restores + ' returning ' + plural(d.restores, 'subscriber') + ' on a new install';
+      var rstLine = summaryLine([
+        storeLine(d.restoresBy), planLine(rows.restores), cohortLine(who.restores),
+        tierLine(rows.restores), buildLine(rows.restores),
+      ]);
+      card('restore', { title: rstTitle, line: rstLine, rows: rows.restores, note: notes.restores });
+      quiet.push(summaryLine([rstTitle, rstLine]));
+    }
+    if (d.lapses > 0) {
+      var lapTitle = d.lapses + ' ' + plural(d.lapses, 'subscription') + ' lapsed';
+      var lapLine = summaryLine([
+        storeLine(d.lapsesBy), planLine(rows.lapses), cohortLine(who.lapses),
+        tierLine(rows.lapses), buildLine(rows.lapses),
+      ]);
+      card('lapse', { title: lapTitle, line: lapLine, rows: rows.lapses, note: notes.lapses });
+      quiet.push(summaryLine([lapTitle, lapLine]));
+    }
+
     /* Readings, and the FIRST readings folded into them.
      *
      * A first reading used to raise a card, a chime and a notification of its
@@ -1936,6 +2075,11 @@
     /* Three seconds of house-coloured glitter, and it runs whatever else
        happened — the canvas ranks nothing, only the sound does. */
     if (returning > 0) celebrate('visit', returning);
+    /* The subscription toasts speak last and only into silence: every other
+       event above has a claim on the one toast element first. */
+    if (quiet.length && !d.sales && !d.downloads && !(readTotal > 0) && !(returning > 0)) {
+      say(quiet.join(' \u00b7 '));
+    }
   }
 
   /* ---------------------------------------------------------------- shell */
@@ -2024,6 +2168,7 @@
     // pure
     snapshot: snapshot, diff: diff, storeLine: storeLine, sensorLine: sensorLine, cohortLine: cohortLine,
     tierLine: tierLine, buildLine: buildLine, versionFor: versionFor, buildNote: buildNote,
+    planLine: planLine, planName: planName,
     mergeFirsts: mergeFirsts,
     stackedMs: stackedMs, DURATION: DURATION,
     // shell
