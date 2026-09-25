@@ -33,16 +33,23 @@ import type { PlanCode } from './ping';
  * - **iOS:** a transaction that is its own original is a first purchase. One
  *   that is not is a renewal, EXCEPT when this session tapped buy: a
  *   resubscription after a lapse keeps the group's original transaction id, and
- *   that is a real sale.
+ *   that is a real sale. The tap only counts for a transaction dated AFTER it:
+ *   a subscriber who taps Subscribe instead of Restore on a new install is
+ *   told they are already subscribed and handed their EXISTING transaction,
+ *   which the tap alone would have reported as a sale right after its `rst`.
  */
 export function isNewPurchase(p: {
   platform: 'ios' | 'android' | string;
   /** The SKU this session last tapped buy on, if the tap is recent. */
   tappedSku?: string;
+  /** When that tap happened (epoch ms). */
+  tappedAt?: number;
   productId: string;
   isAcknowledgedAndroid?: boolean | null;
   transactionId?: string | null;
   originalTransactionId?: string | null;
+  /** The store's purchase date for this transaction (epoch ms). */
+  transactionDate?: number | null;
 }): boolean {
   const tapped = !!p.tappedSku && p.tappedSku === p.productId;
   if (p.platform === 'android') {
@@ -50,10 +57,22 @@ export function isNewPurchase(p: {
     if (p.isAcknowledgedAndroid === true) return false;
     return tapped;
   }
-  if (tapped) return true;
+  if (tapped) {
+    const predates = !!p.transactionDate && p.tappedAt !== undefined
+      && p.transactionDate < p.tappedAt - TAP_CLOCK_SLACK_MS;
+    // Predating the tap is the store handing back what it already sold, even
+    // when that is a first-period transaction that is its own original.
+    return !predates;
+  }
   if (p.transactionId && p.originalTransactionId) return p.transactionId === p.originalTransactionId;
   return false;
 }
+
+/** How far before the buy tap a transaction may be dated and still be the one
+ *  the tap bought: the date is Apple's clock and the tap is the phone's. An
+ *  existing subscription handed back is days or months old, so a few minutes
+ *  of forgiveness costs nothing. */
+export const TAP_CLOCK_SLACK_MS = 5 * 60_000;
 
 /** How long after a store answer before an entitlement with no purchase behind
  *  it is called RESTORED. An unfinished StoreKit transaction is replayed to the
