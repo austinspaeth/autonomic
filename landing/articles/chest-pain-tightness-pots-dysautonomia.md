@@ -8,7 +8,7 @@ keywords: "chest pain POTS, chest tightness POTS, dysautonomia chest pain, non-c
 date: 2026-09-25
 updated: 2026-09-25
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "https://images.unsplash.com/photo-1769029270011-8be0623cd87b?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Unsplash"
 tldr: "Chest pain and tightness are common in POTS, long COVID and dysautonomia, and in a young person with a normal heart they are usually non-cardiac: musculoskeletal chest-wall pain, esophageal and reflux irritation, upper-chest breathing and hyperventilation, and the strain of a racing, adrenaline-primed heart working harder than it should. That does not mean you skip a check. New or unexplained chest pain deserves at least one proper cardiac evaluation, and a specific set of red flags (crushing pressure, pain spreading to the arm, jaw or back, cold sweat, breathlessness, fainting, or pain brought on by exertion) means stop and call emergency services now. Once serious causes are ruled out, the same fundamentals that steady the rest of dysautonomia, volume, pacing, slow breathing and treating reflux, tend to quiet the chest too."
 categories:
