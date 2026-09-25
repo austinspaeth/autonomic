@@ -48,6 +48,32 @@ describe('is a delivered purchase NEW', () => {
       tappedSku: 'com.autonomic.journal.monthly',
     })).toBe(false);
   });
+
+  it('iOS: a tap that is handed back an EXISTING subscription is not a sale', () => {
+    // A returning subscriber taps Subscribe instead of Restore; Apple answers
+    // with the transaction they already own — here a first-period one, which
+    // is its own original and so would read as new on its id alone.
+    const tappedAt = Date.parse('2026-09-25T14:00:00Z');
+    const monthAgo = tappedAt - 30 * 86_400_000;
+    expect(isNewPurchase({
+      platform: 'ios', productId: sku, transactionId: '9', originalTransactionId: '9',
+      tappedSku: sku, tappedAt, transactionDate: monthAgo,
+    })).toBe(false);
+    // A purchase dated after the tap (or within clock slack of it) is the sale.
+    expect(isNewPurchase({
+      platform: 'ios', productId: sku, transactionId: '12', originalTransactionId: '9',
+      tappedSku: sku, tappedAt, transactionDate: tappedAt + 20_000,
+    })).toBe(true);
+    expect(isNewPurchase({
+      platform: 'ios', productId: sku, transactionId: '12', originalTransactionId: '9',
+      tappedSku: sku, tappedAt, transactionDate: tappedAt - 60_000,
+    })).toBe(true);
+    // No date from the store: the tap still decides, as before.
+    expect(isNewPurchase({
+      platform: 'ios', productId: sku, transactionId: '12', originalTransactionId: '9',
+      tappedSku: sku, tappedAt,
+    })).toBe(true);
+  });
 });
 
 describe('which subscriber ping is owed', () => {

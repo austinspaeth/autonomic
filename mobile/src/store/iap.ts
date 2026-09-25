@@ -512,10 +512,13 @@ async function connect() {
       // don't grant Pro or acknowledge until it completes.
       if (purchase.purchaseState === 'pending') { settleAttempt('pending'); return; }
       // Decided BEFORE the acknowledgement, which is what flips Play's flag.
+      const tap = recentTap();
       const fresh = isNewPurchase({
         platform: Platform.OS,
-        tappedSku: recentTap(),
+        tappedSku: tap?.sku,
+        tappedAt: tap?.at,
         productId: purchase.productId,
+        transactionDate: purchase.transactionDate,
         isAcknowledgedAndroid: (purchase as { isAcknowledgedAndroid?: boolean | null }).isAcknowledgedAndroid,
         transactionId: purchase.transactionId ?? purchase.id,
         originalTransactionId: (purchase as { originalTransactionIdentifierIOS?: string | null }).originalTransactionIdentifierIOS,
@@ -729,7 +732,7 @@ let attempt: { sku: string; origin?: PurchaseOrigin } | undefined;
  */
 let lastTap: { sku: string; at: number } | undefined;
 const TAP_WINDOW_MS = 30 * 60_000;
-const recentTap = () => (lastTap && Date.now() - lastTap.at < TAP_WINDOW_MS ? lastTap.sku : undefined);
+const recentTap = () => (lastTap && Date.now() - lastTap.at < TAP_WINDOW_MS ? lastTap : undefined);
 
 /* ---------- new purchases ----------
  * A purchase THIS install made, told to whoever asked. The cohort ping is the
