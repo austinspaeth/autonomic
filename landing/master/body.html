@@ -1067,6 +1067,12 @@
     </div>
 
     <div class="card" style="margin-bottom:14px">
+      <header><h2>Subscription events</h2></header>
+      <p class="hint">Every <b>subscribe</b>, <b>restore</b> and <b>lapse</b> ping as it arrived, one row each, newest first. Unlike the counters below, these keep the <b>exact arrival time</b> the server stamped and the <b>whole ping</b> — cohort, plan, tier and build version together — so a sale can be set against the store's hourly figures and traced to the build that sent it. Times are US Eastern with UTC beside them, since App Store Connect reports in UTC. Kept 400 days; nothing from before this shipped.</p>
+      <div id="pgSubEvents"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
       <header><h2>Every ping received</h2><span class="spacer"></span>
         <div class="segmented" id="pgRawKind">
           <button data-v="all" aria-pressed="true">All</button>

@@ -156,3 +156,46 @@ test('an old letterless sub and a new planned one land under different keys', ()
   assert.equal(cohortKey(legacy.iso, legacy.platform, null, legacy.tier), '082126A-P');
   assert.equal(cohortKey(fresh.iso, fresh.platform, 'Y', fresh.tier), '082126AY-P');
 });
+
+/* Subscription events: the one place a sale is kept as an EVENT, so the
+   dashboard can say when it arrived and from which build. */
+test('a subscription ping becomes one event row holding the whole ping', () => {
+  const { subEventItem, subEventRow, SUB_EVENT_TTL_DAYS } = require('../lambdas/ping/main.js');
+  const now = Date.parse('2026-09-25T13:47:12.345Z');
+  const item = subEventItem('SUB', decodeCohort('D091626IF-TT-V1.29.0'), now, 'a1b2c3');
+  assert.deepEqual(item, {
+    PK: 'SUBEVENT',
+    SK: '2026-09-25T13:47:12.345Z#a1b2c3',
+    entityType: 'SUB_EVENT',
+    route: 'sub',
+    at: '2026-09-25T13:47:12.345Z',
+    day: '2026-09-25',
+    cohort: '2026-09-16',
+    platform: 'I',
+    plan: 'F',
+    tier: 'T',
+    version: '1.29.0',
+    expiresAt: Math.floor(now / 1000) + SUB_EVENT_TTL_DAYS * 86400,
+  });
+  // A `since` DAY sorts before every instant on that day, so the range query
+  // the report runs includes the whole of it.
+  assert.ok(item.SK >= '2026-09-25');
+  assert.deepEqual(subEventRow(item), {
+    route: 'sub', at: item.at, day: '2026-09-25', cohort: '2026-09-16',
+    platform: 'I', plan: 'F', planName: 'founder-yearly', tier: 'T', version: '1.29.0',
+  });
+});
+
+test('only the three subscription routes are logged, and missing parts stay null', () => {
+  const { subEventItem } = require('../lambdas/ping/main.js');
+  const now = Date.parse('2026-09-25T13:47:12Z');
+  assert.equal(subEventItem('OPEN', decodeCohort('D091626I'), now, 'x'), null);
+  assert.equal(subEventItem('HRV', decodeCohort('D091626IB'), now, 'x'), null);
+  assert.equal(subEventItem('RST', decodeCohort('D091626IY'), now, 'x').route, 'rst');
+  assert.equal(subEventItem('LAP', decodeCohort('D091626IM'), now, 'x').route, 'lap');
+  // An older build: no plan, tier or version. Recorded as unknown, not guessed.
+  const old = subEventItem('SUB', decodeCohort('D091626I'), now, 'x');
+  assert.equal(old.plan, null);
+  assert.equal(old.tier, null);
+  assert.equal(old.version, null);
+});

@@ -350,12 +350,12 @@ resources:
             KeyType: RANGE
         PointInTimeRecoverySpecification:
           PointInTimeRecoveryEnabled: true
-        # Only fault rows (PK FAULT) carry `expiresAt`, so only they expire —
-        # every dashboard record and every ping counter is written without the
-        # attribute and is untouched by this. Faults are diagnostic rather than
-        # a historical series (nobody asks what was crashing fourteen months
-        # ago), and an expiry is also what bounds the one public route that
-        # CREATES a row rather than incrementing one.
+        # Only fault rows (PK FAULT), offer fall-through rows (PK OFFERFAIL)
+        # and subscription events (PK SUBEVENT) carry `expiresAt`, so only they
+        # expire — every dashboard record and every ping counter is written
+        # without the attribute and is untouched by this. They are diagnostic
+        # rather than a historical series, and an expiry is also what bounds
+        # the public routes that CREATE a row rather than incrementing one.
         TimeToLiveSpecification:
           AttributeName: expiresAt
           Enabled: true
