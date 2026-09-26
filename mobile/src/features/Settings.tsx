@@ -218,7 +218,7 @@ function ProfileSheet({ controls }: { controls: SheetControls }) {
       {age != null ? <Text style={{ color: p.textDim, fontSize: 13, marginTop: -8, marginBottom: 10 }}>{`Age: ${age}`}</Text> : null}
       <HeightField label="Height" value={height} onChange={setHeight} placeholder="Set height" />
       <TextField label="Weight (lb)" value={weight} onChange={(t) => setWeight(onlyNumeric(t))} keyboardType="decimal-pad" />
-      <Text style={{ color: p.textDim, fontSize: 13, marginBottom: 12 }}>Used to personalize reading scores (sex-adjusted QTc, BMI from height/weight).</Text>
+      <Text style={{ color: p.textDim, fontSize: 13, marginBottom: 12 }}>Age and sex set the healthy HRV ranges shown on your readings and your heart rate zones.</Text>
       <Button title="Save" variant="primary" onPress={() => { getState().profile = { sex, birthday, weight: weight.trim(), height: height.trim() }; save(); controls.close(); }} />
       <View style={{ height: 20 }} />
     </View>

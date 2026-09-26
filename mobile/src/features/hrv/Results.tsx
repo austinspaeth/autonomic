@@ -1,7 +1,7 @@
 /**
  * Results screen after a live reading: runs the HRV pipeline on the collected
  * RR, builds a reading identical to a typed-in one (same field keys), and shows
- * the hero autonomic score, power distribution, tachogram waveform, and graded
+ * the hero HRV score, power distribution, tachogram waveform, and graded
  * metric rows. Save writes the metrics to today's readings and the raw arrays
  * to the waveform sidecar (the journal blob never carries them); optional
  * "Write to Apple Health" logs SDNN + a mindful session.

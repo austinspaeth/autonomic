@@ -35,13 +35,13 @@ import { useBudgetPulse, type BudgetPulse } from './budget/pulse';
 import { openBudgetSheet } from './budget/open';
 import { useNow } from '../lib/useNow';
 import { detectStrain, type Strain } from '../lib/scoring/strain';
-import { hasHrvReading, trustedReadings } from '../lib/hrvQuality';
+import { hasBaselineReadingOn, hasHrvReading, trustedReadings } from '../lib/hrvQuality';
 import { buildDownturnPrompt, buildStrainPrompt } from '../lib/analysis/reports';
 import { PromptSheet } from './PromptSheet';
 import { addDays, todayKey } from '../lib/dates';
 import { hexA, mixHex } from '../lib/color';
 import { LEVEL_DELTA, scoreTrend, type ScoreTrend } from '../lib/scoring/scoreTrend';
-import { getState, useAppState } from '../store/store';
+import { getState, useAppState, useStore } from '../store/store';
 import { requestInsightsCard, setJournalSectionY } from '../store/nav';
 import { router } from 'expo-router';
 import { readPressure } from '../lib/pressure';
@@ -431,7 +431,7 @@ function BaselineWaitingCard({ dk, budget, pulse }: { dk: string; budget: Budget
         </View>
 
         <Pressable
-          onPress={() => openSheet((c) => <HrvSetup controls={c} />)}
+          onPress={() => openSheet((c) => <HrvSetup kind="unstructured" controls={c} />)}
           style={({ pressed }) => [
             { alignItems: 'center', justifyContent: 'center', paddingVertical: 14, borderRadius: radius.control, backgroundColor: p.accent },
             pressed && { opacity: 0.85 },
@@ -509,21 +509,30 @@ function UnscoredHero({ dk, all, hasReadings, budget, pulse }: { dk: string; all
         <BudgetStrip budget={budget} locked={budgetLocked} pulse={pulse} onPress={() => openBudgetSheet(openSheet, dk, budget)} onShowAnyway={() => showBudgetAnyway(dk)} />
       )}
       {future ? null : <KeyFigures dk={dk} all={all} />}
-      {/* The same offer the baseline card makes, on the one day it can be acted
-          on. Wears the Readings section's own icon and label, because it is the
-          same action one scroll further down the same screen and two names for it
-          would read as two different things.
+      <BaselineCta dk={dk} />
+    </View>
+  );
+}
 
-          TODAY only, and that is a correctness rule rather than a taste one: a
-          live capture saves to the moment it happens and can never be back-dated,
-          so on a past day this button would quietly write into today and leave the
-          day the reader is looking at exactly as empty as before. The Journal's
-          Readings section is still the way to enter a value for an earlier day. */}
-      {dk === today ? (
-        <View style={{ flexDirection: 'row', marginTop: 16 }}>
-          <Button title="Capture HRV reading" icon="activity" variant="primary" onPress={() => openSheet((c) => <HrvSetup controls={c} />)} />
-        </View>
-      ) : null}
+/**
+ * The Outlook's one reading button: "Capture baseline HRV", on TODAY
+ * only and only until the day holds a baseline. The first baseline is the
+ * snapshot the score and the pacing budget are built on, so it is the one
+ * reading this card asks for; once it exists the card asks for nothing, and
+ * training readings live in the Readings section below.
+ *
+ * Today only because a live capture saves to the moment it happens and can
+ * never be back-dated: on a past day this would write into today and leave the
+ * day on screen as empty as before.
+ */
+function BaselineCta({ dk }: { dk: string }) {
+  const { openSheet } = useSheets();
+  const isToday = dk === todayKey();
+  const hasBaseline = useStore((st) => hasBaselineReadingOn(st.state.days[dk]));
+  if (!isToday || hasBaseline) return null;
+  return (
+    <View style={{ flexDirection: 'row', marginTop: 16 }}>
+      <Button title="Capture baseline HRV" icon="activity" variant="primary" onPress={() => openSheet((c) => <HrvSetup kind="unstructured" controls={c} />)} />
     </View>
   );
 }
@@ -590,7 +599,8 @@ function GaugeDeltas({ trend, amDelta }: { trend: ScoreTrend | null; amDelta: nu
  * reading RMSSD does, so all three tiles would fill together and empty together
  * and a blank row would name one action instead of three.
  *
- *   HRV (RMSSD)   the score's largest single input, 25 of 95 — take a reading
+ *   HRV           baseline RMSSD, the score's largest single input (training
+ *                 RMSSD when the day has no baseline) — take a reading
  *   Resting HR    the other autonomic axis, and the one every device supplies
  *   Sleep         the biggest lever the reader actually controls overnight
  *
@@ -639,9 +649,8 @@ const FIG_BOX = 23;
 type Figure = { text: string; unit: string | null; cat: ScoreCat | null };
 
 /** The raw number the explain sheet quotes for a component, with the band that
- *  graded it. HRV lists training first and baseline second (scoreSet's own
- *  order), and the score weights training 0.7, so the first metric is the one
- *  the tile shows. */
+ *  graded it. The HRV tile shows the baseline reading when the day has one,
+ *  since that is the heavier input, and the training reading otherwise. */
 const fromComp = (all: ScoreSetResult, label: string): Figure | null => {
   const m = all.comps.find((c) => c.label === label)?.detail.metrics[0];
   if (!m) return null;
@@ -649,7 +658,7 @@ const fromComp = (all: ScoreSetResult, label: string): Figure | null => {
 };
 
 const KEY_FIGURES: { label: string; ghost: `${number}%`; delay: number; pick: (all: ScoreSetResult, days: any, dk: string) => Figure | null }[] = [
-  { label: 'HRV', ghost: '68%', delay: 0, pick: (all) => fromComp(all, 'HRV (RMSSD)') },
+  { label: 'HRV', ghost: '68%', delay: 0, pick: (all) => fromComp(all, 'Baseline HRV') || fromComp(all, 'Training HRV') },
   { label: 'Resting HR', ghost: '48%', delay: 900, pick: (all) => fromComp(all, 'Resting HR') },
   {
     label: 'Sleep',
@@ -843,6 +852,7 @@ function ScoredHero({ dk, readings, d, all, ctx, trend, budget, pulse, onExplain
           the card it came out of, which is the day's own grade. */}
       {revealed ? <Flag color={cat.color} text={PAUSE_ADVICE} /> : null}
       <KeyFigures dk={dk} all={all} />
+      <BaselineCta dk={dk} />
     </Pressable>
   );
 }
@@ -1188,15 +1198,15 @@ function ScoreExplain({ all, dk }: { all: ScoreSetResult; dk: string }) {
   // what the score actually uses; only the "which action captures it" mapping
   // lives here.
   const CONF_SRC: Record<string, string> = {
-    'HRV (RMSSD)': 'hrv',
-    'Total power': 'training', 'pNN50': 'training', 'VLF power': 'training', 'LF peak': 'training',
+    'Baseline HRV': 'baseline',
+    'Training HRV': 'training', 'Total power': 'training', 'pNN50': 'training', 'VLF power': 'training', 'LF peak': 'training',
     'Blood pressure': 'bp', 'Resting HR': 'rhr', 'Sleep': 'sleep', 'Activity': 'activity',
   };
   const CONF_SOURCES: Record<string, string> = {
     // "Training HRV" is what the app calls this everywhere else (registry.ts,
     // the HRV setup sheet). "Guided" appeared nowhere but here.
-    training: 'Capture a training HRV reading',
-    hrv: 'Take an HRV reading',
+    training: 'Take a training HRV reading',
+    baseline: 'Take a baseline HRV reading',
     bp: 'Log a blood pressure reading',
     rhr: 'Log a resting heart rate',
     sleep: 'Log last night’s sleep',

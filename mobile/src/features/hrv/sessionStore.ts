@@ -40,7 +40,9 @@ import { getState } from '../../store/store';
 import {
   type BreathPattern, type BreathPhase, parsePattern, phaseAt,
 } from '../../lib/breathClock';
-import { pingActivation, pingCaptureCompleted, pingCaptureStarted } from '../../store/ping';
+import { pingActivation, pingCaptureCompleted, pingCaptureStarted, pingReadingKind } from '../../store/ping';
+import { isFirstBaseline } from '../../lib/ping';
+import { todayKey } from '../../lib/dates';
 
 export interface SessionConfig {
   kind: 'breath' | 'unstructured';
@@ -58,12 +60,12 @@ export interface SessionResult {
 }
 
 /**
- * Strap and watch readings — training or baseline — run the full 5 minutes.
- * Camera (finger) readings run 3: long enough to resolve the LF band and settle
- * RMSSD (a 1-minute optical reading swings too much to compare against a
- * dedicated app), still realistic to hold a fingertip still.
+ * Every reading — strap, watch or camera, training or baseline — runs the full
+ * 5 minutes. Camera readings used to run 3, which left them the one source that
+ * could never resolve VLF and the one whose numbers were not comparable to a
+ * seated 5-minute reading from anything else.
  */
-export const durationFor = (config: SessionConfig) => (config.source === 'camera' ? 180 : 300);
+export const durationFor = (_config: SessionConfig) => 300;
 
 /**
  * Does this source feed live beats to the phone DURING the reading?
@@ -305,7 +307,9 @@ function armBreath() {
   const pt = phaseAt(snap.pattern, Date.now() - snap.breathStartMs);
   if (pt.phase !== snap.phase) {
     bump({ phase: pt.phase });
-    Haptics.impactAsync(PHASE_HAPTIC[pt.phase]).catch(() => {});
+    // Not on the camera: the phone IS the sensor, and a vibration under the
+    // fingertip shakes the very pulse signal being read.
+    if (snap.config.source !== 'camera') Haptics.impactAsync(PHASE_HAPTIC[pt.phase]).catch(() => {});
   }
   breathTimer = setTimeout(armBreath, Math.max(40, pt.remainMs));
 }
@@ -462,6 +466,9 @@ export function beginCollection() {
   // mounted because this is the one path a running reading can start from,
   // whatever opened it and wherever it is later minimized to.
   pingCaptureStarted(src);
+  // A camera reading is taken face down, so the screen cannot say it started.
+  // The placement card promises this buzz; the completion buzz is its pair.
+  if (src === 'camera') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
   if (timer) clearInterval(timer);
   timer = setInterval(syncElapsed, 1000);
 }
@@ -499,6 +506,14 @@ export async function finishSession() {
   // just finished their first.
   pingCaptureCompleted(snap.config?.source);
   pingActivation(snap.config?.source);
+  // Which kind it was. Nothing has been written yet (Results files it), so the
+  // day's readings are exactly the ones before this one.
+  if (snap.config) {
+    pingReadingKind(
+      snap.config.kind === 'breath' ? 'breathHrv' : 'hrv',
+      isFirstBaseline(getState().days[todayKey()]?.readings),
+    );
+  }
   void completionBuzz();
   // Backgrounded (a BLE reading keeps running while the phone is set aside), iOS
   // never plays the buzz above — post a notification so completion is still

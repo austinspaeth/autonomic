@@ -11,6 +11,7 @@ import { budgetSeries } from '../budget/series';
 import { SCORE_COLORS, orthoMaxDelta, restingHrBands, sBP } from '../scoring';
 import { scoreCat, sleepHours, streakInfo, type DaysMap } from '../scoring/day';
 import { ACTIVITY_TYPES, MED_TYPES, TRIGGER_TYPES } from '../registry';
+import { FORM_CAT, FORM_LABEL, STOOL_FORMS, stoolForm, summarizeGut } from '../digestion';
 import {
   BANDS, CustomRange, Mode, acBandZones, acBandsToZones, acBuckets, acLatestIdx, acMean, acPresent, acRangeLabel,
   acReadVals, acScoreZones, avgRound, bucketViews, bucketWhen, catFromBands, isEvening, isMorning,
@@ -55,7 +56,11 @@ export interface BarGroup { label: string; rows: { name: string; count: number; 
 /** Per-bucket counts behind a bars card: `totals` draws a bucket chart above
  *  the horizontal bars, and tapping a row (matched by its `key`) narrows the
  *  chart to that row's own counts until a tap elsewhere resets it. */
-export interface BarBuckets { totals: (number | null)[]; byKey: Record<string, (number | null)[]> }
+export interface BarBuckets { totals: (number | null)[]; byKey: Record<string, (number | null)[]>;
+  /** Draw the unselected chart as one stacked segment per row, in the rows'
+   *  own colours, rather than a single total: for rows that are PARTS of one
+   *  thing (the forms of a bowel movement), where the mix is the reading. */
+  stacked?: boolean }
 /** Minutes left over per bucket, drawn as columns hanging off a ceiling at
  *  zero (components/charts MarginColumns). Its own field rather than a `Chart`
  *  because it is a different shape, not a differently-styled line. */
@@ -542,6 +547,46 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext, cu
     return cards;
   };
 
+  /**
+   * Bowel movements: how often, and what they were. Counts and a mix, never a
+   * graded line — there is no defensible per-day score for a gut, and the
+   * whole card is built on ../digestion's rule for which days are KNOWN, so a
+   * user who never logs movements (or stopped) sees nothing rather than a run of
+   * zeros dressed as constipation.
+   */
+  const gut = (): AnalysisCard[] => {
+    const keys: string[] = [];
+    buckets.forEach((b) => keys.push(...b.days));
+    const sum = summarizeGut(days, keys);
+    if (!sum || !sum.movements) return [];
+    const byKey: Record<string, (number | null)[]> = {};
+    STOOL_FORMS.forEach((f) => { byKey[f] = buckets.map(() => 0); });
+    const totals = buckets.map(() => 0);
+    buckets.forEach((b, bi) => b.days.forEach((dk) => ((days[dk].digestion && days[dk].digestion.movements) || []).forEach((m) => {
+      totals[bi]++;
+      const f = stoolForm(m);
+      if (f) byKey[f][bi] = (byKey[f][bi] || 0) + 1;
+    })));
+    const rows = STOOL_FORMS.filter((f) => sum.forms[f]).map((f) => ({ key: f, name: FORM_LABEL[f], count: sum.forms[f], color: SCORE_COLORS[FORM_CAT[f]] }));
+    const strained = sum.strainedMild + sum.strainedSevere;
+    return [{
+      title: 'Bowel movements', sub: range,
+      desc: 'How often you went, and what it looked like.',
+      help: {
+        what: 'Every bowel movement logged in this range, split by form: Formed is Bristol 3 to 4, Hard 1 to 2, Loose 5 to 6, Diarrhea 7. The chart stacks them per day, week or month; tap a form to narrow the chart to it. The 💩 days tile counts the days a movement was logged out of the days the app can speak for: a day you logged other things while you were tracking these, so a day you did not open the app is never counted as a day without one.',
+        why: 'The gut runs on the same autonomic wiring as your heart rate and blood pressure, and both ends are common here: slow transit shows up as hard stools, straining and days without going, and the fast end as loose stools. Loose days cost fluid and salt, which tends to show up the next morning as a higher standing heart rate. Straining is a strain on circulation too, so severe straining is worth raising with your doctor.',
+      },
+      bars: [{ label: '', rows }],
+      barBuckets: { totals, byKey, stacked: true },
+      tiles: true,
+      stats: [
+        { label: '💩 days', value: `${sum.daysWithMovement}/${sum.trackedDays}` },
+        { label: 'Longest gap', value: sum.longestGap, sub: sum.longestGap === 1 ? 'day' : 'days' },
+        { label: 'Strained', value: strained, sub: strained === 1 ? 'time' : 'times', color: sum.strainedSevere ? SCORE_COLORS.bad : undefined },
+      ],
+    }];
+  };
+
   const supps = (): AnalysisCard[] => {
     const counts: Record<string, number> = {}; let anyMeds = false;
     buckets.forEach((b) => b.days.forEach((dk) => { const meds = days[dk].meds || []; if (meds.length) anyMeds = true; new Set(meds.map((m) => m.type)).forEach((t) => { counts[t] = (counts[t] || 0) + 1; }); }));
@@ -657,6 +702,7 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext, cu
     { id: 'activity', icon: 'bike', title: 'Activity', desc: 'Workouts & exercise', buckets: bl, build: () => nonEmpty(activity()) },
     { id: 'pacing', icon: 'gauge', title: 'Pacing', desc: 'Budget vs what the day cost', buckets: bl, build: () => nonEmpty(pacing()) },
     { id: 'triggers', icon: 'triangle', title: 'Triggers', desc: 'Triggers & hydration', buckets: bl, build: () => nonEmpty(triggers()) },
+    { id: 'gut', icon: 'poop', title: 'Digestion', desc: 'Bowel movements & stool form', buckets: bl, build: () => nonEmpty(gut()) },
     { id: 'supps', icon: 'pill', title: 'Meds', desc: 'Meds & supplements', buckets: bl, build: () => nonEmpty(supps()) },
   ];
 }

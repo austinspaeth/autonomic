@@ -6,6 +6,7 @@
  *   targets/watch/OrthostaticController.swift → (baseline/mean helpers)
  * Pure functions, no store or native imports — unit-tested directly.
  */
+import { maxHrFormula } from '../workoutZones';
 
 /** One 1 Hz heart-rate sample: `t` seconds since the test began. Matches the
  *  waveform sidecar's `sampledHr` shape, so the series stores as-is. */
@@ -21,11 +22,12 @@ export function restingBaseline(series: HrPoint[], endT: number, windowSec = 120
   return meanBpm(window.length ? window : series);
 }
 
-/** Tanaka (208 − 0.7×age); Gulati (206 − 0.88×age) for female profiles. */
+/** Tanaka (208 − 0.7×age); Gulati (206 − 0.88×age) for female profiles.
+ *  The one formula lives in `workoutZones.ts`; this keeps the watch port's
+ *  unrounded value and its looser age guard. */
 export function computedMaxHr(age: number | null, sex?: string | null): number | null {
   if (age == null || age <= 0) return null;
-  if (sex && sex.toLowerCase().startsWith('f')) return 206 - 0.88 * age;
-  return 208 - 0.7 * age;
+  return maxHrFormula(age, sex);
 }
 
 /** Adolescents (12–19) use the ≥40 bpm POTS-range criterion; adults ≥30. */

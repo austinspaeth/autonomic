@@ -28,7 +28,8 @@ import {
 import { missingClasses } from '../../../modules/app-env';
 import * as ExpoLinking from 'expo-linking';
 import { flushSave, getState, save, storeWaveform, upsertEntry } from '../../store/store';
-import { pingWristReading } from '../../store/ping';
+import { pingReadingKind, pingWristReading } from '../../store/ping';
+import { isFirstBaseline } from '../ping';
 import { todayKey } from '../dates';
 import { logError } from '../diagnostics/errorLog';
 import { computeScores } from '../scoring';
@@ -195,7 +196,11 @@ function receive(msg: GarminMessage) {
     // and none of the capture counters fired. Counted here instead, and only
     // for a reading that belongs to TODAY: the watch queues while the phone is
     // unreachable, so last night's reading can land on this morning's launch.
-    if (mapped.entry.type === 'hrv' && mapped.dayKey === todayKey()) pingWristReading('garmin');
+    if (mapped.entry.type === 'hrv' && mapped.dayKey === todayKey()) {
+      pingWristReading('garmin');
+      // Already written above, so it excludes itself from "the day's first".
+      pingReadingKind('hrv', isFirstBaseline(getState().days[mapped.dayKey]?.readings, mapped.entry.id));
+    }
     arrivalListeners.forEach((fn) => fn(mapped.dayKey, mapped.entry));
   }
 }

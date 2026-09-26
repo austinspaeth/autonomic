@@ -4,6 +4,8 @@
  *
  * Fixtures match the scoring tests: an 'hrv' reading with only rmssd set makes
  * the day score exactly its grade points (40→100, 30→80, 25→60, 20→35, 15→10).
+ * It is a TRAINING ('breathHrv') reading so the grade stays absolute: a baseline
+ * is also graded against the user's own usual once five exist.
  */
 import type { DayRecord, Entry } from '../../types';
 import { engagedDayCount, shouldAskForReview, MIN_DAYS_BETWEEN_ASKS } from '../eligibility';
@@ -17,7 +19,7 @@ const day = (over: Partial<DayRecord> = {}): DayRecord => ({
 });
 
 const hrvR = (rmssd: number, over: Partial<Entry> = {}): Entry =>
-  ({ id: `r${rmssd}`, type: 'hrv', time: '08:00', rmssd: String(rmssd), ...over });
+  ({ id: `r${rmssd}`, type: 'breathHrv', time: '08:00', rmssd: String(rmssd), ...over });
 const hrvDay = (rmssd: number) => day({ readings: [hrvR(rmssd)] });
 
 const DK = '2026-01-08';

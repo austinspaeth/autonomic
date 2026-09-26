@@ -4,11 +4,18 @@
  * time-in-zones ignores sensor-dropout gaps.
  */
 import { estimatedHrMax, hrZones, timeInZones, zoneFor } from '../workoutZones';
+import { computedMaxHr } from '../pots/live';
 
 describe('estimatedHrMax', () => {
   it('applies Tanaka (208 − 0.7 × age)', () => {
     expect(estimatedHrMax(40)).toBe(180);
     expect(estimatedHrMax(20)).toBe(194);
+  });
+  it('applies Gulati (206 − 0.88 × age) for a female profile, the same pair the POTS test uses', () => {
+    expect(estimatedHrMax(40, 'Female')).toBe(171);
+    expect(estimatedHrMax(40, 'Male')).toBe(180);
+    expect(estimatedHrMax(40, 'Other')).toBe(180);
+    expect(estimatedHrMax(40, 'Female')).toBe(Math.round(computedMaxHr(40, 'Female')!));
   });
   it('returns null without a plausible age', () => {
     expect(estimatedHrMax(null)).toBeNull();

@@ -204,3 +204,45 @@ describe('detectStrain — what it says', () => {
     expect(w.body).toMatch(/not a diagnosis/i);
   });
 });
+
+describe('detectStrain — digestion', () => {
+  const gutOn = (days: Days, ks: string[], kind: string) =>
+    ks.forEach((k) => { days[k] = { ...days[k], digestion: { movements: [{ id: id(), time: '09:00', kind }] } }; });
+
+  /** Resting HR up a weight-2 amount, which cannot fire on its own. */
+  function oneBigMarker(): Days {
+    const d = blank();
+    restingOn(d, BASE_KEYS, 60);
+    restingOn(d, RECENT_KEYS, 70);
+    return d;
+  }
+
+  it('corroborates a marker when the gut has left its own normal', () => {
+    const d = oneBigMarker();
+    gutOn(d, BASE_KEYS, 'Formed');
+    gutOn(d, RECENT_KEYS, 'Formed');
+    gutOn(d, RECENT_KEYS.slice(-4), 'Loose');
+    const s = detectStrain(d, DK);
+    expect(s).not.toBeNull();
+    expect(s!.signals.map((x) => x.id)).toEqual(['restingHr', 'digestion']);
+    expect(s!.signals[1]).toMatchObject({ kind: 'context', weight: 1, value: 'off 4 of 7 days' });
+  });
+
+  it('never fires on the gut alone', () => {
+    const d = blank();
+    gutOn(d, BASE_KEYS, 'Formed');
+    gutOn(d, RECENT_KEYS, 'Diarrhea');
+    expect(detectStrain(d, DK)).toBeNull();
+  });
+
+  it('says nothing when a rough gut is this person\'s normal', () => {
+    const d = oneBigMarker();
+    gutOn(d, BASE_KEYS, 'Hard');
+    gutOn(d, RECENT_KEYS, 'Hard');
+    expect(detectStrain(d, DK)).toBeNull();
+  });
+
+  it('reads a journal with no movements logged as saying nothing about the gut', () => {
+    expect(detectStrain(oneBigMarker(), DK)).toBeNull();
+  });
+});

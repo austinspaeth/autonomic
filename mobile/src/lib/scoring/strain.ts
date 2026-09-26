@@ -46,10 +46,11 @@ import type { DownturnFactor } from './downturn';
 import { dayScore } from '../trends/metrics';
 import { keyRange, metricSeries } from '../trends/series';
 import { pick, shift } from './baseline';
+import { gutDay, isOffDay } from '../digestion';
 
 export type StrainSignalId =
   | 'hrRecovery' | 'legsUpHr' | 'restingHr' | 'sleepingHr'
-  | 'orthostatic' | 'symptoms' | 'exertion';
+  | 'orthostatic' | 'symptoms' | 'digestion' | 'exertion';
 
 export interface StrainSignal {
   id: StrainSignalId;
@@ -125,6 +126,10 @@ const SYMPTOM_MULT = 2;
 const SYMPTOM_MULT_BIG = 3;
 const SYMPTOM_EXTRA = 4;
 const SYMPTOM_EXTRA_BIG = 8;
+/** Digestion: off days this week, and how far the share of them has to rise
+ *  above the user's own. */
+const GUT_OFF_MIN = 3;
+const GUT_SHARE_RISE = 0.3;
 
 const num = (v: unknown): number | null => {
   const n = parseFloat(v as string);
@@ -260,6 +265,33 @@ export function detectStrain(days: DaysMap, dk: string, ctx: ScoreContext = {}):
     }
   }
 
+  /* ---------- digestion (context, never alone) ---------- */
+  // Hard, loose or strained movements, or a third day running without one,
+  // against the share of such days in the user's own baseline. Context rather
+  // than a marker: it is logged, not measured, and gut motility moves for plenty
+  // of reasons that are not autonomic. What it adds is corroboration — a week
+  // where the gut and the heart rate both left their normal is a stronger case
+  // than either alone. Only KNOWN days count on either side (../digestion), so
+  // somebody who does not log movements simply never has this signal.
+  const gutOn = (ks: string[]) => {
+    let off = 0, known = 0;
+    ks.forEach((k) => { const g = gutDay(days, k); if (!g) return; known++; if (isOffDay(g)) off++; });
+    return { off, known };
+  };
+  const gr = gutOn(recentKeys);
+  const gb = gutOn(baseKeys);
+  if (gr.known >= 4 && gb.known >= 14 && gr.off >= GUT_OFF_MIN) {
+    const baseShare = gb.off / gb.known;
+    if (gr.off / gr.known - baseShare >= GUT_SHARE_RISE) {
+      push({
+        id: 'digestion', kind: 'context', weight: 1,
+        label: 'Digestion', value: `off ${gr.off} of ${gr.known} days`,
+        phrase: 'your digestion has been off',
+        detail: `Hard, loose or strained movements, or days without one, on ${gr.off} of the last ${gr.known} days you logged, against about ${Math.round(baseShare * 100)}% of days normally. The gut runs on the same autonomic wiring as the markers above, so a change here often travels with them; on its own it is just a rough week.`,
+      });
+    }
+  }
+
   /* ---------- heavy activity (context, never alone) ---------- */
   let heavy = 0;
   let moderate = 0;
@@ -287,7 +319,7 @@ export function detectStrain(days: DaysMap, dk: string, ctx: ScoreContext = {}):
 
   // Strongest first, and a marker always leads: the card's sentence has to open
   // on something measured, not on "activity has run heavy".
-  const order: StrainSignalId[] = ['hrRecovery', 'orthostatic', 'restingHr', 'sleepingHr', 'legsUpHr', 'symptoms', 'exertion'];
+  const order: StrainSignalId[] = ['hrRecovery', 'orthostatic', 'restingHr', 'sleepingHr', 'legsUpHr', 'symptoms', 'digestion', 'exertion'];
   const ranked = signals.slice().sort((a, b) =>
     (b.kind === 'marker' ? 1 : 0) - (a.kind === 'marker' ? 1 : 0)
     || b.weight - a.weight

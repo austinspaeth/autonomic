@@ -69,6 +69,8 @@
  */
 
 import { redactMessage } from './errorReport';
+import { isTrustedReading } from './hrvQuality';
+import type { Entry } from './types';
 
 /** Base URL of every ping route. */
 export const PING_BASE = 'https://api.autonomic.care/ping';
@@ -96,7 +98,9 @@ export type PingKind =
   | 'log'                           // logged something by hand
   | 'use'                           // used a feature (Milestones, protocol)
   | 'fnd'                           // opened an Insights finding's deep dive
-  | 'rpt';                          // built an AI report
+  | 'rpt'                           // built an AI report
+  | 'rdg'                           // an HRV reading completed, by KIND
+  | 'mbp';                          // the morning baseline prompt card
 
 /**
  * The platform marker carried by a ping: one letter, appended to the cohort
@@ -343,6 +347,59 @@ export function reportCode(report: string | undefined): ReportCode | undefined {
 }
 
 /**
+ * Which KIND of HRV reading completed: `M` the day's first baseline (the
+ * "morning baseline", the one that sets the score and the pacing budget), `B`
+ * a later baseline, `T` a training (paced breathing) reading.
+ *
+ * Its own route rather than a letter on `cap`/`hrv`, because those already
+ * spend their slot on the SENSOR and are capped once per day for the whole
+ * route. Here each letter is capped on its own, so a day with a morning
+ * baseline and a training session is a headcount for both, and `M` over `open`
+ * is the share of people who took the reading the morning card asks for.
+ */
+export type ReadingKindCode = 'M' | 'B' | 'T';
+
+/** Map a reading type onto its letter. `firstBaselineToday` separates the
+ *  morning baseline from the rest; it means nothing for training. */
+export function readingKindCode(kind: string | undefined, firstBaselineToday: boolean): ReadingKindCode | undefined {
+  if (kind === 'breathHrv') return 'T';
+  if (kind === 'hrv') return firstBaselineToday ? 'M' : 'B';
+  return undefined;
+}
+
+/**
+ * Would a baseline reading be the day's FIRST? True when the day holds no other
+ * trusted baseline (`exceptId` excludes the reading itself, for callers that
+ * have already written it). Trusted, because a short imported sample never
+ * counted as anybody's morning reading and must not steal the letter.
+ */
+export function isFirstBaseline(
+  readings: readonly { id?: unknown; type: string; imported?: unknown; durationSec?: unknown }[] | undefined,
+  exceptId?: string,
+): boolean {
+  return !(readings || []).some((r) => r.type === 'hrv' && r.id !== exceptId && isTrustedReading(r as Entry));
+}
+
+/**
+ * What the morning baseline prompt card got: `S` shown, `T` the capture button
+ * tapped, `X` closed with the ✕ (or the backdrop), the card's only way to say no.
+ *
+ * ONE route for one card's outcomes, unlike the three offer routes. The offer
+ * funnel is read as conversion rates against revenue; this card is read as a
+ * simple split of what people did with it, and each letter is capped on its
+ * own so each is a headcount: `T / S` is how often it works, `X / S` how often
+ * it is waved away.
+ */
+export type MorningPromptCode = 'S' | 'T' | 'X';
+
+export function morningPromptCode(action: string | undefined): MorningPromptCode | undefined {
+  if (action === 'shown') return 'S';
+  if (action === 'take') return 'T';
+  if (action === 'closed') return 'X';
+  return undefined;
+}
+
+/**
  * Which subscription product: `Y` yearly, `M` monthly, `P` the promo year the
  * annual card sells, `F` the founder year. Carried by all three subscriber
  * routes (`sub`, `rst`, `lap`), so new, restored and lapsed read against each
@@ -375,7 +432,8 @@ export function planCode(sku: string | undefined): PlanCode | undefined {
  */
 export type SlotCode =
   | MethodCode | SurfaceCode | NotifyCode | PotsCode | ViewCode | OfferCode
-  | LogCode | FeatureCode | FindingCode | ReportCode | PlanCode;
+  | LogCode | FeatureCode | FindingCode | ReportCode | PlanCode
+  | ReadingKindCode | MorningPromptCode;
 
 /**
  * What this install could do at the moment it pinged: `F` free, `T` trial (the

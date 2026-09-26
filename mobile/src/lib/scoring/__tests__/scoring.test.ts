@@ -252,24 +252,26 @@ describe('day scoring', () => {
     const readings: Entry[] = [{ id: 'x', type: 'breathHrv', rmssd: '35', time: '08:00' }];
     const d = day({ readings });
     const res = scoreSet(readings, d, '2026-07-02', { '2026-07-02': d });
-    // components: HRV (great -> 100). No total power/pnn50/vlf/lfPeak (missing).
-    // hr missing on the reading, so no resting HR either.
-    expect(res.comps.map((c) => c.label)).toEqual(['HRV (RMSSD)']);
+    // components: Training HRV (great -> 100). No total power/pnn50/vlf/lfPeak
+    // (missing). hr missing on the reading, so no resting HR either.
+    expect(res.comps.map((c) => c.label)).toEqual(['Training HRV']);
     expect(res.score).toBe(100);
-    // 25 of the 95-point input set was available: the raw sum stays on
+    // 15 of the 110-point input set was available: the raw sum stays on
     // `weightSum` (the divisor for headroom math), `confidence` is the share.
-    expect(res.weightSum).toBe(25);
-    expect(res.confidence).toBe(26);
+    expect(res.weightSum).toBe(15);
+    expect(res.confidence).toBe(14);
   });
-  it('scoreSet: structured + unstructured blends RMSSD 70/30', () => {
+  it('scoreSet: baseline and training RMSSD are separate components', () => {
     const readings: Entry[] = [
       { id: 'u', type: 'hrv', rmssd: '20', time: '08:00' }, // bad -> 35
       { id: 's', type: 'breathHrv', rmssd: '35', time: '08:30' }, // great -> 100
     ];
     const d = day({ readings });
     const res = scoreSet(readings, d, '2026-07-02', { '2026-07-02': d });
-    const hrv = res.comps.find((c) => c.label === 'HRV (RMSSD)')!;
-    expect(hrv.p).toBeCloseTo(0.7 * 100 + 0.3 * 35);
+    expect(res.comps.find((c) => c.label === 'Baseline HRV')!.p).toBe(35);
+    expect(res.comps.find((c) => c.label === 'Training HRV')!.p).toBe(100);
+    // 25 and 15: the baseline is the heavier input.
+    expect(res.score).toBe(Math.round((25 * 35 + 15 * 100) / 40));
   });
   it('scoreCat bands', () => {
     expect(scoreCat(90).short).toBe('Excellent');

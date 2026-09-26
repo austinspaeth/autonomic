@@ -21,8 +21,9 @@ export function runBudgetAction(id: RecommendationId | undefined, openSheet: Ope
   // DaySummary -> Strip -> here -> forms -> DaySummary.
   /* eslint-disable @typescript-eslint/no-require-imports */
   if (id === 'hrv' || id === 'orthostatic') {
-    const { HrvSetup } = require('../hrv/Setup') as typeof import('../hrv/Setup');
-    openSheet((c) => React.createElement(HrvSetup, { controls: c }));
+    const { HrvSetup, suggestedKind } = require('../hrv/Setup') as typeof import('../hrv/Setup');
+    const kind = suggestedKind();
+    openSheet((c) => React.createElement(HrvSetup, { kind, controls: c }));
     return;
   }
   if (id === 'sleep') {

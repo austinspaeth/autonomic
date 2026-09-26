@@ -288,7 +288,7 @@ export function InsightsSkeleton({ shape }: { shape: InsightsShape }) {
       {shape.correlations > 0 ? (
         <CardGhost title="Correlations" help="correlations" height={h.correlations}>
           {/* How many ROWS, which is not the same as how many findings: the real card
-              folds a driver's findings into one row with a "+N" pill, so a report of
+              folds a driver's findings into one row, so a report of
               six correlations can be four rows. The remembered row heights are one
               per rendered row, so their count is the truthful one; the stored
               `correlations` figure is the finding count and stays what the button

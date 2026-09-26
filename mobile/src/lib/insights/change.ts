@@ -8,7 +8,7 @@
  * far easier to get wrong, because a before/after split will always find SOME
  * difference if you let it choose the split point freely.
  *
- * Two candidate shapes, and the guards that keep them honest:
+ * Three candidate shapes, and the guards that keep them honest:
  *
  * ONSET — the first day a factor appears. The split point is therefore fixed by
  * the data rather than chosen to maximise the effect, which is the whole reason
@@ -16,6 +16,12 @@
  * are trimmed to EQUAL length so a 60-day "after" can't be compared against a
  * 5-day "before", and the difference is tested with the same rank test
  * ./correlate uses.
+ *
+ * STOP — the day after the last dose of a REGIMEN. The mirror of an onset, with
+ * the same fixed split point, equal windows and test, and three guards of its
+ * own (see `regimenEvents`): it had to be a regimen (the start/stop rule's own
+ * density bar), the absence has to be sustained, and the user has to have gone
+ * on logging OTHER meds, or "stopped everything" is really "stopped logging".
  *
  * SHIFT — an outcome that simply moved, month against month, straight through
  * ../trends/compareWindows so its thresholds are the ones the rest of the app
@@ -27,7 +33,8 @@
  * Pure: no store, no MMKV, no expo, no React.
  */
 import { OUTCOME_FAMILY, TREND_METRICS, TREND_WINDOW_DAYS, compareWindows, type TrendMetricDef, type TrendMetricId } from '../trends';
-import { CORRELATION_OUTCOMES, MIN_EFFECT, midSentence, shortMetric } from './correlate';
+import { CORRELATION_OUTCOMES, MIN_EFFECT, REGIME_MIN_DENSITY, midSentence, shortMetric } from './correlate';
+import type { FactorDef } from './factors';
 import type { DayMatrix } from './matrix';
 import { benjaminiHochberg, confidenceLabel, confidencePips, mannWhitney, type ConfidenceLabel } from './stats';
 import { RETAIN_P } from './stability';
@@ -38,14 +45,51 @@ export const MIN_SIDE = 10;
 export const CHANGE_FDR_Q = 0.10;
 /** An onset older than this is history, not "this month". */
 export const MAX_ONSET_AGE_DAYS = 120;
+/**
+ * Other things started within this many days of an onset are named beside it.
+ *
+ * On a real journal vitamin C and Zyrtec began on the same morning, and the card
+ * could only ever say "since you started vitamin C": the one comparison that
+ * cannot tell the two apart, presented as if it had picked one. Naming them
+ * together is the honest version, and it is what the user needs to know before
+ * they act on it.
+ */
+export const CO_START_DAYS = 2;
+/**
+ * The shortest stretch that counts as an event when it is only being MENTIONED
+ * beside another change ("you also started vitamin C in this stretch"): a week
+ * of regimen before a stop and a week of absence after it. A change that heads
+ * the card needs MIN_SIDE either side, because it is tested; a mention only has
+ * to be true.
+ */
+export const MIN_EVENT_DAYS = 7;
+/** How far back the "was it a regimen" density is read before a stop. */
+export const STOP_REGIMEN_DAYS = 28;
+/**
+ * Share of the days after a stop on which OTHER meds were still logged. Below
+ * it, the absence is the user stopping logging rather than stopping the thing,
+ * and nobody's supplement is declared stopped because they got tired of the app.
+ */
+export const STOP_MIN_LOGGING = 0.6;
 
 export interface BiggestChange {
   id: string;
-  kind: 'onset' | 'shift' | 'welcome';
+  kind: 'onset' | 'stop' | 'shift' | 'welcome';
   /** The columns behind the claim, for ./detail. `outcome` is null only on the
    *  fabricated welcome card, which has no data to chart. */
   outcome: TrendMetricId | null;
   factorId: string | null;
+  /** Driver keys of everything the change names, its own first: things started
+   *  or stopped together are one event, and every one of them is on this card,
+   *  as is anything `context` mentions. */
+  drivers: string[];
+  /**
+   * What ELSE started or stopped in the stretch the change compares ("You also
+   * started vitamin C and Zyrtec in this stretch..."), or null. Shown in the
+   * finding's sheet. A before/after silently credits one change with everything
+   * else that moved in the same weeks; this is the sentence that says so.
+   */
+  context: string | null;
   /** Index into the matrix's key range where the before/after split sits. */
   onsetIndex: number | null;
   /** "SDNN is up since you started magnesium glycinate" */
@@ -95,7 +139,7 @@ function worthSaying(def: TrendMetricDef, after: number, before: number): boolea
 }
 
 interface Cand {
-  kind: 'onset' | 'shift';
+  kind: 'onset' | 'stop' | 'shift';
   id: string;
   def: TrendMetricDef;
   /** The onset's noun ("magnesium glycinate"), or null for a shift. */
@@ -187,6 +231,115 @@ function onsetCandidates(matrix: DayMatrix): Cand[] {
   return out;
 }
 
+/** Last index where a factor column reads 1, or -1. */
+function lastOnIndex(col: (number | null)[]): number {
+  for (let i = col.length - 1; i >= 0; i--) if (col[i] === 1) return i;
+  return -1;
+}
+
+/** One thing somebody started or stopped, with the index it happened at (for a
+ *  stop, the first day WITHOUT it). */
+interface RegimenEvent {
+  factor: FactorDef;
+  key: string;
+  kind: 'start' | 'stop';
+  at: number;
+  noun: string;
+  /** For a stop: the first day it was ever taken, so the regimen's length is known. */
+  firstOn: number;
+}
+
+/**
+ * Every start and stop in the window, for things a person takes
+ * (`onsetNoun` factors), one per driver per kind.
+ *
+ * A START is the first day a factor appears, at least MIN_SIDE days into the span
+ * where its category was being logged (./matrix's active window), or it is only
+ * the day logging began. A STOP is the day after the last dose, and it has to earn
+ * the word:
+ *
+ * 1. IT WAS A REGIMEN. Over the last STOP_REGIMEN_DAYS before it, the thing was
+ *    taken on at least REGIME_MIN_DENSITY of known days — the same bar
+ *    ./correlate uses to call a block of days one episode, so the two modules
+ *    agree about what a regimen is. Stopping something taken twice is not news.
+ * 2. THE ABSENCE IS SUSTAINED. At least `minDays` days with none, to the end of
+ *    the window.
+ * 3. THE USER KEPT LOGGING. Other meds appear on at least STOP_MIN_LOGGING of the
+ *    days after. Somebody who stopped opening the meds section has "stopped"
+ *    every supplement on the same day, and the active-window rule cannot see it,
+ *    because a span never closes.
+ */
+function regimenEvents(matrix: DayMatrix, minDays: number): RegimenEvent[] {
+  const total = matrix.keys.length;
+  const out: RegimenEvent[] = [];
+  const seen = new Set<string>();
+  for (const f of matrix.defs) {
+    if (f.kind !== 'binary' || !f.onsetNoun) continue;
+    const col = matrix.factors[f.id];
+    if (!col) continue;
+    const key = f.variantOf || f.id;
+    const first = onsetIndex(col);
+    const known = firstKnownIndex(col);
+    if (first < 0 || known < 0) continue;
+
+    if (!seen.has(`start|${key}`) && first - known >= MIN_SIDE) {
+      seen.add(`start|${key}`);
+      out.push({ factor: f, key, kind: 'start', at: first, noun: f.onsetNoun, firstOn: first });
+    }
+
+    const stopAt = lastOnIndex(col) + 1;
+    if (seen.has(`stop|${key}`) || total - stopAt < minDays) continue;
+    const from = Math.max(first, stopAt - STOP_REGIMEN_DAYS);
+    if (stopAt - from < minDays) continue;
+    let on = 0, knownBefore = 0;
+    for (let i = from; i < stopAt; i++) { if (col[i] != null) { knownBefore++; if (col[i] === 1) on++; } }
+    if (!knownBefore || on / knownBefore < REGIME_MIN_DENSITY) continue;
+    const pres = f.presence;
+    let logging = 0;
+    for (let i = stopAt; i < total; i++) {
+      const d = matrix.days[matrix.keys[i]];
+      if (d && (!pres || pres.has(d))) logging++;
+    }
+    if (logging / (total - stopAt) < STOP_MIN_LOGGING) continue;
+    seen.add(`stop|${key}`);
+    out.push({ factor: f, key, kind: 'stop', at: stopAt, noun: f.onsetNoun, firstOn: first });
+  }
+  return out;
+}
+
+/**
+ * Stop candidates: for each regimen that ended, every outcome compared in the
+ * weeks before the stop against the weeks after. Same windows, same test and the
+ * same family as an onset — a stop is an onset read in the other direction.
+ */
+function stopCandidates(matrix: DayMatrix): Cand[] {
+  const out: Cand[] = [];
+  const total = matrix.keys.length;
+  regimenEvents(matrix, MIN_SIDE).forEach((e) => {
+    if (e.kind !== 'stop' || total - e.at > MAX_ONSET_AGE_DAYS) return;
+    const span = Math.min(e.at - e.firstOn, total - e.at);
+    if (span < MIN_SIDE) return;
+    CORRELATION_OUTCOMES.forEach((id) => {
+      if (e.factor.blocks.includes(OUTCOME_FAMILY[id])) return;
+      const series = matrix.outcomes[id];
+      if (!series) return;
+      const before: number[] = [], after: number[] = [];
+      for (let i = e.at - span; i < e.at; i++) { const v = series[i]; if (v != null) before.push(v); }
+      for (let i = e.at; i < e.at + span; i++) { const v = series[i]; if (v != null) after.push(v); }
+      if (before.length < MIN_SIDE || after.length < MIN_SIDE) return;
+      const g = mannWhitney(after, before);
+      if (!Number.isFinite(g.median1) || !Number.isFinite(g.median2) || g.median1 === g.median2) return;
+      out.push({
+        kind: 'stop', id: `stop:${e.factor.id}|${id}`, def: TREND_METRICS[id], driver: e.noun,
+        outcome: id, factorId: e.factor.id, onsetAt: e.at,
+        before: g.median2, after: g.median1, n: before.length + after.length,
+        spanDays: span, r: g.r, p: g.p,
+      });
+    });
+  });
+  return out;
+}
+
 /**
  * Shift candidates: an outcome that moved month against month.
  *
@@ -240,7 +393,7 @@ const HEADLINE_RANK: Partial<Record<TrendMetricId, number>> = {
 };
 
 const loudness = (pips: number, r: number, kind: string, id: TrendMetricId) =>
-  pips * 100 + Math.abs(r) * 50 + (HEADLINE_RANK[id] || 0) * 2 + (kind === 'onset' ? 1 : 0);
+  pips * 100 + Math.abs(r) * 50 + (HEADLINE_RANK[id] || 0) * 2 + (kind === 'onset' || kind === 'stop' ? 1 : 0);
 
 /**
  * `retain` — the id of the change a previous real report headlined. A strict
@@ -251,7 +404,7 @@ const loudness = (pips: number, r: number, kind: string, id: TrendMetricId) =>
  * correlation list, applied to the one slot up here.
  */
 export function findBiggestChange(matrix: DayMatrix, opts: { retain?: string | null } = {}): BiggestChange | null {
-  const cands = [...onsetCandidates(matrix), ...shiftCandidates(matrix)];
+  const cands = [...onsetCandidates(matrix), ...stopCandidates(matrix), ...shiftCandidates(matrix)];
   if (!cands.length) return null;
 
   // Correct over the whole family first, then apply the clinical bars to the
@@ -281,16 +434,31 @@ export function findBiggestChange(matrix: DayMatrix, opts: { retain?: string | n
   const magnitude = def.fmt(Math.abs(c.after - c.before));
 
   // Verb agreement: "Bowel movements ARE up", "RMSSD IS up". A word ending in a
-  // lowercase plural-s marks the plural labels; the acronyms stay clear of it.
-  const plural = metric.split(' ').some((w) => /[a-z]s$/.test(w));
-  const headline = c.kind === 'onset'
-    ? `${metric} ${plural ? 'are' : 'is'} ${up ? 'up' : 'down'} since you started ${c.driver}`
-    : `${metric} ${plural ? 'have' : 'has'} ${up ? 'risen' : 'fallen'} over the last month`;
+  // lowercase plural-s marks the plural labels; the acronyms stay clear of it,
+  // and so does a double s ("Stool softness IS up").
+  const plural = metric.split(' ').some((w) => /[a-rt-z]s$/.test(w));
+  const verb = c.kind === 'stop' ? 'stopped' : 'started';
+  const story = describeEvents(matrix, c);
+  const nouns = [c.driver as string, ...story.together.map((e) => e.noun)];
+  const headline = c.kind === 'shift'
+    ? `${metric} ${plural ? 'have' : 'has'} ${up ? 'risen' : 'fallen'} over the last month`
+    : `${metric} ${plural ? 'are' : 'is'} ${up ? 'up' : 'down'} since you ${verb} ${listOf(nouns)}`;
 
   const said = midSentence(metric);
-  const body = c.kind === 'onset'
-    ? `In the ${c.spanDays} days since, ${said} ran ${magnitude} ${def.unit} ${up ? 'higher' : 'lower'} than the ${c.spanDays} days before. This is an association in your own log, not proof of a cause.`
-    : `Across the last ${c.spanDays} days, ${said} ran ${magnitude} ${def.unit} ${up ? 'higher' : 'lower'} than the ${c.spanDays} days before.`;
+  const apart = nouns.length === 2
+    ? ` Both ${verb} within a couple of days of each other, so your log cannot tell which one this goes with, if either.`
+    : nouns.length > 2
+      ? ` They all ${verb} within a couple of days of each other, so your log cannot tell which one this goes with, if any.`
+      : ' This is an association in your own log, not proof of a cause.';
+  // A medication is somebody's prescriber's business: nothing here may read as a
+  // reason to start, stop or restart one.
+  const named = [story.self, ...story.together, ...story.during].filter(Boolean) as RegimenEvent[];
+  const doctor = c.kind !== 'shift' && named.some((e) => e.factor.group === 'medication')
+    ? ' Talk to your doctor before changing a medication.' : '';
+  const body = c.kind === 'shift'
+    ? `Across the last ${c.spanDays} days, ${said} ran ${magnitude} ${def.unit} ${up ? 'higher' : 'lower'} than the ${c.spanDays} days before.${story.context ? ` ${story.context}` : ''}`
+    : `In the ${c.spanDays} days since, ${said} ran ${magnitude} ${def.unit} ${up ? 'higher' : 'lower'} than the ${c.spanDays} days before.${apart}${story.context ? ` ${story.context}` : ''}${doctor}`;
+  const drivers = named.map((e) => e.key).filter((k, i, all) => all.indexOf(k) === i);
 
   // A percentage only where a ratio actually means something, which the registry
   // already knows: `deltaKind === 'relative'` is exactly the metrics whose own
@@ -307,6 +475,8 @@ export function findBiggestChange(matrix: DayMatrix, opts: { retain?: string | n
     kind: c.kind,
     outcome: c.outcome,
     factorId: c.factorId,
+    drivers,
+    context: story.context ? `${story.context}${doctor}` : doctor.trim() || null,
     onsetIndex: c.onsetAt,
     headline,
     body,
@@ -341,6 +511,8 @@ export const WELCOME_CHANGE: BiggestChange = {
   // reads this as "nothing to chart" and the card stays untappable.
   outcome: null,
   factorId: null,
+  drivers: [],
+  context: null,
   onsetIndex: null,
   headline: 'You downloaded this app',
   body: 'Easily the biggest change this month. Log a few days and this card starts reporting the real ones: what you changed, what moved, and how sure we are about it.',
@@ -359,6 +531,67 @@ export const WELCOME_CHANGE: BiggestChange = {
   pips: 5,
   confidence: 'Very strong',
 };
+
+/**
+ * The rest of the story around a change: what happened at the same moment, and
+ * what else started or stopped inside the stretch it compares.
+ *
+ * `together` — the same kind of event (a start beside a start) within
+ * CO_START_DAYS: one event, named in the headline. `during` — anything else
+ * inside the compared window: said in `context`, because a before/after credits
+ * its one named change with everything else that moved in those weeks. For a
+ * shift the window is the two months it compares, and `context` is the honest
+ * answer to "what changed then?" without claiming any of it is why.
+ */
+function describeEvents(matrix: DayMatrix, c: Cand): {
+  self: RegimenEvent | null;
+  together: RegimenEvent[];
+  during: RegimenEvent[];
+  context: string | null;
+} {
+  const events = regimenEvents(matrix, MIN_EVENT_DAYS);
+  const total = matrix.keys.length;
+  const lead = c.factorId ? matrix.defs.find((f) => f.id === c.factorId) : undefined;
+  const selfKey = lead ? lead.variantOf || lead.id : null;
+  const kind = c.kind === 'stop' ? 'stop' : 'start';
+  const self = selfKey ? events.find((e) => e.key === selfKey && e.kind === kind) || null : null;
+
+  const at = c.onsetAt;
+  const together: RegimenEvent[] = [];
+  const nouns = new Set<string>(c.driver ? [c.driver.toLowerCase()] : []);
+  if (at != null && c.kind !== 'shift') {
+    for (const e of events) {
+      if (e.kind !== kind || e.key === selfKey || Math.abs(e.at - at) > CO_START_DAYS) continue;
+      if (nouns.has(e.noun.toLowerCase())) continue;
+      nouns.add(e.noun.toLowerCase());
+      together.push(e);
+    }
+  }
+
+  const [from, to] = c.kind === 'shift'
+    ? [total - c.spanDays * 2, total]
+    : [(at as number) - c.spanDays, (at as number) + c.spanDays];
+  const during = events.filter((e) => e !== self && !together.includes(e)
+    && !(e.key === selfKey && e.kind === kind) && e.at > from && e.at < to);
+
+  if (!during.length) return { self, together, during, context: null };
+  const started = during.filter((e) => e.kind === 'start').map((e) => e.noun);
+  const stopped = during.filter((e) => e.kind === 'stop').map((e) => e.noun);
+  const parts = [
+    started.length ? `started ${listOf(started)}` : '',
+    stopped.length ? `stopped ${listOf(stopped)}` : '',
+  ].filter(Boolean);
+  const context = c.kind === 'shift'
+    ? `In these two months you ${parts.join(' and ')}.`
+    : `You also ${parts.join(' and ')} in this stretch, so the change cannot be pinned on any one of them.`;
+  return { self, together, during, context };
+}
+
+/** "a", "a and b", "a, b and c". */
+function listOf(items: string[]): string {
+  if (items.length < 2) return items[0] || '';
+  return `${items.slice(0, -1).join(', ')} and ${items[items.length - 1]}`;
+}
 
 /** Outcome ids a change may be reported for, exported for the tests. */
 export const CHANGE_OUTCOMES: TrendMetricId[] = CORRELATION_OUTCOMES;

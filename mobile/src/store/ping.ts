@@ -83,8 +83,8 @@
 import { AppState as RNAppState, Platform } from 'react-native';
 import { MMKV } from 'react-native-mmkv';
 import {
-  easternDay, featureCode, findingCode, logCode, methodCode, notifyCode, offerCode,
-  offerFailureBody, pingUrl, planCode, platformCode, reportCode, resolveCohort, shouldPingDaily,
+  easternDay, featureCode, findingCode, logCode, methodCode, morningPromptCode, notifyCode, offerCode,
+  offerFailureBody, pingUrl, planCode, platformCode, readingKindCode, reportCode, resolveCohort, shouldPingDaily,
   surfaceCode, tierCode, type PlanCode,
   type LogKind, type OfferFailureBody, type PingKind, type PotsCode, type PurchaseOutcome,
   type SlotCode, type ViewCode,
@@ -119,6 +119,8 @@ const KEY_LAST_LOG = 'pingLastLog';     // + the logged-kind letter
 const KEY_LAST_USE = 'pingLastUse';     // + the feature letter
 const KEY_LAST_FND = 'pingLastFnd';     // + the finding letter
 const KEY_LAST_RPT = 'pingLastRpt';     // + the report letter
+const KEY_LAST_RDG = 'pingLastRdg';     // + the reading-kind letter
+const KEY_LAST_MBP = 'pingLastMbp';     // + the morning-prompt letter
 /** Written by ./tier.ts on first launch: this install's birthday. */
 const KEY_TRIAL_STARTED = 'trialStartedAt';
 
@@ -602,7 +604,7 @@ export function pingViewOpened(view: 'insights' | 'progress' | 'pacing'): void {
  * route exists for — and `logCode` returns undefined on purpose for most
  * reading types.
  */
-function pingPerLetter(kind: 'log' | 'use' | 'fnd' | 'rpt', base: string, slot: SlotCode | undefined): void {
+function pingPerLetter(kind: 'log' | 'use' | 'fnd' | 'rpt' | 'rdg' | 'mbp', base: string, slot: SlotCode | undefined): void {
   if (!slot) return;
   pingDaily(kind, slotKey(base, slot), slot);
 }
@@ -638,6 +640,24 @@ export function pingFinding(finding: 'early' | 'unconfirmed' | 'change' | 'corre
  *  health report) or `'doctor'` (the medical summary). */
 export function pingReport(report: 'data' | 'overall' | 'doctor'): void {
   pingPerLetter('rpt', KEY_LAST_RPT, reportCode(report));
+}
+
+/**
+ * An HRV reading COMPLETED, by kind: the day's first baseline (`M`), a later
+ * baseline (`B`) or a training reading (`T`). Fired wherever the capture
+ * completed counter fires — the session engine and the two wrist receivers —
+ * and, like them, only for a reading taken today. The caller decides
+ * `firstBaselineToday` (see `isFirstBaseline` in lib/ping.ts), since only it
+ * knows whether the reading has already been written.
+ */
+export function pingReadingKind(kind: 'hrv' | 'breathHrv', firstBaselineToday: boolean): void {
+  pingPerLetter('rdg', KEY_LAST_RDG, readingKindCode(kind, firstBaselineToday));
+}
+
+/** What the morning baseline prompt card got: shown, "Take reading", "Not
+ *  today", or closed with the ✕. */
+export function pingMorningPrompt(action: 'shown' | 'take' | 'closed'): void {
+  pingPerLetter('mbp', KEY_LAST_MBP, morningPromptCode(action));
 }
 
 /**

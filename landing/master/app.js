@@ -4282,7 +4282,9 @@
 
      The four routes that say what people DO once they are in: what they log by
      hand (`log`), and what they dig into — Milestones and the protocol (`use`),
-     an Insights finding's deep dive (`fnd`), which AI report (`rpt`). Two cards,
+     an Insights finding's deep dive (`fnd`), which AI report (`rpt`), plus the
+     KIND of HRV reading taken (`rdg`, on the log card) and what the morning
+     baseline card got (`mbp`, on the dig card). Two cards,
      because seventeen lines on one axis is a legend, not a chart.
 
      All four are capped per LETTER, so each line is a headcount for that one
@@ -4300,7 +4302,10 @@
     { kind: 'log', slot: 'W', name: 'Logged water', color: COLOR.s4 },
     { kind: 'log', slot: 'B', name: 'Logged a bowel movement', color: COLOR.s5 },
     { kind: 'log', slot: 'P', name: 'Logged blood pressure', color: COLOR.s2 },
-    { kind: 'log', slot: 'R', name: 'Logged resting heart rate', color: COLOR.s6 }
+    { kind: 'log', slot: 'R', name: 'Logged resting heart rate', color: COLOR.s6 },
+    { kind: 'rdg', slot: 'M', name: 'Took a morning baseline', color: COLOR.green },
+    { kind: 'rdg', slot: 'B', name: 'Took a later baseline', color: COLOR.muted },
+    { kind: 'rdg', slot: 'T', name: 'Took a training reading', color: COLOR.red }
   ];
   var DIG_LINES = [
     { kind: 'use', slot: 'M', name: 'Opened Milestones', color: COLOR.s1 },
@@ -4312,7 +4317,10 @@
     { kind: 'fnd', slot: 'R', name: 'Opened a correlation', color: COLOR.s6 },
     { kind: 'rpt', slot: 'D', name: 'AI: data for prompt', color: COLOR.s4 },
     { kind: 'rpt', slot: 'H', name: 'AI: full health report', color: COLOR.s2 },
-    { kind: 'rpt', slot: 'C', name: 'AI: medical summary for doctor', color: COLOR.green }
+    { kind: 'rpt', slot: 'C', name: 'AI: medical summary for doctor', color: COLOR.green },
+    { kind: 'mbp', slot: 'S', name: 'Morning card: shown', color: COLOR.muted },
+    { kind: 'mbp', slot: 'T', name: 'Morning card: took the reading', color: COLOR.green },
+    { kind: 'mbp', slot: 'X', name: 'Morning card: closed', color: COLOR.red }
   ];
 
   function renderSlotLines(ix, days, lines, chartId, noteId, emptyText) {
@@ -9539,7 +9547,9 @@
     { key: 'log', label: 'Logged', color: COLOR.s1, note: 'logged something by hand' },
     { key: 'use', label: 'Feature', color: COLOR.s3, note: 'Milestones opened or protocol saved' },
     { key: 'fnd', label: 'Finding', color: COLOR.s7, note: 'opened a finding\'s deep dive' },
-    { key: 'rpt', label: 'AI report', color: COLOR.s4, note: 'built an AI report' }
+    { key: 'rpt', label: 'AI report', color: COLOR.s4, note: 'built an AI report' },
+    { key: 'rdg', label: 'Reading kind', color: PC.reading, note: 'morning baseline, later baseline or training' },
+    { key: 'mbp', label: 'Morning card', color: COLOR.s5, note: 'shown, took it, closed' }
   ];
 
   /**

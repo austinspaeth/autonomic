@@ -16,7 +16,9 @@ import { health } from '../../lib/health';
 import { HrvSession, type SessionConfig } from './Session';
 import { MindfulnessIcon } from './MindfulnessIcon';
 
-const STEPS: { title: string; sub: string }[] = [
+/** The watch paces every Breathe session, so the third step says which way to
+ *  take it: a baseline ignores the animation, a training reading follows it. */
+const stepsFor = (kind: SessionConfig['kind']): { title: string; sub: string }[] => [
   {
     title: 'Open Mindfulness on your Apple Watch',
     sub: 'The teal app with the flower icon, shown above.',
@@ -27,7 +29,9 @@ const STEPS: { title: string; sub: string }[] = [
   },
   {
     title: 'Tap Breathe on the watch',
-    sub: 'Then tell us below, and sit still through the whole reading.',
+    sub: kind === 'unstructured'
+      ? 'Then tell us below. Ignore the breathing animation, breathe normally and stay still through the whole reading.'
+      : 'Then tell us below, follow its breathing, and sit still through the whole reading.',
   },
 ];
 
@@ -61,7 +65,7 @@ export function WatchPrep({ config, controls }: { config: SessionConfig; control
       </Text>
 
       <View style={{ alignSelf: 'stretch', gap: 8 }}>
-        {STEPS.map((s, i) => (
+        {stepsFor(config.kind).map((s, i) => (
           <View key={i} style={{ flexDirection: 'row', gap: 12, padding: 14, borderRadius: radius.control, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2 }}>
             <View style={{ width: 24, height: 24, borderRadius: 12, backgroundColor: p.accentSoft, alignItems: 'center', justifyContent: 'center', marginTop: 1 }}>
               <Text style={{ color: p.accent, fontWeight: '800', fontSize: 13 }}>{i + 1}</Text>

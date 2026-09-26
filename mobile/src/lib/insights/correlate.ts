@@ -189,10 +189,32 @@ export const EARLY_MAX = 3;
 export const MAX_MINORITY_RUN_SHARE = 0.75;
 
 /**
+ * How solid the block holding MAX_MINORITY_RUN_SHARE of the minority has to be.
+ *
+ * The first version of this rule asked for one UNBROKEN run, and a single missed
+ * day defeated it. Measured on a real 118-day journal: vitamin C started on Aug 3
+ * and was taken on 47 of the next 48 days, but the one skipped day split it into
+ * runs of 24 and 23, a share of 0.51, so the sweep tested it as a day-level on/off
+ * and reported "Vitamin C days show lower next-day RMSSD" at the top of the card.
+ * Zyrtec (started the same day, four skips) and magnesium (stopped two weeks
+ * earlier, two skips) went through the same hole, and between them those three
+ * drivers produced eight of the list's rows, every one of them "after August vs
+ * before August", in the month the user's HRV happened to fall.
+ *
+ * So the block is now the SHORTEST stretch of known days holding the share, and it
+ * counts as one episode when the minority fills at least this much of it. Real
+ * logs skip days, and 47 of 48 is a start, not a pattern. An unbroken run has
+ * density 1, so everything the old rule caught is still caught; a supplement taken
+ * every other day has density ~0.5 however long it runs, so genuine alternation is
+ * still tested.
+ */
+export const REGIME_MIN_DENSITY = 0.85;
+
+/**
  * Is this binary column a regime change rather than a day-level on/off?
  *
  * Reads only the days where the factor is KNOWN (./matrix has already nulled the
- * era before the category was logged), so the run is measured against real
+ * era before the category was logged), so the block is measured against real
  * evidence rather than against a stretch of unknowns.
  *
  * Continuous columns are never regime changes: a factor with a real range is split
@@ -203,15 +225,115 @@ export function isRegimeChange(col: (number | null)[]): boolean {
   for (const v of col) { if (v === 1) on++; else if (v === 0) off++; }
   if (!on || !off) return false;
   const minority = on <= off ? 1 : 0;
-  const count = minority === 1 ? on : off;
 
-  let longest = 0, run = 0;
+  // Positions of the minority, counted in KNOWN days so an unlogged day breaks
+  // nothing and stretches nothing.
+  const at: number[] = [];
+  let known = 0;
   for (const v of col) {
-    if (v == null) continue;          // an unlogged day breaks nothing: skip it
-    if (v === minority) { run++; if (run > longest) longest = run; }
-    else run = 0;
+    if (v == null) continue;
+    if (v === minority) at.push(known);
+    known++;
   }
-  return longest / count >= MAX_MINORITY_RUN_SHARE;
+  const need = Math.ceil(at.length * MAX_MINORITY_RUN_SHARE);
+  let shortest = Infinity;
+  for (let i = 0; i + need - 1 < at.length; i++) {
+    shortest = Math.min(shortest, at[i + need - 1] - at[i] + 1);
+  }
+  return need / shortest >= REGIME_MIN_DENSITY;
+}
+
+/**
+ * Half-width, in days, of the neighbourhood a day is compared against when a
+ * finding is checked for being the calendar in disguise. 14 either side is a
+ * month, the same span Trend Watch calls "this month".
+ */
+export const DETREND_HALF_WINDOW = 14;
+/** Neighbours with a value needed before a day's own departure is read at all. */
+export const DETREND_MIN_NEIGHBOURS = 6;
+/** The bar the finding has to clear a second time, on the detrended outcome. */
+export const DETREND_MAX_P = 0.05;
+/** The check only runs on an outcome spanning at least a full month window. */
+export const DETREND_MIN_SPAN = 2 * DETREND_HALF_WINDOW + 2;
+
+/**
+ * Each day's outcome minus the median of the month around it (itself left out).
+ *
+ * THE FAILURE THIS EXISTS FOR is the regime rule's blind spot. MCT oil on the same
+ * 118-day journal was taken in scattered clusters, never one solid block, so it is
+ * not a start/stop and the sweep tested it fairly as a kind of day. But almost all
+ * of those days sat in the last five weeks, which is when that user's RMSSD fell,
+ * and "MCT Oil days show lower next-day RMSSD" was the decline wearing a
+ * supplement's name. CoQ10 was the mirror image: taken almost every day, with most
+ * of its OFF days bunched in the early, better months.
+ *
+ * Neither the correction nor the clinical bars can see this: the association is
+ * real, it just belongs to the calendar. Asking the question again on the day's
+ * departure from its own month can. A factor that genuinely moves the outcome still
+ * separates the two groups when every day is measured against its neighbours;
+ * one that only rode a slow drift does not.
+ */
+export function detrended(col: (number | null)[], half = DETREND_HALF_WINDOW): (number | null)[] {
+  const out = new Array<number | null>(col.length).fill(null);
+  let first = -1, last = -1;
+  col.forEach((v, i) => { if (v != null) { if (first < 0) first = i; last = i; } });
+  for (let i = 0; i < col.length; i++) {
+    const v = col[i];
+    if (v == null) continue;
+    // SYMMETRIC, shrinking toward either end of the data. A one-sided window at
+    // the recent edge compares the last days of a slide against the higher days
+    // before them, which is the very bias this exists to remove, and it sits
+    // exactly where a newly started supplement is densest.
+    const h = Math.min(half, i - first, last - i);
+    const near: number[] = [];
+    for (let j = i - h; j <= i + h; j++) {
+      const w = col[j];
+      if (j !== i && w != null) near.push(w);
+    }
+    if (near.length < DETREND_MIN_NEIGHBOURS) continue;
+    out[i] = v - median(near);
+  }
+  return out;
+}
+
+/** The matrix with every outcome replaced by its departure from its own month.
+ *  Built lazily, once per sweep, and only when something survives to be checked. */
+function detrendedMatrix(matrix: DayMatrix): DayMatrix {
+  const outcomes: DayMatrix['outcomes'] = {};
+  (Object.keys(matrix.outcomes) as TrendMetricId[]).forEach((id) => {
+    const col = matrix.outcomes[id];
+    if (col) outcomes[id] = detrended(col);
+  });
+  return { ...matrix, outcomes };
+}
+
+/**
+ * Does the finding survive being asked within its own month? Same factor, same
+ * lag, same coverage floors, and it must point the same way at raw p ≤
+ * DETREND_MAX_P. Applied AFTER the correction and the clinical bars, like every
+ * other filter here, so it can only ever remove a row, never make the family
+ * more permissive.
+ */
+function holdsWithinPeriod(local: DayMatrix, c: Candidate, floors: Floors, maxP = DETREND_MAX_P): boolean {
+  // A journal shorter than one month window has no "month around the day" to
+  // measure against: the windows shrink toward nothing and the check fails
+  // EVERYTHING. Measured with a planted +8 ms effect over 20 seeds: at 20 days it
+  // found 0 of 20 with the check against 12 without it, while from 30 days on the
+  // two agreed within a seed. So a young journal skips it, and a finding the
+  // detrended column cannot even test is kept rather than blamed on the calendar:
+  // "could not check" is not "failed the check".
+  if (knownSpan(local.outcomes[c.def.id]) < DETREND_MIN_SPAN) return true;
+  const t = test(local, c.factor, c.def, c.lag, floors);
+  if (!t) return true;
+  return t.p <= maxP && Math.sign(t.r) === Math.sign(c.r);
+}
+
+/** Days from the first to the last value in a column, inclusive; 0 when empty. */
+function knownSpan(col: (number | null)[] | undefined): number {
+  if (!col) return 0;
+  let first = -1, last = -1;
+  col.forEach((v, i) => { if (v != null) { if (first < 0) first = i; last = i; } });
+  return first < 0 ? 0 : last - first + 1;
 }
 
 /**
@@ -614,6 +736,20 @@ export function testFinding(matrix: DayMatrix, id: string): Correlation | null {
  * is exactly what the noise suite measures.
  */
 export function findCorrelations(matrix: DayMatrix, opts: { retain?: readonly string[] } = {}): Correlation[] {
+  return sweepCorrelations(matrix, opts).correlations;
+}
+
+/**
+ * `findCorrelations`, plus the drivers whose findings were dropped for belonging
+ * to the calendar (`holdsWithinPeriod`). Those are neither findings nor null
+ * results — the data cannot separate them from the period they sat in — so
+ * `findNoImpact` must not call them "no detected impact" either.
+ */
+export function sweepCorrelations(matrix: DayMatrix, opts: { retain?: readonly string[] } = {}): {
+  correlations: Correlation[];
+  confounded: Set<string>;
+} {
+  const confounded = new Set<string>();
   const retained = new Set(opts.retain || []);
   const regime = regimeFactorIds(matrix);
   const candidates: Candidate[] = [];
@@ -632,7 +768,7 @@ export function findCorrelations(matrix: DayMatrix, opts: { retain?: readonly st
     });
   });
 
-  if (!candidates.length) return [];
+  if (!candidates.length) return { correlations: [], confounded };
 
   // One family, one correction, over EVERY test that ran.
   //
@@ -647,18 +783,32 @@ export function findCorrelations(matrix: DayMatrix, opts: { retain?: readonly st
     // A candidate passes on its own merits, or coasts on a previous report's:
     // retention never admits anything the user hasn't already been shown, and its
     // q is this build's honest (weaker) q, so the confidence pips sag with it.
-    .map((c, i) => ({ c, q: fdr.q[i], ok: fdr.rejected[i] || (retained.has(candidateId(c)) && c.p <= RETAIN_P) }))
+    .map((c, i) => ({ c, q: fdr.q[i], shown: retained.has(candidateId(c)), ok: fdr.rejected[i] || (retained.has(candidateId(c)) && c.p <= RETAIN_P) }))
     .filter((s) => s.ok)
     // Clinical bars, applied to what survived: too small to matter, or a
     // difference between two perfectly normal values.
     .filter((s) => Math.abs(s.c.r) >= MIN_EFFECT && worthSaying(s.c.def, s.c.high, s.c.low)
-      && hasVisibleDelta(s.c.def, s.c.high, s.c.low))
-    .map((s) => describe(s.c, s.q));
+      && hasVisibleDelta(s.c.def, s.c.high, s.c.low));
+
+  // Last, the calendar: a finding that disappears when each day is measured
+  // against its own month was the month. A finding the user has already been
+  // shown is held to it at the looser bar (RETAIN_P), whether or not it also
+  // passed strictly this build: strict to enter, looser to stay, on both
+  // questions. Keying this on "passed strictly" instead dropped a remembered
+  // finding on exactly the build where its evidence got STRONGER.
+  const local = survivors.length ? detrendedMatrix(matrix) : matrix;
+  const kept = survivors.filter((s) => {
+    if (holdsWithinPeriod(local, s.c, { pairs: MIN_PAIRS, group: MIN_GROUP }, s.shown ? RETAIN_P : DETREND_MAX_P)) return true;
+    confounded.add(s.c.factor.variantOf || s.c.factor.id);
+    return false;
+  }).map((s) => describe(s.c, s.q));
 
   // Strongest first, so the dedup passes below keep the best of each collision.
-  survivors.sort((a, b) => (b.pips - a.pips) || (Math.abs(b.r) - Math.abs(a.r)));
+  kept.sort((a, b) => (b.pips - a.pips) || (Math.abs(b.r) - Math.abs(a.r)));
 
-  return pickRepresentatives(survivors, MAX_PER_FACTOR, MAX_CORRELATIONS);
+  // A driver with one finding that held is not confounded, whatever its others did.
+  kept.forEach((c) => confounded.delete(c.driverKey));
+  return { correlations: pickRepresentatives(kept, MAX_PER_FACTOR, MAX_CORRELATIONS), confounded };
 }
 
 /**
@@ -691,14 +841,20 @@ export function findEarlySignals(matrix: DayMatrix, opts: { floors?: Floors; tie
     .map((c, i) => ({ c, q: fdr.q[i], ok: fdr.rejected[i] }))
     .filter((s) => s.ok && s.c.p <= EARLY_MAX_P)
     .filter((s) => Math.abs(s.c.r) >= EARLY_MIN_EFFECT && worthSaying(s.c.def, s.c.high, s.c.low)
-      && hasVisibleDelta(s.c.def, s.c.high, s.c.low))
+      && hasVisibleDelta(s.c.def, s.c.high, s.c.low));
+  // The calendar check, on the tier that runs on a long journal. A young journal
+  // has no month around each day to measure it against, so the early variant
+  // keeps the bars it was calibrated with.
+  const local = tier === 'unconfirmed' && survivors.length ? detrendedMatrix(matrix) : null;
+  const held = local ? survivors.filter((s) => holdsWithinPeriod(local, s.c, floors)) : survivors;
+  const rows = held
     // ONE pip, whatever the numbers say: eight days cannot earn more, and the
     // pinned value is what keeps the card's own confidence strip honest.
     .map((s) => ({ ...describe(s.c, s.q), early: true, tier, pips: 1, confidence: confidenceLabel(1) }));
 
-  survivors.sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
+  rows.sort((a, b) => Math.abs(b.r) - Math.abs(a.r));
   // One row per driver — a glimpse names the driver once.
-  return pickRepresentatives(survivors, 1, EARLY_MAX);
+  return pickRepresentatives(rows, 1, EARLY_MAX);
 }
 
 /* ---------- no detectable impact ---------- */
@@ -742,10 +898,17 @@ export function findNoImpact(matrix: DayMatrix, shown: {
   correlations: Correlation[];
   early: Correlation[];
   changeFactorId: string | null;
+  /** Drivers whose findings were the calendar (`sweepCorrelations`). Not a null
+   *  result: the data could not tell them apart from the period they sat in. */
+  confounded?: ReadonlySet<string>;
+  /** Drivers an onset names ("since you started X and Y"). */
+  changeDrivers?: readonly string[];
 }): NoImpactItem[] {
   const withFindings = new Set<string>([
     ...shown.correlations.map((c) => c.driverKey),
     ...shown.early.map((c) => c.driverKey),
+    ...(shown.confounded || []),
+    ...(shown.changeDrivers || []),
   ]);
   if (shown.changeFactorId) {
     const f = matrix.defs.find((d) => d.id === shown.changeFactorId);

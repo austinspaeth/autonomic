@@ -203,6 +203,7 @@ const KINDS = {
   pay: 'PAY', not: 'NOT', pot: 'POT', see: 'SEE', err: 'ERR',
   osh: 'OSH', odm: 'ODM', oac: 'OAC', ofl: 'OFL',
   log: 'LOG', use: 'USE', fnd: 'FND', rpt: 'RPT',
+  rdg: 'RDG', mbp: 'MBP',
 };
 
 /** The routes whose slot letter is a capture SENSOR. */
@@ -311,6 +312,22 @@ const FINDINGS = { E: 'early-signal', U: 'unconfirmed-pattern', C: 'biggest-chan
 const REPORTS = { D: 'data-for-prompt', H: 'full-health-report', C: 'doctor-summary' };
 
 /**
+ * Which KIND of HRV reading completed — the RDG route. Its own route because
+ * the reading routes spend their slot on the SENSOR and are capped for the
+ * whole route; here each letter is its own headcount, so a day with a morning
+ * baseline and a training session counts for both.
+ */
+const READING_TYPES = { M: 'morning-baseline', B: 'later-baseline', T: 'training' };
+
+/**
+ * What the morning baseline prompt card got — the MBP route. One card's
+ * outcomes share one route, unlike the offer funnel's three: each letter is
+ * capped on its own and is therefore a headcount, and the card is read as
+ * S (shown) against T (took the reading), N (not today) and X (closed).
+ */
+const MORNING_PROMPT = { S: 'shown', T: 'take-reading', X: 'closed' };
+
+/**
  * The alphabet each route speaks, or null for the routes that carry no letter.
  *
  * Validated per route rather than globally, because the same slot means
@@ -325,6 +342,7 @@ const ALPHABET = {
   PAY: SURFACES, NOT: NOTIFY, POT: POTS, SEE: VIEWS,
   OSH: OFFERS, ODM: OFFERS, OAC: OFFERS, OFL: OFFER_FAILS,
   LOG: LOGS, USE: FEATURES, FND: FINDINGS, RPT: REPORTS,
+  RDG: READING_TYPES, MBP: MORNING_PROMPT,
   SUB: PLANS, RST: PLANS, LAP: PLANS,
 };
 
@@ -1272,7 +1290,7 @@ const handler = async (event) => {
 
 module.exports = {
   handler, decodeCohort, cohortKey, buildKey, easternDay, report, ALPHABET, KINDS,
-  LOGS, FEATURES, FINDINGS, REPORTS, PLANS,
+  LOGS, FEATURES, FINDINGS, REPORTS, PLANS, READING_TYPES, MORNING_PROMPT,
   redactFault, safeTag, faultKey, hash8, FAULT_MSG_MAX, FAULT_TTL_DAYS, FAULT_MAX_N,
   readOfferFailure, offerFailKey, OUTCOMES, OFFER_FAIL_TTL_DAYS,
 };

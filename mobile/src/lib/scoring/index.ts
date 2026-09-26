@@ -339,7 +339,7 @@ export const HRV_EXPLAIN: Record<string, string> = {
  *  same way. */
 export const HRV_HELP: Record<string, HelpContent> = {
   score: {
-    what: 'A weighted 0–100 composite of the reading\'s key metrics: vagal tone (RMSSD, pNN50), total power and baroreflex position (LF peak), each graded against the recovery framework\'s thresholds and combined into one number.',
+    what: 'A weighted 0–100 composite of the reading\'s key metrics: vagal tone (RMSSD, pNN50), total power and baroreflex position (LF peak), each graded against the recovery framework\'s thresholds and combined into one number. It grades this one reading; the Autonomic score on the Journal is the whole day, built from all its readings plus sleep and activity.',
     why: 'It is the fastest read on how much capacity you have today. A score holding at or above your own recent average is a day you can spend; a drop of ten points or more, especially after a flat stretch, usually means pacing before the symptoms arrive.',
     learnMore: '/insights/basics/the-autonomic-score-and-grade-bands/',
   },

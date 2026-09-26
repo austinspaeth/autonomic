@@ -17,7 +17,7 @@
  *
  * Pure: no store, no MMKV, no expo, no React.
  */
-import { makeSectionRenderer } from '../analysis/reports';
+import { makeSectionRenderer, profileBlock } from '../analysis/reports';
 import type { ScoreContext } from '../scoring';
 import type { AppState } from '../types';
 import type { Correlation } from './correlate';
@@ -76,7 +76,7 @@ WHAT TO DO WITH THIS. Be sceptical and be specific. Do NOT invent a plausible me
 5. WHAT IS MISSING. Given the data below, what would most improve the next round of findings.
 
 RULES: Base everything on the data provided. Do not assume a diagnosis, medication, age or sex that is not present. Report associations as associations. Note where a doctor should be involved for anything touching medication or a therapeutic dose. Do not use em dashes; use commas, colons, parentheses or separate sentences.
-
+${profileBlock(state.profile)}
 THE UNDERLYING DATA (${rangeText}), so you can check the findings rather than take them on trust:
 
 ${render(keys, ['scores', 'hrv', 'rhr', 'bp', 'sleep', 'activities', 'triggers', 'meds', 'supplements', 'symptoms', 'digestion', 'cleanDays', 'notes'])}`,

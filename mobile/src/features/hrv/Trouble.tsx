@@ -32,6 +32,8 @@ import { usePalette } from '../../theme';
 import { ppgTrace } from '../../lib/ppg/diagnostics';
 import { leadTipId, tipsFor, troubleSourceFor, type TroubleEvidence, type TroubleSource } from '../../lib/ppg/tips';
 import type { SessionConfig } from './sessionStore';
+import { StrapCard } from './StrapCard';
+import { SupportCard } from '../SupportCard';
 
 /** What the attempt showed, read off the camera trace. Reads, never requests —
  *  the same rule the diagnostics collector follows. */
@@ -97,6 +99,14 @@ export function TroubleSheet({ config, stopped, onRetry, controls }: {
             : 'A strap that is on properly is the most accurate reading you can take. These are the things worth checking.'}
       </Text>
 
+      {source === 'camera' ? (
+        <View style={{ marginBottom: 18 }}>
+          <StrapCard>
+            A strap reads your heartbeat electrically and skips every problem below. The Coospo H808S is under $30 on Amazon.
+          </StrapCard>
+        </View>
+      ) : null}
+
       <View style={{ gap: 10, marginBottom: 20 }}>
         {tips.map((t, i) => (
           <View
@@ -134,6 +144,10 @@ export function TroubleSheet({ config, stopped, onRetry, controls }: {
             </View>
           </View>
         ))}
+      </View>
+
+      <View style={{ marginBottom: 20 }}>
+        <SupportCard prompt="If you continue to have issues, please contact us for help." style={{ marginTop: 0 }} />
       </View>
 
       <View style={{ gap: 10 }}>

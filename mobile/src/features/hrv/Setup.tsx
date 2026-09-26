@@ -1,24 +1,27 @@
 /**
- * HRV setup sheet — the entry point for a live 5-minute capture. Purpose-first:
- * pick what the reading is FOR (Training, which paces your breath at resonance,
- * or Baseline, which reads where you sit right now), confirm the signal source
- * on one line, and Start. The time-of-day tag is stamped automatically at Start.
+ * HRV setup sheet — the entry point for a live 5-minute capture. It is opened
+ * for ONE kind of reading and says what that kind is for and when to take it:
+ * Baseline (breathe normally; the day's first one is its snapshot and sets the
+ * score and pacing budget) or Training (paced breathing, any time). The two used
+ * to share this sheet behind a picker, and people could not tell which one they
+ * were meant to take; each entry point now names its own. Confirm the signal
+ * source on one line, and Start. The time-of-day tag is stamped at Start.
  *
  * There is no breathing-pattern picker: training readings are always 4/6
  * (resonant-frequency) pacing. Offering box breathing or 4/7/8 invited choices
  * that flatten RSA and broke day-to-day comparability, which is the whole point
  * of a daily measure. Legacy readings keep whatever style they were saved with.
  */
-import React, { useEffect, useState } from 'react';
+import React, { useState } from 'react';
 import { Platform, Pressable, Text, View } from 'react-native';
-import Animated, { Easing, interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { SheetControls, useSheets } from '../../components/Sheet';
 import { Button } from '../../components/ui';
 import { Icon, type IconName } from '../../components/Icon';
 import { useToast } from '../../components/Toast';
-import { GRADE_COLORS, radius, usePalette } from '../../theme';
+import { radius, usePalette } from '../../theme';
 import { getState, save, useStore } from '../../store/store';
 import { todayKey } from '../../lib/dates';
+import { hasBaselineReadingOn } from '../../lib/hrvQuality';
 import { health } from '../../lib/health';
 import { defaultPeriod } from '../../lib/period';
 import { ppg } from '../../lib/ppg/camera';
@@ -28,8 +31,7 @@ import { DevicesScreen } from '../Devices';
 import { GarminPrep } from './GarminPrep';
 import { WatchPrep } from './WatchPrep';
 import { HealthRrImportSheet } from './HealthImport';
-import { garminDevices, subscribeGarminDevices } from '../../lib/garmin/receiver';
-import { hasOtherWatches } from './WatchBrands';
+import { garminDevices } from '../../lib/garmin/receiver';
 import { SOURCE_META, SourcePicker, sourceSub, type Source } from './SourcePicker';
 
 /** The sheet opener, as `useSheets()` hands it out. */
@@ -39,31 +41,42 @@ type OpenSheet = ReturnType<typeof useSheets>['openSheet'];
 // runs underneath it (was clipped on narrower screens).
 const CLOSE_CLEARANCE = 58;
 
-/** The "now supported" tab above the source bubble. Violet is the palette's
- *  "noticed" colour (the tab bar's unseen dot wears it); the red accent is
- *  reserved for things that are tapped, and this notice isn't one. */
-const NOTICE = GRADE_COLORS.warning;
-const NOTICE_SOFT = 'rgba(167,139,250,0.16)';
-/** The tab's visible band, and how far it runs on UNDER the source bubble. The
- *  tuck is the bubble's own corner radius, so the tab is hidden exactly where
- *  the bubble stops covering it — any less and its square bottom corners peek
- *  out beside the rounded ones. */
-const NOTICE_BAND = 34;
-const NOTICE_TUCK = radius.control;
-
 export type Kind = 'unstructured' | 'breath';
 
-/** The two things a reading can be for. `breath` is the daily default. */
-const MODES: { val: Kind; icon: IconName; title: string; desc: string; daily?: boolean }[] = [
-  {
-    val: 'breath', icon: 'wind', title: 'Training HRV', daily: true,
-    desc: 'We pace your breath so heart rate and breathing sync. The most sensitive, most repeatable daily measure, and the pacing itself helps train your autonomic system.',
+/**
+ * What each kind is for and when to take it, in the few words the setup sheet,
+ * the Add reading list and the morning card all share. Two entry points with
+ * two descriptions of the same reading would be the confusion this split exists
+ * to end.
+ */
+export const KIND_COPY: Record<Kind, { title: string; row: string; why: string; chips: { icon: IconName; label: string }[] }> = {
+  unstructured: {
+    title: 'Baseline HRV reading',
+    row: 'Breathe normally. Your first one each day sets your score',
+    why: 'Lie still and breathe normally for five minutes, ideally soon after you wake. Your first one each day sets your score and pacing budget. Take one any time paced breathing feels strained.',
+    chips: [{ icon: 'wind', label: 'Breathe normally' }, { icon: 'clock', label: 'Morning' }],
   },
-  {
-    val: 'unstructured', icon: 'heartPulse', title: 'Baseline HRV',
-    desc: 'Breathe however you normally do. Best for capturing where your nervous system actually sits right now.',
+  breath: {
+    title: 'Training HRV reading',
+    row: 'Paced breathing practice, any time of day',
+    why: 'Five minutes of paced breathing. It exercises your autonomic system and helps calm your sympathetic/fight-or-flight response. Best in the morning after your baseline. Like any workout, overdoing it can cause strain.',
+    chips: [{ icon: 'wind', label: '4 / 6 Breathing Pace' }, { icon: 'clock', label: 'Any time' }],
   },
-];
+};
+
+/** When the morning card stops asking. Past this the day is well underway and
+ *  a reading taken now is not the snapshot the card is asking for. */
+export const MORNING_CUTOFF_HOUR = 13;
+
+/**
+ * The kind an entry point that does not name one should open: a baseline while
+ * the day has none and it is still morning, otherwise training. Used by the
+ * widget deep link and the pacing Todo, which only know "take a reading".
+ */
+export function suggestedKind(now: Date = new Date()): Kind {
+  const today = getState().days[todayKey()];
+  return !hasBaselineReadingOn(today) && now.getHours() < MORNING_CUTOFF_HOUR ? 'unstructured' : 'breath';
+}
 
 /**
  * Why a source can't be used right now, as the sentence to toast, or null when
@@ -135,17 +148,15 @@ export function defaultSource(): Source {
  *  fall through to Other). */
 export const defaultPeriodFor = (kind: Kind) => defaultPeriod(kind === 'breath' ? 'breathHrv' : 'hrv', todayKey());
 
-export function HrvSetup({ controls }: { controls: SheetControls }) {
+export function HrvSetup({ kind, controls }: { kind: Kind; controls: SheetControls }) {
   const p = usePalette();
   const toast = useToast();
   const { openSheet } = useSheets();
-  const [kind, setKind] = useState<Kind>('breath');
+  const copy = KIND_COPY[kind];
   const [source, setSource] = useState<Source>(defaultSource);
   // Reactive so the summary row updates the moment a strap is saved from the
   // source picker stacked on top of this one.
   const savedName = useStore((s) => s.state.settings.lastBleDeviceName);
-  const [garminLinked, setGarminLinked] = useState(garminDevices().length > 0);
-  useEffect(() => subscribeGarminDevices((l) => setGarminLinked(l.length > 0)), []);
 
   const changeSource = () => openSheet((c) => <SourcePicker value={source} onPick={setSource} controls={c} />);
 
@@ -171,58 +182,11 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
 
   return (
     <View>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6, paddingRight: CLOSE_CLEARANCE }}>Capture an HRV reading</Text>
-      <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20, paddingRight: CLOSE_CLEARANCE, marginBottom: 18 }}>Five minutes, same time each day. Choose what this reading is for.</Text>
-
-      <View style={{ gap: 10 }}>
-        {MODES.map((m) => (
-          <ModeCard key={m.val} mode={m} active={kind === m.val} onPress={() => setKind(m.val)} />
-        ))}
-      </View>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6, paddingRight: CLOSE_CLEARANCE }}>{copy.title}</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20, paddingRight: CLOSE_CLEARANCE, marginBottom: 16 }}>{copy.why}</Text>
+      <KindChips kind={kind} />
 
       <Text style={{ fontSize: 13, textTransform: 'uppercase', letterSpacing: 0.6, color: p.textDim, fontWeight: '700', marginTop: 22, marginBottom: 10 }}>Measuring with</Text>
-
-      {/* Announcement, not a source, and not a CONTROL either: it says one thing
-          and there is nothing behind it, so it is a plain View. It rides the top
-          edge of the source bubble like the tab on a folder — narrower than the
-          card, rounded on top only, flush at the bottom — which is what makes it
-          read as a label ON that card rather than as a second row above it. It
-          retires itself once a Garmin is linked: at that point it is no longer
-          news and the thing it points at has already been used.
-
-          Violet, not the red accent: the accent is what the user TAPS, and a
-          notice wearing it invites a tap that does nothing. */}
-      {hasOtherWatches() && !garminLinked ? (
-        <View
-          style={{
-            // Full width and tucked BEHIND the source bubble: the tab is one
-            // object with the card, sliding out from under its top edge, rather
-            // than a narrower plate balanced on it. It is drawn first, so the
-            // bubble (a later sibling) paints over the overlap on its own.
-            //
-            // Height carries the overlap: the visible band stays NOTICE_BAND
-            // tall, and the extra NOTICE_TUCK is hidden under the bubble's
-            // rounded top, so no corner of the tab is ever exposed beside it.
-            height: NOTICE_BAND + NOTICE_TUCK,
-            paddingBottom: NOTICE_TUCK,
-            marginBottom: -NOTICE_TUCK,
-            // Centred contents rather than padding either side of the text: the
-            // NEW chip and the sentence have different line boxes, and only a
-            // real height centres both.
-            flexDirection: 'row', alignItems: 'center', gap: 8,
-            paddingHorizontal: 14,
-            borderTopLeftRadius: radius.control, borderTopRightRadius: radius.control,
-            backgroundColor: p.sunk,
-          }}
-        >
-          <View style={{ paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6, backgroundColor: NOTICE_SOFT }}>
-            <Text style={{ color: NOTICE, fontSize: 10, fontWeight: '800', letterSpacing: 0.3 }}>NEW</Text>
-          </View>
-          <Text numberOfLines={1} style={{ color: p.text, fontSize: 12.5, fontWeight: '600', flexShrink: 1 }}>
-            Garmin watches are now supported
-          </Text>
-        </View>
-      ) : null}
 
       <Pressable
         onPress={changeSource}
@@ -258,68 +222,18 @@ export function HrvSetup({ controls }: { controls: SheetControls }) {
   );
 }
 
-/** One purpose card: icon tile, title (+ "Daily" tag on the recommended one),
- *  and a plain-language description of what the reading is for.
- *
- *  The selected card RECEDES rather than lighting up red: a translucent black
- *  overlay sinks it below the sheet surface and the accent moves to the border,
- *  icon, title and check. A red wash over the whole card (accentSoft) muddied
- *  the body copy — the description read as tinted rather than the card as
- *  chosen.
- *
- *  Selection eases in rather than snapping: the darkening is an overlay whose
- *  opacity animates, and the border color interpolates between two opaque greys/
- *  accent. Do NOT interpolate the card's own backgroundColor against a
- *  translucent color — one is opaque and the other has alpha, so the midpoint
- *  reads as a flash on every tap. Everything else (icon, title, radio) switches
- *  instantly; animating those too made the whole card shimmer. Reanimated
- *  because color can't use the native driver. */
-const MODE_ANIM = { duration: 180, easing: Easing.out(Easing.quad) };
-/** Sinks `surface2` (#242427) to roughly #1e0705 — near-black with the accent
- *  hue still in it. Not a tint of the bright accent (that washed the card) and
- *  not neutral grey. */
-const MODE_SELECTED_SHADE = 'rgba(30,6,4,0.94)';
-
-function ModeCard({ mode, active, onPress }: { mode: (typeof MODES)[number]; active: boolean; onPress: () => void }) {
+/** The two how-to chips a kind carries (the morning card's design): sunk
+ *  tiles, icon and one short instruction each. */
+export function KindChips({ kind }: { kind: Kind }) {
   const p = usePalette();
-  const t = useSharedValue(active ? 1 : 0);
-  React.useEffect(() => { t.value = withTiming(active ? 1 : 0, MODE_ANIM); }, [active, t]);
-
-  const borderStyle = useAnimatedStyle(() => ({
-    borderColor: interpolateColor(t.value, [0, 1], [p.border, p.accent]),
-  }));
-  const tintStyle = useAnimatedStyle(() => ({ opacity: t.value }));
-
   return (
-    <Pressable onPress={onPress}>
-      <Animated.View
-        style={[{ flexDirection: 'row', alignItems: 'flex-start', gap: 12, padding: 14, borderRadius: radius.control, borderWidth: 1, backgroundColor: p.surface2, overflow: 'hidden' }, borderStyle]}
-      >
-        <Animated.View pointerEvents="none" style={[{ position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: MODE_SELECTED_SHADE }, tintStyle]} />
-        <View style={{ width: 40, height: 40, borderRadius: 12, backgroundColor: active ? p.accentSoft : p.sunk, alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name={mode.icon} size={21} color={active ? p.accent : p.textDim} />
+    <View style={{ flexDirection: 'row', gap: 8 }}>
+      {KIND_COPY[kind].chips.map((c) => (
+        <View key={c.label} style={{ flexGrow: 1, flexShrink: 1, flexBasis: 'auto', flexDirection: 'row', alignItems: 'center', gap: 9, backgroundColor: p.sunk, borderRadius: 13, paddingVertical: 15, paddingHorizontal: 12 }}>
+          <Icon name={c.icon} size={18} color={p.textDim} strokeWidth={1.8} />
+          <Text numberOfLines={1} style={{ color: p.textDim, fontSize: 13, fontWeight: '600', flexShrink: 1 }}>{c.label}</Text>
         </View>
-        <View style={{ flex: 1 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
-            <Text style={{ color: active ? p.accent : p.text, fontWeight: '700', fontSize: 15 }}>{mode.title}</Text>
-            {mode.daily ? (
-              <View style={{ paddingHorizontal: 7, paddingVertical: 2, borderRadius: 999, borderWidth: 1, borderColor: active ? p.accent : '#47474e' }}>
-                <Text style={{ color: active ? p.accent : p.textDim, fontSize: 10, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.4 }}>Daily</Text>
-              </View>
-            ) : null}
-          </View>
-          <Text style={{ color: p.textDim, fontSize: 12.5, lineHeight: 17, marginTop: 5 }}>{mode.desc}</Text>
-        </View>
-        <View style={{ marginTop: 2 }}>
-          {active ? (
-            <View style={{ width: 22, height: 22, borderRadius: 11, backgroundColor: p.accent, alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="check" size={13} color="#fff" strokeWidth={3.2} />
-            </View>
-          ) : (
-            <View style={{ width: 22, height: 22, borderRadius: 11, borderWidth: 2, borderColor: '#4a4a52' }} />
-          )}
-        </View>
-      </Animated.View>
-    </Pressable>
+      ))}
+    </View>
   );
 }

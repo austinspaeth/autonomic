@@ -11,7 +11,7 @@ import { addDays, todayKey } from '../../dates';
 import type { AppState, DayRecord, Entry } from '../../types';
 import { WELCOME_CHANGE, findBiggestChange } from '../change';
 import { dataConfidence } from '../confidence';
-import { CORRELATION_OUTCOMES, EARLY_MIN_FACTOR_DAYS, MIN_GROUP, MIN_PAIRS, NO_IMPACT_MIN_OUTCOMES, findCorrelations, findEarlySignals, findNoImpact, groupCorrelations, isRegimeChange, regimeFactorIds } from '../correlate';
+import { CORRELATION_OUTCOMES, EARLY_MIN_FACTOR_DAYS, MIN_GROUP, MIN_PAIRS, NO_IMPACT_MIN_OUTCOMES, findCorrelations, findEarlySignals, findNoImpact, groupCorrelations, isRegimeChange, regimeFactorIds, sweepCorrelations } from '../correlate';
 import { buildFactors, factorProgress } from '../factors';
 import { buildDayMatrix } from '../matrix';
 import { PROBES_BY_ID, findObservations } from '../observations';
@@ -88,20 +88,38 @@ describe('a journal with no real signal', () => {
    * nothing to find, so anything found is a false claim. Several seeds, because a
    * single lucky one proves nothing.
    */
-  it.each([1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12])('reports nothing (seed %i)', (seed) => {
-    const r = rng(seed * 7919);
-    const state = journal(120, () => {
-      const d = blank();
-      d.readings = [hrv(Math.round(20 + r() * 30))];
-      ['magGlycinate', 'coq10', 'quercetin'].forEach((t) => { if (r() < 0.5) d.meds.push(med(t)); });
-      if (r() < 0.4) d.symptoms.push({ id: nextId(), type: 'fatigue', time: '12:00' });
-      d.food.water = Math.round((1 + r() * 2) * 10) / 10;
-      const bedH = 22 + Math.floor(r() * 2);
-      d.sleep = { bed: `${bedH}:00`, wake: '07:00' };
-      return d;
-    });
-    const found = findCorrelations(matrixOf(state));
-    expect(found).toEqual([]);
+  /**
+   * THE CONTRACT IS A RATE, and this is the measurement FDR_Q was set by: at
+   * q = 0.05, one false finding across thirty independent noise journals.
+   *
+   * It used to be twelve seeds that each had to report nothing, which was only
+   * ever passing on an accident: `bmCount` counted a day with no movement as 0,
+   * so a journal that never logs movements carried a constant outcome column,
+   * and its tests (all p = 1) padded the correction's family and made it
+   * stricter than the constant says. Reading those days as UNKNOWN is correct,
+   * the padding went, and the measured rate became the documented one — which
+   * landed on seed 12. Asserting "none on any seed" asserts a guarantee FDR_Q
+   * never made; asserting the rate catches exactly what matters, a change that
+   * makes the engine invent claims more often.
+   */
+  it('reports something on at most one of thirty journals', () => {
+    const flagged: string[] = [];
+    for (let seed = 1; seed <= 30; seed++) {
+      const r = rng(seed * 7919);
+      const state = journal(120, () => {
+        const d = blank();
+        d.readings = [hrv(Math.round(20 + r() * 30))];
+        ['magGlycinate', 'coq10', 'quercetin'].forEach((t) => { if (r() < 0.5) d.meds.push(med(t)); });
+        if (r() < 0.4) d.symptoms.push({ id: nextId(), type: 'fatigue', time: '12:00' });
+        d.food.water = Math.round((1 + r() * 2) * 10) / 10;
+        const bedH = 22 + Math.floor(r() * 2);
+        d.sleep = { bed: `${bedH}:00`, wake: '07:00' };
+        return d;
+      });
+      const found = findCorrelations(matrixOf(state));
+      if (found.length) flagged.push(`seed ${seed}: ${found.map((c) => c.id).join(', ')}`);
+    }
+    expect(flagged.length).toBeLessThanOrEqual(1);
   });
 
   it('reports no biggest change either', () => {
@@ -429,6 +447,125 @@ describe('a start/stop is not an on/off comparison', () => {
   });
 });
 
+describe('a start with a skipped day is still a start', () => {
+  /**
+   * The real journal that broke the first version of the rule: vitamin C started
+   * on Aug 3 and taken on 47 of the next 48 days. One skipped day split the run in
+   * two, the unbroken-run share fell to 0.51, and the sweep reported "Vitamin C
+   * days show lower next-day RMSSD" as the month the user's HRV happened to fall.
+   */
+  const skipping = journal(100, (i) => {
+    const d = blank();
+    d.readings = [hrv(20 + Math.round(i * 0.3))];
+    if (i >= 50 && i !== 72 && i !== 88 && i !== 89) d.meds.push(med('quercetin'));
+    d.meds.push(med('vitD3'));
+    return d;
+  });
+
+  it('flags it as a regime change despite the gaps', () => {
+    expect(isRegimeChange(matrixOf(skipping, 100).factors['med:quercetin'])).toBe(true);
+  });
+
+  it('reports no correlation for it', () => {
+    expect(findAbout(findCorrelations(matrixOf(skipping, 100)), 'med:quercetin')).toEqual([]);
+  });
+
+  it('never calls every-other-day a regime, however long it runs', () => {
+    const r = rng(5);
+    const alternate = journal(100, (i) => {
+      const d = blank();
+      d.readings = [hrv(Math.round(20 + r() * 30))];
+      if (i % 2 === 0) d.meds.push(med('quercetin'));
+      d.meds.push(med('vitD3'));
+      return d;
+    });
+    expect(isRegimeChange(matrixOf(alternate, 100).factors['med:quercetin'])).toBe(false);
+  });
+});
+
+describe('a factor bunched in one stretch of a drifting journal', () => {
+  /**
+   * MCT oil on the same journal: never one solid block, so not a regime, but
+   * taken almost only in the last five weeks, while RMSSD slid for reasons of its
+   * own. The on/off test reads the slide as the supplement. Here RMSSD is a pure
+   * function of the day index and the factor does nothing at all.
+   */
+  const bunched = (seed: number) => {
+    const r = rng(seed);
+    return journal(120, (i) => {
+      const d = blank();
+      d.readings = [hrv(Math.round(48 - i * 0.2 + r() * 4))];
+      if (r() < (i >= 80 ? 0.55 : 0.06)) d.meds.push(med('quercetin'));
+      d.meds.push(med('vitD3'));
+      return d;
+    });
+  };
+
+  it('is not a regime change, so the regime rule cannot catch it', () => {
+    expect(isRegimeChange(matrixOf(bunched(41)).factors['med:quercetin'])).toBe(false);
+  });
+
+  it('would separate the groups on the raw outcome', () => {
+    const m = matrixOf(bunched(41));
+    const col = m.factors['med:quercetin'];
+    const rmssd = m.outcomes.rmssd!;
+    const on: number[] = [], off: number[] = [];
+    col.forEach((v, i) => { const o = rmssd[i]; if (v == null || o == null) return; (v ? on : off).push(o); });
+    const g = mannWhitney(on, off);
+    expect(g.p).toBeLessThan(0.001);
+  });
+
+  it('reports nothing for it, and does not call it a null result either', () => {
+    [41, 42, 43].forEach((seed) => {
+      const m = matrixOf(bunched(seed));
+      const sweep = sweepCorrelations(m);
+      expect(findAbout(sweep.correlations, 'med:quercetin')).toEqual([]);
+      const none = findNoImpact(m, { correlations: sweep.correlations, early: [], changeFactorId: null, confounded: sweep.confounded });
+      expect(none.map((n) => n.driverKey)).not.toContain('med:quercetin');
+    });
+  });
+
+  it('costs a young journal nothing', () => {
+    // A 20-day journal has no month around each day to measure it against, and a
+    // first version of this check therefore failed EVERY finding there: 0 of 20
+    // seeds found a planted +8 ms effect, against 12 of 20 without the check. The
+    // people with the youngest journals are the ones waiting on a first finding.
+    const count = (n: number) => {
+      let hits = 0;
+      for (let seed = 1; seed <= 20; seed++) {
+        const r = rng(seed * 104729 + n);
+        const state = journal(n, () => {
+          const d = blank();
+          const took = r() < 0.5;
+          d.readings = [hrv(Math.round(24 + r() * 16 + (took ? 8 : 0)))];
+          if (took) d.meds.push(med('magGlycinate'));
+          d.meds.push(med('vitD3'));
+          return d;
+        });
+        if (findAbout(findCorrelations(matrixOf(state, n)), 'med:magGlycinate').length) hits++;
+      }
+      return hits;
+    };
+    expect(count(20)).toBeGreaterThanOrEqual(12);
+    expect(count(30)).toBeGreaterThanOrEqual(18);
+  });
+
+  it('keeps a real day-level effect riding on the same drift', () => {
+    // Same slide, but the factor is scattered across the whole journal and adds
+    // 8 ms on the day it is taken. Measured against its own month, it still shows.
+    const r = rng(9);
+    const real = journal(120, (i) => {
+      const d = blank();
+      const took = r() < 0.5;
+      d.readings = [hrv(Math.round(48 - i * 0.2 + r() * 4 + (took ? 8 : 0)))];
+      if (took) d.meds.push(med('quercetin'));
+      d.meds.push(med('vitD3'));
+      return d;
+    });
+    expect(findAbout(findCorrelations(matrixOf(real)), 'med:quercetin').length).toBeGreaterThan(0);
+  });
+});
+
 describe('LF peak frequency is never the subject of a claim', () => {
   it('is not a correlation outcome', () => {
     expect(CORRELATION_OUTCOMES).not.toContain('lfPeak');
@@ -679,16 +816,19 @@ describe('bowel movements as an outcome', () => {
   });
 
   it('reports an onset in plain English', () => {
-    // Started the supplement on day 60; movements went from none to one or two.
+    // Started the supplement on day 60; movements went from every third day to
+    // one or two a day. The slow stretch still has to LOG a movement now and
+    // then: a journal with none at all before day 60 is somebody who was not
+    // tracking them yet, and ../digestion rightly reads those days as unknown.
     const r = rng(909);
     const state = journal(120, (i) => {
       const d = blank();
       d.readings = [hrv(30)];
       d.meds.push(med('vitD3'));
       if (i >= 60) d.meds.push(med('magGlycinate'));
-      d.digestion.movements = i >= 60 && r() < 0.85
-        ? [{ id: nextId(), time: '09:00' }, ...(r() < 0.5 ? [{ id: nextId(), time: '18:00' }] : [])]
-        : [];
+      d.digestion.movements = i >= 60
+        ? (r() < 0.85 ? [{ id: nextId(), time: '09:00' }, ...(r() < 0.5 ? [{ id: nextId(), time: '18:00' }] : [])] : [])
+        : (i % 3 === 0 ? [{ id: nextId(), time: '09:00' }] : []);
       return d;
     });
     const change = findBiggestChange(matrixOf(state));
@@ -696,6 +836,63 @@ describe('bowel movements as an outcome', () => {
     expect(change!.outcome).toBe('bmCount');
     // "are", not "is": the headline's verb has to agree with a plural metric.
     expect(change!.headline).toBe('Bowel movements are up since you started magnesium glycinate');
+  });
+
+  it('links a supplement to stool form, in Bristol types', () => {
+    // Hard off the supplement, formed on it: the finding a count cannot make,
+    // since both groups go once a day.
+    const r = rng(1212);
+    const state = journal(120, (i) => {
+      const d = blank();
+      const took = i % 2 === 0;
+      d.readings = [hrv(Math.round(28 + r() * 10))];
+      d.meds.push(med('vitD3'));
+      if (took) d.meds.push(med('magGlycinate'));
+      d.digestion.movements = [{ id: nextId(), time: '09:00', kind: took ? 'Formed' : 'Hard' }];
+      return d;
+    });
+    const found = findCorrelations(matrixOf(state));
+    const form = found.find((c) => c.factorId === 'med:magGlycinate' && c.outcome === 'stoolForm');
+    expect(form).toBeTruthy();
+    expect(form!.good).toBe(true);
+    expect(form!.headline).toBe('Magnesium Glycinate days show higher stool softness');
+    expect(form!.deltaText).toBe('+2 Bristol');
+    expect(found.filter((c) => c.factorId === 'med:magGlycinate' && c.outcome === 'bmCount')).toEqual([]);
+  });
+
+  it('links a loose day to a lower next-day HRV', () => {
+    const r = rng(1313);
+    let loosePrev = false;
+    const state = journal(120, () => {
+      const d = blank();
+      d.meds.push(med('vitD3'));
+      d.readings = [hrv(Math.round((loosePrev ? 22 : 38) + r() * 6))];
+      loosePrev = r() < 0.3;
+      d.digestion.movements = [{ id: nextId(), time: '09:00', kind: loosePrev ? 'Diarrhea' : 'Formed' }];
+      return d;
+    });
+    const found = findCorrelations(matrixOf(state));
+    const loose = found.find((c) => c.factorId === 'bm:loose' && c.lag === 1 && c.outcome === 'rmssd');
+    expect(loose).toBeTruthy();
+    expect(loose!.good).toBe(false);
+  });
+
+  it('does not read somebody who stopped logging movements as never going', () => {
+    // Two months of daily movements, then two months of the journal kept with
+    // none. The second stretch is somebody who stopped logging them.
+    const r = rng(1414);
+    const state = journal(120, (i) => {
+      const d = blank();
+      d.meds.push(med('vitD3'));
+      d.readings = [hrv(Math.round(i < 60 ? 38 + r() * 6 : 24 + r() * 6))];
+      d.digestion.movements = i < 60 ? [{ id: nextId(), time: '09:00', kind: 'Formed' }] : [];
+      return d;
+    });
+    const m = matrixOf(state);
+    const none = m.factors['bm:none'];
+    expect(none.slice(60 + 8).every((v) => v == null)).toBe(true);
+    expect(m.outcomes.bmCount!.slice(60 + 8).every((v) => v == null)).toBe(true);
+    expect(findCorrelations(m).filter((c) => c.factorId === 'bm:none')).toEqual([]);
   });
 });
 
@@ -966,6 +1163,120 @@ describe('the biggest change', () => {
     });
     const c = findBiggestChange(matrixOf(late));
     if (c) expect(c.id).not.toContain('med:magGlycinate');
+  });
+});
+
+describe('things started together', () => {
+  /** Magnesium on day 60, quercetin the next morning, and RMSSD steps up with
+   *  both. The log cannot tell them apart and the card must say so. */
+  const state = journal(120, (i) => {
+    const r = rng(333 + i);
+    const d = blank();
+    d.readings = [hrv(Math.round((i >= 60 ? 44 : 30) + r() * 6))];
+    d.meds.push(med('vitD3'));
+    if (i >= 60) d.meds.push(med('magGlycinate'));
+    if (i >= 61) d.meds.push(med('quercetin'));
+    return d;
+  });
+  const change = findBiggestChange(matrixOf(state))!;
+
+  it('names both in the headline', () => {
+    expect(change.kind).toBe('onset');
+    expect(change.headline).toMatch(/since you started \S.* and \S/);
+    expect(change.headline.toLowerCase()).toContain('quercetin');
+    expect(change.headline.toLowerCase()).toContain('magnesium');
+  });
+
+  it('says the log cannot separate them, and records both drivers', () => {
+    expect(change.body).toMatch(/cannot tell which one/);
+    expect(change.drivers).toEqual(expect.arrayContaining(['med:magGlycinate', 'med:quercetin']));
+  });
+
+  it('keeps a lone onset on the single-driver wording', () => {
+    const lone = journal(120, (i) => {
+      const r = rng(777 + i);
+      const d = blank();
+      d.readings = [hrv(Math.round((i >= 60 ? 44 : 30) + r() * 6))];
+      d.meds.push(med('vitD3'));
+      if (i >= 60) d.meds.push(med('magGlycinate'));
+      if (i >= 90) d.meds.push(med('quercetin'));
+      return d;
+    });
+    const c = findBiggestChange(matrixOf(lone))!;
+    expect(c.headline).not.toMatch(/ and /);
+    expect(c.body).toMatch(/not proof of a cause/);
+    // Quercetin started on day 90, a month inside the 60 days this compares, so it
+    // is not named in the headline but IS said in the sheet.
+    expect(c.context).toMatch(/You also started quercetin in this stretch/);
+    expect(c.drivers).toEqual(['med:magGlycinate', 'med:quercetin']);
+  });
+});
+
+describe('a regimen that stopped', () => {
+  /** Magnesium daily (with the odd skip) until day 70, then never again, while
+   *  vitamin D goes on being logged every day, and RMSSD steps down with it. */
+  const stopped = (opts: { keepLogging?: boolean; sporadic?: boolean; also?: number | null; type?: string } = {}) =>
+    journal(120, (i) => {
+      const r = rng(4100 + i);
+      const d = blank();
+      const type = opts.type || 'magGlycinate';
+      d.readings = [hrv(Math.round((i >= 70 ? 28 : 42) + r() * 6))];
+      if (i < 70 && i !== 33 && (!opts.sporadic || r() < 0.45)) d.meds.push(med(type));
+      if (opts.keepLogging !== false || i < 70) d.meds.push(med('vitD3'));
+      if (opts.also != null && i >= opts.also) d.meds.push(med('quercetin'));
+      return d;
+    });
+
+  it('reads the stop, fixed at the day after the last dose', () => {
+    const c = findBiggestChange(matrixOf(stopped()))!;
+    expect(c.kind).toBe('stop');
+    expect(c.id).toContain('med:magGlycinate');
+    expect(c.headline).toMatch(/is down since you stopped magnesium glycinate$/i);
+    expect(c.after).toBeLessThan(c.before);
+    expect(c.body).toMatch(/not proof of a cause/);
+  });
+
+  it('is not a stop when the user stopped logging meds altogether', () => {
+    const c = findBiggestChange(matrixOf(stopped({ keepLogging: false })));
+    expect(c && c.kind).not.toBe('stop');
+  });
+
+  it('is not a stop when it was never a regimen', () => {
+    const c = findBiggestChange(matrixOf(stopped({ sporadic: true })));
+    expect(c && c.kind).not.toBe('stop');
+  });
+
+  it('says what else changed in the stretch it compares', () => {
+    const c = findBiggestChange(matrixOf(stopped({ also: 82 })))!;
+    expect(c.kind).toBe('stop');
+    expect(c.context).toMatch(/You also started quercetin in this stretch/);
+    expect(c.drivers).toEqual(expect.arrayContaining(['med:magGlycinate', 'med:quercetin']));
+  });
+
+  it('tells somebody to ask their doctor before changing a medication', () => {
+    const c = findBiggestChange(matrixOf(stopped({ type: 'melatonin' })))!;
+    expect(c.kind).toBe('stop');
+    expect(c.context).toMatch(/Talk to your doctor before changing a medication/);
+    expect(c.headline).not.toMatch(/\b(restart|start again|should)\b/i);
+  });
+
+  it('never lets a supplement alone carry the doctor line', () => {
+    expect(findBiggestChange(matrixOf(stopped()))!.context).toBeNull();
+  });
+});
+
+describe('the biggest change is not repeated in trend watch', () => {
+  it('drops the watch row for the metric a month-on-month shift already headlines', () => {
+    const state = journal(120, (i) => {
+      const r = rng(55 + i);
+      const d = blank();
+      d.readings = [hrv(Math.round((i >= 90 ? 26 : 40) + r() * 4))];
+      d.meds.push(med('vitD3'));
+      return d;
+    });
+    const report = buildInsights(state, addDays(DK, 1));
+    expect(report.change && report.change.kind).toBe('shift');
+    expect(report.watch.map((w) => w.metric)).not.toContain(report.change!.outcome);
   });
 });
 
@@ -1385,6 +1696,15 @@ describe('the header verdict', () => {
 });
 
 describe('the header claim, against day one', () => {
+  /** TRAINING readings, graded on absolute bands only, so each day's score is
+   *  its own grade points and the arithmetic below is exact. A baseline reading
+   *  is also graded half against the user's own usual (scoring/baseline.ts),
+   *  which by design pulls a long plateau toward 'good'. */
+  const hrv = (rmssd: number, over: Partial<Entry> = {}): Entry => ({
+    id: nextId(), type: 'breathHrv', time: '08:00',
+    rmssd: String(rmssd), sdnn: String(Math.round(rmssd * 1.4)), pnn50: String(Math.round(rmssd / 4)),
+    ...over,
+  });
   /** 60 logged days: a bad first fortnight, a good last one. */
   const risen = journal(60, (i) => { const d = blank(); d.readings = [hrv(i < 30 ? 22 : 44)]; return d; });
   const fallen = journal(60, (i) => { const d = blank(); d.readings = [hrv(i < 30 ? 44 : 22)]; return d; });
@@ -1394,7 +1714,7 @@ describe('the header claim, against day one', () => {
     expect(s).toBeTruthy();
     expect(s.better).toBe(true);
     expect(s.pct).toBeGreaterThan(0);
-    expect(s.value).toMatch(/^\d+% better$/);
+    expect(s.value).toMatch(/^\d+ pts? better$/);
     expect(s.tail).toBe(' than day one');
     expect(s.detail).toMatch(/then, .* now/);
   });
@@ -1403,7 +1723,7 @@ describe('the header claim, against day one', () => {
     const s = changeSinceStart(fallen.days, DK)!;
     expect(s.better).toBe(false);
     expect(s.pct).toBeLessThan(0);
-    expect(s.value).toMatch(/^\d+% worse$/);
+    expect(s.value).toMatch(/^\d+ pts? worse$/);
   });
 
   it('says "about the same" rather than dressing a flat run as a gain', () => {

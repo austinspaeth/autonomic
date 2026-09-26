@@ -13,6 +13,7 @@ import {
   BANDS, GRADE_PTS, computeScores, numOr, restingHrBands, totalPower,
   type ScoreContext,
 } from './index';
+import { personalBaselineCat, usualBaseline } from './baseline';
 
 export type DaysMap = Record<string, DayRecord>;
 
@@ -51,7 +52,8 @@ export const TOMORROW: Record<string, string> = {
 };
 
 export const SCORE_TIPS: Record<string, string> = {
-  'HRV (RMSSD)': 'Vagal tone responds to rest, hydration, slow breathing, and avoiding triggers or over-exertion the day before.',
+  'Baseline HRV': 'Your first baseline reading is a snapshot of where your system starts the day. Rest, hydration, sleep, and not over-doing it the day before all lift it.',
+  'Training HRV': 'Paced breathing practice builds vagal tone over weeks. Keep the sessions regular and the pace steady.',
   'Total power': 'Low total power means little overall autonomic engagement - favor rest, fluids, and gentle movement over intensity.',
   'pNN50': 'Parasympathetic depth builds on genuine recovery days and consistent, earlier sleep.',
   'VLF power': 'Elevated VLF reflects stress load - cut late stimulation, manage stress, and wind down earlier.',
@@ -202,7 +204,13 @@ export interface ScoreComp {
  *  confidence copy in DaySummary needs the same weights the score uses, and a
  *  second copy of the table drifts silently the first time one moves. */
 export const SCORE_WEIGHTS: { label: string; w: number }[] = [
-  { label: 'HRV (RMSSD)', w: 25 },
+  // The two HRV readings answer different questions, so they are two inputs.
+  // BASELINE (unpaced) is the snapshot of where the system sits and is the
+  // heaviest single input; TRAINING (paced) is the practice, and alone feeds
+  // the four spectral components below, because paced breathing is what makes
+  // them measurable and a baseline's run far lower on the same bands.
+  { label: 'Baseline HRV', w: 25 },
+  { label: 'Training HRV', w: 15 },
   { label: 'Total power', w: 15 },
   { label: 'pNN50', w: 10 },
   { label: 'VLF power', w: 10 },
@@ -300,11 +308,36 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
     return null;
   };
 
-  const rmS = blendOf(gStruct, 'rmssd'), rmU = blendOf(gUn, 'rmssd');
-  let hrvPts: number | null = null;
-  if (rmS.p != null && rmU.p != null) hrvPts = 0.7 * rmS.p + 0.3 * rmU.p;
-  else if (rmS.p != null) hrvPts = rmS.p;
-  else if (rmU.p != null) hrvPts = rmU.p;
+  // Training RMSSD: the practice, recency-blended like every structured metric.
+  const rmS = blendOf(gStruct, 'rmssd');
+
+  // Baseline RMSSD: the FIRST reading of the day is the snapshot the day is
+  // built on and dominates; later baseline readings still count (somebody who
+  // cannot do paced breathing may take several) but only as a 30% say. Each is
+  // graded on the absolute bands, and once the user has a usual baseline, a
+  // morning BELOW it is pulled down halfway toward its personal grade.
+  //
+  // The personal half may only LOWER a grade, never lift one. Blended both
+  // ways it graded a sustained crash against a median that had crashed with
+  // it, so weeks at 18 ms read as "good", and a whole recovery shrank to half
+  // its size in "better than day one". A drop off your own normal is news; a
+  // bad month that has become your normal is still a bad month.
+  const usual = unstructured.length ? usualBaseline(days, dk) : null;
+  const baseResolved = unstructured
+    .map((r, i) => ({ r, cat: gUn[i].rmssd as ScoreCat | undefined, v: parseFloat(r.rmssd as string) }))
+    .filter((x) => x.cat != null);
+  const baselinePts = (x: (typeof baseResolved)[number]): number => {
+    const abs = GRADE_PTS[x.cat!];
+    if (!usual || !Number.isFinite(x.v) || x.v <= 0) return abs;
+    return Math.min(abs, 0.5 * abs + 0.5 * GRADE_PTS[personalBaselineCat(x.v, usual.median)]);
+  };
+  let basePts: number | null = null;
+  if (baseResolved.length) {
+    const p0 = baselinePts(baseResolved[0]);
+    const later = recencyBlend(baseResolved.slice(1).map(baselinePts));
+    basePts = later == null ? p0 : 0.7 * p0 + 0.3 * later;
+  }
+  const firstBase = baseResolved.length ? baseResolved[0].r : null;
 
   const tp = blendOf(gStruct, 'totalPower');
   const pn = blendOf(gStruct, 'pnn50');
@@ -319,13 +352,15 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
   const rhrBlend = blendOf(rhrs.map((r) => computeScores(r, ctx)), 'hr');
   let rhrPts = rhrBlend.p;
   let rhrN = rhrBlend.n;
+  // No logged resting HR: the first baseline reading's average IS a resting
+  // heart rate (still, breathing normally), so it outranks the paced one.
+  const firstBaseIdx = unstructured.findIndex((_, i) => gUn[i].avgHr != null);
+  if (rhrPts == null && firstBaseIdx >= 0) {
+    rhrPts = GRADE_PTS[gUn[firstBaseIdx].avgHr]; rhrN = 1;
+  }
   if (rhrPts == null) {
     const fromStruct = blendOf(gStruct, 'hr');
     if (fromStruct.p != null) { rhrPts = fromStruct.p; rhrN = fromStruct.n; }
-  }
-  if (rhrPts == null) {
-    const fromUn = blendOf(gUn, 'avgHr');
-    if (fromUn.p != null) { rhrPts = fromUn.p; rhrN = fromUn.n; }
   }
 
   // ---- Per-component detail (raw values + bands) for the score-explain sheet ----
@@ -333,18 +368,26 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
   // it. Each row quotes the most recent reading that resolved the metric and
   // says how many readings the grade came from, rather than implying the last
   // number is the whole story.
-  const bs = last(structured), bu = last(unstructured);
+  const bs = last(structured);
   const nv = (x: unknown): number | null => { const v = parseFloat(x as string); return isNaN(v) ? null : v; };
   const fromN = (n: number) => (n > 1 ? `Combined across ${n} readings today, weighted toward the most recent. ` : '');
   const rmSv = (() => { const e = lastWith(structured, gStruct, 'rmssd'); return e ? nv(e.rmssd) : null; })();
-  const rmUv = (() => { const e = lastWith(unstructured, gUn, 'rmssd'); return e ? nv(e.rmssd) : null; })();
-  const hrvMetrics: CompDetailMetric[] = [];
-  if (rmSv != null) hrvMetrics.push({ label: 'RMSSD (training)', raw: rmSv, bands: BANDS.rmssdS, unit: 'ms' });
-  if (rmUv != null) hrvMetrics.push({ label: 'RMSSD (baseline)', raw: rmUv, bands: BANDS.rmssdU, unit: 'ms' });
-  const hrvDetail: CompDetail = {
-    value: rmSv != null && rmUv != null ? `${rmSv}/${rmUv} ms` : rmSv != null ? `${rmSv} ms` : rmUv != null ? `${rmUv} ms` : '',
-    metrics: hrvMetrics,
-    note: fromN(rmS.n + rmU.n) || undefined,
+  const trainDetail: CompDetail = {
+    value: rmSv != null ? `${rmSv} ms` : '',
+    metrics: rmSv != null ? [{ label: 'RMSSD (training)', raw: rmSv, bands: BANDS.rmssdS, unit: 'ms' }] : [],
+    note: fromN(rmS.n) || undefined,
+  };
+  // The baseline row quotes the FIRST reading, since that is the one the grade
+  // is mostly made of.
+  const rmUv = firstBase ? nv(firstBase.rmssd) : null;
+  const baseNote = [
+    baseResolved.length > 1 ? `Your first baseline reading of the day counts most; the ${baseResolved.length - 1 === 1 ? 'later one adds' : `${baseResolved.length - 1} later ones add`} a smaller share.` : '',
+    usual ? `Graded half on the standard ranges and half against your own usual baseline of ${Math.round(usual.median)} ms (${usual.n} readings over the last six weeks).` : '',
+  ].filter(Boolean).join(' ');
+  const baseDetail: CompDetail = {
+    value: rmUv != null ? `${rmUv} ms` : '',
+    metrics: rmUv != null ? [{ label: 'RMSSD (baseline)', raw: rmUv, bands: BANDS.rmssdU, unit: 'ms' }] : [],
+    note: baseNote || undefined,
   };
 
   const tpE = lastWith(structured, gStruct, 'totalPower');
@@ -374,8 +417,8 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
   if (rhr) {
     rhrV = nv(rhr.hr); rhrBands = restingHrBands(rhr.position);
     if (rhr.position) rhrLabel = `Resting HR (${rhr.position})`;
-  } else if (bs) { rhrV = nv(bs.hr); rhrBands = BANDS.hrBreath; rhrLabel = 'HR (from training HRV)'; }
-  else if (bu) { rhrV = nv(bu.avgHr); rhrBands = BANDS.hrBreath; rhrLabel = 'Avg HR (from HRV)'; }
+  } else if (firstBaseIdx >= 0) { rhrV = nv(unstructured[firstBaseIdx].avgHr); rhrBands = BANDS.hrBreath; rhrLabel = 'Avg HR (from baseline HRV)'; }
+  else if (bs) { rhrV = nv(bs.hr); rhrBands = BANDS.hrBreath; rhrLabel = 'HR (from training HRV)'; }
   const rhrDetail: CompDetail = { value: rhrV != null ? `${rhrV} bpm` : '', metrics: rhrV != null ? [{ label: rhrLabel, raw: rhrV, bands: rhrBands, unit: 'bpm', lowerBetter: true }] : [], note: fromN(rhrN) || undefined };
 
   const slH = sleepHours(days, dk);
@@ -395,7 +438,8 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
 
   // Ordered exactly like SCORE_WEIGHTS, whose weights these are.
   const byLabel: Record<string, { p: number | null; detail: CompDetail; readings: number }> = {
-    'HRV (RMSSD)': { p: hrvPts, detail: hrvDetail, readings: rmS.n + rmU.n },
+    'Baseline HRV': { p: basePts, detail: baseDetail, readings: baseResolved.length },
+    'Training HRV': { p: rmS.p, detail: trainDetail, readings: rmS.n },
     'Total power': { p: tp.p, detail: tpDetail, readings: tp.n },
     'pNN50': { p: pn.p, detail: pnDetail, readings: pn.n },
     'VLF power': { p: vlfB.p, detail: vlfDetail, readings: vlfB.n },

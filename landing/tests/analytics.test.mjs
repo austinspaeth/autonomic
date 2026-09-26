@@ -633,6 +633,16 @@ check('the plan letters have names on all three routes',
   A.planName('P') === 'Promo year' && A.slotName('rst', 'M') === 'Monthly' &&
     A.slotName('lap', 'F') === 'Founder year' && A.planName(null) === 'Plan unknown');
 check('the report routes include rst and lap', A.KINDS.includes('rst') && A.KINDS.includes('lap'));
+check('the report routes include the reading-kind and morning-card routes',
+  A.KINDS.includes('rdg') && A.KINDS.includes('mbp'));
+check('reading kinds and the morning card are per-letter, so their totals are not people',
+  !A.isHeadcount('rdg') && !A.isHeadcount('mbp'));
+check('the reading-kind letters are named',
+  A.slotName('rdg', 'M') === 'Morning baseline' && A.slotName('rdg', 'T') === 'Training',
+  A.slotName('rdg', 'M'));
+check('the morning card letters are named',
+  A.slotName('mbp', 'T') === 'Took the reading' && A.slotName('mbp', 'X') === 'Closed',
+  A.slotName('mbp', 'X'));
 
 /* ---------------------------------------------------------- activation */
 

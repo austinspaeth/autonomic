@@ -247,7 +247,7 @@ export interface SinceStart {
   parts: SincePart[];
   /** Is the change the healthy direction? */
   better: boolean;
-  /** The coloured half: "14% better", "9% worse", "About the same". */
+  /** The coloured half: "14 pts better", "9 pts worse", "About the same". */
   value: string;
   /** The grey half, including its leading space: " than day one". */
   tail: string;
@@ -256,7 +256,7 @@ export interface SinceStart {
 }
 
 /**
- * "14% better than day one" — the daily score now against the daily score at the
+ * "14 pts better than day one" — the daily score now against the daily score at the
  * very start of the journal.
  *
  * This is the one number on the screen that answers "is any of this working",
@@ -337,7 +337,10 @@ export function changeSinceStart(days: DaysMap, dk: string, ctx: ScoreContext = 
     ...base,
     pct,
     better,
-    value: `${Math.abs(pct)}% ${better ? 'better' : 'worse'}`,
+    // Written as POINTS, which is what it is. "4% worse" sat one card above Trend
+    // watch's "down 11.5 pts" on a real journal, and the reader saw two answers to
+    // one question in two units. The explain sheet already said "Points lost".
+    value: `${Math.abs(pct)} ${Math.abs(pct) === 1 ? 'pt' : 'pts'} ${better ? 'better' : 'worse'}`,
     tail: ' than day one',
   };
 }

@@ -58,6 +58,7 @@ import { PromptSheet } from '../PromptSheet';
 import { CAMERA_PREP_TIPS, TROUBLE_WAIT_SEC } from '../../lib/ppg/tips';
 import { HrvSession, type SessionConfig } from './Session';
 import { TroubleSheet } from './Trouble';
+import { StrapCard } from './StrapCard';
 
 /** Sheet content is inset 18/24 (padding/topPad); its floating ✕ pill sits at
  *  14/10 on the sheet itself. These pull the back pill out to the same spot so
@@ -76,11 +77,6 @@ const DIAGNOSTICS_HOLD_MS = 8000;
 /** Why the camera can't run. Each one used to render as the same eternal
  *  "Waiting for a steady pulse…" over a black circle. */
 type CameraFault = 'permission' | 'camera' | 'unavailable' | 'frames';
-
-/** Strap explainer on the website. Deliberately not an in-app product list:
- *  no stock, no prices and no hardware endorsement to maintain here. */
-const STRAP_ARTICLE_URL =
-  'https://autonomic.care/insights/hrv/best-hrv-chest-strap-polar-h10-coospo-h808s/';
 
 type Pt = { x: number; y: number };
 type Step = 'warn' | 'shape' | 'flash' | 'wait';
@@ -388,8 +384,8 @@ export function CameraSetup({ config, controls: _controls }: { config: SessionCo
     : step === 'shape' ? 'Choose your camera layout'
       : step === 'flash' ? 'Where is your flash?' : 'Place your finger';
   const subtext = step === 'shape' ? 'Which of these best matches the camera on the back of your phone?'
-    : step === 'flash' ? 'Tap the glowing spot where your flash sits.'
-      : 'The camera circle shows a live view of the lens.';
+    : step === 'flash' ? "Tap the glowing spot where your flash sits. If none match your phone, tap any spot. It's only a guide."
+      : 'Lay the phone face down and rest your fingertip over both the lens and the flash. Don\'t press. It vibrates when the reading starts and again when it ends.';
 
   const chosen = step !== 'shape' && shape ? shape : null;
 
@@ -514,8 +510,8 @@ function HeadsUp() {
   return (
     <View style={{ flexGrow: 1, gap: 14 }}>
       <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20 }}>
-        Movement, finger pressure and stray light all affect the signal, so quality varies from reading to reading.
-        If a number looks off, take the reading again.
+        Camera readings are here for anyone who can&apos;t afford or get a chest strap or wearable. Movement, finger
+        pressure and stray light all affect the signal, so if a number looks off, take the reading again.
       </Text>
 
       {/* The four things a reader can still act on while they are setting up.
@@ -546,23 +542,10 @@ function HeadsUp() {
         </View>
       </View>
 
-      <View style={{ padding: 16, borderRadius: radius.card, borderCurve: 'continuous', borderWidth: 1, borderColor: 'rgba(224,49,39,0.28)', backgroundColor: p.accentSoft }}>
-        <Text style={{ color: p.text, fontSize: 16, fontWeight: '700', marginBottom: 6 }}>Chest straps are more accurate</Text>
-        <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 19, marginBottom: 14 }}>
-          Straps read your heartbeat electrically, so the timing stays clean. We highly recommend one for anyone
-          who wants to monitor their HRV. Good ones start around $30.
-        </Text>
-        <Pressable
-          onPress={() => Linking.openURL(STRAP_ARTICLE_URL).catch(() => {})}
-          style={({ pressed }) => [
-            { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, height: 46, borderRadius: radius.control, borderWidth: 1, borderColor: 'rgba(224,49,39,0.45)' },
-            pressed && { opacity: 0.7 },
-          ]}
-        >
-          <Text style={{ color: p.accent, fontSize: 14, fontWeight: '700' }}>Which strap to buy</Text>
-          <Icon name="chevronRight" size={15} color={p.accent} />
-        </Pressable>
-      </View>
+      <StrapCard>
+        Straps read your heartbeat electrically, so the timing stays clean. We highly recommend one for anyone
+        who wants to monitor their HRV. Good ones start around $30.
+      </StrapCard>
     </View>
   );
 }

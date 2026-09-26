@@ -40,7 +40,7 @@ import type { AppState } from '../types';
 import { WELCOME_CHANGE, findBiggestChange, type BiggestChange } from './change';
 import { changeSeries, correlationSeries, type DetailSeries } from './detail';
 import { dataConfidence, type DataConfidence } from './confidence';
-import { EARLY_MIN_FACTOR_DAYS, MIN_GROUP, MIN_PAIRS, findCorrelations, findEarlySignals, findNoImpact, testFinding, type Correlation, type NoImpactItem } from './correlate';
+import { EARLY_MIN_FACTOR_DAYS, MIN_GROUP, MIN_PAIRS, findEarlySignals, sweepCorrelations, findNoImpact, testFinding, type Correlation, type NoImpactItem } from './correlate';
 import { PRESSURE_FACTOR_ID, buildFactors, factorProgress, type FactorProgress } from './factors';
 import { lowPressureValue } from '../pressure';
 import { buildDayMatrix } from './matrix';
@@ -131,8 +131,14 @@ export interface PressureMemory {
  */
 export const ANALYSIS_DAYS = 180;
 
-/** Correlations visible before the user asks for the rest. */
-export const VISIBLE_CORRELATIONS = 4;
+/**
+ * Correlations visible before the user asks for the rest.
+ *
+ * Three, not four: the card sits under the Biggest change and above Trend watch,
+ * and a fourth row pushed everything below it off the first screen on a real
+ * journal while adding the least-supported claim of the four.
+ */
+export const VISIBLE_CORRELATIONS = 3;
 
 
 export interface InsightReport {
@@ -260,7 +266,8 @@ export function buildInsights(state: AppState, dk: string, opts: {
   // is empty.
   const downturn = !!detectDownturn(state.days, dk, ctx, ctx.protocol, state.customTypes);
 
-  const swept = findCorrelations(matrix, { retain: opts.retain?.correlations });
+  const sweep = sweepCorrelations(matrix, { retain: opts.retain?.correlations });
+  const swept = sweep.correlations;
   // Pressure rows leave the list here and live on their own card (see
   // PressureInsight). Only a link to a WORSE outcome is kept: "low pressure days
   // show higher HRV" would be a real row, but not one this card was built to say.
@@ -313,6 +320,7 @@ export function buildInsights(state: AppState, dk: string, opts: {
   // and "this did nothing" is not a sentence to fabricate.
   const noImpact = opts.demo ? [] : findNoImpact(matrix, {
     correlations, early, changeFactorId: change ? change.factorId : null,
+    confounded: sweep.confounded, changeDrivers: change ? change.drivers : [],
   });
 
   const observations = findObservations({ matrix, state, dk: analysisDk });
@@ -345,7 +353,12 @@ export function buildInsights(state: AppState, dk: string, opts: {
       pressure = { findings, found: pressureFound.map((c) => c.id), knownDays, lowDays, since };
     }
   }
-  const watch = findWatchItems(matrix, downturn);
+  // A month-on-month SHIFT at the top of the screen is the very comparison Trend
+  // watch makes, so its row there would repeat the card above it word for word
+  // ("RMSSD has fallen" over 29.4 → 23.7, then "RMSSD, down 5.7 ms" over the same
+  // two windows). The row goes; the card says it once, with its evidence.
+  const watch = findWatchItems(matrix, downturn)
+    .filter((w) => !(change && change.kind === 'shift' && w.metric === change.outcome));
   // NOT gated on the downturn. Trend Watch hides its five red rows during one, but
   // the header saying "Trending down" in a single calm line is the honest headline
   // for exactly that situation, and suppressing it would leave the screen mute at

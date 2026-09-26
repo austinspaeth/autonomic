@@ -1,8 +1,8 @@
 /**
  * Exercise heart-rate zones for the imported-workout report — pure and
  * unit-tested. Zones are the classic five %-of-max bands (Z1 <60% … Z5 ≥90%),
- * anchored on an age-estimated max HR (Tanaka: 208 − 0.7 × age). Without a
- * birthday there is no max to anchor on, so callers render the trace unzoned.
+ * anchored on an age-estimated max HR (`maxHrFormula`). Without a birthday
+ * there is no max to anchor on, so callers render the trace unzoned.
  */
 
 export interface HrZone {
@@ -13,10 +13,21 @@ export interface HrZone {
   color: string;
 }
 
-/** Estimated max heart rate (Tanaka), or null without an age. */
-export function estimatedHrMax(age: number | null): number | null {
+/**
+ * THE max heart rate formula, everywhere in the app: Tanaka (208 − 0.7 × age),
+ * or Gulati (206 − 0.88 × age) for a female profile. The POTS stand test
+ * (`pots/live.ts`) and the watch (`targets/watch/Haptics.swift`) use the same
+ * pair, so one person gets one max. Unrounded; callers round for display.
+ */
+export function maxHrFormula(age: number, sex?: string | null): number {
+  if (sex && sex.trim().toLowerCase().startsWith('f')) return 206 - 0.88 * age;
+  return 208 - 0.7 * age;
+}
+
+/** Estimated max heart rate, or null without a plausible age. */
+export function estimatedHrMax(age: number | null, sex?: string | null): number | null {
   if (age == null || age < 10 || age > 120) return null;
-  return Math.round(208 - 0.7 * age);
+  return Math.round(maxHrFormula(age, sex));
 }
 
 /** Cool grey → watch blue → the grade greens/orange/red the app already uses,

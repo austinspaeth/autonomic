@@ -207,7 +207,9 @@ function KindGlyph({ kind }: { kind: string }) {
 function BowelForm({ dk, existing, controls }: { dk: string; existing: Movement | null; controls: SheetControls }) {
   const p = usePalette();
   const [time, setTime] = useState(existing?.time || defaultTimeFor(dk));
-  const [kind, setKind] = useState(existing?.kind || 'Loose');
+  // Formed, not the first card: this field is now graded (lib/digestion), and a
+  // default of Loose filed every untouched entry as the loose end.
+  const [kind, setKind] = useState(existing?.kind || 'Formed');
   const [volume, setVolume] = useState(existing?.volume || 'Small pieces');
   const [strain, setStrain] = useState<'none' | 'mild' | 'severe'>(
     existing?.straining === 'severe' ? 'severe' : existing?.straining ? 'mild' : 'none',

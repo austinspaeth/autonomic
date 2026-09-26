@@ -28,7 +28,9 @@ import { entryFields, isDivider, READING_TYPES } from '../lib/registry';
 import { healthAppName } from '../lib/health';
 import { ageFromBirthday, fmtNum, fmtShort, todayKey } from '../lib/dates';
 import { estimatedHrMax, hrZones, timeInZones } from '../lib/workoutZones';
-import { computeHrv, correctArtifacts, splitSegments } from '../lib/hrv';
+import type { NormMetric } from '../lib/hrvNorms';
+import { HrvNormNote } from './HrvNorm';
+import { beatTrace, computeHrv, correctArtifacts, splitSegments, type BeatTrace } from '../lib/hrv';
 import { BREATH_STYLE, styleTitle } from '../lib/breathStyle';
 import { buildEventInsightPrompt, buildReadingInsightPrompt, buildWorkoutInsightPrompt } from '../lib/analysis/reports';
 import { getState, getWaveform } from '../store/store';
@@ -346,7 +348,7 @@ export function SectionHead({ title, help, cat, value, unit, when, desc, right, 
 const ViewedReadingCtx = React.createContext<string | null>(null);
 const useViewedReading = () => React.useContext(ViewedReadingCtx);
 
-function MetricSection({ label, value, unit, cat, desc, help, days, type, ex, bands, hero, fmt, kind }: {
+function MetricSection({ label, value, unit, cat, desc, help, days, type, ex, bands, hero, fmt, kind, norm }: {
   label: string; value?: string | number | null; unit?: string; cat?: ScoreCat | null;
   desc?: string; help?: HelpContent; days: DaysMap; type: string;
   ex: (r: Entry) => number | null; bands?: Band[] | null;
@@ -359,6 +361,9 @@ function MetricSection({ label, value, unit, cat, desc, help, days, type, ex, ba
    *  carries a prefix or sign ("Δ +14") must pass the same formatter, or
    *  scrubbing to another date silently drops it. Defaults to `fmtNum`. */
   fmt?: (v: number) => string;
+  /** Close the card on the age/sex reference for this metric (baseline
+   *  readings only: the norms are resting, spontaneous breathing). */
+  norm?: NormMetric;
 }) {
   const [showZones, setShowZones] = useState(false);
   const [sel, setSel] = useState<{ v: number; date: string } | null>(null);
@@ -385,6 +390,7 @@ function MetricSection({ label, value, unit, cat, desc, help, days, type, ex, ba
           zonesOn={hero ? undefined : showZones}
         />
       ) : null}
+      {norm ? <HrvNormNote metric={norm} unit={unit || ''} /> : null}
     </Section>
   );
 }
@@ -509,6 +515,23 @@ function rrCleanFor(r: Entry): number[] | null {
   return splitSegments(raw, segs).flatMap((s) => correctArtifacts(s).clean);
 }
 
+/** What the beat chart draws: the same repair, correction and triage the
+ *  reading's numbers came from, so corrected beats and dropped stretches can
+ *  be marked. Null when the reading has no raw series (a manual entry, a
+ *  watch summary); a defensive cleaned-only shape falls back to a plain trace. */
+function traceFor(r: Entry): BeatTrace | null {
+  const w = getWaveform(String(r.id));
+  const raw = (w && w.rrRaw) || (r.rrRaw as number[] | undefined);
+  if (raw && raw.length) {
+    return beatTrace(raw, {
+      source: r.source as string | undefined,
+      segmentStarts: (w && w.rrSegments) || (r.rrSegments as number[] | undefined),
+    });
+  }
+  const clean = rrCleanFor(r);
+  return clean ? { rr: clean, corrected: [], dropped: [] } : null;
+}
+
 /**
  * Both HRV kinds render the identical stack of metric cards — the only
  * difference is which RMSSD/HR grade band applies, plus a breathing-style row
@@ -517,7 +540,10 @@ function rrCleanFor(r: Entry): number[] | null {
 function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHrv' | 'hrv' }) {
   const s = computeScores(r, ctx);
   const { score, overall } = hrvComposite(r, ctx);
-  const rr = useMemo(() => rrCleanFor(r), [r]);
+  const trace = useMemo(() => traceFor(r), [r]);
+  const rr = trace && trace.rr;
+  // The spectrum is drawn over the beats the numbers used, not the dropped stretches.
+  const rrUsed = useMemo(() => (trace ? trace.rr.filter((_, i) => !trace.dropped[i]) : null), [trace]);
   const rmssdBand = type === 'breathHrv' ? BANDS.rmssdS : BANDS.rmssdU;
   const hrKey = type === 'breathHrv' ? 'hr' : 'avgHr';
   const n = (k: string) => { const x = parseFloat(r[k] as string); return isNaN(x) ? null : x; };
@@ -541,6 +567,8 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
   const legacyStyle = type === 'breathHrv' && r.style && r.style !== BREATH_STYLE ? styleTitle(r.style as string) : null;
   const capture = useMemo(() => captureFacts(r, recoverQuality(r)), [r]);
   const hasDetails = !!sourceLabel || !!legacyStyle || !!r.period || capture.length > 0;
+  // Age/sex references are resting norms; paced breathing inflates all three.
+  const norm = (m: NormMetric) => (type === 'hrv' ? m : undefined);
   return (
     <>
       {/* A reading the user chose to keep after the app declined to file it.
@@ -553,7 +581,7 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
 
       <Section cat={overall}>
         <SectionHead
-          title="Autonomic score" help={HRV_HELP.score}
+          title="HRV score" help={HRV_HELP.score}
           value={score != null ? String(score) : '–'} unit="/100"
           desc={overall ? HRV_VERDICT[overall] : 'Composite of vagal tone, power, and baroreflex position.'}
         />
@@ -565,20 +593,20 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
             title="Beat-to-beat intervals" help={HRV_HELP.tachogram}
             desc="Every RR interval in the reading; healthy traces look like rolling waves."
           />
-          <View style={{ marginTop: 12 }}><Tachogram rr={rr} /></View>
+          <View style={{ marginTop: 12 }}><Tachogram rr={rr} corrected={trace!.corrected} dropped={trace!.dropped} /></View>
         </Section>
       ) : null}
 
       <MetricSection
-        label="SDNN" value={r.sdnn as string} unit="ms" cat={s.sdnn} days={days} type={type} ex={numEx('sdnn')} bands={BANDS.sdnn}
+        label="SDNN" value={r.sdnn as string} unit="ms" cat={s.sdnn} days={days} type={type} ex={numEx('sdnn')} norm={norm('sdnn')} bands={BANDS.sdnn}
         desc={HRV_EXPLAIN.sdnn} help={HRV_HELP.sdnn}
       />
       <MetricSection
-        label="RMSSD" value={r.rmssd as string} unit="ms" cat={s.rmssd} days={days} type={type} ex={numEx('rmssd')} bands={rmssdBand}
+        label="RMSSD" value={r.rmssd as string} unit="ms" cat={s.rmssd} days={days} type={type} ex={numEx('rmssd')} norm={norm('rmssd')} bands={rmssdBand}
         desc={HRV_EXPLAIN.rmssd} help={HRV_HELP.rmssd}
       />
       <MetricSection
-        label="pNN50" value={r.pnn50 as string} unit="%" cat={s.pnn50} days={days} type={type} ex={numEx('pnn50')} bands={BANDS.pnn50}
+        label="pNN50" value={r.pnn50 as string} unit="%" cat={s.pnn50} days={days} type={type} ex={numEx('pnn50')} norm={norm('pnn50')} bands={BANDS.pnn50}
         desc={HRV_EXPLAIN.pnn50} help={HRV_HELP.pnn50}
       />
       <MetricSection
@@ -607,13 +635,13 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
         desc={HRV_EXPLAIN.cv} help={HRV_HELP.cv}
       />
 
-      {total != null || (rr && rr.length >= 16) ? (
+      {total != null || (rrUsed && rrUsed.length >= 16) ? (
         <Section>
           <SectionHead
             title="Power distribution" help={HRV_HELP.power}
             desc="Total HRV power split across the VLF, LF and HF frequency bands."
           />
-          <View style={{ marginTop: 12 }}><PowerSpectrum rr={rr} vlf={vlf} lf={lf} hf={hf} /></View>
+          <View style={{ marginTop: 12 }}><PowerSpectrum rr={rrUsed} vlf={vlf} lf={lf} hf={hf} /></View>
         </Section>
       ) : null}
 
@@ -1121,7 +1149,7 @@ const WORKOUT_HELP: Record<string, HelpContent> = {
     learnMore: '/insights/basics/heart-rate-recovery-after-exercise/',
   },
   zones: {
-    what: 'Exercise zones as a percentage of your estimated max heart rate (208 minus 0.7 times your age): Z1 under 60%, Z2 60-70%, Z3 70-80%, Z4 80-90%, Z5 90% and up.',
+    what: 'Exercise zones as a percentage of your estimated max heart rate (208 minus 0.7 times your age, or 206 minus 0.88 times your age for women): Z1 under 60%, Z2 60-70%, Z3 70-80%, Z4 80-90%, Z5 90% and up.',
     why: 'With dysautonomia most of the useful work sits in Z1 and Z2; time spent in Z4 and Z5 is what tends to buy a crash the next day. The max is estimated from your birthday in Settings, so treat the boundaries as approximate.',
     learnMore: '/insights/recovery/heart-rate-zones-explained/',
   },
@@ -1158,7 +1186,8 @@ export function workoutCurveFor(r: Entry): { t: number; bpm: number }[] | null {
 export function WorkoutSummary({ r, days, ctx: _ctx }: SummaryProps) {
   const p = usePalette();
   const curve = hrCurveFor(r);
-  const hrMax = estimatedHrMax(ageFromBirthday(getState().profile.birthday));
+  const prof = getState().profile;
+  const hrMax = estimatedHrMax(ageFromBirthday(prof.birthday), prof.sex);
   const zones = hrMax != null ? hrZones(hrMax) : null;
   // HR stats prefer the imported fields; a trace with missing fields fills in.
   const fromCurve = (f: (b: number[]) => number) => (curve ? Math.round(f(curve.map((q) => q.bpm))) : null);

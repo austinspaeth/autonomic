@@ -28,7 +28,7 @@ import { defaultTimeFor, fmtTime12, todayKey, uid } from '../lib/dates';
 import { scrollJournalToSection } from '../store/nav';
 import { pingLogged } from '../store/ping';
 import { isPotsResultLocked, PotsLockedCard } from './PotsLock';
-import { HrvSetup } from './hrv/Setup';
+import { HrvSetup, KIND_COPY, suggestedKind } from './hrv/Setup';
 import { OrthostaticIntroSheet } from './OrthostaticIntro';
 import { DevicesScreen } from './Devices';
 import { StandTestSession } from './pots/StandTestSession';
@@ -215,9 +215,9 @@ function softTint(hex: string): string {
  *  neutral grey. HRV kinds are live-capture only, so the manual list starts at
  *  Blood Pressure. On a past day the live-only captures (HRV, stand test)
  *  disappear — a live reading can only belong to the day it happens. */
-function ReadingPicker({ isToday, onLive, onPick }: {
+function ReadingPicker({ isToday, onLive, onBaseline, onPick }: {
   isToday: boolean;
-  onLive: () => void; onPick: (type: string) => void;
+  onLive: () => void; onBaseline: () => void; onPick: (type: string) => void;
 }) {
   const p = usePalette();
   const tintFor = (t: string) => (t === 'standTest' ? POTS_BLUE : t === 'orthostatic' ? POTS_PURPLE : t === 'bp' ? BP_GOLD : p.textDim);
@@ -235,7 +235,12 @@ function ReadingPicker({ isToday, onLive, onPick }: {
   // half (src/features/PotsLock.tsx).
   const readingRow = (t: string) => ({ key: t, title: pickerLabel(t), sub: subFor[t] || '', icon: READING_TYPES[t].icon as string, tint: tintFor(t), onPress: () => onPick(t) });
   const rows: { key: string; title: string; sub: string; icon: string; tint: string; onPress: () => void }[] = [
-    ...(isToday ? [{ key: 'hrv', title: 'HRV Reading', sub: Platform.OS === 'ios' ? 'From a chest strap, Apple Watch or camera' : 'From a chest strap or your camera', icon: 'heartPulse', tint: p.accent, onPress: onLive }] : []),
+    // The two HRV kinds lead, each saying what it is for and when: baseline
+    // first, since the day's first one is its snapshot.
+    ...(isToday ? [
+      { key: 'hrv', title: KIND_COPY.unstructured.title, sub: KIND_COPY.unstructured.row, icon: 'heartPulse', tint: p.accent, onPress: onBaseline },
+      { key: 'breathHrv', title: KIND_COPY.breath.title, sub: KIND_COPY.breath.row, icon: 'wind', tint: p.accent, onPress: onLive },
+    ] : []),
     ...manual.map(readingRow),
   ];
   return (
@@ -383,7 +388,10 @@ export function useCaptureDeepLink() {
         return;
       }
       if (q?.capture !== 'hrv') return;
-      openSheet((c) => <HrvSetup controls={c} />);
+      // The widget only says "take a reading": a baseline while the morning's
+      // is still missing, otherwise training.
+      const kind = suggestedKind();
+      openSheet((c) => <HrvSetup kind={kind} controls={c} />);
     };
     if (!initialLinkHandled) {
       initialLinkHandled = true;
@@ -535,11 +543,13 @@ export function useEntryForms(dk: string) {
   // as the report; everything else opens the edit form directly, as before.
   const openActivity = (r: Entry) => (workoutCurveFor(r) ? openActivitySummary(r) : openActivityForm(r.type, r));
 
-  const captureHrv = () => openSheet((c) => <HrvSetup controls={c} />);
+  const captureHrv = () => openSheet((c) => <HrvSetup kind="breath" controls={c} />);
+  const captureBaseline = () => openSheet((c) => <HrvSetup kind="unstructured" controls={c} />);
   const pickReading = () => openSheet(() => (
     <ReadingPicker
       isToday={dk === todayKey()}
       onLive={captureHrv}
+      onBaseline={captureBaseline}
       onPick={(t) => pickReadingSource(t)}
     />
   ));
@@ -567,7 +577,7 @@ export function useEntryForms(dk: string) {
   const openMed = (r: Entry) => openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'meds')} arrKey="meds" dk={dk} type={r.type} existing={r} controls={c} onSaved={refresh} />);
   const openSymptom = (r: Entry) => openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'symptoms')} arrKey="symptoms" dk={dk} type={r.type} existing={r} controls={c} onSaved={refresh} />);
 
-  return { openReadingForm, openActivityForm, openActivity, openReadingSummary, captureHrv, pickReading, pickActivity, pickMed, pickSymptom, openMed, openSymptom };
+  return { openReadingForm, openActivityForm, openActivity, openReadingSummary, captureHrv, captureBaseline, pickReading, pickActivity, pickMed, pickSymptom, openMed, openSymptom };
 }
 
 export function ReadingSummarySheet({ r, dk }: { r: Entry; dk: string }) {

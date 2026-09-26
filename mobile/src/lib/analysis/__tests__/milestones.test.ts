@@ -64,3 +64,20 @@ describe('Getting started milestones', () => {
     expect(starters({}, dk)[STARTERS.protocol]).toMatchObject({ done: true, date: dk });
   });
 });
+
+describe('Gut milestones', () => {
+  const streak = (kind: string) => {
+    const days: DaysMap = {};
+    for (let i = 7; i >= 1; i--) days[dayKey(i)] = { ...blankDay(), digestion: { movements: [{ id: `m${i}`, time: '09:00', kind }] } };
+    const group = buildMilestoneGroups(buildMilestoneDays(days, ctx)).find((g) => g.title === 'Gut & symptoms')!;
+    return group.items.find((it) => it.label === '7 consecutive days with a normal bowel movement')!;
+  };
+
+  it('counts a week of normal movements', () => {
+    expect(streak('Formed').done).toBe(true);
+  });
+
+  it('does not award the streak to a week of diarrhea', () => {
+    expect(streak('Diarrhea').done).toBe(false);
+  });
+});

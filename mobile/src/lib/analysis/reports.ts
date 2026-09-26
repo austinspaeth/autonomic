@@ -17,6 +17,7 @@ import { budgetSeries } from '../budget/series';
 import { buildBurn } from '../budget/burn';
 import { exertionLine } from '../budget/baseline';
 import { typesFor } from '../typeResolve';
+import { gutSummaryLine, summarizeGut } from '../digestion';
 
 export type ReportRange = 'day' | 'week' | 'month' | 'year' | 'all';
 
@@ -122,7 +123,14 @@ function secTriggers(days: DaysMap, keys: string[], custom?: CustomTypes) {
 const secMeds = (days: DaysMap, keys: string[], supplements: boolean, custom?: CustomTypes) => orNone(eachEntry(days, keys, (d, k) => (d.meds || []).filter((m) => (supplements ? !MED_KEYS.has(m.type) : MED_KEYS.has(m.type))).map((m) => { const label = custom?.meds?.[m.type]?.label || MED_TYPES[m.type]?.label || m.type; const bits: string[] = []; if (m.amount) bits.push(String(m.amount)); if (m.note) bits.push(m.note); return `${stamp(k, m.time as string)} ${label}${bits.length ? ' | ' + bits.join(' | ') : ''}`; })));
 const secSymptoms = (days: DaysMap, keys: string[], custom?: CustomTypes) => orNone(eachEntry(days, keys, (d, k) => (d.symptoms || []).map((s) => { const def = custom?.symptoms?.[s.type] || SYMPTOM_TYPES[s.type]; const label = def ? def.label : s.type; const parts: string[] = []; if (def) { (def.fields || []).forEach((f) => { if (isDivider(f) || f.type === 'time' || f.type === 'check' || f.key === 'note') return; const v = rv(s, f.key!); if (v != null) parts.push(`${f.label}: ${v}${f.unit ? f.unit : ''}`); }); (def.fields || []).filter((f) => f.type === 'check' && s[f.key!]).forEach((f) => parts.push(f.label!)); } if (s.note) parts.push(`Note: ${s.note}`); return `${stamp(k, s.time as string)} ${label}${parts.length ? ' | ' + parts.join(' | ') : ''}`; })));
 const secNotes = (days: DaysMap, keys: string[]) => orNone(eachEntry(days, keys, (d, k) => (d.notes && d.notes.trim() ? [`[${k}] ${d.notes.trim()}`] : [])));
-const secDigestion = (days: DaysMap, keys: string[]) => orNone(eachEntry(days, keys, (d, k) => ((d.digestion && d.digestion.movements) || []).map((m) => `${stamp(k, m.time)} ${bmLabel(m)}${noteSuffix(m)}`)));
+/** The range's totals (../digestion) above the raw entries: frequency, form mix,
+ *  straining and the longest run without one are what a reader actually needs,
+ *  and an AI left to count them from a list of lines miscounts. */
+const secDigestion = (days: DaysMap, keys: string[]) => {
+  const lines = eachEntry(days, keys, (d, k) => ((d.digestion && d.digestion.movements) || []).map((m) => `${stamp(k, m.time)} ${bmLabel(m)}${noteSuffix(m)}`));
+  const sum = summarizeGut(days, keys);
+  return orNone(lines.length && sum ? [gutSummaryLine(sum), ...lines] : lines);
+};
 const secOrthostatic = (days: DaysMap, keys: string[]) => orNone(eachEntry(days, keys, (d, k) => { const out: string[] = []; (d.readings || []).filter((r) => r.type === 'orthostatic').forEach((r) => out.push(`${stamp(k, r.time as string)} ${rv(r, 'transition') ?? 'Position change'} | Before HR: ${rv(r, 'beforeHr') ?? '-'} | After HR: ${rv(r, 'afterHr') ?? '-'} | HR @1min: ${rv(r, 'hr1min') ?? '-'}${noteSuffix(r)}`)); (d.readings || []).filter((r) => r.type === 'standTest').forEach((r) => out.push(`${stamp(k, r.time as string)} POTS stand test | Baseline HR: ${rv(r, 'baselineHr') ?? '-'} | Peak HR: ${rv(r, 'peakHr') ?? '-'} | Peak Δ: ${rv(r, 'peakDelta') ?? '-'} | Sustained Δ: ${rv(r, 'sustainedDelta') ?? '-'} | Sustained rise ≥30 bpm: ${r.metThreshold ? 'Yes' : 'No'}${kv(r, 'Max HR reached', 'maxHrReached')}${r.endedEarly ? ' | Ended early' : ''}${r.baselineUnstable ? ' | Short resting phase (baseline may be unreliable)' : ''}${noteSuffix(r)}`)); (d.symptoms || []).filter((s) => s.type === 'labileHr').forEach((s) => out.push(`${stamp(k, s.time as string)} High HR event | HR: ${rv(s, 'hr') ?? '-'} | Position: ${rv(s, 'position') ?? '-'}${kv(s, 'HR after 5 min rest', 'hr5')}${noteSuffix(s)}`)); return out; }));
 
 /**
@@ -262,7 +270,7 @@ export function makeSectionRenderer(state: AppState, ctx: ScoreContext) {
   return (keys: string[], list: string[]) => list.map((key) => { const def = DEFS[key]; return def ? `${def[0]}:\n${def[1](keys)}` : ''; }).filter(Boolean).join('\n\n');
 }
 
-export function universalHeader(_state: AppState, rangeText: string): string {
+export function universalHeader(state: AppState, rangeText: string): string {
   return `You are analyzing autonomic and recovery health data logged by a person using Autonomic (autonomic.care), a personal health-tracking app for autonomic recovery. Base every observation on the data provided below. Do not assume a diagnosis, age, sex, or medical history that is not present in the data.
 
 Approach this analysis as an honest friend examining the data carefully - direct and accurate without unnecessary softening or cruelty.
@@ -270,7 +278,7 @@ Approach this analysis as an honest friend examining the data carefully - direct
 REQUIREMENTS: Be concise, accurate, honest, specific (use actual numbers), research-grounded, and careful with recommendations (note doctor consultation for medications, therapeutic-dose supplements, or major protocol changes). Do not use em dashes anywhere in your response; use commas, colons, parentheses, or separate sentences instead.
 
 STRUCTURE YOUR RESPONSE: Analysis; Trends Identified; Recovery Position; Projections; Recommendations; Citations.
-
+${profileBlock(state.profile)}
 PERIOD ANALYZED: ${rangeText}`;
 }
 
@@ -299,6 +307,7 @@ const ALL_SECTION_KEYS = ['scores', 'hrv', 'bp', 'rhr', 'sleep', 'orthostatic', 
 /** Metrics summarised per month, in the order they appear on the line. */
 const ROLLUP_METRICS: TrendMetricId[] = [
   'score', 'rmssd', 'sdnn', 'restingHr', 'sys', 'dia', 'sleepDuration', 'sleepingHr', 'waterIntake',
+  'bmCount', 'stoolForm',
 ];
 /** Metrics whose month value is a TOTAL rather than a median. */
 const ROLLUP_TOTALS: TrendMetricId[] = ['symptomLoad', 'cleanDays'];
@@ -382,7 +391,7 @@ function renderBody(state: AppState, ctx: ScoreContext, keys: string[], sections
 export function buildDataExport(state: AppState, ctx: ScoreContext, range: ReportRange, currentKey: string): string {
   const { keys: allKeys, rangeText } = reportDateRange(range, currentKey, state.days);
   const keys = allKeys.filter((k) => state.days[k]).sort();
-  return `DATA EXPORT\nSOURCE: Autonomic (autonomic.care), a personal health-tracking app for autonomic recovery\nPERIOD: ${rangeText}\n\n${renderBody(state, ctx, keys, ALL_SECTION_KEYS, range)}`;
+  return `DATA EXPORT\nSOURCE: Autonomic (autonomic.care), a personal health-tracking app for autonomic recovery\nPERIOD: ${rangeText}\n${profileBlock(state.profile)}\n${renderBody(state, ctx, keys, ALL_SECTION_KEYS, range)}`;
 }
 
 /**
@@ -412,7 +421,7 @@ export function buildDownturnPrompt(state: AppState, ctx: ScoreContext, dk: stri
 Approach this analysis as an honest friend examining the data carefully - direct and accurate without unnecessary softening or cruelty.
 
 REQUIREMENTS: Be concise, accurate, honest, specific (use actual numbers), research-grounded, and careful with recommendations (note doctor consultation for medications, therapeutic-dose supplements, or major protocol changes). Do not use em dashes anywhere in your response; use commas, colons, parentheses, or separate sentences instead.
-
+${profileBlock(state.profile)}
 SITUATION: The app's trend detection flagged a downturn ending ${longFmt(dk)}. The daily autonomic score fell about ${w.drop} points below its recent baseline over roughly ${w.spanDays} days (severity: ${w.severity === 'alert' ? 'high' : 'moderate'}). The app scanned the slide window and found:
 ${findings}
 
@@ -461,7 +470,7 @@ export function buildStrainPrompt(state: AppState, ctx: ScoreContext, dk: string
 Approach this analysis as an honest friend examining the data carefully - direct and accurate without unnecessary softening or cruelty.
 
 REQUIREMENTS: Be concise, accurate, honest, specific (use actual numbers), research-grounded, and careful with recommendations (note doctor consultation for medications, therapeutic-dose supplements, or major protocol changes). Do not use em dashes anywhere in your response; use commas, colons, parentheses, or separate sentences instead.
-
+${profileBlock(state.profile)}
 SITUATION: The daily autonomic score has NOT fallen, but the app flagged early signs of strain on ${longFmt(dk)} (severity: ${w.severity === 'alert' ? 'high' : 'moderate'}). It compared the last ${STRAIN_RECENT_DAYS} days against the six weeks before them, using medians on each side, and found these markers moved away from this person's own baseline:
 ${findings}
 
@@ -490,6 +499,23 @@ function profileAge(profile: AppState['profile']): number | null {
   let a = now.getFullYear() - b.getFullYear();
   if (now.getMonth() < b.getMonth() || (now.getMonth() === b.getMonth() && now.getDate() < b.getDate())) a--;
   return a >= 0 && a < 130 ? a : null;
+}
+
+/**
+ * The self-entered profile as one prompt line ("Age: 35 | Sex: Male"), or ''
+ * when nothing is filled in. Every prompt tells the model not to ASSUME an age
+ * or sex, so each one that has them must actually SAY them, or a model reading
+ * RMSSD 24 cannot know it belongs to a 60-year-old. Age only, never the date.
+ */
+export function profileLine(profile: AppState['profile']): string {
+  const age = profileAge(profile);
+  return [age != null ? `Age: ${age}` : '', profile && profile.sex ? `Sex: ${profile.sex}` : ''].filter(Boolean).join(' | ');
+}
+
+/** `profileLine` as a prompt block, with the blank lines around it; '' if empty. */
+export function profileBlock(profile: AppState['profile']): string {
+  const who = profileLine(profile);
+  return who ? `\nPROFILE (self-entered): ${who}\n` : '';
 }
 
 /** Human label for an entry's capture source (device name wins when stamped). */
@@ -564,8 +590,7 @@ export function buildEventInsightPrompt(
   for (let i = 0; i < HIST_DAYS; i++) histKeys.push(addDays(dk, -(HIST_DAYS - 1) + i));
   const hist = secOrthostatic(days, histKeys.filter((k) => days[k]));
 
-  const age = profileAge(profile);
-  const who = [age != null ? `Age: ${age}` : '', profile && profile.sex ? `Sex: ${profile.sex}` : ''].filter(Boolean).join(' | ');
+  const who = profileLine(profile);
   const eventName = isTest
     ? 'guided POTS stand test (a timed lie-then-stand heart-rate test)'
     : 'orthostatic episode (a logged heart-rate event around a position change)';
@@ -659,7 +684,7 @@ export function buildReadingInsightPrompt(
       line('Reading type', r.period),
       line('Capture source', sourceLine(r)),
       line('HR', numOr(r.type === 'breathHrv' ? r.hr : r.avgHr), ' bpm'),
-      line('App composite autonomic score', score, '/100'),
+      line('App composite HRV score for this reading', score, '/100'),
       line('SDNN', numOr(r.sdnn), ' ms'),
       line('RMSSD', numOr(r.rmssd), ' ms'),
       line('pNN50', numOr(r.pnn50), '%'),
@@ -724,8 +749,7 @@ export function buildReadingInsightPrompt(
     : r.type === 'restingHr' ? secRHR(days, keys)
     : orNone(eachEntry(days, keys, (d, k) => (d.readings || []).filter((x) => x.type === r.type).map((x) => { const parts = genericReadingParts(x); return `${stamp(k, x.time as string)} ${READING_TYPES[x.type]?.label ?? x.type}${parts.length ? ' | ' + parts.join(' | ') : ''}${noteSuffix(x)}`; })));
 
-  const age = profileAge(profile);
-  const who = [age != null ? `Age: ${age}` : '', profile && profile.sex ? `Sex: ${profile.sex}` : ''].filter(Boolean).join(' | ');
+  const who = profileLine(profile);
 
   return {
     rangeText,
@@ -811,14 +835,14 @@ export function buildWorkoutInsightPrompt(
 
   // Time in the five %-of-max zones, when an age gives us a max to anchor on.
   const age = profileAge(profile);
-  const hrMax = estimatedHrMax(age);
+  const hrMax = estimatedHrMax(age, profile ? profile.sex : null);
   let zoneBlock = '';
   if (curve && hrMax != null) {
     const zones = hrZones(hrMax);
     const secs = timeInZones(curve, zones);
     const fmtSec = (s: number) => (s >= 60 ? `${Math.floor(s / 60)}m ${Math.round(s % 60)}s` : `${Math.round(s)}s`);
     const rows = zones.map((z, i) => `Z${z.z} ${z.label} (${isFinite(z.to) ? `${z.from}–${z.to}` : `${z.from}+`} bpm): ${secs[i] > 0 ? fmtSec(secs[i]) : '-'}`);
-    zoneBlock = `\n\nTIME IN EXERCISE ZONES (zones from an age-estimated max HR of ${hrMax} bpm, Tanaka 208 - 0.7 x age; boundaries are approximate):\n${rows.join('\n')}`;
+    zoneBlock = `\n\nTIME IN EXERCISE ZONES (zones from an age-estimated max HR of ${hrMax} bpm, Tanaka 208 - 0.7 x age, or Gulati 206 - 0.88 x age for women; boundaries are approximate):\n${rows.join('\n')}`;
   }
 
   // The HR trace, thinned to ~150 points so the prompt stays small.
@@ -836,7 +860,7 @@ export function buildWorkoutInsightPrompt(
   for (let i = 0; i < HIST_DAYS; i++) histKeys.push(addDays(dk, -(HIST_DAYS - 1) + i));
   const hist = secActivities(days, histKeys.filter((k) => days[k]), custom);
 
-  const who = [age != null ? `Age: ${age}` : '', profile && profile.sex ? `Sex: ${profile.sex}` : ''].filter(Boolean).join(' | ');
+  const who = profileLine(profile);
 
   return {
     rangeText,
@@ -897,11 +921,12 @@ DOCUMENT STRUCTURE (each item a titled section; use tables unless noted):
 4. ORTHOSTATIC / POTS ASSESSMENT: A table of every stand test and orthostatic reading: Date | Baseline HR | Peak HR | Peak delta (bpm) | Sustained delta (bpm) | Sustained rise >=30 bpm | Notes. Follow it with one neutral line stating whether the recorded responses meet the common orthostatic tachycardia threshold (sustained HR rise >=30 bpm on standing, >=40 bpm if under 20 years old), without rendering a diagnosis.
 5. SYMPTOM SUMMARY: A table Symptom | Occurrences | Typical severity | Dates / pattern | Notes, most frequent first.
 6. SLEEP SUMMARY: A table of nightly duration, quality, HR range, and stages when present, plus a one-line period average.
-7. MEDICATIONS & SUPPLEMENTS: A table Name | Dose / amount | How often logged | Notes.
-8. ACTIVITY & PACING: Include only if pacing data is present. A table Date | Budget (effort min) | Measured load (effort min) | Margin | Following 2 days | Steps, then one neutral line on how often the day's measured load stayed within the app's fitted budget. State plainly that the budget is a personalized ceiling the app fits from this patient's own history and is not a clinical target or a prescribed activity limit.
-9. TRENDS & TRAJECTORY: A brief objective narrative (3 to 6 sentences) of how the metrics moved across the period, using actual numbers. Observations only, no advice.
-10. QUESTIONS FOR THE VISIT: A short bulleted list of specific, data-grounded questions the patient may want to raise (for example about an orthostatic finding, an HRV trend, or a symptom cluster). Phrase them as the patient's questions, not as clinical recommendations.
-11. METHODOLOGY & LIMITATIONS: A brief closing footnote naming the data source and noting that consumer-device measurements and self-reported symptoms have accuracy limits and are not a substitute for clinical measurement.
+7. BOWEL HABITS: Include only if bowel movements were logged. A table Measure | Value with rows for movements per tracked day, days with a movement (of days tracked), the form mix by Bristol range (Hard 1 to 2, Formed 3 to 4, Loose 5 to 6, Diarrhea 7), straining (mild and severe counts) and the longest run without one, taken from the SUMMARY line of the bowel movement data. Observations only; do not label the pattern as constipation, diarrhea or any other condition.
+8. MEDICATIONS & SUPPLEMENTS: A table Name | Dose / amount | How often logged | Notes.
+9. ACTIVITY & PACING: Include only if pacing data is present. A table Date | Budget (effort min) | Measured load (effort min) | Margin | Following 2 days | Steps, then one neutral line on how often the day's measured load stayed within the app's fitted budget. State plainly that the budget is a personalized ceiling the app fits from this patient's own history and is not a clinical target or a prescribed activity limit.
+10. TRENDS & TRAJECTORY: A brief objective narrative (3 to 6 sentences) of how the metrics moved across the period, using actual numbers. Observations only, no advice.
+11. QUESTIONS FOR THE VISIT: A short bulleted list of specific, data-grounded questions the patient may want to raise (for example about an orthostatic finding, an HRV trend, or a symptom cluster). Phrase them as the patient's questions, not as clinical recommendations.
+12. METHODOLOGY & LIMITATIONS: A brief closing footnote naming the data source and noting that consumer-device measurements and self-reported symptoms have accuracy limits and are not a substitute for clinical measurement.
 
 Omit any section or table row that has no supporting data rather than showing blanks or speculating. Keep the finished document tight enough to print on two to three pages.
 ${sparse}

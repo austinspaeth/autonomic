@@ -267,6 +267,17 @@ functions:
       - httpApi:
           method: GET
           path: /ping/rpt/{cohort}
+      # Two more per-letter routes, same shape:
+      #   rdg  an HRV reading completed, by KIND (M the day's first baseline /
+      #        B a later baseline / T training)
+      #   mbp  the morning baseline prompt card (S shown / T take reading /
+      #        N not today / X closed)
+      - httpApi:
+          method: GET
+          path: /ping/rdg/{cohort}
+      - httpApi:
+          method: GET
+          path: /ping/mbp/{cohort}
       # A FAULT report — the one route here that is not a counter. Its own path
       # prefix on purpose: every route above is a fixed alphabet and a number
       # that means "how many people", and this one carries text (a tag naming

@@ -3,6 +3,9 @@ import {
   easternDay,
   featureCode,
   findingCode,
+  isFirstBaseline,
+  morningPromptCode,
+  readingKindCode,
   logCode,
   reportCode,
   methodCode,
@@ -145,6 +148,37 @@ describe('cohort ping wire format', () => {
     expect(reportCode('other')).toBeUndefined();
     expect(pingUrl('rpt', '2026-08-21', 'A', 'C', 'P', '1.28.0'))
       .toBe('https://api.autonomic.care/ping/rpt/D082126AC-TP-V1.28.0');
+  });
+
+  it('names the kind of reading, and the morning baseline apart from later ones', () => {
+    expect(readingKindCode('hrv', true)).toBe('M');
+    expect(readingKindCode('hrv', false)).toBe('B');
+    expect(readingKindCode('breathHrv', true)).toBe('T');
+    expect(readingKindCode('breathHrv', false)).toBe('T');
+    expect(readingKindCode('bp', true)).toBeUndefined();
+    expect(pingUrl('rdg', '2026-08-21', 'I', 'M', 'T', '1.30.0'))
+      .toBe('https://api.autonomic.care/ping/rdg/D082126IM-TT-V1.30.0');
+  });
+
+  it('decides the day\'s first baseline from trusted baselines only', () => {
+    expect(isFirstBaseline(undefined)).toBe(true);
+    expect(isFirstBaseline([])).toBe(true);
+    // A training reading earlier in the day does not take the morning slot.
+    expect(isFirstBaseline([{ id: 'a', type: 'breathHrv' }])).toBe(true);
+    expect(isFirstBaseline([{ id: 'a', type: 'hrv' }])).toBe(false);
+    // A short imported sample never counted as anybody's morning reading.
+    expect(isFirstBaseline([{ id: 'a', type: 'hrv', imported: true, durationSec: 60 }])).toBe(true);
+    // A caller that already wrote the reading excludes it.
+    expect(isFirstBaseline([{ id: 'a', type: 'hrv' }], 'a')).toBe(true);
+    expect(isFirstBaseline([{ id: 'a', type: 'hrv' }, { id: 'b', type: 'hrv' }], 'b')).toBe(false);
+  });
+
+  it('maps the morning prompt card outcomes onto letters', () => {
+    expect(morningPromptCode('shown')).toBe('S');
+    expect(morningPromptCode('take')).toBe('T');
+    expect(morningPromptCode('notToday')).toBeUndefined();
+    expect(morningPromptCode('closed')).toBe('X');
+    expect(morningPromptCode('other')).toBeUndefined();
   });
 
   it('maps a tier onto a letter, and anything unknown onto free', () => {

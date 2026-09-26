@@ -9,6 +9,7 @@ import { type ScoreContext } from '../scoring';
 import { dayCleanliness, scoreSet, sleepHours, type DaysMap } from '../scoring/day';
 import { isTrustedReading, trustedReadings } from '../hrvQuality';
 import { isEngagedDay } from '../review/eligibility';
+import { gutDay } from '../digestion';
 
 
 export interface MDay {
@@ -16,7 +17,7 @@ export interface MDay {
   rmssd: number | null; sdnn: number | null; pnn50: number | null; totalPower: number | null; lfPeak: number | null; vlf: number | null;
   restHrLay: number | null; walkHr: number | null; hr60: number | null; orthoDelta: number | null;
   hasOrtho: boolean; severeOrtho: boolean; highBpEvent: boolean; bpGood: boolean | null;
-  sleepH: number | null; sleepGood: boolean; sleepLow: number | null; bm: number; score: number | null; clean: boolean;
+  sleepH: number | null; sleepGood: boolean; sleepLow: number | null; gutNormal: boolean; score: number | null; clean: boolean;
   hfDom: boolean; hfDomMorning: boolean; symptomFree: boolean;
   sessions: number; walked: boolean; sys: number | null; dia: number | null; waterGood: boolean;
   hasHrv: boolean; loggedDay: boolean;
@@ -81,7 +82,9 @@ export function buildMilestoneDays(days: DaysMap, ctx: ScoreContext): { map: Rec
       sleepH: sleepHours(days, dk),
       sleepGood: (() => { const h = sleepHours(days, dk); return h != null && !(d.sleep && d.sleep.quality === 'interrupted'); })(),
       sleepLow: d.sleep && d.sleep.hrLow != null ? parseFloat(String(d.sleep.hrLow)) : null,
-      bm: d.digestion && d.digestion.movements ? d.digestion.movements.length : 0,
+      // A movement that was neither loose nor hard/severely strained. A bare
+      // count let a week of daily diarrhea earn the streak.
+      gutNormal: gutDay(days, dk)?.grade === 'normal',
       score: scoreSet(rd, d, dk, days, ctx).score,
       clean: cln ? cln.clean : false,
       hfDom: rd.some((r) => r.type === 'hrv' && parseFloat(r.highPower as string) > parseFloat(r.lowPower as string)),
@@ -228,8 +231,8 @@ export function buildMilestoneGroups(md: MD, extras?: { protocolSetOn?: string |
       ['Month without any Crash days', () => msNoneIn(md, 30, (d) => d.score != null && d.score < 25)],
     ]],
     ['Gut & symptoms', [
-      ['7 consecutive days with a bowel movement', consec((d) => d.bm >= 1, 7)],
-      ['30 consecutive days with a bowel movement', consec((d) => d.bm >= 1, 30)],
+      ['7 consecutive days with a normal bowel movement', consec((d) => d.gutNormal, 7)],
+      ['30 consecutive days with a normal bowel movement', consec((d) => d.gutNormal, 30)],
       ['7 days symptom-free', consec((d) => d.symptomFree, 7)],
       ['14 days symptom-free', consec((d) => d.symptomFree, 14)],
       ['30 days symptom-free', consec((d) => d.symptomFree, 30)],

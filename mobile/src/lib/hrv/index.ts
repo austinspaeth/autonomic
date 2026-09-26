@@ -207,6 +207,9 @@ export interface SegmentTriage {
   keptArtifactPct: number[];
   dropped: number;
   droppedBeats: number;
+  /** Per INPUT segment: whether triage kept it. Lets a view draw the pieces
+   *  the statistics threw away without re-deciding which they were. */
+  keep: boolean[];
 }
 
 export function triageSegments(cleaned: { clean: number[]; artifactPct: number }[]): SegmentTriage {
@@ -214,6 +217,7 @@ export function triageSegments(cleaned: { clean: number[]; artifactPct: number }
   const kept: number[][] = [];
   const keptStarts: number[] = [];
   const keptArtifactPct: number[] = [];
+  const keep: boolean[] = [];
   let dropped = 0, droppedBeats = 0, cursor = 0;
   for (const c of cleaned) {
     const segMed = median(c.clean);
@@ -221,14 +225,16 @@ export function triageSegments(cleaned: { clean: number[]; artifactPct: number }
     if (c.clean.length < MIN_SEGMENT_BEATS || c.artifactPct > SEGMENT_MAX_ARTIFACT || offBaseline) {
       dropped++;
       droppedBeats += c.clean.length;
+      keep.push(false);
       continue;
     }
+    keep.push(true);
     keptStarts.push(cursor);
     cursor += c.clean.length;
     kept.push(c.clean);
     keptArtifactPct.push(c.artifactPct);
   }
-  return { kept, keptStarts, keptArtifactPct, dropped, droppedBeats };
+  return { kept, keptStarts, keptArtifactPct, dropped, droppedBeats, keep };
 }
 
 /* ---------- time-domain ---------- */
@@ -441,6 +447,43 @@ export function psdCurve(rr: number[]): { freqs: number[]; psd: number[] } | nul
   return { freqs, psd };
 }
 
+/** Repair (camera only) then correct each segment on its own. The ONE
+ *  per-segment pipeline: {@link computeHrv} builds its statistics from it and
+ *  {@link beatTrace} draws from it, so the chart cannot mark different beats
+ *  from the ones the numbers were built on. */
+function cleanSegments(rawSegments: number[][], source?: string): { cleaned: ArtifactResult[]; repaired: number } {
+  let repaired = 0;
+  const cleaned = rawSegments.map((seg) => {
+    const pre = source === 'camera' ? repairBeatsCounted(seg) : { rr: seg, repaired: 0 };
+    repaired += pre.repaired;
+    return correctArtifacts(pre.rr);
+  });
+  return { cleaned, repaired };
+}
+
+/** A reading's beat series as the chart draws it: every beat, corrected
+ *  values in place, plus which beats were corrected and which sit in a segment
+ *  triage threw away. Index-aligned throughout. */
+export interface BeatTrace {
+  rr: number[];
+  corrected: boolean[];
+  dropped: boolean[];
+}
+
+export function beatTrace(rrRaw: number[], opts: { source?: string; segmentStarts?: number[] } = {}): BeatTrace {
+  const { cleaned } = cleanSegments(splitSegments(rrRaw, opts.segmentStarts), opts.source);
+  const { keep } = triageSegments(cleaned);
+  const out: BeatTrace = { rr: [], corrected: [], dropped: [] };
+  cleaned.forEach((c, k) => {
+    for (let i = 0; i < c.clean.length; i++) {
+      out.rr.push(c.clean[i]);
+      out.corrected.push(!!c.flags[i]);
+      out.dropped.push(!keep[k]);
+    }
+  });
+  return out;
+}
+
 /* ---------- top-level: full result ---------- */
 export interface HrvResult {
   ok: boolean;
@@ -492,7 +535,7 @@ const r0 = (v: number) => Math.round(v);
  * few seconds short: collection starts on the first notification, the session
  * stops mid-beat, and a single dropout splits the record. At a 300 s floor a
  * clean 5-minute reading passes or fails on a coin flip. 240 s gives it real
- * headroom while still excluding the 180 s camera capture and 30 s Apple ECG.
+ * headroom while still excluding the 30 s Apple ECG.
  * The cost is bounded: `frequencyDomain` caps its Welch window at 256 samples
  * (64 s at FS=4), so band RESOLUTION is identical either way — a shorter record
  * only averages fewer segments (8 at 300 s vs 6 at 240 s), so VLF is slightly
@@ -602,12 +645,7 @@ export function computeHrv(
   // spike corrector runs. Strap/watch/ECG sources have a true R-peak clock.
   // Repair and correction both run PER SEGMENT so neither one reasons across a
   // seam it can't see.
-  let repaired = 0;
-  const cleaned = rawSegments.map((seg) => {
-    const pre = opts.source === 'camera' ? repairBeatsCounted(seg) : { rr: seg, repaired: 0 };
-    repaired += pre.repaired;
-    return correctArtifacts(pre.rr);
-  });
+  const { cleaned, repaired } = cleanSegments(rawSegments, opts.source);
   const repairPct = rrRaw.length ? (repaired / rrRaw.length) * 100 : 0;
 
   const { kept, keptStarts, keptArtifactPct, dropped } = triageSegments(cleaned);

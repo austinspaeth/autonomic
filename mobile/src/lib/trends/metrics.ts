@@ -19,6 +19,7 @@ import type { DayRecord, Entry } from '../types';
 import { orthoMaxDelta, totalPower, type ScoreContext } from '../scoring';
 import { DEFAULT_PROTOCOL, dayCleanliness, scoreCat, scoreSet, sleepHours, type DaysMap } from '../scoring/day';
 import { isTrustedReading } from '../hrvQuality';
+import { dayBristol, movementCount } from '../digestion';
 
 export type TrendMetricId =
   // The six the Journal's Trend card walks (TREND_PRIORITY).
@@ -30,7 +31,7 @@ export type TrendMetricId =
   // index) stay off the screen: they are deliberately absent.
   | 'sdnn' | 'pnn50' | 'totalPower' | 'lfPeak'
   | 'sys' | 'dia' | 'sleepingHr'
-  | 'symptomLoad' | 'bmCount' | 'waterIntake' | 'cleanDays' | 'orthoDelta';
+  | 'symptomLoad' | 'bmCount' | 'stoolForm' | 'waterIntake' | 'cleanDays' | 'orthoDelta';
 
 /**
  * How a window's per-day values collapse to one number.
@@ -516,8 +517,33 @@ export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
     minDelta: 0.5,
     deltaKind: 'absolute',
     minPoints: 8,
-    value: (d) => dayCount(d, (x) => ((x.digestion && x.digestion.movements) || []).length),
+    // Not `dayCount`: a day with no movement logged is only a zero where the
+    // journal has earned one (../digestion), so somebody who never logs them,
+    // or stopped, is unknown rather than constipated.
+    value: (d, dk, days) => movementCount(days, dk),
     phrase: (delta) => `${dir(delta, 'up', 'down')} ${round1(Math.abs(delta))} a day`,
+    fmt: (v) => String(round1(v)),
+  },
+
+  stoolForm: {
+    id: 'stoolForm',
+    // "Softness" rather than "form" or "type": Bristol runs hard to liquid, so
+    // the one word that makes "higher" mean something is the direction it runs.
+    label: 'Stool softness',
+    subject: 'Your stools are',
+    unit: 'Bristol',
+    countNoun: 'days with a typed movement',
+    // Types 3-4 are the healthy middle; both ends are the finding.
+    better: 'band',
+    target: [3, 4],
+    aggregate: 'median',
+    minDelta: 1,
+    deltaKind: 'absolute',
+    minPoints: 8,
+    // Only days holding a movement WITH a form: a day without one has no stool
+    // to grade, and how often is ../digestion's zero and `bmCount`'s question.
+    value: (d) => dayBristol(d),
+    phrase: (delta) => `${dir(delta, 'softer', 'firmer')} by ${round1(Math.abs(delta))} Bristol ${plural(round1(delta), 'type', 'types')}`,
     fmt: (v) => String(round1(v)),
   },
 
@@ -613,7 +639,7 @@ export const TREND_PRIORITY: TrendMetricId[] = [
 export const INSIGHT_OUTCOMES: TrendMetricId[] = [
   'score', 'badDays', 'rmssd', 'sdnn', 'pnn50', 'totalPower', 'lfPeak',
   'restingHr', 'sleepingHr', 'sys', 'dia',
-  'sleepDuration', 'sleepConsistency', 'symptomLoad', 'bmCount', 'waterIntake',
+  'sleepDuration', 'sleepConsistency', 'symptomLoad', 'bmCount', 'stoolForm', 'waterIntake',
   'cleanDays', 'orthoDelta',
 ];
 
@@ -630,7 +656,7 @@ export const INSIGHT_OUTCOMES: TrendMetricId[] = [
 export const WATCH_PRIORITY: TrendMetricId[] = [
   'score', 'badDays', 'rmssd', 'sdnn', 'restingHr', 'sleepDuration',
   'sleepConsistency', 'sleepingHr', 'symptomLoad', 'cleanDays', 'waterIntake',
-  'sys', 'dia', 'bmCount',
+  'sys', 'dia', 'bmCount', 'stoolForm',
 ];
 
 /**
@@ -659,6 +685,7 @@ export const OUTCOME_FAMILY: Record<TrendMetricId, string> = {
   sleepConsistency: 'sleep',
   symptomLoad: 'symptoms',
   bmCount: 'digestion',
+  stoolForm: 'digestion',
   waterIntake: 'hydration',
 };
 
@@ -696,6 +723,8 @@ export const FAMILY_RANK: Partial<Record<TrendMetricId, number>> = {
   sys: 0, dia: 1,
   // sleep — duration is the one a reader can picture; consistency is a stdev.
   sleepDuration: 0, sleepConsistency: 1,
+  // digestion — form says more than frequency: once a day can be hard and strained.
+  stoolForm: 0, bmCount: 1,
 };
 
 /** Sort key for choosing a family's representative. Unlisted metrics sort last. */

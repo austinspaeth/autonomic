@@ -31,6 +31,7 @@ import { DEFAULT_PROTOCOL, activityGrade, dayCleanliness, sleepHours, waterGoalL
 import type { ScoreContext } from '../scoring';
 import type { AppState, DayRecord, TypeDef } from '../types';
 import { lowPressureValue, type PressureMap } from '../pressure';
+import { gutDay } from '../digestion';
 
 export type FactorKind = 'binary' | 'continuous';
 
@@ -152,6 +153,12 @@ const MED_KEYS = new Set(['allegra', 'pepsidAc', 'gaviscon', 'melatonin']);
 const BUILTIN: Record<string, Record<string, TypeDef>> = {
   meds: MED_TYPES, activities: ACTIVITY_TYPES, symptoms: SYMPTOM_TYPES, triggers: TRIGGER_TYPES,
 };
+
+/** Did the user create this med/supplement type themselves? */
+function isCustomMed(state: AppState, type: string): boolean {
+  const custom = state.customTypes && (state.customTypes as Record<string, Record<string, TypeDef>>).meds;
+  return !!(custom && custom[type]) && !MED_TYPES[type];
+}
 
 /** Label for a type key, honouring the user's own definitions and overrides. */
 function labelFor(state: AppState, kind: string, key: string): string {
@@ -306,7 +313,11 @@ export function buildFactors(state: AppState, keys: string[], opts: {
       id: `med:${type}`,
       label,
       driver: label,
-      onsetNoun: label.toLowerCase(),
+      // A built-in label is the app's own title case ("Magnesium Glycinate") and
+      // reads right lowercased mid-sentence. A name the user typed is theirs:
+      // "Vitamin C", "Zyrtec" and "MCT Oil" lowercased became "vitamin c",
+      // "zyrtec" and "mct oil" in the one sentence at the top of the screen.
+      onsetNoun: isCustomMed(state, type) ? label : label.toLowerCase(),
       group: MED_KEYS.has(type) ? 'medication' : 'supplement',
       kind: 'binary',
       lags: [0, 1],
@@ -587,6 +598,11 @@ function derivedFactors(): FactorDef[] {
       presence: SPAN_TRIGGERS,
       value: (d) => (d ? Object.values((d.food && d.food.triggers) || {}).reduce((s, v) => s + (Number(v) > 0 ? 1 : 0), 0) : null),
     },
+    // Bowel movements. No `presence` probe on any of the three: ../digestion
+    // already answers "is this day known", and answers it more strictly than a
+    // span could — a span opened by the first movement ever logged never closes,
+    // so somebody who logged a month of them and stopped would read as never
+    // going again. `gutDay` is null outside what the journal has earned.
     {
       id: 'bm:none',
       subject: 'Days with no bowel movement',
@@ -596,8 +612,33 @@ function derivedFactors(): FactorDef[] {
       kind: 'binary',
       lags: [0, 1],
       blocks: ['digestion'],
-      presence: { key: 'digestion', mode: 'span', has: (d) => ((d.digestion && d.digestion.movements) || []).length > 0 },
-      value: (d) => (d ? (((d.digestion && d.digestion.movements) || []).length === 0 ? 1 : 0) : null),
+      value: (d, dk, days) => { const g = gutDay(days, dk); return g ? (g.grade === 'none' ? 1 : 0) : null; },
+    },
+    {
+      // The fast end: loose stools and diarrhea cost fluid and salt, which is
+      // exactly what a standing heart rate and a morning HRV feel the next day.
+      id: 'bm:loose',
+      subject: 'Days with a loose stool',
+      label: 'Loose stool or diarrhea',
+      driver: 'Loose stool',
+      group: 'digestion',
+      kind: 'binary',
+      lags: [0, 1],
+      blocks: ['digestion'],
+      value: (d, dk, days) => { const g = gutDay(days, dk); return g ? (g.grade === 'loose' ? 1 : 0) : null; },
+    },
+    {
+      // The slow end, as far as a movement can show it: hard, or severely
+      // strained. Straining is a Valsalva, which this population feels.
+      id: 'bm:hard',
+      subject: 'Days with a hard or strained stool',
+      label: 'Hard or strained stool',
+      driver: 'Hard stool',
+      group: 'digestion',
+      kind: 'binary',
+      lags: [0, 1],
+      blocks: ['digestion'],
+      value: (d, dk, days) => { const g = gutDay(days, dk); return g ? (g.grade === 'hard' ? 1 : 0) : null; },
     },
     {
       id: 'protocol:clean',

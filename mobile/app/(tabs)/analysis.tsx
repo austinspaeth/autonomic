@@ -1344,7 +1344,13 @@ const CardView = React.memo(function CardView({ card, buckets }: { card: Analysi
                   buckets={buckets}
                   height={124}
                   hideHeader
-                  segments={[{ label: selRow ? selRow.name : bg.label, color: p.accent, values: selRow ? (bb.byKey[selRow.key!] ?? bb.totals) : bb.totals }]}
+                  segments={bb.stacked
+                    // Rows that are parts of one thing: the unselected chart is
+                    // their mix, and a selected row keeps its own colour.
+                    ? (selRow
+                      ? [{ label: selRow.name, color: selRow.color || p.accent, values: bb.byKey[selRow.key!] ?? bb.totals }]
+                      : bg.rows.map((r) => ({ label: r.name, color: r.color || p.accent, values: bb.byKey[r.key!] ?? [] })))
+                    : [{ label: selRow ? selRow.name : bg.label, color: p.accent, values: selRow ? (bb.byKey[selRow.key!] ?? bb.totals) : bb.totals }]}
                 />
               </View>
             ) : null}

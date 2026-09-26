@@ -69,7 +69,7 @@ export function JournalSections({ dk }: { dk: string }) {
             {dk === todayKey() ? (
               <Pressable onPress={forms.captureHrv} style={({ pressed }) => [{ flexDirection: 'row', gap: 10, alignItems: 'center', justifyContent: 'center', backgroundColor: p.accent, borderRadius: radius.control, paddingVertical: 13 }, pressed && { opacity: 0.7 }]}>
                 <Icon name="activity" size={18} color="#fff" />
-                <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Capture HRV reading</Text>
+                <Text style={{ color: '#fff', fontSize: 15, fontWeight: '600' }}>Capture training HRV</Text>
               </Pressable>
             ) : null}
             <AddDashButton onPress={forms.pickReading} label="+ Add reading" />

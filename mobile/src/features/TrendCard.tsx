@@ -60,6 +60,8 @@ export const METRIC_CARD: Partial<Record<TrendMetricId, string>> = {
   sleepDuration: 'Duration',
   sleepingHr: 'Sleeping HR',
   waterIntake: 'Hydration',
+  bmCount: 'Bowel movements',
+  stoolForm: 'Bowel movements',
   // No symptomLoad: Progress has no symptom chart, and its `triggers` section
   // charts trigger EXPOSURE counts — a different quantity. It lands on the
   // section, which is the nearest true thing.
@@ -83,7 +85,8 @@ export const METRIC_SECTION: Record<TrendMetricId, string> = {
   sleepingHr: 'sleep',
   waterIntake: 'triggers',
   symptomLoad: 'triggers',
-  bmCount: 'triggers',
+  bmCount: 'gut',
+  stoolForm: 'gut',
 };
 
 export function TrendCard({ dk }: { dk: string }) {

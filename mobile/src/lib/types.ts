@@ -163,7 +163,7 @@ export interface DayRecord {
   meds: Entry[];
   symptoms: Entry[];
   food: FoodRecord;
-  digestion: { movements: Movement[]; bm?: number };
+  digestion: { movements: Movement[] };
   /** Free-text day notes; only surfaced in AI-insights prompts. */
   notes?: string;
   /** What the health store said this day cost, summarised at read time.

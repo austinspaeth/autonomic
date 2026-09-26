@@ -16,8 +16,9 @@ import {
   type DaysMap,
 } from './day';
 import { keyRange, metricSeries } from '../trends/series';
+import { gutDay } from '../digestion';
 
-export type DownturnCause = 'triggers' | 'exertion' | 'sleep' | 'protocol' | 'unexplained';
+export type DownturnCause = 'triggers' | 'exertion' | 'sleep' | 'digestion' | 'protocol' | 'unexplained';
 
 /** One journal finding that could be driving the slide, for the detail sheet. */
 export interface DownturnFactor { label: string; value: string; detail: string }
@@ -98,7 +99,7 @@ export function detectDownturn(
   // the slide on "missed" protocol items the user hasn't reached yet. A past
   // day being viewed is complete, so it stays in the window.
   const scanEnd = dk === todayKey() ? addDays(dk, -1) : dk;
-  let trigN = 0, slipDays = 0, shortNights = 0, heavy = 0, heavyDays = 0, windowLen = 0;
+  let trigN = 0, slipDays = 0, shortNights = 0, heavy = 0, heavyDays = 0, windowLen = 0, looseDays = 0, hardDays = 0;
   const trigCounts: Record<string, number> = {};
   const misses: Record<string, { label: string; key: string; days: number }> = {};
   for (let k = scored[startIdx].k; k <= scanEnd; k = addDays(k, 1)) {
@@ -115,6 +116,10 @@ export function detectDownturn(
     else if (g === 'ok') heavy++;
     const hrs = sleepHours(days, k);
     if ((hrs != null && hrs < 6) || (d.sleep && d.sleep.quality === 'interrupted')) shortNights++;
+    // Only days ../digestion can speak for; an unlogged gut is not a clean one.
+    const gut = gutDay(days, k);
+    if (gut && gut.grade === 'loose') looseDays++;
+    else if (gut && gut.grade === 'hard') hardDays++;
     const c = dayCleanliness(days, k, protocol, custom);
     const slipped = c ? c.criteria.filter((x) => {
       if (x.pass || x.pending) return false;
@@ -134,6 +139,9 @@ export function detectDownturn(
     trigN > 0 ? 'triggers'
     : heavy >= 2 ? 'exertion'
     : shortNights >= Math.min(2, windowLen) ? 'sleep'
+    // Loose stools on two days of a slide is a physical explanation (fluid and
+    // salt loss) where a protocol slip is a behavioural one, so it ranks first.
+    : looseDays >= 2 ? 'digestion'
     : slipDays >= 2 ? 'protocol'
     : 'unexplained';
 
@@ -143,6 +151,7 @@ export function detectDownturn(
     triggers: `${trigN} trigger${trigN === 1 ? '' : 's'} logged in this stretch may be driving it. Cut them out and give your system room to recover.`,
     exertion: 'Activity has run heavy through the slide. This pattern often comes before a post-exertional crash, so scale back and rest.',
     sleep: 'Sleep ran short or interrupted on these nights. An earlier, longer night is the fastest way to turn this around.',
+    digestion: `Loose stools on ${looseDays} of these days. That costs fluid and salt, which pulls heart rate up and HRV down, so replace both and rest. If it came on suddenly, you may be fighting something off.`,
     protocol: `Your protocol slipped on ${slipDays} of these days. Getting back to basics usually turns the trend around.`,
     unexplained: 'No triggers logged and your protocol is on track, so this may be stress or sickness building. Your autonomic system can signal illness before symptoms start. Take it easy and rest.',
   };
@@ -174,6 +183,14 @@ export function detectDownturn(
   if (shortNights && !misses.sleep) factors.push({
     label: 'Sleep', value: `${shortNights} night${shortNights === 1 ? '' : 's'}`,
     detail: 'Short or interrupted sleep in this stretch. An earlier, longer night is the fastest lever to turn the trend around.',
+  });
+  if (looseDays) factors.push({
+    label: 'Loose stools', value: `${looseDays} day${looseDays === 1 ? '' : 's'}`,
+    detail: 'Loose stools or diarrhea in this stretch. Losing fluid and salt this way lowers blood volume, which shows up as a higher heart rate and a lower score.',
+  });
+  if (hardDays >= 2) factors.push({
+    label: 'Hard or strained stools', value: `${hardDays} days`,
+    detail: 'Hard stools or severe straining in this stretch. Slow digestion often moves with the rest of the autonomic system, so it can be part of the same picture.',
   });
   Object.keys(misses).forEach((k) => {
     const m = misses[k];

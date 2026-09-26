@@ -65,12 +65,12 @@ describe('a short later reading cannot delete what an earlier one measured', () 
   it('keeps every component the morning resolved, at the same confidence', () => {
     const alone = score([morning]);
     const withShort = score([morning, tooShort('pm', '19:00')]);
-    expect(labels(alone)).toEqual(['HRV (RMSSD)', 'Total power', 'pNN50', 'VLF power', 'LF peak', 'Resting HR']);
+    expect(labels(alone)).toEqual(['Training HRV', 'Total power', 'pNN50', 'VLF power', 'LF peak', 'Resting HR']);
     expect(labels(withShort)).toEqual(labels(alone));
-    // THE REPORTED BUG. Six components, 77 of the 95-point input set.
-    expect(alone.weightSum).toBe(77);
-    expect(withShort.weightSum).toBe(77);
-    expect(withShort.confidence).toBe(81);
+    // THE REPORTED BUG. Six components, 67 of the 110-point input set.
+    expect(alone.weightSum).toBe(67);
+    expect(withShort.weightSum).toBe(67);
+    expect(withShort.confidence).toBe(61);
     expect(withShort.confidence).toBe(alone.confidence);
   });
 
@@ -82,7 +82,7 @@ describe('a short later reading cannot delete what an earlier one measured', () 
   });
 
   it('still lets the short reading contribute what it DID resolve', () => {
-    const rmssdOf = (r: ReturnType<typeof scoreSet>) => r.comps.find((c) => c.label === 'HRV (RMSSD)')!;
+    const rmssdOf = (r: ReturnType<typeof scoreSet>) => r.comps.find((c) => c.label === 'Training HRV')!;
     const alone = rmssdOf(score([morning]));
     const withShort = rmssdOf(score([morning, tooShort('pm', '19:00')]));
     expect(withShort.readings).toBe(2);

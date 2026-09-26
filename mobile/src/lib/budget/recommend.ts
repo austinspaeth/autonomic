@@ -39,6 +39,10 @@ export interface Recommendation {
  *  about. Before it, the user may simply not have done anything yet. */
 const ACTIVITY_ASK_HOUR = 14;
 
+/** 1pm: past it, a day that already holds a training reading is not asked for
+ *  a baseline, the same cut-off the Journal's baseline prompt uses. */
+const BASELINE_ASK_UNTIL_MIN = 13 * 60;
+
 export interface RecommendInput {
   days: DaysMap;
   dk: string;
@@ -58,11 +62,16 @@ export function nextRecommendation(input: RecommendInput): Recommendation | null
   const { days, dk } = input;
   const day = days[dk];
 
-  // 1. HRV. Everything downstream is built from it, so it always leads.
-  const hrvToday = (day?.readings || []).some(
-    (r: Entry) => (r.type === 'hrv' || r.type === 'breathHrv') && isTrustedReading(r),
-  );
-  if (!hrvToday) return { id: 'hrv', title: 'Todo: Take an HRV reading', actionable: true };
+  // 1. HRV. Everything downstream is built from it, so it always leads, and
+  //    what it asks for is the BASELINE reading, the one the budget is built
+  //    on. A training reading alone quiets it after the morning prompt's own
+  //    cut-off (BASELINE_ASK_UNTIL_MIN): by then the day's snapshot has passed.
+  const trusted = (day?.readings || []).filter((r: Entry) => isTrustedReading(r));
+  const baselineToday = trusted.some((r: Entry) => r.type === 'hrv');
+  const trainingToday = trusted.some((r: Entry) => r.type === 'breathHrv');
+  if (!baselineToday && (!trainingToday || input.nowMin < BASELINE_ASK_UNTIL_MIN)) {
+    return { id: 'hrv', title: 'Todo: Take a baseline HRV reading', actionable: true };
+  }
 
   // 2. Last night's sleep.
   if (sleepHours(days, dk) == null) return { id: 'sleep', title: 'Todo: Log your sleep', actionable: true };

@@ -6,6 +6,10 @@
  * Score fixtures lean on the unstructured RMSSD bands: an 'hrv' reading with
  * only rmssd set makes the day score exactly its grade points
  * (40→100, 30→80, 25→60, 20→35, 15→10).
+ * The fixture reading is a TRAINING ('breathHrv') reading because it is graded
+ * on absolute bands alone: a baseline reading is also graded against the
+ * user's own usual once five exist, which would make each fixture day's score
+ * depend on its neighbours. (rmssdS and rmssdU agree at every value used.)
  */
 import type { DayRecord, Entry } from '../../types';
 import { addDays, todayKey } from '../../dates';
@@ -23,7 +27,7 @@ const day = (over: Partial<DayRecord> = {}): DayRecord => ({
   ...over,
 });
 
-const hrvR = (rmssd: number): Entry => ({ id: `r${rmssd}`, type: 'hrv', time: '08:00', rmssd: String(rmssd) });
+const hrvR = (rmssd: number): Entry => ({ id: `r${rmssd}`, type: 'breathHrv', time: '08:00', rmssd: String(rmssd) });
 const hrvDay = (rmssd: number, over: Partial<DayRecord> = {}) => day({ readings: [hrvR(rmssd)], ...over });
 
 const DK = '2026-01-08';
@@ -136,6 +140,23 @@ describe('detectDownturn — cause attribution', () => {
     days[K(8)] = hrvDay(20, { sleep: { bed: '', wake: '', quality: 'interrupted' } });
     const w = detectDownturn(days, DK)!;
     expect(w.cause).toBe('sleep');
+  });
+
+  it('loose stools on 2+ days → digestion, named as a factor', () => {
+    const days = steepDecline();
+    let n = 0;
+    const bm = (kind: string) => ({ movements: [{ id: `m${++n}`, time: '09:00', kind }] });
+    days[K(5)] = hrvDay(40, { digestion: bm('Formed') });
+    days[K(6)] = hrvDay(30, { digestion: bm('Diarrhea') });
+    days[K(7)] = hrvDay(25, { digestion: bm('Loose') });
+    const w = detectDownturn(days, DK)!;
+    expect(w.cause).toBe('digestion');
+    expect(w.body).toMatch(/^Loose stools on 2 of these days/);
+    expect(w.factors.map((f) => f.label)).toContain('Loose stools');
+  });
+
+  it('a journal that logs no movements never reads as a digestion cause', () => {
+    expect(detectDownturn(steepDecline(), DK)!.factors.map((f) => f.label)).not.toContain('Loose stools');
   });
 
   it('tracked-but-short water on 2+ days → protocol slip', () => {

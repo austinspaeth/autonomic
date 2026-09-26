@@ -5,6 +5,10 @@
  *
  * Same fixtures as downturn.test: an 'hrv' reading with only rmssd set makes
  * the day score exactly its grade points (40→100, 30→80, 25→60, 20→35, 15→10).
+ * The fixture reading is a TRAINING ('breathHrv') reading because it is graded
+ * on absolute bands alone: a baseline reading is also graded against the
+ * user's own usual once five exist, which would make each fixture day's score
+ * depend on its neighbours. (rmssdS and rmssdU agree at every value used.)
  */
 import type { DayRecord, Entry } from '../../types';
 import { detectUpturn } from '../upturn';
@@ -17,7 +21,7 @@ const day = (over: Partial<DayRecord> = {}): DayRecord => ({
   ...over,
 });
 
-const hrvR = (rmssd: number): Entry => ({ id: `r${rmssd}`, type: 'hrv', time: '08:00', rmssd: String(rmssd) });
+const hrvR = (rmssd: number): Entry => ({ id: `r${rmssd}`, type: 'breathHrv', time: '08:00', rmssd: String(rmssd) });
 const hrvDay = (rmssd: number) => day({ readings: [hrvR(rmssd)] });
 
 const DK = '2026-01-08';

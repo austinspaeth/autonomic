@@ -23,7 +23,8 @@
 import { watchBridge, type WatchUserInfo } from '../../../modules/watch-bridge';
 import { getTier, subscribeTier } from '../../store/tier';
 import { flushSave, getState, storeWaveform, subscribeStore, upsertEntry } from '../../store/store';
-import { pingWristReading } from '../../store/ping';
+import { pingReadingKind, pingWristReading } from '../../store/ping';
+import { isFirstBaseline } from '../ping';
 import { ageFromBirthday, todayKey } from '../dates';
 import { SYMPTOM_TYPES } from '../registry';
 import { computeScores } from '../scoring';
@@ -107,7 +108,11 @@ function receive(info: WatchUserInfo, live = false) {
   // in `sessionStore` never saw it. Gated on `fresh` and on the reading being
   // TODAY'S, not on `live`: an inboxed reading delivered at launch is still a
   // reading this install took, as long as it was taken today.
-  if (fresh && mapped.entry.type === 'hrv' && mapped.dayKey === todayKey()) pingWristReading('watch');
+  if (fresh && mapped.entry.type === 'hrv' && mapped.dayKey === todayKey()) {
+    pingWristReading('watch');
+    // Already written above, so it excludes itself from "the day's first".
+    pingReadingKind('hrv', isFirstBaseline(getState().days[mapped.dayKey]?.readings, mapped.entry.id));
+  }
   if (live && fresh && mapped.section === 'readings') arrivalListeners.forEach((fn) => fn(mapped.dayKey, mapped.entry));
 }
 

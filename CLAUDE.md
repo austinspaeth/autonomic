@@ -59,7 +59,7 @@ old web app so old `export.json` files import directly.
   "version": 1,
   "settings": { "theme": "light" | "dark",
                 "reminder": { "enabled": true, "time": "08:00" } },  // daily morning nudge; source of truth for the OS schedule
-  "profile": { "sex", "weight", "height" },  // feeds reading scores (e.g. sex-adjusted QTc)
+  "profile": { "sex", "birthday", "weight", "height" },  // age+sex: HRV norm bubbles (lib/hrvNorms), max-HR formula, AI prompts; no score reads it
   "customTypes": { "meds": { "custom-magnesium": { /* pure-JSON TypeDef */ } } },  // user-created types (activities/meds/symptoms/triggers)
   "hiddenTypes": { "symptoms": ["nausea"] },  // built-in types the user deleted (only allowed while unused)
   "meta": {
@@ -798,8 +798,11 @@ old web app so old `export.json` files import directly.
   sags — this is what stops a strong claim vanishing overnight because the BH family
   re-formed. The memory resets on import/Clear-all (a retained claim is about THIS
   journal) and demo builds never touch it. **One row per driver**: `Correlation`
-  carries `driverKey`, `groupCorrelations` folds the list, the row wears a violet
-  "+N" pill and the sheet stacks every member's card + evidence chart. **An early
+  carries `driverKey`, `groupCorrelations` folds the list, and the sheet stacks every
+  member's card + evidence chart. The row carries NO "+N" pill any more: it took the
+  width the pair needed ("Magnesiu… → RM…"). A next-day finding says so on the row
+  instead ("pNN50 next day", the lag in grey), since the lag is half the claim. The
+  card shows `VISIBLE_CORRELATIONS` (3) drivers. **An early
   tier** (`findEarlySignals`, run ONLY when the strict list is empty, on a matrix
   rebuilt at `EARLY_MIN_FACTOR_DAYS`): relaxed coverage, much higher evidence bar
   (`|r| ≥ 0.5`, raw p, BH at `EARLY_FDR_Q`), pinned to one pip, under an "Early signals" card that sits ABOVE the countdown
@@ -820,8 +823,9 @@ old web app so old `export.json` files import directly.
   81-day journal that the engine answered with two claims, both about LF peak
   frequency.** (1) **A start/stop is not an on/off comparison.** `isRegimeChange` /
   `regimeFactorIds` in `correlate.ts` (pure + tested): a binary factor whose
-  MINORITY group sits mostly in one contiguous run (`MAX_MINORITY_RUN_SHARE`, 0.75)
-  is a before/after wearing a correlation's clothes, and is excluded from
+  MINORITY group sits mostly in one block — the shortest stretch of known days holding
+  `MAX_MINORITY_RUN_SHARE` (0.75) of it is at least `REGIME_MIN_DENSITY` (0.85)
+  minority — is a before/after wearing a correlation's clothes, and is excluded from
   `findCorrelations`, `findEarlySignals` AND `findNoImpact` — never tested means
   never a null result either. It goes to `change.ts` instead, whose split point is
   fixed by the data and whose windows are equal either side. This is not a corner
@@ -843,6 +847,59 @@ old web app so old `export.json` files import directly.
   show lower daily score" over a readout of "0" is the app contradicting itself
   inside one row. Checked through `def.fmt`, so the bar is the precision the user
   actually sees.
+- **A real 118-day journal answered with 24 correlations, and most were the
+  calendar.** RMSSD fell 19% in its last month, and every supplement whose days
+  leaned toward that month read as "X days show lower next-day RMSSD": 8 of the top
+  rows were one switchover (magnesium stopped, vitamin C and Zyrtec started the same
+  week). Four guards now stand between a period and a claim, all pure + tested.
+  (1) **The regime rule tolerates a skipped day** (`REGIME_MIN_DENSITY` above). It
+  used to ask for one UNBROKEN run, and vitamin C taken on 47 of 48 days split into
+  runs of 24 and 23 (share 0.51) and was tested as an on/off. Every-other-day still
+  has density ~0.5 however long it runs, so genuine alternation is still tested.
+  (2) **A finding must survive its own month** (`detrended` / `holdsWithinPeriod` in
+  `correlate.ts`): after BH and the clinical bars, the same test is re-run on each
+  day's departure from the median of the 29 days around it (symmetric, shrinking at
+  the ends — a one-sided window at the recent edge re-creates the very bias), and
+  must still point the same way at raw p ≤ `DETREND_MAX_P`. This catches what the
+  regime rule cannot: a factor taken in scattered clusters that happen to sit in one
+  stretch (MCT oil), or taken daily with its OFF days bunched early (CoQ10). A
+  finding the user has already been SHOWN gets `RETAIN_P` here, whether or not it
+  also passed strictly this build — keying it on "passed strictly" dropped a
+  remembered finding on exactly the build its evidence got stronger. **It skips a
+  journal shorter than `DETREND_MIN_SPAN`** and keeps a finding it cannot test:
+  measured with a planted +8 ms effect, the first version found it on 0 of 20
+  twenty-day journals (12 of 20 without the check), because there is no month
+  around each day to compare against. From 30 days on the two agree. Drivers it
+  removes come back from `sweepCorrelations` as `confounded` and are kept OFF the
+  No detected impact card: the data cannot separate them from their period, which
+  is not the same as a null result. It runs on the `'unconfirmed'` tier too, never
+  the `'early'` one. (3) **Stops are changes** (`regimenEvents` / `stopCandidates`
+  in `change.ts`): "RMSSD is down since you stopped magnesium citrate", in the same
+  BH family as onsets and shifts. A stop has to EARN the word — a regimen before it
+  (`REGIME_MIN_DENSITY` over `STOP_REGIMEN_DAYS`, the regime rule's own bar, so the
+  two modules agree what a regimen is), a sustained absence after, and OTHER meds
+  still logged on `STOP_MIN_LOGGING` of the days after, or "stopped everything" is
+  really "stopped logging" (a span never closes, so the active-window rule cannot
+  see it). Things started (or stopped) within `CO_START_DAYS` of each other are named
+  together in the headline. (4) **A change says what ELSE changed in the stretch it
+  compares** (`BiggestChange.context`, rendered as a second note in the change
+  sheet, now titled "Change details"): "You also started X and stopped Y in this
+  stretch, so the change cannot be pinned on any one of them", and for a monthly
+  shift "In these two months you started…". A medication anywhere in it adds "Talk
+  to your doctor before changing a medication" — nothing here may read as a reason
+  to start, stop or restart one. The card body itself is NOT rendered anywhere but
+  the AI prompt; anything the user must read goes in `context`. A med type the user
+  CREATED keeps its own spelling in these sentences ("Vitamin C", "MCT Oil"); a
+  built-in lowercases mid-sentence. Also from the same review: a month-on-month
+  SHIFT at the top drops its own Trend Watch row (it was the same two windows said
+  twice), and the confidence word and bar never wear red — a bad finding's are grey,
+  since they grade the evidence, not the news. **The noise suite asserts a RATE**:
+  at most 1 of 30 noise journals may report anything, which is what `FDR_Q` was
+  measured at. It used to be 12 seeds that each had to report nothing, passing on an
+  accident: `bmCount` read a day with no movement as 0, so a journal that never logs
+  movements carried a constant column whose p = 1 tests padded the BH family and made
+  it stricter than `FDR_Q` says. Reading those days as unknown is correct; the
+  padding went and seed 12 became the 1 in 30.
 - **The weak tier answers TWO different empty screens** (`Correlation.tier`).
   `'early'` is the original: a journal too YOUNG for the main sweep, relaxed coverage
   floors, "Early signals". `'unconfirmed'` is the new one: a long, well-logged
@@ -905,10 +962,12 @@ old web app so old `export.json` files import directly.
   itself, which only showed up once a third layer existed. Note the iOS trap in
   `AskAi.tsx`: a shadow and `overflow: hidden` on the same view cancel out, so the
   shadow lives on an outer layer and the clip on an inner one. The "new" dot is PER CARD (`insights/seen.ts` stores
-  The header is the claim `changeSinceStart` makes — "64% better than day one", bold and coloured,
-  with the reference in grey — beside a bare confidence ring. That percentage is
-  PERCENTAGE POINTS on the score's own 0-100 index, never a ratio: a ratio called
-  the same move "251% better", which is unbounded and hype. It scores only the
+  The header is the claim `changeSinceStart` makes — "12 pts better than day one", bold and coloured,
+  with the reference in grey — beside a bare confidence ring. It is POINTS on the
+  score's own 0-100 index, never a ratio: a ratio called the same move "251% better",
+  which is unbounded and hype. It used to be written "64% better", which sat above
+  Trend Watch's "down 11.5 pts" and read as two answers in two units; it now says
+  "pts", as the explain sheet's "Points lost" always did. It scores only the
   earliest and latest fortnight of LOGGED days, so "day one" is genuinely day one
   rather than the start of the 180-day analysis window, and it falls back to stating
   the window when there is too little to compare.
@@ -1387,7 +1446,13 @@ old web app so old `export.json` files import directly.
   `E` early, `U` unconfirmed, `C` biggest change, `R` correlation) and `rpt`
   (`D` data for prompt, `H` full health report, `C` doctor summary, counted when
   the prompt sheet opens). The dashboard draws them on *What they log* and *What
-  they dig into*.
+  they dig into*. Two more per-letter routes sit beside them: `rdg` (an HRV
+  reading COMPLETED, by kind: `M` the day's first baseline, `B` a later one, `T`
+  training; fired beside `hrv` from the engine and the wrist receivers,
+  `isFirstBaseline` in `lib/ping.ts`) and `mbp` (the morning baseline card:
+  `S` shown, `T` capture tapped, `X` closed — one card's outcomes on
+  one route, each letter a headcount; `pingMorningPrompt`). The lambda must be
+  deployed before a build sending them ships.
   **An accepted offer that did not become a subscription is `POST /ping/ofl`,
   the one ping with a BODY** (`reportOfferOutcome`, fed by `onPurchaseOutcome`
   in `store/iap.ts`, which settles each `subscribe(sku, origin)` attempt ONCE as
@@ -1608,6 +1673,31 @@ old web app so old `export.json` files import directly.
   written before the counter existed announces no activations at all, or the
   first refresh after the deploy would report the whole back catalogue as news.
   Details in `sls/README.md` and `MASTER_DASHBOARD.md`.
+- **Bowel movements are graded by FORM, and a zero is INFERRED, never assumed.**
+  `src/lib/digestion.ts` (pure + tested) is the one place that reads a movement
+  (`stoolForm`: Hard / Formed / Loose / Diarrhea by Bristol range, older "Type N"
+  kinds included; `strainLevel`) and a day (`gutDay`: loose > hard-or-severely-
+  strained > normal, or `none` with its `gapDays`). A day with no movement is a
+  zero only when `isTrackedDay` earns it: after the first movement ever logged,
+  on a day the user logged something else (`isEngagedDay`, now in
+  `src/lib/engaged.ts` so `scoring/strain` can reach it without a cycle), inside
+  a silence of at most `MAX_SILENCE_DAYS` (7) between movements or after the
+  last one. Somebody who never logs movements, or stopped, is UNKNOWN, never
+  constipated; a trailing silence is withdrawn once it runs past the bar. The old
+  `bm:none` factor used a `span` presence that opened on the first movement and
+  never closed, which is exactly that bug. Consumers: the `bmCount` trend row and
+  a new `stoolForm` row ("Stool softness", median Bristol, band [3, 4]) as
+  Insights outcomes and Trend Watch rows; `bm:none` / `bm:loose` / `bm:hard`
+  factors (all block `digestion`); the Progress **Digestion** section (form mix
+  as `barBuckets.stacked`, days with one of known days, longest gap, strained);
+  the strain detector's `digestion` CONTEXT signal (off-day share up 0.3 on the
+  user's own baseline, never fires alone); the downturn's `digestion` cause
+  (loose stools on 2+ days, ranked after sleep, before protocol); the "normal
+  bowel movement" streak milestones; and a SUMMARY line atop every report's
+  bowel section plus a Bowel Habits table in the doctor summary. **It does not
+  feed the daily score**: nothing logged by hand does, and a gut term would
+  penalise the users who log honestly. The log form defaults to Formed, not
+  Loose, since the field is now graded.
 - **Barometric pressure is recorded silently and SHOWN only once it is found to
   matter.** `src/lib/pressure.ts` (pure + tested) defines a LOW day against the
   user's OWN last 30 days (median day ≥ 0.20 inHg under it; a jump past
@@ -1909,6 +1999,28 @@ old web app so old `export.json` files import directly.
   sheet**: a failure path that only calls it looks to the user like the tap did
   nothing at all. Report failure inside the sheet's own content, or better, make
   the impossible option unavailable rather than tappable-then-refused.
+- **Baseline and training HRV are two inputs to the day score, not one blend.**
+  `SCORE_WEIGHTS` (`lib/scoring/day.ts`) carries `Baseline HRV` (25) and
+  `Training HRV` (15); the old `HRV (RMSSD)` 70/30 blend let the unpaced reading
+  move the day by about 8%. Total power, pNN50, VLF and LF peak stay
+  TRAINING-ONLY: paced breathing is what makes them measurable, and a baseline's
+  run far lower on the same bands. The baseline component is built from the day's
+  FIRST trusted `hrv` reading by clock (later ones get a 30% say, for somebody
+  who cannot do the paced breathing), and each reading is graded on `rmssdU`,
+  then pulled halfway toward a PERSONAL grade once `PERSONAL_MIN_READINGS` (5)
+  earlier days hold one (`scoring/baseline.ts`, first-of-day readings only,
+  percent bands). **The personal half can only LOWER a grade**: a morning under
+  your own usual is news, but blended both ways it graded a sustained crash
+  against a median that had crashed with it (weeks at 18 ms read 'good') and
+  halved a recovery's "better than day one". A bad stretch that has become the
+  usual is still bad.
+  The first baseline's `avgHr` outranks the paced HR as the resting-HR fallback.
+  **The budget's HRV input is the baseline reading too** (`buildEnvelope`):
+  today's FIRST baseline RMSSD against each earlier day's first, on a PERCENT
+  scale (10% under usual costs a 10% step, since RMSSD scales with the person),
+  and it alone may reach 0.6 where every other input floors at 0.7. A later
+  training reading can never move it. With no baseline to compare it falls back
+  to the `Training HRV` component in ms, as before.
 - **Reading scoring**: on render, `computeScores(r, ctx)` categorizes each scorable
   metric (great/good/ok/bad/crash|concerning, plus a `warning` blue zone) per the
   framework thresholds; rows tint their value via the score category and sparklines

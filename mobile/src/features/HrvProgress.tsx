@@ -22,6 +22,8 @@ import { BANDS, catFromBands, HRV_HELP, type ScoreContext } from '../lib/scoring
 import type { HelpContent } from '../lib/help';
 import { type DaysMap } from '../lib/scoring/day';
 import { isTrustedReading } from '../lib/hrvQuality';
+import { isNormMetric } from '../lib/hrvNorms';
+import { HrvNormNote } from '../components/HrvNorm';
 import {
   acBandZones, acBuckets, acReadVals, bucketViews, isEvening, isMorning, makeAgg, type CustomRange,
   type BucketView, type Mode,
@@ -477,6 +479,9 @@ function MetricSection({ m, structured, unstructured, combined, buckets }: {
             zonesOn={showZones}
             onSelect={setSel}
           />
+          {/* Age/sex reference, a resting norm, so not beside Training alone:
+              paced breathing inflates every one of these by design. */}
+          {kind !== 'breath' && isNormMetric(m.u) ? <HrvNormNote metric={m.u} unit={m.unit || ''} /> : null}
         </>
       )}
     </Section>

@@ -37,7 +37,7 @@ import { TREND_METRICS } from '../../lib/trends';
 import { markColumn, type BiggestChange, type Correlation, type DetailSeries, type PressureInsight, type WatchItem } from '../../lib/insights';
 import { pressureHeadline } from '../../lib/insights/pressureCopy';
 import { LOW_BELOW_INHG } from '../../lib/pressure';
-import { CorrelationsAiButton, FindingCard, type FindingTile } from './Sections';
+import { CorrelationsAiButton, FindingCard, type FindingTile } from './Card';
 import * as S from './style';
 import { pingFinding } from '../../store/ping';
 
@@ -62,7 +62,7 @@ const MARK = GRADE_COLORS.warning;
  * the Trend watch sheet: that claim is one metric against its own past, with no
  * second variable to mistake for a cause.
  */
-function CausationNote() {
+function CausationNote({ text = 'Correlation is not causation. Treat this as a lead to explore, not an answer.' }: { text?: string }) {
   const p = usePalette();
   return (
     <View style={{
@@ -70,9 +70,7 @@ function CausationNote() {
       borderRadius: radius.card, backgroundColor: p.surface2, borderWidth: 1, borderColor: p.border,
     }}>
       <Icon name="info" size={15} color={p.textDim} />
-      <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 17, color: p.textDim }}>
-        Correlation is not causation. Treat this as a lead to explore, not an answer.
-      </Text>
+      <Text style={{ flex: 1, fontSize: 12.5, lineHeight: 17, color: p.textDim }}>{text}</Text>
     </View>
   );
 }
@@ -299,11 +297,21 @@ export function ChangeSheet({ change, series }: { change: BiggestChange; series:
   const color = change.good ? GOOD : p.accent;
   return (
     <Body
-      title="Correlation details"
+      // Not "Correlation details": a start, a stop or a monthly shift is a before
+      // and an after, and only a correlation row's sheet is about a correlation.
+      title="Change details"
       // An onset is a before/after rather than an on/off, but it is the same kind
       // of claim: the weeks after someone started something differ from the weeks
       // before in more than the one thing they started.
-      intro={<CausationNote />}
+      // Then what ELSE changed in the stretch being compared, when anything did:
+      // a before/after quietly credits its one named change with everything else
+      // that moved in those weeks, and this is the one place that can say so.
+      intro={(
+        <>
+          <CausationNote />
+          {change.context ? <CausationNote text={change.context} /> : null}
+        </>
+      )}
       findings={[{
         headline: change.headline,
         tiles: [

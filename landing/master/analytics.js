@@ -212,6 +212,8 @@ window.Analytics = (function () {
   var FEATURE_NAME = { M: 'Milestones opened', P: 'Protocol saved', B: 'Pacing budget opened', U: 'Pacing budget unpaused' };
   var FINDING_NAME = { E: 'Early signal', U: 'Unconfirmed pattern', C: 'Biggest change', R: 'Correlation' };
   var REPORT_NAME = { D: 'Data for prompt', H: 'Full health report', C: 'Doctor summary' };
+  var READING_KIND_NAME = { M: 'Morning baseline', B: 'Later baseline', T: 'Training' };
+  var MORNING_PROMPT_NAME = { S: 'Shown', T: 'Took the reading', X: 'Closed' };
   /* The subscription product, on `sub` / `rst` / `lap` alike — the lambda's
      PLANS. A `sub` row with NO letter is not an unknown plan in the usual
      sense: it is a build older than the letter, whose `sub` meant "found a
@@ -231,6 +233,7 @@ window.Analytics = (function () {
     pay: SURFACE_NAME, not: NOTIFY_NAME, pot: POTS_NAME, see: VIEW_NAME,
     osh: OFFER_NAME, odm: OFFER_NAME, oac: OFFER_NAME,
     log: LOG_NAME, use: FEATURE_NAME, fnd: FINDING_NAME, rpt: REPORT_NAME,
+    rdg: READING_KIND_NAME, mbp: MORNING_PROMPT_NAME,
     sub: PLAN_NAME, rst: PLAN_NAME, lap: PLAN_NAME
   };
   var SLOT_ORDER = {
@@ -240,6 +243,7 @@ window.Analytics = (function () {
     osh: ['A', 'F', '?'], odm: ['A', 'F', '?'], oac: ['A', 'F', '?'],
     log: ['S', 'A', 'M', 'Y', 'W', 'B', 'P', 'R', '?'],
     use: ['M', 'P', 'B', '?'], fnd: ['E', 'U', 'C', 'R', '?'], rpt: ['D', 'H', 'C', '?'],
+    rdg: ['M', 'B', 'T', '?'], mbp: ['S', 'T', 'X', '?'],
     sub: ['Y', 'M', 'P', 'F', '?'], rst: ['Y', 'M', 'P', 'F', '?'], lap: ['Y', 'M', 'P', 'F', '?']
   };
 
@@ -249,7 +253,7 @@ window.Analytics = (function () {
      two subscription events that are NOT purchases (a subscription arriving
      on a new install, one going away) and are never folded into `sub`. */
   var KINDS = ['open', 'sub', 'rst', 'lap', 'act', 'cap', 'hrv', 'pay', 'not', 'pot', 'see', 'err',
-    'osh', 'odm', 'oac', 'log', 'use', 'fnd', 'rpt'];
+    'osh', 'odm', 'oac', 'log', 'use', 'fnd', 'rpt', 'rdg', 'mbp'];
 
   /* The report's platform letters, and the names the filter bar speaks. */
   var PLATFORM_LETTER = { ios: 'I', android: 'A', unknown: 'U', I: 'I', A: 'A', U: 'U' };
@@ -684,13 +688,13 @@ window.Analytics = (function () {
      route (`open`, `cap`, `hrv`, `pay`), so their daily TOTAL is a headcount and
      their letter describes only the first event of the day. Others are capped
      per LETTER (`not`, `pot`, `see`, the three offer routes, and `log`, `use`,
-     `fnd`, `rpt`), so each LETTER'S count is a headcount and the route's total
+     `fnd`, `rpt`, `rdg`, `mbp`), so each LETTER'S count is a headcount and the route's total
      is not. `PER_LETTER` records which, and `isHeadcount` is the question worth
      asking before dividing.
 
      (2) `err` carries no letter and is once per install EVER, so it is a running
      population and not a daily count at all — see `errorInstalls`. */
-  var PER_LETTER = { not: 1, pot: 1, see: 1, osh: 1, odm: 1, oac: 1, log: 1, use: 1, fnd: 1, rpt: 1 };
+  var PER_LETTER = { not: 1, pot: 1, see: 1, osh: 1, odm: 1, oac: 1, log: 1, use: 1, fnd: 1, rpt: 1, rdg: 1, mbp: 1 };
 
   /** Is this route's DAILY TOTAL a count of people? */
   function isHeadcount(kind) { return !PER_LETTER[kind] && kind !== 'err'; }

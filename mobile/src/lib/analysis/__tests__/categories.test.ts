@@ -193,3 +193,34 @@ describe('Triggers card bucket chart', () => {
     expect(bb.byKey.alcohol[13 - 1]).toBe(0);
   });
 });
+
+describe('Digestion card', () => {
+  const bmDay = (...kinds: (string | null)[]) => {
+    const d = { ...blankDay(), meds: [{ id: `md-${Math.random()}`, type: 'vitD3', time: '08:00' }] as Entry[] };
+    d.digestion = { movements: kinds.filter((k): k is string => k != null).map((kind, i) => ({ id: `bm-${i}-${Math.random()}`, time: '09:00', kind })) };
+    return d;
+  };
+  const gutCards = (days: DaysMap) => buildCategories(days, 'day', ctx).find((c) => c.id === 'gut')!.build();
+
+  it('is absent for somebody who never logs bowel movements', () => {
+    expect(gutCards({ [dayKey(1)]: bmDay(), [dayKey(2)]: bmDay() })).toEqual([]);
+  });
+
+  it('counts forms, days with one out of known days, and the longest gap', () => {
+    const days: DaysMap = {
+      [dayKey(6)]: bmDay('Formed'),
+      [dayKey(5)]: bmDay(),
+      [dayKey(4)]: bmDay(),
+      [dayKey(3)]: bmDay('Hard', 'Loose'),
+      [dayKey(2)]: bmDay('Formed'),
+    };
+    const [card] = gutCards(days);
+    expect(card.title).toBe('Bowel movements');
+    expect(card.bars![0].rows.map((r) => [r.name, r.count])).toEqual([['Formed', 2], ['Loose', 1], ['Hard', 1]]);
+    expect(card.bars![0].rows[0].color).toBe(SCORE_COLORS.good);
+    expect(card.barBuckets!.stacked).toBe(true);
+    const stat = (label: string) => card.stats!.find((s) => s.label === label)!.value;
+    expect(stat('💩 days')).toBe('3/5');
+    expect(stat('Longest gap')).toBe(2);
+  });
+});

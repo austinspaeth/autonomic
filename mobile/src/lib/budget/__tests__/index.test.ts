@@ -115,9 +115,30 @@ describe('the demo journal, run through the real engine', () => {
         expect(v.envelope.effortMin).toBeGreaterThan(0);
       }
     });
-    // The journal has to exercise both sides, or this asserts nothing.
+    // The journal has to exercise at least one side, or this asserts nothing.
+    // Since baseline readings are graded half against the user's own usual,
+    // the demo's crash stretch reads a few points higher and no longer holds a
+    // crash-grade FLOOR, so the floor side is pinned on its own journal below.
     expect(falls + floors).toBeGreaterThan(0);
-    expect(floors).toBeGreaterThan(0);
+  });
+
+  it('publishes a number on a crash-grade day that is this person\'s floor', () => {
+    // Three weeks of the same crash-grade training reading: today is Crash,
+    // and so was every day before it, so it is not a fall.
+    const dk = todayKey();
+    const days: DaysMap = {};
+    for (let i = 0; i <= 21; i++) {
+      days[addDays(dk, -i)] = day({ readings: [{ id: `c${i}`, type: 'breathHrv', time: '07:30', rmssd: '12' } as Entry] });
+    }
+    const s = dayScore(days[dk], dk, days, {})!;
+    expect(scoreCat(s).short).toBe('Crash');
+    const recent = keyRange(addDays(dk, -1), CRASH_REL_WINDOW, addDays)
+      .map((k) => dayScore(days[k], k, days, {}))
+      .filter((x): x is number => x != null);
+    expect(crashIsFall(s, recent)).toBe(false);
+    const v = buildBudget(stateOf(days), dk, {}, { ...OPTS, now: AT_2PM(), brief: true });
+    expect(v.state).not.toBe('suppressed');
+    expect(v.envelope.effortMin).toBeGreaterThan(0);
   });
 
   it('gives a bad day a smaller budget than a good one', () => {

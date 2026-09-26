@@ -6,7 +6,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { LayoutChangeEvent, Pressable, Text as RNText, View } from 'react-native';
 import Svg, {
-  Circle, Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText,
+  Circle, ClipPath, Defs, G, Line, LinearGradient, Path, Rect, Stop, Text as SvgText,
 } from 'react-native-svg';
 import { fmtNum, fmtShort } from '../lib/dates';
 import { GRADE_COLORS, TAIL_STYLE, fonts, radius, readoutTail, usePalette } from '../theme';
@@ -779,11 +779,29 @@ export function Waveform({ data, color, height = 120, label }: { data: number[];
  * ups and downs are crisp — unlike a per-second BPM waveform, which quantizes
  * to whole beats and reads as a staircase. A faint area fill under the trace
  * makes the swing easy to read.
+ *
+ * With `corrected` / `dropped` (index-aligned, from `beatTrace`) it also says
+ * what the cleanup did. A corrected beat is drawn at its corrected value in
+ * violet, with a tick on the top edge where the spike was: plotting the spike
+ * itself would squash the rest of the trace into a line. A dropped stretch is
+ * a hatched grey band with NO trace through it, because the statistics skip it
+ * and a chart that drew it would be showing beats the numbers never used. The
+ * legend lists only what this reading actually has, so a clean one looks
+ * exactly as it always did.
  */
-export function Tachogram({ rr, height = 132 }: { rr: number[]; height?: number }) {
+const TACHO_VIOLET = GRADE_COLORS.warning;
+let tachoId = 0;
+export function Tachogram({ rr, corrected, dropped, height = 132 }: {
+  rr: number[]; corrected?: boolean[]; dropped?: boolean[]; height?: number;
+}) {
   const p = usePalette();
+  const [cid] = useState(() => `tg${tachoId++}`);
   if (!rr || rr.length < 2) return null;
-  const dMin = Math.min(...rr), dMax = Math.max(...rr);
+  const isDrop = (i: number) => !!dropped && !!dropped[i];
+  const isFix = (i: number) => !!corrected && !!corrected[i] && !isDrop(i);
+  const used = rr.filter((_, i) => !isDrop(i));
+  if (used.length < 2) return null;
+  const dMin = Math.min(...used), dMax = Math.max(...used);
   const span = dMax - dMin || 1;
   const min = dMin - span * 0.05, max = dMax + span * 0.05;
   const range = max - min || 1;
@@ -791,12 +809,38 @@ export function Tachogram({ rr, height = 132 }: { rr: number[]; height?: number 
   const innerW = W - padL - padR;
   const xAt = (i: number) => padL + (i / (rr.length - 1)) * innerW;
   const yAt = (v: number) => padT + (1 - (v - min) / range) * (H - padT - padB);
-  const line = rr.map((v, i) => `${i === 0 ? 'M' : 'L'}${xAt(i).toFixed(1)} ${yAt(v).toFixed(1)}`).join(' ');
-  const area = `${line} L${xAt(rr.length - 1).toFixed(1)} ${H - padB} L${padL} ${H - padB} Z`;
+  const pt = (i: number) => `${xAt(i).toFixed(1)} ${yAt(rr[i]).toFixed(1)}`;
+
+  // Continuous runs of used beats (a dropped stretch breaks the trace), and
+  // the dropped stretches themselves as [first, last] index pairs.
+  const runs: number[][] = [];
+  const gaps: [number, number][] = [];
+  for (let i = 0; i < rr.length; i++) {
+    if (isDrop(i)) {
+      if (!gaps.length || gaps[gaps.length - 1][1] !== i - 1) gaps.push([i, i]);
+      else gaps[gaps.length - 1][1] = i;
+      continue;
+    }
+    if (!runs.length || isDrop(i - 1) || i === 0) runs.push([]);
+    runs[runs.length - 1].push(i);
+  }
+  // The red trace, then violet over every line segment touching a corrected beat.
+  const line = runs.filter((r) => r.length > 1).map((r) => `M${r.map(pt).join(' L')}`).join(' ');
+  const area = runs.filter((r) => r.length > 1)
+    .map((r) => `M${r.map(pt).join(' L')} L${xAt(r[r.length - 1]).toFixed(1)} ${H - padB} L${xAt(r[0]).toFixed(1)} ${H - padB} Z`).join(' ');
+  let fixPath = '';
+  runs.forEach((r) => {
+    for (let k = 1; k < r.length; k++) {
+      if (isFix(r[k]) || isFix(r[k - 1])) fixPath += `M${pt(r[k - 1])} L${pt(r[k])} `;
+    }
+  });
+  const fixIdx = rr.map((_, i) => i).filter(isFix);
+  const droppedSec = Math.round(rr.reduce((s, v, i) => (isDrop(i) ? s + v : s), 0) / 1000);
   const ticks = [min, (min + max) / 2, max];
+  const plotH = H - padT - padB;
   return (
     <View style={{ backgroundColor: p.bg, borderRadius: radius.control, padding: 8 }}>
-      <RNText style={{ fontSize: 11, color: p.textDim, marginBottom: 4 }}>{`Beat-to-beat interval (ms) · ${rr.length} beats`}</RNText>
+      <RNText style={{ fontSize: 11, color: p.textDim, marginBottom: 4 }}>{`Beat-to-beat interval (ms) · ${used.length} beats`}</RNText>
       <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none">
         {ticks.map((t, i) => (
           <React.Fragment key={i}>
@@ -804,9 +848,49 @@ export function Tachogram({ rr, height = 132 }: { rr: number[]; height?: number 
             <SvgText x={padL - 4} y={yAt(t) + 3} textAnchor="end" fontSize={9} fill={p.textDim}>{Math.round(t)}</SvgText>
           </React.Fragment>
         ))}
-        <Path d={area} fill={p.accent} opacity={0.12} />
-        <Path d={line} fill="none" stroke={p.accent} strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
+        {gaps.map(([a, b], gi) => {
+          // Pad half a beat either side so a one-beat gap still has width.
+          const step = innerW / (rr.length - 1);
+          const x0 = Math.max(padL, xAt(a) - step / 2), x1 = Math.min(W - padR, xAt(b) + step / 2);
+          const id = `${cid}c${gi}`;
+          const hatch: string[] = [];
+          for (let x = x0 - plotH; x < x1; x += 6) hatch.push(`M${x.toFixed(1)} ${H - padB} L${(x + plotH).toFixed(1)} ${padT}`);
+          return (
+            <G key={gi}>
+              <Defs>
+                <ClipPath id={id}><Rect x={x0} y={padT} width={x1 - x0} height={plotH} rx={3} /></ClipPath>
+              </Defs>
+              <Rect x={x0} y={padT} width={x1 - x0} height={plotH} rx={3} fill={p.textDim} opacity={0.08} />
+              <Path d={hatch.join(' ')} stroke={p.textDim} strokeWidth={1} opacity={0.3} clipPath={`url(#${id})`} />
+            </G>
+          );
+        })}
+        {area ? <Path d={area} fill={p.accent} opacity={0.12} /> : null}
+        {line ? <Path d={line} fill="none" stroke={p.accent} strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" /> : null}
+        {fixPath ? <Path d={fixPath} fill="none" stroke={TACHO_VIOLET} strokeWidth={2} strokeLinejoin="round" strokeLinecap="round" /> : null}
+        {fixIdx.map((i) => (
+          <Path key={i} d={`M${(xAt(i) - 3).toFixed(1)} ${padT - 9} L${(xAt(i) + 3).toFixed(1)} ${padT - 9} L${xAt(i).toFixed(1)} ${padT - 4} Z`} fill={TACHO_VIOLET} />
+        ))}
       </Svg>
+      {fixIdx.length || gaps.length ? (
+        <View style={{ flexDirection: 'row', flexWrap: 'wrap', columnGap: 14, rowGap: 4, marginTop: 6, paddingHorizontal: 2 }}>
+          <LegendKey color={p.accent} label="Beats" />
+          {fixIdx.length ? <LegendKey color={TACHO_VIOLET} label={`Corrected · ${fixIdx.length}`} /> : null}
+          {gaps.length ? <LegendKey color={p.textDim} box label={`Not used · ${droppedSec}s`} /> : null}
+        </View>
+      ) : null}
+    </View>
+  );
+}
+
+function LegendKey({ color, label, box }: { color: string; label: string; box?: boolean }) {
+  const p = usePalette();
+  return (
+    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+      <View style={box
+        ? { width: 12, height: 10, borderRadius: 2, backgroundColor: hexA(color, 0.18), borderWidth: 1, borderColor: hexA(color, 0.4) }
+        : { width: 14, height: 3, borderRadius: 2, backgroundColor: color }} />
+      <RNText style={{ fontSize: 11.5, color: p.textDim }}>{label}</RNText>
     </View>
   );
 }

@@ -19,6 +19,7 @@ import { HealthUpdatePill } from '../src/features/HealthUpdates';
 import { WhatsNewPill } from '../src/features/WhatsNew';
 import { RestoreGate } from '../src/features/RestoreGate';
 import { ReviewPrompt } from '../src/features/ReviewPrompt';
+import { MorningBaselinePrompt } from '../src/features/MorningBaseline';
 import { initIap } from '../src/store/iap';
 import { initTier } from '../src/store/tier';
 import { initFaultReporting } from '../src/store/errorReport';
@@ -177,6 +178,9 @@ export default function RootLayout() {
               {/* Store review ask — renders nothing; waits for a day that's
                   trending up and a calm moment (src/lib/review). */}
               <ReviewPrompt />
+              {/* The day's first open, before 1pm, with no baseline yet: the
+                  morning card asks for it once (src/features/MorningBaseline). */}
+              <MorningBaselinePrompt />
               {/* Freemium: no blocking paywall. Locked surfaces raise the
                   PaywallCard sheet on demand (src/features/Paywall.tsx). */}
               {/* First-run welcome wizard — overlays the tabs until completed,

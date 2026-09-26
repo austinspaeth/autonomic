@@ -31,6 +31,8 @@ GET  https://api.autonomic.care/ping/log/D082126IS   (logged by hand: S sleep, A
 GET  https://api.autonomic.care/ping/use/D082126IM   (feature used: M Milestones opened, P protocol saved, B pacing budget opened)
 GET  https://api.autonomic.care/ping/fnd/D082126IR   (finding opened: E early, U unconfirmed, C biggest change, R correlation)
 GET  https://api.autonomic.care/ping/rpt/D082126IH   (AI report built: D data for prompt, H full health report, C doctor summary)
+GET  https://api.autonomic.care/ping/rdg/D082126IM   (HRV reading completed, by kind: M the day's first baseline, B a later baseline, T training)
+GET  https://api.autonomic.care/ping/mbp/D082126IS   (morning baseline prompt card: S shown, T take reading, N not today, X closed)
 GET  https://api.autonomic.care/ping/report?key=...&since=2026-08-01
 
 GET  https://api.autonomic.care/fault/D082126I-TP-V1.26.0?t=health.check&m=timeout+after+%3Cn%3Ems&n=17&d=1
@@ -386,13 +388,18 @@ the WHOLE route. A day's rows therefore sum to a headcount, which is what makes
 `hrv[day] / open[day]` a share of people — and it is also why the letter on those
 routes can only ever describe the FIRST event of the day.
 
-`not`, `pot`, `see`, `osh`, `odm`, `oac`, `log`, `use`, `fnd` and `rpt` are
-capped per LETTER. Their letters are choices the user made between real
+`not`, `pot`, `see`, `osh`, `odm`, `oac`, `log`, `use`, `fnd`, `rpt`, `rdg` and
+`mbp` are capped per LETTER. Their letters are choices the user made between real
 alternatives: a stand test is not an episode, Insights is not Progress, the
 morning reminder is not the crash warning, logging a symptom is not logging water.
 `log` counts only NEW entries the user typed in — never an edit, a live capture
 or a health-store import — and `rpt` counts the report being BUILT (its prompt
 sheet opening), since the app cannot see whether it was copied.
+`rdg` splits a completed HRV reading by KIND (the day's first baseline, a later
+one, training) on its own route because `cap`/`hrv` spend their slot on the
+sensor. `mbp` puts one card's outcomes (shown / take / closed) on
+one route rather than the offer funnel's three: each letter is its own
+headcount, and the card is read as `S` against `T` and `X`.
 A whole-route cap would have silently dropped whichever came second, which on a
 bad day is exactly the one worth knowing about. The trade is that those routes'
 daily TOTALS are not headcounts; each letter's count still is, which is the
@@ -653,7 +660,7 @@ Two doors onto the same function, because they have different callers:
   the shared key. The email allowlist guards it like everything else there.
 
 Both answer one key per route — `{ since, open, sub, rst, lap, act, cap, hrv, pay, not,
-pot, see, err, osh, odm, oac, ofl, log, use, fnd, rpt }` — each row
+pot, see, err, osh, odm, oac, ofl, log, use, fnd, rpt, rdg, mbp }` — each row
 
 ```jsonc
 {

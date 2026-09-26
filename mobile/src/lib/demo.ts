@@ -437,7 +437,7 @@ function demoDay(i: number, rand: () => number): DayRecord {
     movements.push({
       id: id('bm'),
       time: hhmm(wake + 40 + Math.round(rand() * 120)),
-      kind: gutD.w < 0.4 ? (rand() < 0.5 ? 'Type 6' : 'Type 2') : 'Type 4',
+      kind: gutD.w < 0.4 ? (rand() < 0.5 ? 'Loose' : 'Hard') : 'Formed',
       straining: gutD.w < 0.4 && rand() < 0.4 ? 'mild' : false,
     });
   }

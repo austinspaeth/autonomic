@@ -79,6 +79,14 @@ export function hasHrvReadingOn(day: DayRecord | undefined): boolean {
     && day.readings.some((r) => HRV_TYPES.has(r.type) && isTrustedReading(r));
 }
 
+/** Does this day already hold a trusted BASELINE reading? The first one of a
+ *  day is its morning snapshot (scoring and pacing build on it), so this is the
+ *  question the morning card and the "which kind do you mean" entry points ask. */
+export function hasBaselineReadingOn(day: DayRecord | undefined): boolean {
+  return !!day && Array.isArray(day.readings)
+    && day.readings.some((r) => r.type === 'hrv' && isTrustedReading(r));
+}
+
 /** RR coverage in whole seconds for a beat-to-beat series (ms intervals). */
 export const rrCoverageSec = (rr: readonly number[] | undefined): number =>
   Math.round((rr || []).reduce((s, v) => s + v, 0) / 1000);

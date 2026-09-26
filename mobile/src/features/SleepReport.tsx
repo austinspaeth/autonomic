@@ -151,7 +151,7 @@ export function SleepReportBody({ report }: { report: SleepReport }) {
 
 /**
  * The report's hero, built exactly like the top card of the reading reports
- * (the "Autonomic score" card on a training HRV summary): `<Section cat>` for
+ * (the "HRV score" card on a training HRV summary): `<Section cat>` for
  * the grade tint and corner tag, then a plain `<SectionHead>` carrying the
  * title, the value at the shared readout size and its dim unit tail. Nothing
  * here sets its own type scale — a second one is how two report cards start

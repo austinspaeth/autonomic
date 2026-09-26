@@ -43,7 +43,7 @@ describe('skeleton samples cover the paragraphs they reserve', () => {
   });
 
   it('reserves a correlation row and a trend-watch row', () => {
-    report.correlations.slice(0, VISIBLE_CORRELATIONS).forEach((c) => atLeast(SAMPLE.pair, `${c.driver} → ${c.metric}`));
+    report.correlations.slice(0, VISIBLE_CORRELATIONS).forEach((c) => atLeast(SAMPLE.pair, `${c.driver} → ${c.metric}${c.lag ? ' next day' : ''}`));
     report.watch.forEach((t) => atLeast(SAMPLE.watchTitle, t.title));
   });
 

@@ -29,7 +29,7 @@
  */
 import type { ScoreContext } from '../scoring';
 import { scoreCat, sleepGradeParts, sleepHours, type DaysMap } from '../scoring/day';
-import { shift } from '../scoring/baseline';
+import { baselineHistory, firstBaselineRmssd, shift } from '../scoring/baseline';
 import { median } from '../trends/compare';
 import { keyRange, metricSeries } from '../trends/series';
 import type { Entry, TypeDef } from '../types';
@@ -45,6 +45,12 @@ const FACTOR_MIN = 0.5;
 /** Per-input bounds, so no single reading can carry the whole day. */
 const INPUT_MAX = 1.1;
 const INPUT_MIN = 0.7;
+/** The baseline HRV reading alone may take this much off: it is the one input
+ *  that is a direct snapshot of the system the budget describes, so it is the
+ *  one allowed to outweigh the rest. */
+const BASELINE_INPUT_MIN = 0.6;
+/** Percent below the user's usual baseline RMSSD that costs a 10% step. */
+const BASELINE_PCT_SCALE = 10;
 
 /** Yesterday's overspend carries into today: PEM is a debt instrument, not a
  *  daily reset. Half the overspend ratio, capped at a third of the budget. */
@@ -226,11 +232,17 @@ function makeInput(
   /** A finished day. Copy only: "Not logged today" about last Tuesday is a
    *  sentence about a day that has not happened yet. */
   past = false,
+  /** `relative` reads the move as a PERCENT of the usual rather than in the
+   *  value's own units (`scale` is then percent); `floor` overrides the
+   *  per-input floor. */
+  opts: { relative?: boolean; floor?: number } = {},
 ): EnvelopeInput {
   if (today == null || history.length < 3) {
     return {
-      id, label, value: null, unit,
-      vs: past ? 'Not logged' : 'Not logged today', vsCat: 'neutral',
+      id, label, value: today == null ? null : fmt(today), unit,
+      // A value with too little history behind it was logged; saying it was
+      // not would be false. It simply has nothing to be compared with yet.
+      vs: today != null ? 'Learning your usual' : past ? 'Not logged' : 'Not logged today', vsCat: 'neutral',
       bar: null, usual: null, factor: 1, known: false,
     };
   }
@@ -241,9 +253,10 @@ function makeInput(
 
   // 'band' metrics (sleep duration) are good in a range: distance from the
   // middle of the band is what costs, in either direction.
-  const signed = better === 'down' ? -delta : better === 'up' ? delta : -Math.abs(delta);
+  const moved = opts.relative && usual > 0 ? (delta / usual) * 100 : delta;
+  const signed = better === 'down' ? -moved : better === 'up' ? moved : -Math.abs(moved);
   const raw = 1 + (signed / scale) * 0.1;
-  const factor = Math.min(INPUT_MAX, Math.max(INPUT_MIN, raw));
+  const factor = Math.min(INPUT_MAX, Math.max(opts.floor ?? INPUT_MIN, raw));
 
   const mag = fmt(Math.abs(delta));
   const dir = better === 'band'
@@ -304,20 +317,38 @@ export function buildEnvelope(opts: EnvelopeOpts): Envelope {
   const vals = (xs: (number | null)[]) => xs.filter((v): v is number => v != null);
 
   /**
-   * HRV comes out of the SCORE, not the trends registry.
+   * HRV is the BASELINE reading whenever there is one to compare.
    *
-   * Both today's figure and the 42 days it is compared against, or the
-   * comparison would be a training-weighted number against a set of means. The
-   * registry averages TRAINING and BASELINE RMSSD into one value, and those are
-   * graded on different bands precisely because a paced reading runs higher —
-   * so the budget quoted a figure the Journal's own HRV tile, one card above
-   * it, contradicted. `compValue` reads the same component the tile does.
+   * The budget describes the system the user woke up with, and the baseline
+   * (unpaced) reading is the direct snapshot of it: today's FIRST baseline
+   * RMSSD against each earlier day's first, on a percent scale because RMSSD
+   * scales with the person (3 ms is noise at 60 and a real drop at 18). Only
+   * the first reading, so a training session later in the day can never move
+   * a budget that was already published from the baseline. It is the one input
+   * allowed to reach `BASELINE_INPUT_MIN` on its own.
+   *
+   * With no baseline to compare, it falls back to the TRAINING component read
+   * out of the score (never the trends registry, which averages the two kinds
+   * into one figure), against its own history, in ms, as before.
    */
-  const hrvOf = (k: string) => compValue(setAt(k), 'HRV (RMSSD)');
-  const hrvHist = histKeys.map(hrvOf).filter((v): v is number => v != null);
+  const fmtMs = (v: number) => String(Math.round(v));
+  const baseToday = firstBaselineRmssd(days[dk]);
+  const baseHist = baselineHistory(days, dk);
+  const trainOf = (k: string) => compValue(setAt(k), 'Training HRV');
+  let hrvInput: EnvelopeInput;
+  if (baseToday != null && baseHist.length >= 3) {
+    hrvInput = makeInput('hrv', 'Baseline HRV', 'ms', baseToday, baseHist, 'up', fmtMs, BASELINE_PCT_SCALE, past, { relative: true, floor: BASELINE_INPUT_MIN });
+  } else {
+    const trainToday = trainOf(dk);
+    const trainHist = trainToday != null ? histKeys.map(trainOf).filter((v): v is number => v != null) : [];
+    hrvInput = trainToday != null && trainHist.length >= 3
+      ? makeInput('hrv', 'Training HRV', 'ms', trainToday, trainHist, 'up', fmtMs, 8, past)
+      // Nothing comparable: the row asks for (or is still learning) the baseline.
+      : makeInput('hrv', 'Baseline HRV', 'ms', baseToday, baseHist, 'up', fmtMs, BASELINE_PCT_SCALE, past, { relative: true, floor: BASELINE_INPUT_MIN });
+  }
 
   const inputs: EnvelopeInput[] = [
-    makeInput('hrv', past ? 'HRV that morning' : 'HRV this morning', 'ms', hrvOf(dk), hrvHist, 'up', (v) => String(Math.round(v)), 8, past),
+    hrvInput,
     makeInput('restingHr', 'Resting heart rate', 'bpm', today.restingHr[0], vals(hist.restingHr), 'down', (v) => String(Math.round(v)), 6, past),
     makeInput('sleep', past ? 'Sleep the night before' : 'Sleep last night', '', today.sleepDuration[0], vals(hist.sleepDuration), 'band', (v) => hm(v * 60), 1.5, past),
     makeInput('sleepingHr', 'Overnight low', 'bpm', today.sleepingHr[0], vals(hist.sleepingHr), 'down', (v) => String(Math.round(v)), 6, past),

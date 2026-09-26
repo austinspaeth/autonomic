@@ -50,6 +50,15 @@ export function fmtReleaseDate(iso: string): string {
 
 export const RELEASES: Release[] = [
   {
+    version: '1.30',
+    date: '2026-09-25',
+    notes: [
+      'Baseline and training readings are now separate. Your morning baseline shapes your Outlook and pacing budget, and the app now prompts you for it each morning.',
+      'Better camera readings: clearer guidance while you measure, and plain feedback on what was used and why.',
+      'Insights is easier to read, with cleaner cards and findings you can tap to see the evidence.',
+    ],
+  },
+  {
     version: '1.29',
     date: '2026-09-18',
     notes: [
