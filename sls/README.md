@@ -664,6 +664,13 @@ pot, see, err, osh, odm, oac, ofl, log, use, fnd, rpt }` — each row
 }
 ```
 
+The report also carries `subEvents`: every `sub` / `rst` / `lap` ping as its own
+row (`PK SUBEVENT`, `SK <ISO arrival>#<rand>`, 400-day TTL), oldest first —
+`{ route, at, day, cohort, platform, plan, planName, tier, version }`. It is the
+one place a subscription ping keeps its arrival instant and its version beside
+its cohort, which the counters split apart; the dashboard's Pings tab lists
+them. Nothing from before it shipped.
+
 Rows stored before the platform marker existed report `platform: "U"`. The 8th
 character of a cohort key is reported three ways so a consumer never has to know
 which kind it is holding: `slot` is it raw, `method` is it on the two reading

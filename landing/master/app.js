@@ -9615,6 +9615,68 @@
     return out;
   }
 
+  /* An instant as the reader thinks of it, with the UTC hour App Store Connect
+     files it under beside it. */
+  var EASTERN_FMT = (function () {
+    try {
+      return new Intl.DateTimeFormat('en-US', {
+        timeZone: 'America/New_York', month: 'short', day: 'numeric',
+        hour: 'numeric', minute: '2-digit', second: '2-digit', timeZoneName: 'short'
+      });
+    } catch (e) { return null; }
+  })();
+  function subEventWhen(iso) {
+    var d = new Date(iso);
+    if (isNaN(d)) return esc(String(iso || ''));
+    var utc = String(d.getUTCHours()).padStart(2, '0') + ':' + String(d.getUTCMinutes()).padStart(2, '0') + ' UTC';
+    return esc(EASTERN_FMT ? EASTERN_FMT.format(d) : d.toISOString()) +
+      ' <span class="na">· ' + esc(utc) + '</span>';
+  }
+
+  var SUB_EVENT_ROUTE = { sub: 'Subscribe', rst: 'Restore', lap: 'Lapse' };
+
+  function renderSubEvents(r) {
+    var host = document.getElementById('pgSubEvents');
+    if (!host) return;
+    if (!pings.report.subEvents) {
+      host.innerHTML = '<div class="empty">The API has not returned subscription events yet — the ping lambda that records them may not be deployed.</div>';
+      return;
+    }
+    var letter = { ios: 'I', android: 'A' }[state.platform] || null;
+    var rows = pings.report.subEvents.filter(function (e) {
+      if (letter && e.platform !== letter) return false;
+      if (r && r.from && e.day < r.from) return false;
+      if (r && r.to && e.day > r.to) return false;
+      return true;
+    }).slice().sort(function (a, b) { return a.at < b.at ? 1 : a.at > b.at ? -1 : 0; });
+    if (!rows.length) {
+      host.innerHTML = '<div class="empty">No subscription events in this range' +
+        (letter ? ' for this platform' : '') + '.</div>';
+      return;
+    }
+    host.innerHTML =
+      '<div class="table-scroll"><table><thead><tr>' +
+      '<th style="text-align:left">Route</th><th style="text-align:left">Arrived</th><th>Cohort</th><th>Age</th>' +
+      '<th style="text-align:left">Platform</th><th style="text-align:left">Plan</th>' +
+      '<th style="text-align:left">Tier</th><th style="text-align:left">Version</th>' +
+      '</tr></thead><tbody>' +
+      rows.map(function (e) {
+        return '<tr>' +
+          '<td style="text-align:left"><span class="swatch" style="background:' +
+            (e.route === 'lap' ? COLOR.muted : PC.subs) + '"></span>' + esc(SUB_EVENT_ROUTE[e.route] || e.route) + '</td>' +
+          '<td style="text-align:left">' + subEventWhen(e.at) + '</td>' +
+          '<td>' + esc(labelDay(e.cohort)) + '</td>' +
+          '<td>D' + (A.ageBetween ? A.ageBetween(e.cohort, e.day) : diffDays(e.cohort, e.day)) + '</td>' +
+          '<td style="text-align:left">' + esc(A.platformName(e.platform)) + '</td>' +
+          '<td style="text-align:left">' + (e.plan ? esc(A.planName(e.plan))
+            : '<span class="na">' + (e.route === 'sub' ? 'unknown (older build)' : '–') + '</span>') + '</td>' +
+          '<td style="text-align:left">' + (e.tier ? esc(A.tierName(e.tier)) : '<span class="na">–</span>') + '</td>' +
+          '<td style="text-align:left">' + (e.version ? esc(e.version) : '<span class="na">unknown</span>') + '</td>' +
+          '</tr>';
+      }).join('') +
+      '</tbody></table></div>';
+  }
+
   function renderPings() {
     document.getElementById('pgRawStatus').innerHTML = pingStatusHTML();
     var retry = document.getElementById('pgRetry');
@@ -9624,11 +9686,13 @@
     if (!ready) {
       document.getElementById('pgRawTiles').innerHTML = '';
       document.getElementById('pgRawTable').innerHTML = '';
+      document.getElementById('pgSubEvents').innerHTML = '';
       return;
     }
 
     var ix = A.index(pings.report, pingPlatform());
     var r = ix.days && ix.days.length ? pingRange(ix) : null;
+    renderSubEvents(r);
     var rows = rawPingRows(r);
 
     /* Tiles count PINGS, not installs: a row's `count` is how many pings shared

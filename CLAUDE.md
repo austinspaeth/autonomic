@@ -1318,16 +1318,13 @@ old web app so old `export.json` files import directly.
   only when the rounding really is 48-52%), the exact per-month division beside
   the yearly row, and the rounded one in the sentence, which is why that one
   says "about".
-- **The founding-member offer is the other one, and it lives for a single day.
-  IT IS CURRENTLY SWITCHED OFF** — `FOUNDER_ENABLED = false` in
-  `src/lib/upsell/founder.ts`, checked first in `founderVerdict` so even a phone
-  that had already claimed its day goes quiet. The rules are untouched and stay
-  under test through `founderRules` (nothing in the app may call that directly),
-  so turning it back on is that one constant. Being off SPENDS nothing: no
-  memory is stamped, no day claimed, and the shared 7-day offer cool-down is
-  never taken, so the half-off annual card below is unaffected and in fact freer
-  to appear. The rest of this bullet describes it as it will behave when it
-  returns.
+- **The founding-member offer is the other one, and it lives for a single day.**
+  It is gated by `FOUNDER_ENABLED` in `src/lib/upsell/founder.ts` (currently
+  `true`), checked first in `founderVerdict` so switching it off silences even a
+  phone that had already claimed its day. The rules stay under test through
+  `founderRules` (nothing in the app may call that directly). Being off SPENDS
+  nothing: no memory is stamped, no day claimed, and the shared 7-day offer
+  cool-down is never taken.
   `src/lib/upsell/founder.ts` (pure + tested) + `founderMemory.ts` (flags MMKV),
   rendered by `<FounderOfferCard/>` under the Journal's Outlook. It fires on the
   first launch AFTER five days carrying the user's OWN entries (`engagedBefore`
@@ -1552,7 +1549,12 @@ old web app so old `export.json` files import directly.
   cohort+platform(+method) → count (`PK PING#OPEN` / `PING#SUB` / `PING#RST` / `PING#LAP` / `PING#ACT` /
   `PING#HRV`,
   `SK 2026-08-21`, `cohorts: { '082126I': 12 }`, readings `'082126IB'`) — a map, not a list, because the nested bump is
-  atomic and appending to a list would lose concurrent pings.
+  atomic and appending to a list would lose concurrent pings. **The three
+  subscription routes are ALSO logged one row per ping** (`PK SUBEVENT`, 400-day
+  TTL, returned as `subEvents`, listed on the Pings tab), because a counter keeps
+  no time and splits version from cohort — and the alert card's time is when the
+  dashboard NOTICED a count, not when it arrived, so it cannot be matched to the
+  store's hourly figures.
   Read it back with `GET /ping/report?key=`
   (shared key, `PING_REPORT_KEY`, injected by CodeBuild from SSM) or the `PINGS`
   action on the authenticated `/master` API; both return

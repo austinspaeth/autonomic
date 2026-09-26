@@ -126,6 +126,14 @@
  * None of this is revenue. The imported sales ledger is; these are what the
  * app REPORTED, unverified, and a curl can inflate them like any other count.
  *
+ * These three routes are ALSO written as individual events (`SUBEVENT`, see
+ * `subEventItem`), because a day counter cannot answer the question a sale
+ * actually raises: WHEN did it arrive, and from which build? The counter keeps
+ * version in a map with no cohort, and keeps no time at all; the dashboard's
+ * alert time is only when it NOTICED the counter move. They are a handful a
+ * day, so one row each costs nothing, and they carry exactly what the path
+ * already carried plus the arrival instant — still no identifier.
+ *
  * ------------------------------------------------------------------ faults
  *
  * `/fault` is the one route here that is NOT a counter, and it lives under its
@@ -179,7 +187,8 @@
  * the one route where a request creates a ROW rather than incrementing one.
  */
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
-const { DynamoDBDocumentClient, UpdateCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
+const { DynamoDBDocumentClient, UpdateCommand, QueryCommand, PutCommand } = require('@aws-sdk/lib-dynamodb');
+const { randomBytes } = require('node:crypto');
 
 const TABLE = process.env.DYNAMO_TABLE_NAME;
 
@@ -862,6 +871,80 @@ const readFaults = async (since) => {
   return rows.slice(0, FAULT_READ_MAX);
 };
 
+/* ------------------------------------------------------ subscription events */
+
+/** How long a subscription event lives. Long enough to set a yearly plan's
+ *  lapse beside the purchase that started it. */
+const SUB_EVENT_TTL_DAYS = 400;
+
+/** The route name each subscription kind is reported under. */
+const SUB_EVENT_ROUTES = { SUB: 'sub', RST: 'rst', LAP: 'lap' };
+
+/**
+ * The row one subscription ping is logged as, or null for any other kind. Pure.
+ *
+ * SK leads with the ISO arrival instant, so a `since` day is a range query and
+ * rows come back in the order they happened; the random suffix only keeps two
+ * pings in the same millisecond apart. Everything else is what the path
+ * decoded to — the same fields the counters hold, joined rather than split.
+ */
+const subEventItem = (kind, decoded, nowMs, rand) => {
+  const route = SUB_EVENT_ROUTES[kind];
+  if (!route || !decoded) return null;
+  const at = new Date(nowMs).toISOString();
+  return {
+    PK: 'SUBEVENT',
+    SK: `${at}#${rand}`,
+    entityType: 'SUB_EVENT',
+    route,
+    at,
+    day: easternDay(nowMs),
+    cohort: decoded.iso,
+    platform: decoded.platform || 'U',
+    plan: PLANS[decoded.slot] ? decoded.slot : null,
+    tier: decoded.tier || null,
+    version: decoded.version || null,
+    expiresAt: Math.floor(nowMs / 1000) + SUB_EVENT_TTL_DAYS * 86400,
+  };
+};
+
+/** A stored event as the report returns it. Pure. */
+const subEventRow = (item) => ({
+  route: item.route,
+  at: item.at,
+  day: item.day,
+  cohort: item.cohort,
+  platform: item.platform || 'U',
+  plan: item.plan || null,
+  planName: PLANS[item.plan] || null,
+  tier: item.tier || null,
+  version: item.version || null,
+});
+
+const logSubEvent = async (kind, decoded, nowMs) => {
+  const item = subEventItem(kind, decoded, nowMs, randomBytes(3).toString('hex'));
+  if (item) await ddb.send(new PutCommand({ TableName: TABLE, Item: item }));
+};
+
+/** Every subscription event from `since` (an ISO day) onwards, oldest first,
+ *  returned under `subEvents` on the report. */
+const readSubEvents = async (since) => {
+  const rows = [];
+  let ExclusiveStartKey;
+  do {
+    // eslint-disable-next-line no-await-in-loop
+    const res = await ddb.send(new QueryCommand({
+      TableName: TABLE,
+      KeyConditionExpression: 'PK = :pk AND SK >= :since',
+      ExpressionAttributeValues: { ':pk': 'SUBEVENT', ':since': since },
+      ExclusiveStartKey,
+    }));
+    (res.Items || []).forEach((item) => rows.push(subEventRow(item)));
+    ExclusiveStartKey = res.LastEvaluatedKey;
+  } while (ExclusiveStartKey && rows.length < FAULT_READ_MAX);
+  return rows.slice(0, FAULT_READ_MAX);
+};
+
 /**
  * Every kind, keyed by route name. Shared with the dashboard API.
  *
@@ -879,7 +962,7 @@ const REPORT_KINDS = Object.keys(KINDS);
 
 const report = async (since) => {
   const from = isIsoDate(since) ? since : EPOCH;
-  const [rows, faults, offerFailures] = await Promise.all([
+  const [rows, faults, offerFailures, subEvents] = await Promise.all([
     Promise.all(REPORT_KINDS.map((k) => readDays(KINDS[k], from))),
     // Read alongside the counters rather than behind a second call: the
     // dashboard shows failures against opens ("of the phones in the app today,
@@ -898,8 +981,14 @@ const report = async (since) => {
       console.error('offer failure read failed', err);
       return [];
     }),
+    // And again: a partition that is empty until the first subscription ping
+    // after this shipped.
+    readSubEvents(from).catch((err) => {
+      console.error('subscription event read failed', err);
+      return [];
+    }),
   ]);
-  const out = { since: from, faults, offerFailures };
+  const out = { since: from, faults, offerFailures, subEvents };
   REPORT_KINDS.forEach((k, i) => { out[k] = rows[i]; });
   return out;
 };
@@ -1267,6 +1356,12 @@ const handler = async (event) => {
     // into "collects data". The error and the kind are enough to debug with.
     console.error('ping write failed', kind, err);
   }
+  // Separately, so a failed event write can never cost the counter its count.
+  try {
+    await logSubEvent(kind, { ...decoded, slot: slotFor }, now);
+  } catch (err) {
+    console.error('subscription event write failed', kind, err);
+  }
   return noContent;
 };
 
@@ -1275,4 +1370,5 @@ module.exports = {
   LOGS, FEATURES, FINDINGS, REPORTS, PLANS,
   redactFault, safeTag, faultKey, hash8, FAULT_MSG_MAX, FAULT_TTL_DAYS, FAULT_MAX_N,
   readOfferFailure, offerFailKey, OUTCOMES, OFFER_FAIL_TTL_DAYS,
+  subEventItem, subEventRow, SUB_EVENT_TTL_DAYS,
 };

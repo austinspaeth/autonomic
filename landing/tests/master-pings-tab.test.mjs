@@ -33,6 +33,14 @@ const actRows = [{ day: T(0), total: 2, cohorts: [{ key: cd(T(0))+'IB', cohortDa
    ever name whichever reading came first — so its rows must render a dash in
    the Sensor column rather than inventing one. */
 const hrvRows = [{ day: T(0), total: 3, cohorts: [{ key: cd(T(10))+'I', cohortDate: cd(T(10)), cohort: T(10), platform: 'I', method: null, count: 3 }] }];
+/* The subscription event log: one row per ping, carrying what the counters
+   split apart (version beside cohort) and the arrival instant they never keep. */
+const nowIso = new Date().toISOString();
+const subEvents = [
+  { route: 'sub', at: nowIso, day: T(0), cohort: T(9), platform: 'I', plan: 'F', planName: 'founder-yearly', tier: 'T', version: '1.29.0' },
+  { route: 'rst', at: nowIso, day: T(0), cohort: T(0), platform: 'I', plan: 'Y', planName: 'yearly', tier: 'P', version: '1.28.1' },
+  { route: 'sub', at: nowIso, day: T(0), cohort: T(5), platform: 'A', plan: null, planName: null, tier: null, version: null },
+];
 const b64u = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
 const idToken = [b64u({alg:'RS256'}), b64u({email:'austinspaeth@msn.com', exp: Math.floor(Date.now()/1000)+3600}), 'sig'].join('.');
 const dom = new JSDOM(fs.readFileSync(PAGE,'utf8'), { url:'https://autonomic.care/master/', runScripts:'dangerously', pretendToBeVisual:true });
@@ -46,7 +54,7 @@ window.fetch = (url, opts) => {
   if (target==='RespondToAuthChallenge') return reply({AuthenticationResult:{IdToken:idToken,AccessToken:'at',RefreshToken:'rt'}});
   // A LEGACY settings record: the old two-boundary build's 7-day trial.
   if (body.action==='LOAD') return reply({ entries:[{date:T(4),platform:'ios',downloads:20,impressions:1000,pageViews:100,sales:1}], events:[], settings:{trialDays:7,wallDays:14,currency:'$'}, ui:{view:'overview'} });
-  if (body.action==='PINGS') return reply({ open:openRows, sub:subRows, rst:rstRows, lap:lapRows, act:actRows, hrv:hrvRows });
+  if (body.action==='PINGS') return reply({ open:openRows, sub:subRows, rst:rstRows, lap:lapRows, act:actRows, hrv:hrvRows, subEvents });
   return reply({ok:true});
 };
 const errors=[]; window.addEventListener('error',(e)=>errors.push(String(e.error||e.message)));
@@ -72,6 +80,13 @@ ok('Pings is the last data tab', !!tab && tabs.slice(tabs.indexOf(tab)+1).every(
    'missing, or a data tab follows it');
 tab.click();
 await new Promise(r=>setTimeout(r,400));
+const ev=$('pgSubEvents');
+const evRows=ev ? ev.querySelectorAll('tbody tr') : [];
+ok('subscription events render one row per event', evRows.length===3, String(evRows.length));
+const evTxt=ev ? ev.textContent : '';
+ok('an event shows its version, plan and tier together', /1\.29\.0/.test(evTxt) && /Founder/i.test(evTxt) && /1\.28\.1/.test(evTxt), evTxt.slice(0,200));
+ok('an event shows the UTC time beside Eastern', /UTC/.test(evTxt), evTxt.slice(0,200));
+ok('an older build reads as unknown, never guessed', /unknown \(older build\)/.test(evTxt) && /unknown/.test(evTxt), evTxt.slice(0,300));
 const table=$('pgRawTable');
 const rows=table.querySelectorAll('tbody tr');
 // 2 open rows on T-1 + 1 open on T-0 + 2 subscribe + 1 restore + 1 lapse + 1 activation + 1 reading
