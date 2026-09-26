@@ -447,6 +447,54 @@ check('hand-entered churn gives the forecast a measured rate', cb.churnPct !== n
 check('and the forecast can see it was hand-entered, not a cancellation',
   near(cb.unattachedMrr, 9.98) && cb.cancelledMrr === 0);
 
+
+/* ------------------------------------------------------------ renewals */
+
+/* A row is a first payment. Renewals are derived: same day each month for a
+   monthly plan, the anniversary for an annual one, stopping at a cancellation. */
+check('the 31st renews on the last day of a short month', S.addMonths('2026-01-31', 1) === '2026-02-28');
+check('months carry across a year', S.addMonths('2026-11-15', 3) === '2027-02-15');
+
+const rn = S.renewals(ix, '2026-01-01', '2026-06-30');
+const rm1 = rn.filter((x) => x.id === 'M1').map((x) => x.date);
+check('a monthly plan renews every month after its purchase',
+  JSON.stringify(rm1) === JSON.stringify(['2026-02-10', '2026-03-10', '2026-04-10', '2026-05-10', '2026-06-10']), rm1.join(','));
+const rm3 = rn.filter((x) => x.id === 'M3').map((x) => x.date);
+check('a cancelled plan stops renewing on its cancellation date',
+  JSON.stringify(rm3) === JSON.stringify(['2026-04-01']), rm3.join(','));
+check('a refunded plan never renews', !rn.some((x) => x.id === 'R1'));
+check('lifetime and unclassified rows never renew', !rn.some((x) => x.id === 'L1' || x.id === 'U1'));
+check('an annual plan does not renew inside its year', !rn.some((x) => x.id === 'A1'));
+const ra1 = S.renewals(ix, '2027-01-01', '2027-01-31').filter((x) => x.id === 'A1');
+check('and renews on its anniversary, at its full price',
+  ra1.length === 1 && ra1[0].date === '2027-01-15' && near(ra1[0].amount, 29.99));
+
+/* The split is what the tile shows. In March: M3 (4.99) is new, R1 was refunded;
+   M1 and M2 renew. */
+const rmar = S.revenueSplit(ix, '2026-03-01', '2026-03-31');
+check('new money in range is first payments only', near(rmar.fresh, 4.99), String(rmar.fresh));
+check('renewals in range are the live subscriptions charged again', near(rmar.renewals, 9.98) && rmar.renewalCount === 2, String(rmar.renewals));
+check('the renewal share is of the total', near(rmar.renewalPct, (9.98 / 14.97) * 100));
+check('renewals split by store', near(rmar.byPlatform.ios.amount, 4.99) && near(rmar.byPlatform.android.amount, 4.99));
+const capped = S.revenueSplit(ix, '2026-03-01', '2026-03-31', '2026-03-07');
+check('asOf caps renewals that have not fallen due yet', near(capped.renewals, 4.99), String(capped.renewals));
+
+/* A month of monthly renewals is the monthly MRR — that is what MRR claims. */
+const rjul = S.renewalTotals(S.renewals(ix, '2026-07-01', '2026-07-31'));
+check('a month of monthly renewals equals the monthly MRR',
+  near(rjul.byPlan.monthly.amount, S.mrrOn(ix, '2026-07-31').byPlan.monthly), String(rjul.byPlan.monthly.amount));
+
+/* Unattached churn cannot be pinned on a subscription, so it scales every
+   renewal of its plan by what it left standing. */
+const hix = S.index(ROWS, 'all', [{ id: 'c1', date: '2026-06-01', mrr: 4.99, plan: 'monthly' }]);
+const hjul = S.renewalTotals(S.renewals(hix, '2026-07-01', '2026-07-31'));
+check('unattached churn scales renewals down to the netted book', near(hjul.byPlan.monthly.amount, 4.99), String(hjul.byPlan.monthly.amount));
+
+const rmr = S.monthlyRevenue(ix, '2026-01-01', '2026-03-31');
+check('monthly revenue carries renewals as their own cash', near(rmr[2].renewals, 9.98) && near(rmr[1].renewals, 4.99));
+check('and recognises them in their own field, leaving first-payment recognition alone',
+  near(rmr[2].renewalsRecognised, 9.98) && near(rmr[2].recognised, 4.99 + 29.99 / 12), rmr[2].renewalsRecognised + '/' + rmr[2].recognised);
+
 /* ------------------------------------------------------------- report */
 
 let failed = 0;

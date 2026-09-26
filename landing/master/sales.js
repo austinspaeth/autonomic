@@ -58,6 +58,13 @@
  * a view can say the estimate has outrun the ledger instead of quietly showing
  * a plausible number.
  *
+ * THREE-AND-THREE-QUARTERS. **A row is a FIRST payment, so `bookings` is new
+ * money only.** Renewals are never typed in; `renewals()` derives them from
+ * rule THREE (a live subscription is charged again each term) and every view
+ * that shows them calls them estimated. New and renewal cash are reported side
+ * by side and never folded into `bookings`, which the Overview, Costs and the
+ * forecast all read as "somebody paid for the first time".
+ *
  * FOUR. **Cohort-day statistics only count rows that carry an install date.**
  * `cohortDay` is `purchase date − install date`, exact and per buyer. A row
  * without one (every migrated row, and any purchase whose buyer you could not
@@ -280,13 +287,14 @@ window.Sales = (function () {
    */
   function mrrOn(ix, day) {
     var gross = 0;
-    var byPlan = {};
-    PLAN_KEYS.forEach(function (k) { byPlan[k] = 0; });
+    var byPlan = {}, grossByPlan = {};
+    PLAN_KEYS.forEach(function (k) { byPlan[k] = 0; grossByPlan[k] = 0; });
     ix.rows.forEach(function (r) {
       if (!isLiveOn(r, day)) return;
       var m = mrrOf(r);
       gross += m;
       byPlan[r.plan] += m;
+      grossByPlan[r.plan] += m;
     });
     var churned = churnMrrThrough(ix, day);
     /* Charged against the plan the churn row names, and what that plan cannot
@@ -309,8 +317,116 @@ window.Sales = (function () {
     return {
       gross: gross, churned: churned,
       mrr: Math.max(0, gross - churned),
-      byPlan: byPlan,
+      byPlan: byPlan, grossByPlan: grossByPlan,
       churnFloored: churned > gross + 1e-9
+    };
+  }
+
+  /* ------------------------------------------------------------ renewals */
+
+  /**
+   * Every renewal charge the ledger implies between `from` and `to`.
+   *
+   * A ledger row is the FIRST payment and nothing else — the stores tell this
+   * dashboard about neither renewals nor churn, and nobody types in a row for
+   * every month a subscriber stays. So `bookings` has only ever been new money,
+   * and a book of fifty monthly subscribers read as the handful who joined this
+   * month. Rule THREE already assumes a subscription runs until it is marked
+   * cancelled, and a subscription that runs is one that is charged again: a
+   * monthly plan on the same day of every following month, an annual one on its
+   * anniversary. This is that assumption, written out as cash.
+   *
+   * It is an ESTIMATE and every view that shows it must say so. Two things keep
+   * it consistent with MRR rather than a second opinion beside it:
+   *
+   *   - a renewal is charged only while the row is live on the renewal day, so
+   *     a cancellation stops it on the same date it leaves MRR;
+   *   - unattached churn cannot be pinned on a subscription, so each renewal is
+   *     scaled by the share of its plan's book the churn ledger has left
+   *     standing on that day (`net / gross`). A month of monthly renewals then
+   *     sums to the monthly MRR, which is what MRR claims it is.
+   *
+   * Lifetime and unclassified rows never renew: one has no recurrence and the
+   * other no known term (rule TWO).
+   */
+  function addMonths(s, n) {
+    var p = String(s).split('-');
+    var y = +p[0], m = +p[1] - 1 + n, d = +p[2];
+    y += Math.floor(m / 12); m = ((m % 12) + 12) % 12;
+    /* The 31st renews on the last day of a shorter month, which is what both
+       stores do, rather than spilling into the next one. */
+    var last = new Date(y, m + 1, 0).getDate();
+    return y + '-' + pad(m + 1) + '-' + pad(Math.min(d, last));
+  }
+
+  function renewals(ix, from, to) {
+    var out = [];
+    if (!from || !to || from > to) return out;
+    var ratio = {};
+    function share(plan, day) {
+      var key = day;
+      var book = ratio[key] || (ratio[key] = mrrOn(ix, day));
+      var g = book.grossByPlan[plan];
+      return g > 0 ? Math.max(0, Math.min(1, book.byPlan[plan] / g)) : 0;
+    }
+    ix.rows.forEach(function (r) {
+      if (r.refunded || !isRecurring(r.plan)) return;
+      var term = PLANS[r.plan].termMonths;
+      for (var k = 1; ; k++) {
+        var day = addMonths(r.date, term * k);
+        if (day > to) break;
+        if (r.cancelled && r.cancelled <= day) break;
+        if (day < from) continue;
+        var gross = r.price * r.qty;
+        out.push({
+          id: r.id, date: day, platform: r.platform, plan: r.plan,
+          n: k, gross: gross, amount: gross * share(r.plan, day)
+        });
+      }
+    });
+    return out.sort(function (a, b) { return a.date === b.date ? a.id.localeCompare(b.id) : a.date.localeCompare(b.date); });
+  }
+
+  /** A list of renewals, summed every way a view cuts it. `cells` is store ×
+   *  plan, which is the one grid that answers "where is next month coming
+   *  from". Counts are charges, not subscribers: a monthly plan renewing three
+   *  times in a window is three. */
+  function renewalTotals(list) {
+    var t = { total: 0, count: 0, byPlan: {}, byPlatform: {}, cells: {} };
+    ['monthly', 'annual'].forEach(function (k) { t.byPlan[k] = { amount: 0, count: 0 }; });
+    Object.keys(PLATFORMS).forEach(function (p) {
+      t.byPlatform[p] = { amount: 0, count: 0 };
+      t.cells[p] = { monthly: { amount: 0, count: 0 }, annual: { amount: 0, count: 0 } };
+    });
+    (list || []).forEach(function (x) {
+      t.total += x.amount; t.count += 1;
+      t.byPlan[x.plan].amount += x.amount; t.byPlan[x.plan].count += 1;
+      t.byPlatform[x.platform].amount += x.amount; t.byPlatform[x.platform].count += 1;
+      t.cells[x.platform][x.plan].amount += x.amount; t.cells[x.platform][x.plan].count += 1;
+    });
+    return t;
+  }
+
+  /**
+   * The window's money, split into NEW (first payments — what `bookings` has
+   * always been) and RENEWALS (estimated, above). `renewalPct` is the share of
+   * the total the renewals make up. `asOf` caps the renewal side: a charge
+   * that has not fallen due yet is not revenue in range, it is the schedule.
+   */
+  function revenueSplit(ix, from, to, asOf, list) {
+    var s = summarize(ix, from, to);
+    var end = asOf && asOf < to ? asOf : to;
+    /* `list` lets a caller supply renewals built per store (so a store's own
+       churn scales only that store); it is filtered to the window here. */
+    var ren = renewalTotals(end < from ? [] : list
+      ? list.filter(function (x) { return x.date >= from && x.date <= end; })
+      : renewals(ix, from, end));
+    var total = s.bookings + ren.total;
+    return {
+      fresh: s.bookings, renewals: ren.total, total: total,
+      renewalCount: ren.count, newCount: s.units,
+      renewalPct: total ? (ren.total / total) * 100 : null,
+      byPlatform: ren.byPlatform, byPlan: ren.byPlan, cells: ren.cells
     };
   }
 
@@ -490,11 +606,11 @@ window.Sales = (function () {
    * record on bookings and an ordinary month on recognised revenue, and both
    * readings are true about different things.
    */
-  function monthlyRevenue(ix, from, to) {
+  function monthlyRevenue(ix, from, to, asOf) {
     var months = {}, order = [];
     function bucket(key) {
       var m = months[key];
-      if (!m) { m = months[key] = { key: key, bookings: 0, recognised: 0, units: 0 }; order.push(m); }
+      if (!m) { m = months[key] = { key: key, bookings: 0, renewals: 0, recognised: 0, renewalsRecognised: 0, units: 0 }; order.push(m); }
       return m;
     }
     var cursor = monthStart(from);
@@ -526,6 +642,29 @@ window.Sales = (function () {
         /* A cancelled subscription stops being recognised the month it ends. */
         if (r.cancelled && key > monthStart(r.cancelled)) break;
         bucket(key).recognised += per;
+      }
+    });
+
+    /* Renewals are cash too, and a monthly subscriber in month five is
+       revenue in month five — without them the recognised line credited a
+       monthly plan with its first month only. Each renewal is recognised over
+       the term it buys, exactly like a first payment, into its OWN field:
+       `recognised` stays first payments only, so the rule that churn never
+       touches recognised revenue still holds of it, and a renewal (which
+       unattached churn does scale, because it has not happened yet) is added
+       by the view. `asOf` caps them at the last day charges can have
+       happened. */
+    var renEnd = asOf && asOf < to ? asOf : to;
+    renewals(ix, monthStart(from), renEnd).forEach(function (x) {
+      var start = monthStart(x.date);
+      if (start >= monthStart(from) && start <= to) bucket(start).renewals += x.amount;
+      var term = PLANS[x.plan].termMonths;
+      for (var i = 0; i < term; i++) {
+        var d3 = parse(start);
+        d3.setMonth(d3.getMonth() + i);
+        var key3 = toISO(d3);
+        if (key3 < monthStart(from) || key3 > to) continue;
+        bucket(key3).renewalsRecognised += x.amount / term;
       }
     });
 
@@ -805,6 +944,7 @@ window.Sales = (function () {
     index: index, summarize: summarize,
     mrrOn: mrrOn, churnMrrThrough: churnMrrThrough, churnUnitsThrough: churnUnitsThrough,
     mrrSeries: mrrSeries, churnSeries: churnSeries, monthlyRevenue: monthlyRevenue,
+    addMonths: addMonths, renewals: renewals, renewalTotals: renewalTotals, revenueSplit: revenueSplit,
     purchaseAges: purchaseAges, ageByPlan: ageByPlan, byInstallMonth: byInstallMonth,
     dailyTotals: dailyTotals, migrateEntries: migrateEntries, forecastBasis: forecastBasis,
     median: median, range: range

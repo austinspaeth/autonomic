@@ -505,7 +505,15 @@ input[type="number"] { -moz-appearance: textfield; }
 
 /* ---------- charts ---------- */
 
-.chart-wrap { position: relative; }
+/* A finger dragged across a chart scrubs the tooltip. Without this, iOS and
+   Android read the same drag as a text selection and start highlighting the
+   axis labels, the legend and the card around them. */
+.chart-wrap {
+  position: relative;
+  -webkit-user-select: none; user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
 .chart-wrap svg { display: block; width: 100%; overflow: hidden; }
 .legend { display: flex; flex-wrap: wrap; gap: 6px 16px; margin: 2px 0 10px; }
 .legend .item {
@@ -648,6 +656,16 @@ tbody tr:hover { background: var(--surface-2); }
 .cd-value { font-size: 20px; font-variant-numeric: tabular-nums; }
 .cd-note { color: var(--text-muted); font-size: 11.5px; }
 
+.fc-mode { margin: 0 0 8px; font-size: 13px; color: var(--text-secondary); display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.rev-figs { display: grid; grid-template-columns: repeat(auto-fit, minmax(140px, 1fr)); gap: 12px 18px; margin: 4px 0 12px; }
+.rev-figs > div { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.rev-figs .label { color: var(--text-secondary); font-size: 12px; display: inline-flex; align-items: center; gap: 6px; }
+.rev-figs b { font-size: 20px; font-variant-numeric: tabular-nums; }
+.rev-figs .note { font-size: 11.5px; }
+.mixbar { display: flex; height: 8px; border-radius: 4px; overflow: hidden; gap: 2px; margin: 0 0 12px; background: var(--surface-2); }
+.mixbar i { display: block; height: 100%; }
+tr.total td { border-top: 1px solid var(--border-strong); }
+.subhead { font-size: 13px; font-weight: 600; color: var(--text-secondary); margin: 14px 0 6px; }
 .mini-rows { margin-top: 10px; display: flex; flex-direction: column; gap: 6px; }
 .mini-rows > div { display: flex; align-items: baseline; gap: 8px; font-size: 12.5px; }
 .mini-rows b { font-variant-numeric: tabular-nums; }

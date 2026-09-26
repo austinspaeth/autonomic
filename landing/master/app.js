@@ -5647,6 +5647,40 @@
   function planColor(k) { return (Sales.PLANS[k] || {}).color || COLOR.muted; }
   function planLabel(k) { return (Sales.PLANS[k] || {}).label || k; }
 
+  /* --------------------------------------------------- renewals, per store
+
+     The ledger holds first payments only; renewals are derived (see
+     `Sales.renewals`). They are built from one index PER STORE, so churn filed
+     against iOS scales only iOS renewals rather than being spread across both.
+     Churn that names no store cannot be placed and so is not taken off this
+     schedule — `unplacedChurn` is how much that is, for the views to say. */
+
+  function storeIndexes() {
+    var keys = salesPlatform() === 'all' ? ['ios', 'android'] : [salesPlatform()];
+    var out = {};
+    keys.forEach(function (k) { out[k] = Sales.index(salesList(), k, churnList()); });
+    return out;
+  }
+  function storeRenewals(from, to) {
+    var sx = storeIndexes(), list = [];
+    Object.keys(sx).forEach(function (k) { list = list.concat(Sales.renewals(sx[k], from, to)); });
+    return list.sort(function (a, b) { return a.date === b.date ? a.id.localeCompare(b.id) : a.date.localeCompare(b.date); });
+  }
+  function unplacedChurn() {
+    if (salesPlatform() !== 'all') return 0;
+    return Sales.normalizeChurnAll(churnList()).reduce(function (t, c) { return t + (c.platform ? 0 : c.mrr); }, 0);
+  }
+  /* Renewals only count as revenue once they can have been charged, so the
+     split never reaches past today. */
+  function storeRevenue(ix, from, to) {
+    var end = to < today() ? to : today();
+    return Sales.revenueSplit(ix, from, to, end, end >= from ? storeRenewals(from, end) : []);
+  }
+  function lastOfMonth(d) { var p = parseISO(monthStart(d)); p.setMonth(p.getMonth() + 1); p.setDate(0); return toISO(p); }
+  function afterCut(v) { return v * (1 - storeCut() / 100); }
+
+  var salesUI = { horizon: '90' };
+
   function renderSales() {
     var ix = salesIndex();
     var r = activeRange();
@@ -5660,12 +5694,17 @@
     deltaOK = ix.first !== null && prevFrom >= ix.first;
     var s = Sales.summarize(ix, r.from, r.to);
     var prev = Sales.summarize(ix, prevFrom, prevTo);
+    var rv = storeRevenue(ix, r.from, r.to);
+    var prevRv = storeRevenue(ix, prevFrom, prevTo);
 
     document.getElementById('slScope').textContent =
       labelFull(r.from) + ' → ' + labelFull(r.to) +
       (ix.platform === 'all' ? '' : ' · ' + PLATFORMS[ix.platform]);
 
-    renderSalesTiles(ix, s, prev, r);
+    renderSalesTiles(ix, s, prev, r, rv, prevRv);
+    renderMrrNow(ix);
+    renderThisMonth(ix);
+    renderUpcoming(ix);
     renderMrrChart(ix, r);
     renderChurnChart(ix, r, s);
     renderNewSubs(ix, r);
@@ -5757,7 +5796,7 @@
         : '');
   }
 
-  function renderSalesTiles(ix, s, prev, r) {
+  function renderSalesTiles(ix, s, prev, r, rv, prevRv) {
     var unknownNote = s.activeByPlan.unknown.count
       ? ' · ' + fmtInt(s.activeByPlan.unknown.count) + ' unclassified sales carry no term and are not in it'
       : '';
@@ -5800,9 +5839,21 @@
         meta: 'MRR × 12, at the rate the book runs at today'
       }),
       tile({
-        label: 'Bookings in range', color: ENTITY.sales, value: fmtMoney(s.bookings),
-        delta: pctDelta(s.bookings, prev.bookings),
-        meta: 'cash that arrived · ' + fmtMoney(s.bookings * (1 - storeCut() / 100)) + ' after the ' + storeCut() + '% store cut'
+        /* New AND renewals. The ledger only ever held first payments, so this
+           tile used to be new money alone and read a steady book of renewing
+           subscribers as a quiet month. Renewals are estimated (a live
+           subscription is charged again each term) and the meta says so. */
+        label: 'Revenue in range', color: ENTITY.sales, value: fmtMoney(rv.total),
+        delta: pctDelta(rv.total, prevRv.total),
+        meta: (rv.total
+          ? fmtPct(rv.renewalPct) + ' from renewals · '
+          : '') + fmtMoney(afterCut(rv.total)) + ' after the ' + storeCut() + '% store cut' +
+          (rv.renewalCount ? ' · ' + fmtInt(rv.renewalCount) + ' renewal' + (rv.renewalCount === 1 ? '' : 's') +
+            ' estimated from the ledger, assuming every subscription not marked cancelled renewed' : ''),
+        split: [
+          { name: 'New', color: ENTITY.sales, value: fmtMoney(rv.fresh) + ' · ' + (rv.total ? fmtPct((rv.fresh / rv.total) * 100) : '–') },
+          { name: 'Renewals', color: planColor('annual'), value: fmtMoney(rv.renewals) + ' · ' + (rv.total ? fmtPct(rv.renewalPct) : '–') }
+        ]
       }),
       tile({
         label: 'New MRR in range', color: planColor('monthly'), value: fmtMoney(s.newMrr),
@@ -5977,15 +6028,17 @@
    * record or a collapse depending on which number happened to be on screen.
    */
   function renderBookingsChart(ix, r) {
-    var rows = Sales.monthlyRevenue(ix, r.from, r.to);
+    var rows = Sales.monthlyRevenue(ix, r.from, r.to, r.to < today() ? r.to : today());
     drawChart('slBookings', {
       x: rows.map(function (m) { return bucketLabel(m.key, 'month'); }),
       height: 280, format: fmtMoney, xLabel: 'Month', yTickFormat: moneyTick,
       series: [
-        { key: 'bookings', name: 'Bookings (cash in)', color: ENTITY.sales, type: 'bar',
+        { key: 'bookings', name: 'New purchases', color: ENTITY.sales, type: 'bar',
           values: rows.map(function (m) { return m.bookings; }) },
+        { key: 'renewals', name: 'Renewals (estimated)', color: planColor('annual'), type: 'bar',
+          values: rows.map(function (m) { return m.renewals; }) },
         { key: 'recognised', name: 'Recognised revenue', color: ENTITY.downloads, type: 'line',
-          values: rows.map(function (m) { return m.recognised; }) }
+          values: rows.map(function (m) { return m.recognised + m.renewalsRecognised; }) }
       ],
       emptyText: 'No purchases in this range.'
     });
@@ -6073,6 +6126,198 @@
           '<td>' + (m.maturityDays === null ? '–' : fmtInt(m.maturityDays) + ' days' +
             (young ? ' <span class="warn-small">still buying</span>' : '')) + '</td></tr>';
       }).join('') + '</tbody></table></div>';
+  }
+
+  /* ------------------------------------------------- MRR today, by store
+
+     The book as it stands today, not at the end of the selected range: this is
+     the "what is the business running at" card, and it is always today. Cells
+     come from per-store indexes so a store's own churn lands on that store;
+     churn that names no store is its own reconciling row so the grid still sums
+     to the total MRR the other tiles show. */
+  function renderMrrNow(ix) {
+    var host = document.getElementById('slMrrNow');
+    if (!host) return;
+    var day = today();
+    var sx = storeIndexes();
+    var keys = Object.keys(sx);
+    var cells = {}, sum = { monthly: 0, annual: 0, total: 0 };
+    keys.forEach(function (k) {
+      var b = Sales.mrrOn(sx[k], day);
+      /* Unclassified-plan churn spills onto whichever plan can absorb it, so
+         the two recurring plans are what is left; their sum is the store MRR. */
+      cells[k] = { monthly: b.byPlan.monthly, annual: b.byPlan.annual, total: b.byPlan.monthly + b.byPlan.annual };
+      sum.monthly += cells[k].monthly; sum.annual += cells[k].annual; sum.total += cells[k].total;
+    });
+    var book = Sales.mrrOn(ix, day);
+    var unplaced = Math.max(0, sum.total - book.mrr);
+    var total = book.mrr;
+    document.getElementById('slMrrNowDay').textContent = 'as of ' + labelFull(day);
+
+    if (!total && !sum.total) {
+      host.innerHTML = '<div class="empty">No recurring subscriptions on the books today.</div>';
+      return;
+    }
+    var mShare = sum.total ? (sum.monthly / sum.total) * 100 : 0;
+    function pctCell(v, of) { return of ? '<span class="note">' + fmtPct((v / of) * 100) + '</span>' : ''; }
+    host.innerHTML =
+      '<div class="rev-figs">' +
+        '<div><span class="label">MRR</span><b>' + fmtMoney(total) + '</b><span class="note">' + fmtMoney(afterCut(total)) + ' after the store cut</span></div>' +
+        '<div><span class="label"><span class="swatch" style="background:' + planColor('monthly') + '"></span>From monthly</span><b>' + fmtMoney(sum.monthly) + '</b><span class="note">' + fmtPct(mShare) + '</span></div>' +
+        '<div><span class="label"><span class="swatch" style="background:' + planColor('annual') + '"></span>From annual</span><b>' + fmtMoney(sum.annual) + '</b><span class="note">' + fmtPct(100 - mShare) + ' · a twelfth of each yearly price</span></div>' +
+        '<div><span class="label">ARR</span><b>' + fmtMoney(total * 12) + '</b><span class="note">MRR × 12</span></div>' +
+      '</div>' +
+      '<div class="mixbar" aria-hidden="true">' +
+        '<i style="width:' + mShare.toFixed(2) + '%;background:' + planColor('monthly') + '"></i>' +
+        '<i style="width:' + (100 - mShare).toFixed(2) + '%;background:' + planColor('annual') + '"></i>' +
+      '</div>' +
+      '<div class="table-scroll"><table><thead><tr>' +
+        '<th>Store</th><th class="money">Monthly</th><th class="money">Annual</th><th class="money">MRR</th><th class="money">Share</th>' +
+      '</tr></thead><tbody>' +
+      keys.map(function (k) {
+        var c = cells[k];
+        return '<tr><td><span class="pill ' + k + '">' + PLATFORMS[k] + '</span></td>' +
+          '<td class="money">' + fmtMoney(c.monthly) + ' ' + pctCell(c.monthly, c.total) + '</td>' +
+          '<td class="money">' + fmtMoney(c.annual) + ' ' + pctCell(c.annual, c.total) + '</td>' +
+          '<td class="money"><b>' + fmtMoney(c.total) + '</b></td>' +
+          '<td class="money">' + (sum.total ? fmtPct((c.total / sum.total) * 100) : '–') + '</td></tr>';
+      }).join('') +
+      (unplaced > 0.005
+        ? '<tr><td><span class="note">Churn with no store</span></td><td></td><td></td>' +
+          '<td class="money">-' + fmtMoney(unplaced) + '</td><td></td></tr>'
+        : '') +
+      (keys.length > 1
+        ? '<tr class="total"><td><b>Total</b></td>' +
+          '<td class="money">' + fmtMoney(sum.monthly) + '</td>' +
+          '<td class="money">' + fmtMoney(sum.annual) + '</td>' +
+          '<td class="money"><b>' + fmtMoney(total) + '</b></td><td></td></tr>'
+        : '') +
+      '</tbody></table></div>' +
+      (unplaced > 0.005
+        ? '<p class="hint" style="margin:10px 0 0">' + fmtMoney(unplaced) + ' of churn was entered without a store, so it comes off the total but cannot be taken off either store. The per-store and per-plan figures are before it.</p>'
+        : '');
+  }
+
+  /* ---------------------------------------------- this month's recurring
+
+     Every renewal due in the current calendar month, split into what has
+     already fallen due and what is still to come. Renewals only — new
+     purchases are not recurring revenue until they renew — with this month's
+     new money so far shown beside it rather than folded in. */
+  function renderThisMonth(ix) {
+    var host = document.getElementById('slThisMonth');
+    if (!host) return;
+    var day = today(), from = monthStart(day), to = lastOfMonth(day);
+    document.getElementById('slThisMonthDay').textContent = labelMonth(from);
+    var list = storeRenewals(from, to);
+    var done = Sales.renewalTotals(list.filter(function (x) { return x.date <= day; }));
+    var due = Sales.renewalTotals(list.filter(function (x) { return x.date > day; }));
+    var all = Sales.renewalTotals(list);
+    var fresh = Sales.summarize(ix, from, day);
+    var keys = Object.keys(storeIndexes());
+
+    host.innerHTML =
+      '<div class="rev-figs">' +
+        '<div><span class="label">Expected renewals</span><b>' + fmtMoney(all.total) + '</b><span class="note">' + fmtInt(all.count) + ' charge' + (all.count === 1 ? '' : 's') + ' · ' + fmtMoney(afterCut(all.total)) + ' after the cut</span></div>' +
+        '<div><span class="label">Renewed so far</span><b>' + fmtMoney(done.total) + '</b><span class="note">' + fmtInt(done.count) + ' through ' + labelDay(day) + '</span></div>' +
+        '<div><span class="label">Still due</span><b>' + fmtMoney(due.total) + '</b><span class="note">' + fmtInt(due.count) + ' by ' + labelDay(to) + '</span></div>' +
+        '<div><span class="label">New so far</span><b>' + fmtMoney(fresh.bookings) + '</b><span class="note">' + fmtInt(fresh.units) + ' first payment' + (fresh.units === 1 ? '' : 's') + ', not recurring yet</span></div>' +
+      '</div>' +
+      (all.count ? renewalGrid(keys, all, done, due) : '<div class="empty">No renewals fall due this month.</div>') +
+      renewalCaveat();
+  }
+
+  /** Store × plan, with an optional collected/due pair. */
+  function renewalGrid(keys, all, done, due) {
+    var split = !!done;
+    return '<div class="table-scroll"><table><thead><tr>' +
+      '<th>Store</th><th class="money">Monthly</th><th class="money">Annual</th>' +
+      (split ? '<th class="money">Renewed</th><th class="money">Still due</th>' : '') +
+      '<th class="money">Total</th></tr></thead><tbody>' +
+      keys.map(function (k) {
+        var c = all.cells[k];
+        function cell(x) { return fmtMoney(x.amount) + (x.count ? ' <span class="note">×' + fmtInt(x.count) + '</span>' : ''); }
+        return '<tr><td><span class="pill ' + k + '">' + PLATFORMS[k] + '</span></td>' +
+          '<td class="money">' + cell(c.monthly) + '</td>' +
+          '<td class="money">' + cell(c.annual) + '</td>' +
+          (split ? '<td class="money">' + fmtMoney(done.byPlatform[k].amount) + '</td>' +
+            '<td class="money">' + fmtMoney(due.byPlatform[k].amount) + '</td>' : '') +
+          '<td class="money"><b>' + fmtMoney(all.byPlatform[k].amount) + '</b></td></tr>';
+      }).join('') +
+      (keys.length > 1
+        ? '<tr class="total"><td><b>Total</b></td>' +
+          '<td class="money">' + fmtMoney(all.byPlan.monthly.amount) + '</td>' +
+          '<td class="money">' + fmtMoney(all.byPlan.annual.amount) + '</td>' +
+          (split ? '<td class="money">' + fmtMoney(done.total) + '</td><td class="money">' + fmtMoney(due.total) + '</td>' : '') +
+          '<td class="money"><b>' + fmtMoney(all.total) + '</b></td></tr>'
+        : '') +
+      '</tbody></table></div>';
+  }
+
+  function renewalCaveat() {
+    var u = unplacedChurn();
+    return '<p class="hint" style="margin:10px 0 0">Estimated: every subscription not marked cancelled is assumed to renew on the same day each month (monthly) or on its anniversary (annual), at the price it was bought at. Churn you entered scales its own store’s renewals down.' +
+      (u ? ' ' + fmtMoney(u) + '/mo of churn names no store and is not taken off this schedule.' : '') + '</p>';
+  }
+
+  /* -------------------------------------------------- upcoming renewals */
+  function renderUpcoming(ix) {
+    var host = document.getElementById('slUpcoming');
+    if (!host) return;
+    var days = +salesUI.horizon;
+    var from = addDays(today(), 1), to = addDays(today(), days);
+    var list = storeRenewals(from, to);
+    var t = Sales.renewalTotals(list);
+    var keys = Object.keys(storeIndexes());
+    var grain = days <= 31 ? 'day' : days <= 120 ? 'week' : 'month';
+    var buckets = bareBuckets(from, to, grain);
+    var per = buckets.map(function (b) {
+      var acc = { monthly: 0, annual: 0, ios: 0, android: 0 };
+      list.forEach(function (x) {
+        if (x.date < b.start || x.date > b.end) return;
+        acc[x.plan] += x.amount; acc[x.platform] += x.amount;
+      });
+      return acc;
+    });
+    drawChart('slUpcomingChart', {
+      x: xAxis(buckets, grain), stacked: true, height: 240, format: fmtMoney,
+      xLabel: grain === 'day' ? 'Day' : grain === 'week' ? 'Week' : 'Month', yTickFormat: moneyTick,
+      series: ['monthly', 'annual'].map(function (k) {
+        return { key: k, name: planLabel(k) + ' renewals', color: planColor(k), type: 'bar',
+          values: per.map(function (c) { return c[k]; }) };
+      }),
+      tooltipNote: keys.length > 1 ? function (i) {
+        return 'iOS ' + fmtMoney(per[i].ios) + ' · Android ' + fmtMoney(per[i].android);
+      } : undefined,
+      emptyText: 'No renewals fall due in this window.'
+    });
+
+    var next = list.slice(0, 12);
+    host.innerHTML =
+      '<div class="rev-figs">' +
+        '<div><span class="label">Due in the next ' + (days === 365 ? '12 months' : days + ' days') + '</span><b>' + fmtMoney(t.total) + '</b><span class="note">' + fmtInt(t.count) + ' charge' + (t.count === 1 ? '' : 's') + ' · ' + fmtMoney(afterCut(t.total)) + ' after the cut</span></div>' +
+        keys.map(function (k) {
+          return '<div><span class="label"><span class="swatch" style="background:' + ENTITY[k] + '"></span>' + PLATFORMS[k] + '</span><b>' + fmtMoney(t.byPlatform[k].amount) + '</b><span class="note">' + (t.total ? fmtPct((t.byPlatform[k].amount / t.total) * 100) : '–') + '</span></div>';
+        }).join('') +
+        ['monthly', 'annual'].map(function (k) {
+          return '<div><span class="label"><span class="swatch" style="background:' + planColor(k) + '"></span>' + planLabel(k) + '</span><b>' + fmtMoney(t.byPlan[k].amount) + '</b><span class="note">' + fmtInt(t.byPlan[k].count) + ' charge' + (t.byPlan[k].count === 1 ? '' : 's') + '</span></div>';
+        }).join('') +
+      '</div>' +
+      (t.count ? renewalGrid(keys, t) : '') +
+      (next.length
+        ? '<h3 class="subhead">Next renewals</h3><div class="table-scroll"><table><thead><tr>' +
+          '<th>Due</th><th>Store</th><th>Plan</th><th class="money">Amount</th><th class="money">Renewal</th>' +
+          '</tr></thead><tbody>' +
+          next.map(function (x) {
+            return '<tr><td>' + esc(labelFull(x.date)) + '</td>' +
+              '<td><span class="pill ' + x.platform + '">' + PLATFORMS[x.platform] + '</span></td>' +
+              '<td><span class="swatch" style="background:' + planColor(x.plan) + '"></span> ' + esc(planLabel(x.plan)) + '</td>' +
+              '<td class="money">' + fmtMoney(x.amount) + '</td>' +
+              '<td class="money">#' + fmtInt(x.n) + '</td></tr>';
+          }).join('') + '</tbody></table></div>' +
+          (list.length > next.length ? '<p class="hint">The next ' + next.length + ' of ' + fmtInt(list.length) + '.</p>' : '')
+        : '') +
+      renewalCaveat();
   }
 
   function renderPlanMix(s) {
@@ -6595,6 +6840,14 @@
   }
 
   function wireSales() {
+    var hz = document.getElementById('slHorizon');
+    if (hz) hz.querySelectorAll('button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        salesUI.horizon = b.dataset.v;
+        hz.querySelectorAll('button').forEach(function (o) { o.setAttribute('aria-pressed', o === b ? 'true' : 'false'); });
+        renderUpcoming(salesIndex());
+      });
+    });
     document.getElementById('slPasteClear').addEventListener('click', function () {
       document.getElementById('slPaste').value = '';
       document.getElementById('slPasteStatus').textContent = '';
@@ -7493,6 +7746,38 @@
   }
   function fcIsSub() { return fcModel() !== 'onetime'; }
 
+  function fcMetric() { return (state.fc && state.fc.metric) || 'cash'; }
+
+  /* Which forecast is on screen, said in words above the numbers. The default
+     IS "current pace" — the assumptions read off your own data with installs
+     held flat — and the moment a slider moves the line says so and names what
+     changed, so a tweaked forecast can never be mistaken for the baseline. */
+  var FC_LEVERS = ['installs', 'growth', 'conv', 'price', 'monthlyPrice', 'annualPrice', 'annualShare', 'churn', 'annualRenew'];
+  function renderFcMode(a) {
+    var host = document.getElementById('fcMode');
+    if (!host) return;
+    var changed = FC_LEVERS.filter(fcIsOverridden).map(function (k) {
+      var c = FC_CONTROLS.filter(function (x) { return x.key === k; })[0];
+      return c ? c.label.toLowerCase() : k;
+    });
+    var pace = fmtInt(fcValue('installs', a)) + ' installs a day, ' +
+      fcValue('conv', a).toFixed(2) + '% converting' +
+      (fcIsSub() ? ', ' + fcValue('churn', a).toFixed(1) + '% monthly churn' : '');
+    host.innerHTML = changed.length
+      ? '<span class="pill warn">Adjusted</span> You changed ' + esc(changed.join(', ')) +
+        '. <button class="linkbtn" id="fcPaceLink">Back to current pace</button>'
+      : '<span class="pill green">Current pace</span> If you keep doing exactly what you are doing now: ' + esc(pace) +
+        ', today\u2019s plan mix and prices, no growth.';
+    var link = document.getElementById('fcPaceLink');
+    if (link) link.addEventListener('click', fcCurrentPace);
+  }
+  function fcCurrentPace() {
+    state.fc = { horizon: (state.fc && state.fc.horizon) || 12, model: fcModel(),
+      modelChosen: state.fc && state.fc.modelChosen, metric: fcMetric() };
+    saveUI();
+    renderForecast();
+  }
+
   function renderForecastControls(a) {
     var host = document.getElementById('fcControls');
     var model = fcModel();
@@ -7517,7 +7802,8 @@
             : (c.derived && c.derived(a) ? esc(c.derived(a))
               : (c.needsSales && !a.hasSales ? 'no sales on record yet — assumption'
                 : 'from your data: ' + c.fmt(act)))) +
-          (fcIsOverridden(c.key) ? ' <button class="linkbtn" data-fc-reset="' + c.key + '">reset</button>' : '') +
+          (fcIsOverridden(c.key) ? ' <button class="linkbtn" data-fc-reset="' + c.key + '">reset</button>'
+            : (c.apply && c.apply(a) !== null ? ' <button class="linkbtn" data-fc-apply="' + c.key + '" data-v="' + c.apply(a) + '">apply it</button>' : '')) +
         '</div></div>';
     }).join('');
   }
@@ -7527,83 +7813,101 @@
     var a = sc.actuals, exp = sc.expected, bear = sc.bear, bull = sc.bull;
     var model = fcModel(), months = sc.assume.months;
     var cur = db.settings.currency || '$';
+    /* The annual renewal slider's default follows the churn slider, so it is
+       read off the run rather than off the data. */
+    a.annualRenew = sc.assume.annualRenew * 100;
+    renderFcMode(a);
 
     if (!(opts && opts.keepControls)) renderForecastControls(a);
     document.getElementById('fcLagNote').textContent = wallExit();
     document.getElementById('fcScope').textContent =
       labelFull(addDays(asOf(), 1)) + ' → ' + labelFull(fcEndDate()) +
       (fcPlatform() === 'all' ? '' : ' · ' + platName(fcPlatform()));
-    ['fcHorizon', 'fcModel'].forEach(function (id) {
+    ['fcHorizon', 'fcModel', 'fcMetric'].forEach(function (id) {
       var hostEl = document.getElementById(id);
-      var want = id === 'fcHorizon' ? String(months) : model;
+      var want = id === 'fcHorizon' ? String(months) : id === 'fcMetric' ? fcMetric() : model;
       Array.prototype.forEach.call(hostEl.children, function (c) {
         c.setAttribute('aria-pressed', c.dataset.v === want ? 'true' : 'false');
       });
     });
 
     var mrrLabel = model === 'onetime' ? 'Monthly revenue' : 'MRR';
-    document.getElementById('fcMrrTitle').textContent = mrrLabel;
     document.getElementById('fcMrrHint').textContent = model === 'onetime'
-      ? 'One-time purchases do not recur, so this is the revenue earned in each month rather than a recurring base.'
-      : model === 'annual'
-        ? 'Annual plans are shown as monthly recurring revenue — the yearly price spread across twelve months. Cash arrives a year at a time; the cumulative chart above shows both.'
-        : model === 'mix'
-          ? 'Recurring revenue at the end of each month, from both plans: an annual buyer contributes a twelfth of the yearly price each month, exactly like the Sales view. Monthly plans churn continuously; annual ones are only tested at their renewal, because someone who has paid for a year cannot leave in month three.'
-          : 'Recurring revenue at the end of each month, after churn.';
+      ? 'One-time purchases do not recur, so every bar is new buyers.'
+      : 'Expected case. Renewals are everyone already subscribed plus everyone the forecast signs up, charged again on their renewal date after churn: monthly plans each month, annual plans once a year, which is why the annual renewals arrive as a lump twelve months after a busy month.';
 
     /* ---- tiles ---- */
-    var rangeMeta = function (lo, hi, f) { return 'range ' + f(lo) + ' – ' + f(hi); };
+    var rangeMeta = function (lo, hi, f) { return 'bear ' + f(lo) + ' · optimistic ' + f(hi); };
+    var firstFull = exp.months.length > 1 && exp.months[0].days < 28 ? exp.months[1] : exp.months[0];
     document.getElementById('fcTiles').innerHTML = [
       tile({
         label: mrrLabel + ' in ' + fcEndLabel(), color: ENTITY.revenue, value: fmtMoney(exp.endMrr),
-        meta: rangeMeta(bear.endMrr, bull.endMrr, fmtMoney)
+        meta: rangeMeta(bear.endMrr, bull.endMrr, fmtMoney) +
+          (model === 'onetime' ? '' : ' · ' + fmtMoney(a.startMrr) + ' today')
       }),
       tile({
         label: model === 'onetime' ? 'Annual run-rate' : 'ARR in ' + fcEndLabel(),
         color: ENTITY.revenue, value: fmtMoney(exp.endMrr * 12),
-        meta: rangeMeta(bear.endMrr * 12, bull.endMrr * 12, fmtMoney)
+        meta: rangeMeta(bear.endMrr * 12, bull.endMrr * 12, fmtMoney) + ' · ' + mrrLabel + ' × 12'
       }),
       tile({
-        label: 'Cash through ' + fcEndLabel(), color: ENTITY.sales, value: fmtMoney(exp.totalBookings),
+        label: 'Cash collected by ' + fcEndLabel(), color: ENTITY.sales, value: fmtMoney(exp.totalBookings),
         meta: rangeMeta(bear.totalBookings, bull.totalBookings, fmtMoney) +
-          (model === 'onetime' ? '' : ' · ' + fmtMoney(exp.totalRevenue) + ' of it recognised in the window')
+          (model === 'onetime' ? ''
+            : ' · ' + fmtMoney(exp.totalFresh) + ' new purchases, ' + fmtMoney(exp.totalBookings - exp.totalFresh) + ' renewals') +
+          ' · before the ' + storeCut() + '% store cut (' + fmtMoney(exp.totalBookings * (1 - storeCut() / 100)) + ' after)'
       }),
       tile({
         label: 'Cash, next 30 days', value: fmtMoney(exp.bookingsNext30), smallValue: true,
-        meta: rangeMeta(bear.bookingsNext30, bull.bookingsNext30, fmtMoney)
+        meta: rangeMeta(bear.bookingsNext30, bull.bookingsNext30, fmtMoney) +
+          ' · new purchases plus every renewal that falls due'
+      }),
+      model === 'onetime' ? null : tile({
+        /* The answer to "why is three years barely better than one". */
+        label: 'Where MRR levels off', color: ENTITY.revenue,
+        value: exp.plateauMrr === null ? '–' : fmtMoney(exp.plateauMrr), smallValue: true,
+        meta: exp.plateauMrr === null
+          ? 'with no churn the book never stops growing'
+          : 'at today’s install rate, when the subscribers leaving each month equal the ' +
+            fmtMoney(exp.newMrrPerMonth) + ' of MRR joining. Churn, conversion and installs move it; a longer horizon does not'
       }),
       tile({
-        label: (model === 'onetime' ? 'Buyers in ' : 'Paying users in ') + fcEndLabel(),
+        label: (model === 'onetime' ? 'Buyers by ' : 'Paying users in ') + fcEndLabel(),
         color: ENTITY.trialEnd, value: fmtInt(model === 'onetime' ? a.payers + exp.totalConv : exp.endPayers),
         meta: model === 'onetime'
           ? 'starting from ' + fmtInt(a.payers) + ' today'
           : rangeMeta(bear.endPayers, bull.endPayers, fmtInt) + ' · from ' +
             fmtInt(a.startMonthly + a.startAnnual) + ' on the books today',
-        split: model === 'mix' ? [
+        split: model === 'onetime' ? null : [
           { name: 'Monthly', color: planColor('monthly'), value: fmtInt(exp.endMonthly) },
           { name: 'Annual', color: planColor('annual'), value: fmtInt(exp.endAnnual) }
-        ] : null
+        ]
       }),
       tile({
-        label: 'New installs through ' + fcEndLabel(), color: ENTITY.downloads, value: fmtInt(exp.totalInstalls),
-        meta: rangeMeta(bear.totalInstalls, bull.totalInstalls, fmtInt)
+        label: 'New installs by ' + fcEndLabel(), color: ENTITY.downloads, value: fmtInt(exp.totalInstalls),
+        meta: rangeMeta(bear.totalInstalls, bull.totalInstalls, fmtInt) +
+          (firstFull ? ' · about ' + fmtInt(firstFull.installs) + ' in ' + labelMonth(firstFull.key) : '')
       }),
       tile({
-        label: 'New conversions', color: ENTITY.wallHit, value: fmtInt(exp.totalConv),
-        meta: rangeMeta(bear.totalConv, bull.totalConv, fmtInt)
+        label: 'New paying users', color: ENTITY.wallHit, value: fmtInt(exp.totalConv),
+        meta: rangeMeta(bear.totalConv, bull.totalConv, fmtInt) +
+          (firstFull ? ' · about ' + fmtInt(firstFull.conv) + ' a month' : '')
       }),
       tile({
-        label: 'Revenue per install', value: fmtMoney(exp.totalInstalls ? exp.totalRevenue / exp.totalInstalls : 0),
-        smallValue: true, meta: 'over the whole forecast window'
+        /* New money only. It used to divide ALL recognised revenue, the book
+           you already have included, by new installs — crediting today's
+           subscribers to installs that have not happened yet. */
+        label: 'Cash per new install', value: fmtMoney(exp.totalInstalls ? exp.totalFresh / exp.totalInstalls : 0),
+        smallValue: true, meta: 'first payments from new subscribers ÷ new installs, renewals left out'
       })
-    ].join('');
+    ].filter(Boolean).join('');
 
     /* ---- charts ---- */
     var x = exp.months.map(function (m) { return bucketLabel(m.key, 'month'); });
     var pick = function (run, field) { return run.months.map(function (m) { return m[field]; }); };
     var moneyTick = function (v) { return cur + Chart.fmtCompact(v); };
 
-    function bandChart(id, field, fmt, tickFmt) {
+    function bandChart(id, field, fmt, tickFmt, extra) {
       drawChart(id, {
         x: x, height: id === 'fcRevenue' ? 340 : 260, format: fmt, xLabel: 'Month',
         yTickFormat: tickFmt,
@@ -7612,23 +7916,50 @@
             values: pick(bull, field), base: pick(bear, field), format: fmt },
           { key: 'exp', name: 'Expected', color: ENTITY.downloads, type: 'line',
             values: pick(exp, field), format: fmt }
+        ].concat(extra || [])
+      });
+    }
+
+    /* One quantity per tab. Cash and recognised revenue used to share this
+       chart with the band drawn on recognised and the dashed line on cash, so
+       "expected" sat BELOW "cash collected" and looked like the worse case.
+       They are different measures — cash lands the day an annual plan is
+       bought, recognised revenue spreads it over the year — and each now gets
+       its own band. */
+    var metric = fcMetric();
+    var METRIC = {
+      cash: { field: 'cumBookings', title: 'Cash collected, cumulative',
+        hint: 'Money in the bank from the start of the forecast: every new purchase plus every renewal that falls due, before the store cut. An annual plan lands here in full on the day it is bought, which is why this runs ahead of recognised revenue.' },
+      mrr: { field: 'mrr', title: mrrLabel,
+        hint: 'Recurring revenue at the end of each month. An annual plan counts as a twelfth of its yearly price, so monthly and annual can be added. It flattens once the subscribers leaving each month match the ones joining — see the tile above.' },
+      arr: { field: 'arr', title: model === 'onetime' ? 'Annual run-rate' : 'ARR',
+        hint: 'MRR × 12: the yearly revenue the book would bring in if it stood still at that month.' },
+      recognised: { field: 'cumRevenue', title: 'Recognised revenue, cumulative',
+        hint: 'Revenue earned rather than cash received: each subscription counts for the months it covers, so an annual plan bought today is spread across the next twelve. Lower than cash whenever annual plans are being sold, and the gap is revenue you have been paid for and not yet delivered.' }
+    };
+    var M = METRIC[metric] || METRIC.cash;
+    document.getElementById('fcMainTitle').textContent = M.title;
+    document.getElementById('fcMainHint').textContent = M.hint + ' The shaded band runs from the bear case to the optimistic one; the line is the expected case.';
+    bandChart('fcRevenue', M.field, fmtMoney, moneyTick);
+
+    /* Cash in per month, new vs renewals: where the money in the tile above
+       comes from, and the part the old model left out entirely. */
+    drawChart('fcCash', {
+      x: x, height: 260, format: fmtMoney, yTickFormat: moneyTick, stacked: true,
+      series: [
+        { key: 'fresh', name: 'New purchases', color: ENTITY.sales, type: 'bar', values: pick(exp, 'freshCash') },
+        { key: 'renew', name: 'Renewals', color: planColor('annual'), type: 'bar', values: pick(exp, 'renewCash') }
+      ]
+    });
+    drawChart('fcPayers', {
+      x: x, height: 260, format: fmtInt, stacked: true,
+      series: model === 'onetime'
+        ? [{ key: 'p', name: 'Buyers', color: ENTITY.trialEnd, type: 'area', values: pick(exp, 'payers') }]
+        : [
+          { key: 'mo', name: 'Monthly', color: planColor('monthly'), type: 'area', values: pick(exp, 'monthlyPayers') },
+          { key: 'an', name: 'Annual', color: planColor('annual'), type: 'area', values: pick(exp, 'annualPayers') }
         ]
-      });
-    }
-    bandChart('fcRevenue', 'cumRevenue', fmtMoney, moneyTick);
-    /* Cash rides on the revenue chart rather than getting a card of its own:
-       the two are the same quantity counted at different moments, and the gap
-       between them only means anything when you can see both at once. */
-    if (model !== 'onetime') {
-      var cfg = chartCfgs.fcRevenue;
-      cfg.series.push({
-        key: 'cash', name: 'Cash collected', color: ENTITY.sales, type: 'line', dashed: true,
-        values: pick(exp, 'cumBookings'), format: fmtMoney
-      });
-      drawChart('fcRevenue', cfg);
-    }
-    bandChart('fcMrr', 'mrr', fmtMoney, moneyTick);
-    bandChart('fcPayers', 'payers', fmtInt);
+    });
 
     drawChart('fcInstalls', {
       x: x, height: 260, format: fmtInt,
@@ -7640,22 +7971,26 @@
     });
 
     /* ---- month table ---- */
-    var head = '<tr><th>Month</th><th>New installs</th><th>New paying</th>' +
-      (model === 'mix' ? '<th>New monthly</th><th>New annual</th>' : '') +
-      '<th>' + (fcIsSub() ? 'Paying users' : 'Buyers') + '</th><th>' + esc(mrrLabel) + '</th>' +
-      '<th>Recognised</th><th>Cash in</th><th>Cumulative cash</th><th>Range (cumulative)</th></tr>';
+    var sub = model !== 'onetime';
+    var head = '<tr><th>Month</th><th class="money">New installs</th><th class="money">New paying</th>' +
+      (model === 'mix' ? '<th class="money">New monthly</th><th class="money">New annual</th>' : '') +
+      '<th class="money">' + (sub ? 'Paying users' : 'Buyers') + '</th><th class="money">' + esc(mrrLabel) + '</th>' +
+      (sub ? '<th class="money">Cash: new</th><th class="money">Cash: renewals</th>' : '') +
+      '<th class="money">Cash in</th><th class="money">Cash to date</th><th class="money">Bear – optimistic (to date)</th>' +
+      (sub ? '<th class="money">Recognised</th>' : '') + '</tr>';
     var body = exp.months.map(function (m, i) {
-      return '<tr><td>' + bucketLabel(m.key, 'month').full + '</td>' +
-        '<td>' + fmtInt(m.installs) + '</td>' +
-        '<td>' + fmtInt(m.conv) + '</td>' +
-        (model === 'mix' ? '<td>' + fmtInt(m.newMonthly) + '</td><td>' + fmtInt(m.newAnnual) + '</td>' : '') +
-        '<td>' + fmtInt(m.payers) + '</td>' +
-        '<td>' + fmtMoney(m.mrr) + '</td>' +
-        '<td>' + fmtMoney(m.revenue) + '</td>' +
-        '<td>' + fmtMoney(m.bookings) + '</td>' +
-        '<td>' + fmtMoney(m.cumBookings) + '</td>' +
-        '<td>' + fmtMoney(bear.months[i] ? bear.months[i].cumRevenue : 0) + ' – ' +
-          fmtMoney(bull.months[i] ? bull.months[i].cumRevenue : 0) + '</td></tr>';
+      return '<tr><td>' + bucketLabel(m.key, 'month').full + (m.days < 28 ? ' <span class="note">(' + m.days + ' days)</span>' : '') + '</td>' +
+        '<td class="money">' + fmtInt(m.installs) + '</td>' +
+        '<td class="money">' + fmtInt(m.conv) + '</td>' +
+        (model === 'mix' ? '<td class="money">' + fmtInt(m.newMonthly) + '</td><td class="money">' + fmtInt(m.newAnnual) + '</td>' : '') +
+        '<td class="money">' + fmtInt(m.payers) + '</td>' +
+        '<td class="money">' + fmtMoney(m.mrr) + '</td>' +
+        (sub ? '<td class="money">' + fmtMoney(m.freshCash) + '</td><td class="money">' + fmtMoney(m.renewCash) + '</td>' : '') +
+        '<td class="money"><b>' + fmtMoney(m.bookings) + '</b></td>' +
+        '<td class="money">' + fmtMoney(m.cumBookings) + '</td>' +
+        '<td class="money note">' + fmtMoney(bear.months[i] ? bear.months[i].cumBookings : 0) + ' – ' +
+          fmtMoney(bull.months[i] ? bull.months[i].cumBookings : 0) + '</td>' +
+        (sub ? '<td class="money">' + fmtMoney(m.revenue) + '</td>' : '') + '</tr>';
     }).join('');
     document.getElementById('fcTable').innerHTML =
       '<div class="table-scroll full"><table><thead>' + head + '</thead><tbody>' + body + '</tbody></table></div>';
@@ -7686,6 +8021,7 @@
       if (model !== 'monthly') L.push('Annual plan price       ' + fmtMoney(o.annualPrice));
       if (model === 'mix') L.push('Choose annual           ' + (o.annualShare * 100).toFixed(0) + '%');
       L.push('Monthly churn           ' + (o.churn * 100).toFixed(2) + '%');
+      if (model !== 'monthly') L.push('Annual plans renewing   ' + (o.annualRenew * 100).toFixed(0) + '%');
       L.push('Starting monthly subs   ' + fmtInt(o.startMonthly));
       L.push('Starting annual subs    ' + fmtInt(o.startAnnual));
     }
@@ -7695,6 +8031,7 @@
     L.push((model === 'onetime' ? 'Monthly revenue  ' : 'MRR              ') +
       fmtMoney(bear.endMrr) + ' / ' + fmtMoney(exp.endMrr) + ' / ' + fmtMoney(bull.endMrr));
     L.push('ARR              ' + fmtMoney(bear.endMrr * 12) + ' / ' + fmtMoney(exp.endMrr * 12) + ' / ' + fmtMoney(bull.endMrr * 12));
+    if (exp.plateauMrr !== null && model !== 'onetime') L.push('MRR levels off at ' + fmtMoney(exp.plateauMrr) + ' (expected, at today\u2019s install rate)');
     L.push('Cash collected   ' + fmtMoney(bear.totalBookings) + ' / ' + fmtMoney(exp.totalBookings) + ' / ' + fmtMoney(bull.totalBookings));
     L.push('Recognised rev   ' + fmtMoney(bear.totalRevenue) + ' / ' + fmtMoney(exp.totalRevenue) + ' / ' + fmtMoney(bull.totalRevenue));
     L.push('Paying users     ' + fmtInt(bear.endPayers) + ' / ' + fmtInt(exp.endPayers) + ' / ' + fmtInt(bull.endPayers));
@@ -7703,11 +8040,12 @@
     L.push('');
     L.push('## Month by month (expected)');
     L.push(pad2('month', 12) + padL('installs', 10) + padL('new paying', 12) +
-      padL('paying', 9) + padL('mrr', 12) + padL('recognised', 12) + padL('cash in', 12) +
-      padL('cum cash', 13));
+      padL('paying', 9) + padL('mrr', 12) + padL('recognised', 12) + padL('cash new', 12) +
+      padL('cash renew', 12) + padL('cash in', 12) + padL('cum cash', 13));
     exp.months.forEach(function (m) {
       L.push(pad2(m.key.slice(0, 7), 12) + padL(fmtInt(m.installs), 10) + padL(fmtInt(m.conv), 12) +
         padL(fmtInt(m.payers), 9) + padL(fmtMoney(m.mrr), 12) + padL(fmtMoney(m.revenue), 12) +
+        padL(fmtMoney(m.freshCash), 12) + padL(fmtMoney(m.renewCash), 12) +
         padL(fmtMoney(m.bookings), 12) + padL(fmtMoney(m.cumBookings), 13));
     });
     return L.join('\n');
@@ -7742,6 +8080,14 @@
     });
 
     host.addEventListener('click', function (ev) {
+      var ap = ev.target.closest('[data-fc-apply]');
+      if (ap) {
+        state.fc = state.fc || {};
+        state.fc[ap.dataset.fcApply] = +ap.dataset.v;
+        saveUI();
+        renderForecast();
+        return;
+      }
       var b = ev.target.closest('[data-fc-reset]');
       if (!b) return;
       if (state.fc) state.fc[b.dataset.fcReset] = null;
@@ -7750,6 +8096,14 @@
     });
 
     document.body.addEventListener('click', function (ev) {
+      var mb = ev.target.closest('#fcMetric button');
+      if (mb) {
+        state.fc = state.fc || {};
+        state.fc.metric = mb.dataset.v;
+        saveUI();
+        renderForecast({ keepControls: true });
+        return;
+      }
       var b = ev.target.closest('#fcHorizon button, #fcModel button');
       if (!b) return;
       state.fc = state.fc || {};
@@ -7761,10 +8115,8 @@
     });
 
     document.getElementById('fcReset').addEventListener('click', function () {
-      state.fc = { horizon: (state.fc && state.fc.horizon) || 12, model: fcModel() };
-      saveUI();
-      renderForecast();
-      toast('Assumptions reset to the values derived from your data.');
+      fcCurrentPace();
+      toast('Back to current pace: your own numbers, held where they are today.');
     });
 
     document.getElementById('fcExport').addEventListener('click', function () {
@@ -8060,6 +8412,15 @@
       startMonthly: live.activeByPlan.monthly.count * bookSurvival,
       startAnnual: live.activeByPlan.annual.count * bookSurvival,
       startMrr: live.mrr,
+      /* The book itself, one cohort per live subscription, so the projection
+         can charge each one again on its REAL renewal date at the price it was
+         actually bought at. The counts above could only say how many; without
+         the dates, nobody already paying was ever charged again. */
+      book: salesIndex().rows.filter(function (r) {
+        return Sales.isRecurring(r.plan) && Sales.isLiveOn(r, end);
+      }).map(function (r) {
+        return { plan: r.plan, n: r.qty * bookSurvival, price: r.price, origin: r.date, stop: r.cancelled || null };
+      }),
       hasSales: hasSales,
       hasPlans: six.units > 0,
       unknownSales: six.unknownCount,
@@ -8072,7 +8433,12 @@
       min: function () { return 0; },
       max: function (a) { return Math.max(250, Math.ceil(a.installs * 5 / 50) * 50); } },
     { key: 'growth', label: 'Install growth / month', step: 0.5, fmt: function (v) { return (v > 0 ? '+' : '') + v.toFixed(1) + '%'; },
-      min: function () { return -50; }, max: function () { return 100; } },
+      min: function () { return -50; }, max: function () { return 100; },
+      derived: function (a) {
+        return 'held flat for current pace · your last 28 days vs the 28 before: ' +
+          (a.growth > 0 ? '+' : '') + a.growth.toFixed(1) + '%';
+      },
+      apply: function (a) { return Math.round(a.growth * 2) / 2 ? Math.round(a.growth * 2) / 2 : null; } },
     { key: 'conv', needsSales: true, label: 'Convert rate at the wall', step: 0.05, fmt: function (v) { return v.toFixed(2) + '%'; },
       min: function () { return 0; },
       max: function (a) { return Math.max(40, Math.ceil(a.conv * 3)); } },
@@ -8111,6 +8477,16 @@
         if (a.churnUnattached) return 'from cancellations and hand-entered churn together';
         return null;
       } },
+    /* Its own lever rather than twelve months of the monthly rate compounded
+       in silence. That compounding is still the default, and it is harsh — 5%
+       a month is 54% renewing — but it is now a number on screen that can be
+       argued with. The stores do not tell this dashboard who renewed, so there
+       is nothing to measure it from yet. */
+    { key: 'annualRenew', label: 'Annual plans renewing', step: 1,
+      fmt: function (v) { return v.toFixed(0) + '%'; },
+      only: ['mix', 'annual'],
+      min: function () { return 0; }, max: function () { return 100; },
+      derived: function () { return 'assumption: twelve months of the monthly churn · nothing reports renewals yet'; } },
     { key: 'spread', label: 'Scenario spread', step: 5, fmt: function (v) { return '±' + v.toFixed(0) + '%'; },
       min: function () { return 5; }, max: function () { return 80; },
       note: 'width of the bear / optimistic band' }
@@ -8121,10 +8497,19 @@
   var FC_FALLBACK = { spread: 35 };
   var FC_ASSUMED = { churn: 5 };
 
+  /* Held at a fixed value until the user moves them, whatever the data says.
+     Growth is the one that matters: the default forecast answers "if I keep
+     doing exactly what I am doing now", and a trend read off two 28-day
+     windows (one ad spot is enough to swing it) compounded over three years
+     is a different question. The measured trend is still shown on the
+     slider, with a button to apply it. */
+  var FC_HELD = { growth: 0 };
+
   /* a control's live value: the user's override if set, else the derived actual */
   function fcValue(key, a) {
     var v = state.fc && state.fc[key];
     if (v !== null && v !== undefined && !isNaN(v)) return +v;
+    if (key in FC_HELD) return FC_HELD[key];
     if (key in FC_FALLBACK) return FC_FALLBACK[key];
     var actual = a[key];
     if (actual === null || actual === undefined || isNaN(actual)) return FC_ASSUMED[key] || 0;
@@ -8157,15 +8542,9 @@
   function fcRun(o) {
     var days = o.days;
     var gDaily = Math.pow(1 + o.growth, 1 / DPM) - 1;
-    var churnDaily = o.model === 'onetime' ? 0 : 1 - Math.pow(1 - o.churn, 1 / DPM);
     var lag = wallExit();
     var start = asOf();
-
-    /* Annual plans churn on the renewal, not continuously — someone who has
-       paid for a year cannot leave in month three however unhappy they are, and
-       applying a monthly churn to them understates MRR for eleven months out of
-       twelve. They are held whole and tested once a year instead. */
-    var annualRenewal = Math.pow(1 - o.churn, 12);
+    var sub = o.model !== 'onetime';
 
     var installs = new Array(days + 1);
     for (var t = 1; t <= days; t++) installs[t] = o.installs * Math.pow(1 + gDaily, t);
@@ -8173,17 +8552,60 @@
     var share = o.model === 'mix' ? o.annualShare
       : o.model === 'annual' ? 1
       : 0;                                    // monthly and one-time buy no annual plans
-    var monthlyPrice = o.monthlyPrice;
-    var annualPrice = o.annualPrice;
 
-    var moPayers = o.model === 'onetime' ? 0 : o.startMonthly;
-    var anPayers = o.model === 'onetime' ? 0 : o.startAnnual;
-    /* Annual cohorts, by the day they were bought, so each can renew (or not)
-       exactly a year later instead of decaying every day. */
-    var anCohorts = [];
+    /* EVERY subscription is a cohort that is charged again on its renewal date.
+       This model used to charge a monthly buyer once and never again, and never
+       renew the annual plans already on the books — so "cash" was only ever new
+       purchases, it could not reflect an MRR of any size, and it grew in a
+       straight line however long the horizon.
+
+       A cohort is { plan, n, price, origin, k }: `n` subscribers who bought on
+       `origin` at `price`, `k` renewals in. It is renewed on the real calendar
+       date (`Sales.addMonths`, the same rule the Sales view's schedule uses),
+       and the churn is taken AT the renewal — a monthly subscriber decides once
+       a month, an annual one once a year — which is when a store subscription
+       actually ends. The book on the day the forecast starts is seeded from the
+       ledger itself, so month one opens at the MRR you actually have, at the
+       prices those people actually pay, renewing on their own dates. */
+    var due = {};
+    var moN = 0, anN = 0, mrr = 0;
+    var keepMonthly = 1 - o.churn;
+    var keepAnnual = o.annualRenew;
+
+    function termOf(c) { return c.plan === 'annual' ? 12 : 1; }
+    function schedule(c) {
+      for (;;) {
+        c.k += 1;
+        var d = Sales.addMonths(c.origin, termOf(c) * c.k);
+        /* Cancelled: paid through its term and simply does not come round. */
+        if (c.stop && d >= c.stop) { dropAt(c, diffDays(start, c.stop)); return; }
+        var idx = diffDays(start, d);
+        if (idx > days) return;
+        if (idx >= 1) { (due[idx] || (due[idx] = [])).push({ c: c, kind: 'renew' }); return; }
+      }
+    }
+    function dropAt(c, idx) {
+      if (idx < 1) { remove(c, c.n); return; }
+      if (idx <= days) (due[idx] || (due[idx] = [])).push({ c: c, kind: 'stop' });
+    }
+    function add(c) {
+      if (c.plan === 'annual') anN += c.n; else moN += c.n;
+      mrr += c.n * c.price / termOf(c);
+    }
+    function remove(c, lost) {
+      if (c.plan === 'annual') anN -= lost; else moN -= lost;
+      mrr -= lost * c.price / termOf(c);
+      c.n -= lost;
+    }
+
+    if (sub) (o.book || []).forEach(function (b) {
+      var c = { plan: b.plan, n: b.n, price: b.price, origin: b.origin, stop: b.stop, k: 0, fresh: false };
+      add(c);
+      schedule(c);
+    });
 
     var months = {}, order = [];
-    var cumRev = 0, cumBook = 0, totInstalls = 0, totConv = 0, rev30 = 0, book30 = 0;
+    var cumRev = 0, cumBook = 0, cumFresh = 0, totInstalls = 0, totConv = 0, rev30 = 0, book30 = 0;
 
     for (var t2 = 1; t2 <= days; t2++) {
       var date = addDays(start, t2);
@@ -8191,69 +8613,94 @@
       // before the lag is up, the cohort hitting the wall is one we already recorded
       var wall = srcT >= 1 ? installs[srcT] : dayRec(o.platform, addDays(start, srcT)).downloads;
       var conv = wall * o.conv;
-      var newAnnual = conv * share;
-      var newMonthly = conv - newAnnual;
+      var newAnnual = sub ? conv * share : 0;
+      var newMonthly = sub ? conv - newAnnual : 0;
 
-      var bookings = 0;
-      if (o.model === 'onetime') {
-        bookings = conv * o.price;
+      var fresh = 0, renew = 0;
+      if (!sub) {
+        fresh = conv * o.price;
       } else {
-        moPayers = moPayers * (1 - churnDaily) + newMonthly;
-        anPayers += newAnnual;
-        anCohorts.push({ day: t2, n: newAnnual });
-        bookings = newMonthly * monthlyPrice + newAnnual * annualPrice;
-        /* A year on, an annual cohort renews at whatever survives the annual
-           churn, and the renewal is cash again. */
-        for (var ci = 0; ci < anCohorts.length; ci++) {
-          var c = anCohorts[ci];
-          if (t2 - c.day === 365) {
-            var kept = c.n * annualRenewal;
-            anPayers -= (c.n - kept);
-            bookings += kept * annualPrice;
-            c.n = kept;
-            c.day = t2;
-          }
-        }
+        (due[t2] || []).forEach(function (ev) {
+          var c = ev.c;
+          if (ev.kind === 'stop') { remove(c, c.n); return; }
+          remove(c, c.n * (1 - (c.plan === 'annual' ? keepAnnual : keepMonthly)));
+          renew += c.n * c.price;
+          schedule(c);
+        });
+        delete due[t2];
+        [['monthly', newMonthly, o.monthlyPrice], ['annual', newAnnual, o.annualPrice]].forEach(function (p) {
+          if (!(p[1] > 0)) return;
+          var c = { plan: p[0], n: p[1], price: p[2], origin: date, stop: null, k: 0, fresh: true };
+          add(c);
+          schedule(c);
+          fresh += p[1] * p[2];
+        });
       }
+      var bookings = fresh + renew;
 
-      var mrr = o.model === 'onetime' ? 0
-        : moPayers * monthlyPrice + anPayers * (annualPrice / 12);
-      /* Recognised revenue for the day: a twelfth of a month of MRR-worth. */
-      var rev = o.model === 'onetime' ? conv * o.price : mrr / DPM;
+      /* Recognised revenue for the day: a day's share of the month's MRR. */
+      var rev = sub ? mrr / DPM : conv * o.price;
 
-      cumRev += rev; cumBook += bookings;
+      cumRev += rev; cumBook += bookings; cumFresh += fresh;
       totInstalls += installs[t2]; totConv += conv;
       if (t2 <= 30) { rev30 += rev; book30 += bookings; }
 
       var key = monthStart(date);
       var m = months[key];
-      if (!m) { m = months[key] = { key: key, installs: 0, conv: 0, revenue: 0, bookings: 0, newAnnual: 0, newMonthly: 0 }; order.push(m); }
+      if (!m) {
+        m = months[key] = { key: key, days: 0, installs: 0, conv: 0, revenue: 0, bookings: 0,
+          freshCash: 0, renewCash: 0, newAnnual: 0, newMonthly: 0 };
+        order.push(m);
+      }
+      m.days += 1;
       m.installs += installs[t2];
       m.conv += conv;
       m.revenue += rev;
       m.bookings += bookings;
+      m.freshCash += fresh;
+      m.renewCash += renew;
       m.newAnnual += newAnnual;
       m.newMonthly += newMonthly;
-      m.payers = moPayers + anPayers;
-      m.monthlyPayers = moPayers;
-      m.annualPayers = anPayers;
+      m.payers = moN + anN;
+      m.monthlyPayers = moN;
+      m.annualPayers = anN;
       m.cumRevenue = cumRev;
       m.cumBookings = cumBook;
-      m.mrr = o.model === 'onetime' ? m.revenue : mrr;
+      m.mrr = sub ? mrr : m.revenue;
+      m.arr = m.mrr * 12;
     }
+
+    /* Where the book levels off if nothing changes. With installs flat, each
+       month adds the same new subscribers and churn takes a SHARE of everyone,
+       so the book grows until the share leaving equals the number arriving:
+       monthly payers settle at new-per-month ÷ churn, and annual payers at
+       twelve months of buyers ÷ the share NOT renewing. This is why a longer
+       horizon can look barely better than a shorter one — past this point the
+       only levers are churn, conversion and volume. Reported at the forecast's
+       install rate with growth set aside, so it is a statement about today. */
+    var flow = o.installs * DPM * o.conv;
+    var flowA = sub ? flow * share : 0, flowM = sub ? flow - flowA : 0;
+    var eqM = o.churn > 0 ? flowM / o.churn : null;
+    var eqA = keepAnnual < 1 ? (12 * flowA) / (1 - keepAnnual) : null;
+    var plateau = !sub ? null
+      : (flowM > 0 && eqM === null) || (flowA > 0 && eqA === null) ? null
+      : (eqM || 0) * o.monthlyPrice + (eqA || 0) * o.annualPrice / 12;
 
     return {
       months: order,
-      endPayers: moPayers + anPayers,
-      endMonthly: moPayers,
-      endAnnual: anPayers,
+      endPayers: moN + anN,
+      endMonthly: moN,
+      endAnnual: anN,
       endMrr: order.length ? order[order.length - 1].mrr : 0,
       totalRevenue: cumRev,
       totalBookings: cumBook,
+      totalFresh: cumFresh,
       totalInstalls: totInstalls,
       totalConv: totConv,
       revenueNext30: rev30,
-      bookingsNext30: book30
+      bookingsNext30: book30,
+      plateauMrr: plateau,
+      newMrrPerMonth: flowM * o.monthlyPrice + flowA * o.annualPrice / 12
     };
   }
 
@@ -8274,8 +8721,12 @@
       monthlyPrice: fcValue('monthlyPrice', a),
       annualPrice: fcValue('annualPrice', a),
       annualShare: fcValue('annualShare', a) / 100,
-      churn: fcValue('churn', a) / 100
+      churn: fcValue('churn', a) / 100,
+      book: a.book
     };
+    o.annualRenew = fcIsOverridden('annualRenew')
+      ? fcValue('annualRenew', a) / 100
+      : Math.pow(1 - o.churn, 12);
     function variant(dir) {   // dir = -1 bear, +1 optimistic
       /* Conversion is the lever this dashboard exists to move, so it takes the full
          spread. Growth compounds over the whole horizon, so it gets a much smaller
@@ -8295,7 +8746,10 @@
            swinging them alongside conversion would widen the band with
            uncertainty that is not actually there. */
         annualShare: o.annualShare,
-        churn: Math.max(0, o.churn * (1 - dir * f / 2))
+        churn: Math.max(0, o.churn * (1 - dir * f / 2)),
+        /* The share NOT renewing takes the same swing churn does. */
+        annualRenew: Math.max(0, Math.min(1, 1 - (1 - o.annualRenew) * (1 - dir * f / 2))),
+        book: o.book
       };
     }
     return { assume: o, actuals: a, expected: fcRun(o), bear: fcRun(variant(-1)), bull: fcRun(variant(1)) };
@@ -9128,7 +9582,7 @@
     trial:     { tiles: 6,  wide: [300, 260], half: 2 },
     cohorts:   { tiles: 4,  wide: [300], half: 2 },
     platforms: { tiles: 6,  wide: [280], half: 4 },
-    sales:     { tiles: 9,  wide: [280, 240, 260], half: 3 },
+    sales:     { tiles: 9,  wide: [260, 300, 280], half: 4 },
     costs:     { tiles: 8,  wide: [300, 260], half: 3 },
     forecast:  { tiles: 4,  wide: [320, 240], half: 0 },
     pings:     { tiles: 5,  wide: [420], half: 0 },

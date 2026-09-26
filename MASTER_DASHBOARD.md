@@ -1197,6 +1197,26 @@ costs, and the arithmetic is pure and lives in `sales.js`
 (`tests/sales.test.mjs`). A row is `{ id, date, platform, plan, price, qty,
 cohort?, cancelled?, refunded?, note? }`. Four rules run through it.
 
+**A row is a FIRST payment, so renewals are derived, not recorded.** Nobody
+types a row for every month a subscriber stays, and the stores tell this
+dashboard nothing, so for a long time "revenue" here was new money only and a
+steady book of renewing subscribers read as a quiet month. `Sales.renewals`
+writes out the assumption MRR already made (a subscription runs until marked
+cancelled) as cash: a monthly plan is charged again on the same day each month
+(the 31st on a short month's last day), an annual one on its anniversary,
+stopping on the cancellation date. Unattached churn cannot be pinned on a
+subscription, so each renewal is scaled by the share of its plan's book the
+churn ledger leaves standing that day, which makes a month of monthly renewals
+sum to the monthly MRR. The app builds them from one index PER STORE, so a
+store's own churn only scales that store; churn naming no store is left off the
+schedule and the cards say by how much. `bookings` stays first payments only —
+the Overview, Costs and the forecast read it that way — and renewals travel
+beside it: the **Revenue in range** tile (new vs renewals, with the share),
+the renewal bars on the bookings chart, **Recurring revenue now** (today's MRR
+by store × plan, with a reconciling row for storeless churn), **Recurring
+revenue this month** (renewed so far vs still due) and **Upcoming renewals**
+(30 days / 90 days / 12 months). Every one of them says "estimated".
+
 **Cash and recurring revenue are never the same number.** An annual plan at
 29.99 is 29.99 of *bookings* on the day it is bought and 2.49 of *MRR* every
 month for a year. The view always shows both and never a blend, because a month
@@ -1343,6 +1363,26 @@ consequences worth knowing:
   roughly who picks what, so the bear/optimistic band swings conversion, volume,
   growth and churn and leaves those two alone rather than widening the band with
   uncertainty that is not there.
+
+- **Every subscription renews, on its real date.** The model used to charge a
+  monthly buyer ONCE and never again, and never renewed the annual plans
+  already on the books, so "cash" was only new purchases: it grew in a straight
+  line, could not reflect an MRR of any size, and "cash, next 30 days" was new
+  sign-ups alone. `fcRun` now holds every subscription as a cohort renewed on
+  its calendar date (`Sales.addMonths`, the Sales view's own rule), churn taken
+  AT the renewal, and seeds the starting book from the ledger rows themselves
+  (`fcActuals().book`), each at the price it was bought at, so month one opens
+  at the real MRR. Annual renewal is its own slider, defaulting to twelve
+  months of the monthly churn, because nothing reports renewals yet.
+- **The default is current pace.** Growth is measured but HELD at 0 until the
+  user applies it (`FC_HELD`), so the page opens on "if nothing changes" and a
+  line above the numbers says so, or names what was changed. The **Where MRR
+  levels off** tile is the steady state (new MRR per month balanced by churn),
+  which is why a longer horizon can look barely better than a shorter one.
+- **One quantity per tab.** Cash, MRR, ARR and recognised revenue each get
+  their own band. They used to share one chart with the band on recognised
+  revenue and cash as a dashed line, so "expected" sat below "cash" and read
+  as the worse case; the month table's range column had the same mismatch.
 
 `monthly` used to be the default model, so every saved UI carries it whether or
 not anyone chose it. A model nobody pressed a button for is upgraded to the mix

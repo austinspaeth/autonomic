@@ -795,6 +795,33 @@
     <div class="grid cards" id="slTiles"></div>
 
     <div class="card" style="margin-top:14px">
+      <header><h2>Recurring revenue now</h2><span class="spacer"></span><span class="note" id="slMrrNowDay"></span></header>
+      <p class="hint">What the book runs at today, by plan and by store. An annual plan counts as a twelfth of its yearly price, so monthly and annual can be added together; a lifetime purchase is not recurring and sits outside it.</p>
+      <div id="slMrrNow"></div>
+    </div>
+
+    <div class="grid two-col" style="margin-top:14px">
+      <div class="card">
+        <header><h2>Recurring revenue this month</h2><span class="spacer"></span><span class="note" id="slThisMonthDay"></span></header>
+        <p class="hint">Every renewal that falls due this calendar month, what has already come round and what is still to come.</p>
+        <div id="slThisMonth"></div>
+      </div>
+      <div class="card">
+        <header><h2>Upcoming renewals</h2><span class="spacer"></span>
+          <div class="segmented" id="slHorizon">
+            <button data-v="30" aria-pressed="false">30 days</button>
+            <button data-v="90" aria-pressed="true">90 days</button>
+            <button data-v="365" aria-pressed="false">12 months</button>
+          </div>
+          <button class="btn sm" data-table-toggle="slUpcomingChart">Table</button></header>
+        <p class="hint">Recurring revenue coming due after today, by plan, with the store split in the tooltip and the grid below.</p>
+        <div id="slUpcomingChart"></div>
+        <div id="slUpcomingChart-table" class="hidden" style="margin-top:12px"></div>
+        <div id="slUpcoming" style="margin-top:10px"></div>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:14px">
       <header><h2>Monthly recurring revenue</h2><span class="spacer"></span>
         <button class="btn sm" data-table-toggle="slMrr">Table</button></header>
       <p class="hint">The rate the book runs at on each day, stacked by plan — an annual plan counts as a twelfth of its price, net of churn. A subscription is assumed to still run until you mark it cancelled, or until churn you entered under Edit data takes it off; nothing here is derived from the stores, because they tell this dashboard nothing about churn on their own. Where churn has been recorded, the dashed line is what the purchase ledger alone would say and the gap below it is what the churn is costing.</p>
@@ -814,7 +841,7 @@
     <div class="card" style="margin-top:14px">
       <header><h2>Bookings vs recognised revenue</h2><span class="spacer"></span>
         <button class="btn sm" data-table-toggle="slBookings">Table</button></header>
-      <p class="hint">Bookings is the cash that arrived that month. Recognised revenue spreads each purchase over the months it buys — an annual plan is one twelfth of its price in each of the twelve months after the sale. The gap between them is the annual book, and reading either one alone is how a month with one annual sale gets called a record or a collapse depending which number was on screen.</p>
+      <p class="hint">The cash that arrived each month, split into new purchases and renewals. Renewals are estimated: nothing reports them, so every subscription not marked cancelled is assumed to have renewed each term. Recognised revenue spreads each purchase over the months it buys — an annual plan is one twelfth of its price in each of the twelve months after the sale. The gap between them is the annual book, and reading either one alone is how a month with one annual sale gets called a record or a collapse depending which number was on screen.</p>
       <div id="slBookings"></div>
       <div id="slBookings-table" class="hidden" style="margin-top:12px"></div>
     </div>
@@ -938,35 +965,42 @@
           <button data-v="annual" aria-pressed="false">All annual</button>
           <button data-v="onetime" aria-pressed="false">One-time</button>
         </div>
-        <button class="btn sm" id="fcReset">Reset to actuals</button>
+        <button class="btn sm" id="fcReset">Current pace</button>
       </header>
-      <p class="hint">Every slider starts at the value derived from your own data — drag one and every number below re-computes live. The first <span id="fcLagNote">14</span> days of the forecast convert from installs you have <em>already</em> recorded, so the near term is grounded rather than projected.</p>
+      <p class="fc-mode" id="fcMode"></p>
+      <p class="hint">Every slider starts at the value read off your own data, with installs held flat — that is <b>current pace</b>: what happens if nothing changes. Drag one and every number below re-computes live. Everyone already subscribed renews on their real renewal date at the price they pay, and the first <span id="fcLagNote">14</span> days convert from installs you have <em>already</em> recorded.</p>
       <div class="ctrl-grid" id="fcControls"></div>
     </div>
 
     <div class="grid cards" id="fcTiles"></div>
 
     <div class="card" style="margin-bottom:14px">
-      <header><h2 id="fcMainTitle">Cumulative revenue</h2><span class="spacer"></span>
-        <span class="note" id="fcScope"></span>
+      <header><h2 id="fcMainTitle">Cash collected</h2><span class="spacer"></span>
+        <div class="segmented" id="fcMetric">
+          <button data-v="cash" aria-pressed="true">Cash</button>
+          <button data-v="mrr" aria-pressed="false">MRR</button>
+          <button data-v="arr" aria-pressed="false">ARR</button>
+          <button data-v="recognised" aria-pressed="false">Recognised</button>
+        </div>
         <button class="btn sm" data-table-toggle="fcRevenue">Table</button></header>
-      <p class="hint">The shaded band is the bear-to-optimistic range; the line is the expected case. Scenarios scale conversion, install volume, churn and growth by the spread you set.</p>
+      <p class="note" id="fcScope" style="margin:0 0 4px"></p>
+      <p class="hint" id="fcMainHint"></p>
       <div id="fcRevenue"></div>
       <div id="fcRevenue-table" class="hidden" style="margin-top:12px"></div>
     </div>
 
     <div class="grid two-col">
       <div class="card">
-        <header><h2 id="fcMrrTitle">MRR</h2><span class="spacer"></span>
-          <button class="btn sm" data-table-toggle="fcMrr">Table</button></header>
+        <header><h2>Cash in per month</h2><span class="spacer"></span>
+          <button class="btn sm" data-table-toggle="fcCash">Table</button></header>
         <p class="hint" id="fcMrrHint"></p>
-        <div id="fcMrr"></div>
-        <div id="fcMrr-table" class="hidden" style="margin-top:12px"></div>
+        <div id="fcCash"></div>
+        <div id="fcCash-table" class="hidden" style="margin-top:12px"></div>
       </div>
       <div class="card">
         <header><h2>Paying users</h2><span class="spacer"></span>
           <button class="btn sm" data-table-toggle="fcPayers">Table</button></header>
-        <p class="hint" id="fcPayersHint">Everyone paying at the end of each month, after churn.</p>
+        <p class="hint" id="fcPayersHint">Everyone paying at the end of each month, after churn, by plan.</p>
         <div id="fcPayers"></div>
         <div id="fcPayers-table" class="hidden" style="margin-top:12px"></div>
       </div>
@@ -989,7 +1023,7 @@
     <div class="card" style="margin-top:14px">
       <header><h2>Month by month</h2><span class="spacer"></span>
         <button class="btn sm" id="fcExport">Copy forecast</button></header>
-      <p class="hint">Expected case, with the bear-to-optimistic range on revenue.</p>
+      <p class="hint">Expected case. <b>Cash in</b> is new purchases plus renewals that fall due that month, before the store cut; the bear-to-optimistic column is the same cash, to date. <b>Recognised</b> is revenue earned that month, with annual plans spread over their year. The first month is partial.</p>
       <div id="fcTable"></div>
     </div>
   </section>

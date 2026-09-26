@@ -229,8 +229,8 @@ const tileText = () => {
 };
 
 let tiles = tileText();
-check('bookings reach the screen', /99\.90/.test(tiles['Bookings in range'].value),
-  tiles['Bookings in range'] && tiles['Bookings in range'].value);
+check('revenue reaches the screen', /99\.90/.test(tiles['Revenue in range'].value),
+  tiles['Revenue in range'] && tiles['Revenue in range'].value);
 /* The migrated rows are real money of an unknown TERM, so MRR must be zero and
    the tile must say why rather than reading as a book with nothing in it. */
 const mrrTile = Object.keys(tiles).find((k) => k.indexOf('MRR on ') === 0);
@@ -253,9 +253,9 @@ const sizeOf = (label) => {
 check('ARR is not rendered smaller than the MRR it is twelve times',
   sizeOf('ARR') === sizeOf('MRR on'), sizeOf('ARR') + ' vs ' + sizeOf('MRR on'));
 check('the figures that size the book are full size',
-  ['MRR on', 'ARR', 'Bookings in range', 'New MRR', 'Active subscriptions']
+  ['MRR on', 'ARR', 'Revenue in range', 'New MRR', 'Active subscriptions']
     .every((l) => sizeOf(l) === 'full'),
-  ['MRR on', 'ARR', 'Bookings in range', 'New MRR', 'Active subscriptions'].map((l) => l + '=' + sizeOf(l)).join(' '));
+  ['MRR on', 'ARR', 'Revenue in range', 'New MRR', 'Active subscriptions'].map((l) => l + '=' + sizeOf(l)).join(' '));
 check('and the ones that describe its texture are a step down',
   ['Average price', 'Annual share', 'Refunds in range'].every((l) => sizeOf(l) === 'small'),
   ['Average price', 'Annual share', 'Refunds in range'].map((l) => l + '=' + sizeOf(l)).join(' '));
@@ -335,6 +335,18 @@ check('the active-subscription tile counts three', tiles['Active subscriptions']
 check('annual share is two of the three recurring plans',
   /66\.7|66\.6/.test(tiles['Annual share'].value), tiles['Annual share'].value);
 
+/* Recurring revenue now, by store: iOS holds the 29.99 annual (2.50) and the
+   4.99 monthly, Android the 59.88 annual (4.99). */
+const nowText = $('slMrrNow').textContent;
+check('the recurring-revenue card states today\'s MRR', /12\.48/.test(nowText), nowText.slice(0, 200));
+check('and splits it by store', /iOS/.test(nowText) && /Android/.test(nowText) && /7\.49/.test(nowText), nowText);
+check('and by plan', /From monthly/.test(nowText) && /From annual/.test(nowText));
+/* The one monthly plan renews three times inside 90 days; the annuals not at all. */
+const upText = $('slUpcoming').textContent;
+check('upcoming renewals count the monthly plan three times in 90 days', /14\.97/.test(upText), upText.slice(0, 200));
+check('the renewal schedule says it is an estimate', /Estimated/.test(upText));
+check('this month\'s card renders', /Expected renewals/.test($('slThisMonth').textContent));
+
 check('the days-to-purchase chart drew something', $('slAges').innerHTML.length > 100);
 check('and reports its own coverage rather than implying it covers everything',
   /carry an install date/.test($('slAgeMeta').textContent), $('slAgeMeta').textContent);
@@ -366,6 +378,35 @@ check('switching to one-time drops the plan controls', (() => {
 })());
 window.document.querySelector('#fcModel [data-v="mix"]').click();
 await settle(150);
+
+/* Renewals. The model used to charge a monthly buyer once and never renew the
+   annual plans already on the books, so "cash" was new purchases only. With
+   conversion at zero there ARE no new purchases, so everything left is the
+   existing book coming round: the one 4.99 monthly plan (bought three days ago)
+   renews inside 30 days, after 5% assumed churn. */
+check('the forecast opens at current pace', /Current pace/.test($('fcMode').textContent), $('fcMode').textContent);
+const fcTile = (label) => {
+  const t = [...$('fcTiles').querySelectorAll('.tile')]
+    .find((n) => n.querySelector('.label').textContent.trim().indexOf(label) === 0);
+  return t ? t.querySelector('.value').textContent.trim() : '';
+};
+const convBox = window.document.querySelector('input[data-fc-num="conv"]');
+convBox.value = '0';
+convBox.dispatchEvent(new window.Event('input', { bubbles: true }));
+await settle(100);
+check('with no new buyers, next-30-day cash is the existing book renewing',
+  /\$4\.74/.test(fcTile('Cash, next 30 days')), fcTile('Cash, next 30 days'));
+check('the month opens at today\'s real MRR', /12\.4/.test($('fcTiles').textContent), $('fcTiles').textContent.slice(0, 200));
+check('changing a slider says the forecast is adjusted', /Adjusted/.test($('fcMode').textContent));
+check('the month table carries renewal cash', /Cash: renewals/.test($('fcTable').textContent));
+$('fcReset').click();
+await settle(100);
+check('Current pace clears the change', /Current pace/.test($('fcMode').textContent));
+window.document.querySelector('#fcMetric [data-v="arr"]').click();
+await settle(100);
+check('the main chart switches to ARR', $('fcMainTitle').textContent === 'ARR', $('fcMainTitle').textContent);
+window.document.querySelector('#fcMetric [data-v="cash"]').click();
+await settle(100);
 
 /* ------------------------------------------------------- App usage bars */
 
@@ -521,8 +562,8 @@ check('with a sentence under it stating the net',
 /* CASH does not move. Money that already arrived does not un-arrive — that is
    what a refund is for. */
 check('bookings are untouched by churn',
-  /\$/.test(tiles['Bookings in range'].value) && !/–/.test(tiles['Bookings in range'].value),
-  tiles['Bookings in range'].value);
+  /\$/.test(tiles['Revenue in range'].value) && !/–/.test(tiles['Revenue in range'].value),
+  tiles['Revenue in range'].value);
 
 window.document.querySelector('.tab[data-view="forecast"]').click();
 await settle(350);
@@ -641,7 +682,7 @@ const demoMrr = Object.keys(demoTiles).find((k) => k.indexOf('MRR on ') === 0);
 check('so the Sales view reads real money rather than zero',
   demoMrr && /[1-9]/.test(demoTiles[demoMrr].value), demoMrr && demoTiles[demoMrr].value);
 check('and bookings are non-zero too',
-  /[1-9]/.test(demoTiles['Bookings in range'].value), demoTiles['Bookings in range'].value);
+  /[1-9]/.test(demoTiles['Revenue in range'].value), demoTiles['Revenue in range'].value);
 
 window.document.querySelector('.tab[data-view="overview"]').click();
 await settle(400);
