@@ -105,6 +105,39 @@ hrvBtn.click(); await new Promise(r=>setTimeout(r,250));
 const hrvTxt=$('pgRawTable').textContent;
 ok('route filter narrows to readings', $('pgRawTable').querySelectorAll('tbody tr').length===1, String($('pgRawTable').querySelectorAll('tbody tr').length));
 ok('a reading row names no sensor', /Reading/.test(hrvTxt)&&!/Chest strap/.test(hrvTxt), hrvTxt.slice(0,200));
+// a subscribe ping drafted into a sale
+const subBtn=[...$('pgRawKind').querySelectorAll('button')].find(b=>b.dataset.v==='sub');
+subBtn.click(); await new Promise(r=>setTimeout(r,250));
+const saleBtns=()=>[...$('pgRawTable').querySelectorAll('[data-ping-sale]')];
+ok('each unrecorded subscribe row offers Record sale', saleBtns().length===2, String(saleBtns().length));
+ok('only subscribe rows carry the button',
+  [...$('pgRawTable').querySelectorAll('tbody tr')].every(tr=>/Subscribe/.test(tr.textContent)), 'non-sub row');
+const promoBtn=saleBtns().find(b=>/Promo year/.test(b.closest('tr').textContent));
+promoBtn.click(); await new Promise(r=>setTimeout(r,300));
+ok('Record sale opens Edit data', !$('view-data').classList.contains('hidden'), 'data view hidden');
+ok('drafts the purchase date from the arrival day', $('slDate').value===T(0), $('slDate').value);
+ok('drafts the store', $('slPlatform').value==='ios', $('slPlatform').value);
+ok('a promo year is recorded as an annual term', $('slPlan').value==='annual', $('slPlan').value);
+ok('drafts the install date from the cohort', $('slCohort').value===T(3), $('slCohort').value);
+ok('leaves the price for you', $('slPrice').value==='', $('slPrice').value);
+ok('the note keeps which year it was', /Promo year/.test($('slNote').value), $('slNote').value);
+ok('says where the draft came from', /Drafted from a subscribe ping/.test(($('slPrefillNote')||{}).textContent||''), 'no note');
+$('slPrice').value='14.99';
+$('slSave').click(); await new Promise(r=>setTimeout(r,300));
+ok('the draft is cleared once added', !$('slPrefillNote'), 'note still shown');
+ok('the sale is on the ledger', /14\.99/.test($('slSaleTable').textContent), $('slSaleTable').textContent.slice(0,200));
+tab.click(); await new Promise(r=>setTimeout(r,400));
+[...$('pgRawKind').querySelectorAll('button')].find(b=>b.dataset.v==='sub').click();
+await new Promise(r=>setTimeout(r,250));
+ok('the recorded row says so instead of offering the button again',
+  /Recorded/.test([...$('pgRawTable').querySelectorAll('tbody tr')].find(tr=>/Promo year/.test(tr.textContent)).textContent)
+  && saleBtns().length===1, String(saleBtns().length));
+// the older, letterless ping warns it may be a restore and leaves the plan unknown
+saleBtns()[0].click(); await new Promise(r=>setTimeout(r,300));
+ok('a letterless ping leaves the plan unknown', $('slPlan').value==='unknown', $('slPlan').value);
+ok('and warns it may not be a sale', /older build/.test($('slPrefillNote').textContent), $('slPrefillNote').textContent);
+$('slCancelPrefill').click(); await new Promise(r=>setTimeout(r,200));
+ok('Cancel drops the draft', !$('slPrefillNote') && $('slCohort').value==='', $('slCohort').value);
 ok('no page errors', errors.length===0, errors.join(' | '));
 out.forEach(l=>console.log(l));
 const fails=out.filter(l=>l.startsWith('  FAIL')).length;

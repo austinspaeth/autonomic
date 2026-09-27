@@ -1351,6 +1351,31 @@ The store CSV out (**Backup → Export CSV**) is store days only and says so: a
 purchase is not a property of a day any more. The ledger has its own CSV, and
 the JSON backup carries everything.
 
+## Pings → Sales: drafting a purchase from a subscribe ping
+
+Every `sub` row on the raw **Pings** tab carries a **Record sale** button
+(`recordSaleFromPing` in `app.js`). A subscribe ping already holds everything a
+purchase record needs except the money, so the button opens **Edit data** with
+the purchase form drafted from it: the arrival day as the purchase date, the
+store, the install date from the cohort, and the plan. Y becomes `annual` and M
+`monthly`. The promo and founder years (P, F) are also `annual`, because the
+ledger records the TERM, and the note keeps which one it was. **The price is left
+blank on purpose**: the ping never carries one, and those two years sell below
+list, so a guessed price would be a wrong number in every revenue figure. The
+hint names the last price on record for that store and plan as a reference.
+Nothing is written until **Add purchase**.
+
+A letterless `sub` row comes from an older build, whose ping also fired on a
+restore or a second phone. It drafts with the plan `unknown` and a warning to
+check that it was a sale. The draft survives re-renders of the Data view until
+it is added or cancelled.
+
+A row reads **Recorded** once the ledger holds that many purchases on the same
+day, store and install date — a match, not a link, since a ping has no id. The
+store can date a purchase a day either side of the Eastern arrival day; if you
+correct the date, the row keeps its button. Pinned by
+`landing/tests/master-pings-tab.test.mjs`.
+
 ## Trial & conversion: the recent-conversion card
 
 **Recent conversion** answers "where is my rate heading" over fixed windows —

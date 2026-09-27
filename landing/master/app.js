@@ -6505,6 +6505,12 @@
 
   var lastSale = null;
 
+  /* A purchase drafted from a `sub` ping on the Pings tab (`recordSaleFromPing`).
+     It survives re-renders of this view until it is saved or cancelled, since
+     the Data view repaints the form on every renderAll and a draft that vanished
+     on the next refresh would have you retyping it. */
+  var salePrefill = null;
+
   function renderSaleEntry() {
     renderSaleForm(null);
     renderSaleTable();
@@ -6519,7 +6525,8 @@
     var host = document.getElementById('slSaleForm');
     if (!host) return;
     var sale = id ? saleById(id) : null;
-    var d = sale || saleFormDefaults();
+    var pre = sale ? null : salePrefill;
+    var d = sale || pre || saleFormDefaults();
     var plans = Sales.PLAN_KEYS.map(function (k) {
       return '<option value="' + k + '"' + (d.plan === k ? ' selected' : '') + '>' + esc(planLabel(k)) + '</option>';
     }).join('');
@@ -6527,27 +6534,29 @@
       return '<option value="' + p[0] + '"' + (d.platform === p[0] ? ' selected' : '') + '>' + p[1] + '</option>';
     }).join('');
 
-    host.innerHTML = '<div class="event-form">' +
+    host.innerHTML = (pre ? '<p class="hint" id="slPrefillNote" style="margin:0 0 10px">' + pre.hint + '</p>' : '') +
+      '<div class="event-form">' +
       '<div class="field"><label for="slDate">Purchase date</label>' +
-        '<input type="date" id="slDate" value="' + esc(sale ? sale.date : today()) + '"></div>' +
+        '<input type="date" id="slDate" value="' + esc(sale ? sale.date : pre ? pre.date : today()) + '"></div>' +
       '<div class="field"><label for="slPlatform">Store</label><select id="slPlatform">' + plats + '</select></div>' +
       '<div class="field"><label for="slPlan">Plan</label><select id="slPlan">' + plans + '</select></div>' +
       '<div class="field"><label for="slPrice">Price paid</label>' +
         '<input type="number" id="slPrice" min="0" step="0.01" placeholder="0.00" value="' +
-        esc(sale ? sale.price : (d.price === '' ? '' : d.price)) + '"></div>' +
+        esc(sale ? sale.price : pre ? '' : (d.price === '' ? '' : d.price)) + '"></div>' +
       '<div class="field"><label for="slQty">Count</label>' +
         '<input type="number" id="slQty" min="1" step="1" value="' + esc(sale ? sale.qty : 1) + '"></div>' +
       '<div class="field"><label for="slCohort">Install date (optional)</label>' +
-        '<input type="date" id="slCohort" value="' + esc(sale && sale.cohort ? sale.cohort : '') + '"></div>' +
+        '<input type="date" id="slCohort" value="' + esc(sale && sale.cohort ? sale.cohort : pre ? pre.cohort : '') + '"></div>' +
       '<div class="field"><label for="slCancelled">Cancelled on (optional)</label>' +
         '<input type="date" id="slCancelled" value="' + esc(sale && sale.cancelled ? sale.cancelled : '') + '"></div>' +
       '<div class="field"><label for="slRefunded">Refunded</label>' +
         '<select id="slRefunded"><option value="">No</option><option value="1"' +
         (sale && sale.refunded ? ' selected' : '') + '>Yes — remove from every money figure</option></select></div>' +
       '<div class="field grow"><label for="slNote">Note</label>' +
-        '<input type="text" id="slNote" maxlength="200" value="' + esc(sale && sale.note ? sale.note : '') + '"></div>' +
+        '<input type="text" id="slNote" maxlength="200" value="' + esc(sale && sale.note ? sale.note : pre ? pre.note : '') + '"></div>' +
       '<div class="event-form-actions">' +
       '<button class="btn primary" id="slSave">' + (sale ? 'Save purchase' : 'Add purchase') + '</button>' +
+      (pre ? '<button class="btn" id="slCancelPrefill">Cancel</button>' : '') +
       (sale ? '<button class="btn" id="slCancelEdit">Cancel</button>' +
         '<span class="spacer"></span><button class="btn danger" id="slDelete">Delete</button>' : '') +
       '</div>' +
@@ -6570,6 +6579,13 @@
     }
     qty.addEventListener('input', syncQty);
     syncQty();
+
+    if (pre) {
+      document.getElementById('slCancelPrefill').addEventListener('click', function () {
+        salePrefill = null;
+        renderSaleForm(null);
+      });
+    }
 
     if (sale) {
       document.getElementById('slCancelEdit').addEventListener('click', function () { renderSaleForm(null); });
@@ -6606,6 +6622,7 @@
         note: document.getElementById('slNote').value.trim() || undefined
       };
       putSale(rec);
+      if (!sale) salePrefill = null;
       lastSale = { platform: rec.platform, plan: rec.plan, price: rec.price };
       renderSaleEntry();
       renderAll();
@@ -10208,6 +10225,8 @@
                resolves it, so the table can print a name without holding a copy
                of every alphabet. */
             label: c.label || slotLabel(k.key, c),
+            plan: c.plan || null,
+            slotLetter: c.slot || null,
             tier: c.tier,
             /* Age can legitimately be negative by a day: the cohort date is the
                install's own local day and the arrival day is stamped US
@@ -10229,6 +10248,89 @@
       return a.key < b.key ? -1 : 1;
     });
     return out;
+  }
+
+  /* ------------------------------------------ a subscribe ping as a sale
+
+     A `sub` row already holds everything a purchase record needs except the
+     money: the day it arrived, the store, the plan letter and the install date.
+     `recordSaleFromPing` drafts that purchase into the Edit data form and leaves
+     the price for you, because the ping never carries one — the promo and
+     founder years are sold below the list price, and a guessed price would be a
+     wrong number in every revenue figure. Nothing is written until Add.
+
+     The ping's plan letter is finer than the ledger's: Y, P and F are all a
+     year. The ledger records the TERM (it is what MRR is computed from), so
+     all three become `annual` and the note keeps which one it was.
+
+     A row is "recorded" when the ledger already holds purchases on the same
+     day, store and install date — the fields a draft from this row would
+     carry. It is a match, not a link: the ping has no id to store, and the
+     store's purchase date can land a day either side of the Eastern arrival
+     day, in which case the row keeps its button and the draft's date is yours
+     to correct. */
+  var PING_PLAN_TO_SALE = { Y: 'annual', P: 'annual', F: 'annual', M: 'monthly' };
+
+  function salesMatchingPing(x) {
+    var plat = x.platform === 'A' ? 'android' : x.platform === 'I' ? 'ios' : null;
+    return salesList().reduce(function (n, raw) {
+      if (!raw || raw.date !== x.arrived || raw.cohort !== x.cohort) return n;
+      if (plat && raw.platform !== plat) return n;
+      return n + (Math.max(1, +raw.qty || 1));
+    }, 0);
+  }
+
+  function lastPriceFor(platform, plan) {
+    var best = null;
+    salesList().forEach(function (raw) {
+      if (!raw || raw.refunded || raw.platform !== platform || raw.plan !== plan) return;
+      if (!(+raw.price > 0)) return;
+      if (!best || raw.date > best.date) best = raw;
+    });
+    return best;
+  }
+
+  function recordSaleFromPing(x) {
+    var planLetter = x.plan || x.slotLetter || null;
+    var plan = PING_PLAN_TO_SALE[planLetter] || 'unknown';
+    var platform = x.platform === 'A' ? 'android' : 'ios';
+    var ref = plan === 'unknown' ? null : lastPriceFor(platform, plan);
+    var hint = '<b>Drafted from a subscribe ping</b> that arrived ' + esc(labelFull(x.arrived)) +
+      ' from an install of ' + esc(labelFull(x.cohort)) + '. Enter the <b>price paid</b> and press Add.';
+    if (x.platform !== 'A' && x.platform !== 'I') hint += ' The ping named no store, so check it.';
+    if (!planLetter) {
+      hint += ' It came from an older build, whose subscribe ping also fired on a restore or a second phone — ' +
+        'make sure this was a sale, and set the plan.';
+    } else if (planLetter === 'P' || planLetter === 'F') {
+      hint += ' This was the <b>' + esc(A.planName(planLetter).toLowerCase()) + '</b>, sold below the list price.';
+    } else if (ref) {
+      hint += ' The last ' + esc(planLabel(plan).toLowerCase()) + ' ' + PLATFORMS[platform] +
+        ' purchase on record was ' + fmtMoney(+ref.price) + '.';
+    }
+    if (x.remaining > 1) {
+      hint += ' This row holds <b>' + fmtInt(x.remaining) + '</b> unrecorded purchases from that install day; ' +
+        'add them one at a time.';
+    }
+    hint += ' The store can date a purchase a day either side of when the ping arrived.';
+    salePrefill = {
+      date: x.arrived,
+      platform: platform,
+      plan: plan,
+      price: '',
+      cohort: x.cohort,
+      note: 'From subscribe ping' + (planLetter ? ' · ' + A.planName(planLetter) : ''),
+      hint: hint
+    };
+    setView('data');
+    window.requestAnimationFrame(function () {
+      var form = document.getElementById('slSaleForm');
+      if (!form) return;
+      var acc = form.closest('details');
+      if (acc) acc.open = true;
+      form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      var price = document.getElementById('slPrice');
+      if (price) price.focus();
+    });
   }
 
   function renderPings() {
@@ -10290,13 +10392,29 @@
     var CAP = 500;
     var shown = rows.slice(0, CAP);
 
+    /* Subscribe rows get a Record button that drafts the purchase into Edit
+       data; a row the ledger already covers says so instead. */
+    var hasSub = shown.some(function (x) { return x.kind === 'sub'; });
+    shown.forEach(function (x) {
+      if (x.kind !== 'sub') return;
+      x.recorded = Math.min(x.count, salesMatchingPing(x));
+      x.remaining = x.count - x.recorded;
+    });
+    function saleCell(x, i) {
+      if (x.kind !== 'sub') return '';
+      if (!x.remaining) return '<span class="pill green">Recorded</span>';
+      return '<button class="btn sm" data-ping-sale="' + i + '">Record sale' +
+        (x.count > 1 ? ' (' + fmtInt(x.remaining) + ' left)' : '') + '</button>';
+    }
+
     host.innerHTML =
       '<div class="table-scroll"><table><thead><tr>' +
       '<th style="text-align:left">Route</th><th>Arrived</th><th>Cohort</th><th>Age</th>' +
       '<th style="text-align:left">Platform</th><th style="text-align:left">Sensor / surface / plan</th>' +
       '<th style="text-align:left">Tier</th><th style="text-align:left">Key</th><th>Count</th>' +
+      (hasSub ? '<th></th>' : '') +
       '</tr></thead><tbody>' +
-      shown.map(function (x) {
+      shown.map(function (x, i) {
         return '<tr>' +
           '<td style="text-align:left"><span class="swatch" style="background:' + x.color + '"></span>' + esc(x.kindLabel) + '</td>' +
           '<td>' + esc(labelDay(x.arrived)) + '</td>' +
@@ -10312,6 +10430,7 @@
             (x.tier ? esc(A.tierName(x.tier)) : '<span class="na">–</span>') + '</td>' +
           '<td style="text-align:left"><code>' + esc(x.key) + '</code></td>' +
           '<td>' + fmtInt(x.count) + '</td>' +
+          (hasSub ? '<td>' + saleCell(x, i) + '</td>' : '') +
           '</tr>';
       }).join('') +
       '</tbody></table></div>' +
@@ -10319,6 +10438,10 @@
         ? '<p class="hint" style="margin-top:8px">Showing the ' + fmtInt(CAP) + ' most recent of ' +
           fmtInt(rows.length) + ' rows. Narrow the range, or export the CSV for all of them.</p>'
         : '');
+
+    host.querySelectorAll('[data-ping-sale]').forEach(function (b) {
+      b.addEventListener('click', function () { recordSaleFromPing(shown[+b.dataset.pingSale]); });
+    });
   }
 
 
