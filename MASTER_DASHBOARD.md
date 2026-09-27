@@ -1351,6 +1351,29 @@ The store CSV out (**Backup → Export CSV**) is store days only and says so: a
 purchase is not a property of a day any more. The ledger has its own CSV, and
 the JSON backup carries everything.
 
+## Trial & conversion: the recent-conversion card
+
+**Recent conversion** answers "where is my rate heading" over fixed windows —
+7, 14, 30, 60 and 90 days ending on the latest reported day — regardless of the
+range selector, plus a **rolling** chart (7-day and 30-day lines against the
+lifetime rate) over the selected range. All of it is `windowConv` in `app.js`.
+
+**The denominator is the installs that FINISHED the trial in the window**
+(installed `trialExit()` days before each day in it), never the window's own
+installs. That is what keeps a surge from diluting the rate: surge installs enter
+only once they have had the whole trial to decide. `Paid ÷ installs` sits in the
+last column purely as the contrast — it is the read a surge destroys.
+
+What the store data cannot do is tie a purchase back to its install, so the
+numerator is sales by purchase DATE. A surge that buys during its trial therefore
+lifts the short windows early; the card says so under the table, together with
+how many installs are still inside the trial (in no rate yet) and, when the last
+trial-length of installs is 1.5× or more the one before, that a surge is in
+progress. Each rate carries a 95% Wilson interval (omitted when paid exceeds the
+denominator, which can happen for the reason above), and the change against the
+N days before is in POINTS and left blank when that earlier window runs past the
+history. Pinned by `landing/tests/master-trial.test.mjs`.
+
 ## The forecast, and why it has two prices
 
 The forecast's default model is **Plan mix**, driven by the ledger: an annual

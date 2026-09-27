@@ -1302,6 +1302,141 @@
 
   /* ------------------------------------------------------- view: trial */
 
+  /* The recent-conversion windows, in days. Fixed rather than following the
+     range selector: "where is the rate heading" is a question about the last
+     week against the last quarter, and a range picked for some other view
+     should not change which windows answer it. */
+  var CONV_WINDOWS = [7, 14, 30, 60, 90];
+
+  /**
+   * Conversion over the `n` days ending on `end`: paid in the window over the
+   * installs that FINISHED THE TRIAL in the window (installed `trialExit()`
+   * days before each day in it). That denominator is the whole point — a surge
+   * of installs enters it only once it has had the full trial to decide, so a
+   * spike in downloads cannot dilute the rate the way paid ÷ installs is
+   * diluted. `installs` is carried for exactly that contrast.
+   *
+   * The numerator is sales by purchase date, which the store data cannot tie
+   * back to an install, so a surge that buys DURING its trial lifts the rate
+   * early. The UI says so rather than pretending the two sides are one cohort.
+   *
+   * `covered` is how many of the window's days the data spine reaches; a
+   * window longer than the history is reported as partial, not as zero.
+   */
+  function windowConv(p, end, n) {
+    var T = trialExit();
+    var b = base();
+    var from = addDays(end, -(n - 1));
+    var out = { from: from, to: end, days: n, covered: 0, paid: 0, crossed: 0, installs: 0 };
+    if (!b.dates.length) return finishConv(out);
+    for (var d = from; d <= end; d = addDays(d, 1)) {
+      if (d >= b.start && d <= b.end) out.covered += 1;
+      var r = dayRec(p, d);
+      out.paid += r.sales;
+      out.installs += r.downloads;
+      out.crossed += dayRec(p, addDays(d, -T)).downloads;
+    }
+    return finishConv(out);
+  }
+  function finishConv(o) {
+    o.rate = o.crossed ? (o.paid / o.crossed) * 100 : null;
+    o.installRate = o.installs ? (o.paid / o.installs) * 100 : null;
+    o.partial = o.covered < o.days;
+    var ci = wilson(o.paid, o.crossed);
+    o.lo = ci ? ci.lo : null;
+    o.hi = ci ? ci.hi : null;
+    return o;
+  }
+
+  /**
+   * 95% Wilson score interval for k of n, in percent — the honest width of a
+   * small-sample rate. Null when it does not apply: no one in the denominator,
+   * or more purchases than people finishing the trial (possible here, since
+   * the numerator is not a subset of the denominator), where a binomial
+   * interval would be describing something that did not happen.
+   */
+  function wilson(k, n) {
+    if (!n || k < 0 || k > n) return null;
+    var z = 1.96, p = k / n, z2 = z * z;
+    var den = 1 + z2 / n;
+    var mid = (p + z2 / (2 * n)) / den;
+    var half = (z * Math.sqrt((p * (1 - p)) / n + z2 / (4 * n * n))) / den;
+    return { lo: Math.max(0, mid - half) * 100, hi: Math.min(1, mid + half) * 100 };
+  }
+
+  function renderRecentConversion(main) {
+    var end = asOf();
+    var T = trialExit();
+    document.querySelectorAll('.trExitDay').forEach(function (el) { el.textContent = String(T); });
+    var scope = document.getElementById('trRecentScope');
+    if (scope) scope.textContent = 'through ' + labelFull(end) + (main === 'all' ? '' : ' · ' + platName(main));
+
+    var rows = CONV_WINDOWS.map(function (n) {
+      var cur = windowConv(main, end, n);
+      var prev = windowConv(main, addDays(end, -n), n);
+      var move = cur.rate !== null && prev.rate !== null && !prev.partial ? cur.rate - prev.rate : null;
+      return '<tr><td>Last ' + n + ' days' +
+          (cur.partial ? ' <span class="na">(' + cur.covered + ' days of data)</span>' : '') + '</td>' +
+        '<td>' + fmtInt(cur.paid) + '</td>' +
+        '<td>' + fmtInt(cur.crossed) + '</td>' +
+        '<td><b>' + fmtPct(cur.rate) + '</b></td>' +
+        '<td>' + (cur.lo === null ? '<span class="na">–</span>'
+          : '<span class="na">' + cur.lo.toFixed(1) + '–' + cur.hi.toFixed(1) + '%</span>') + '</td>' +
+        '<td>' + (move === null ? '<span class="na">–</span>' : ptsSpan(move)) + '</td>' +
+        '<td>' + fmtPct(cur.installRate) + '</td></tr>';
+    }).join('');
+
+    /* The surge itself, stated: everyone still inside the trial is in NO rate
+       above yet, and saying how many is what makes a flat rate during a surge
+       readable as "not decided yet" rather than "not converting". */
+    var s = summarize(main, end, end);
+    var waiting = s.inTrial;
+    /* The cohorts still inside the trial are the last T days' (ages 0 to
+       trialDays inclusive), so the surge test compares exactly those days
+       with the T days before them. */
+    var trialDaysBack = windowConv(main, end, T).installs;
+    var prevBack = windowConv(main, addDays(end, -T), T).installs;
+    var surge = prevBack > 0 && trialDaysBack >= prevBack * 1.5;
+
+    document.getElementById('trRecent').innerHTML =
+      '<div class="table-scroll"><table><thead><tr><th>Window</th><th>Paid</th><th>Finished trial</th>' +
+      '<th>Conversion</th><th>± range</th><th>vs the window before</th><th>Paid ÷ installs</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div>' +
+      '<p class="hint" style="margin:8px 0 0"><b>' + fmtInt(waiting) + '</b> ' +
+        (waiting === 1 ? 'install is' : 'installs are') + ' still inside the ' + trialDays() +
+        '-day trial and in none of the conversion rates yet — they enter as they reach day ' + T + '.' +
+        (surge
+          ? ' That is <b>' + (trialDaysBack / prevBack).toFixed(1) + '×</b> the installs of the ' + (T - 1) +
+            ' days before, so the short windows will move a lot over the next two weeks as those people ' +
+            'finish the trial. Purchases they make <em>during</em> the trial are already counted, which lifts ' +
+            'the short windows early; the rate settles once they have all finished.'
+          : '') +
+      '</p>';
+  }
+
+  function renderRollingConversion(main, r) {
+    var days = [];
+    for (var d = r.from; d <= r.to; d = addDays(d, 1)) days.push(d);
+    var T = trialExit();
+    var line = function (n) {
+      return days.map(function (d) { return windowConv(main, d, n).rate; });
+    };
+    var lifetime = days.map(function (d) {
+      var out = cumAt(main, addDays(d, -T), 'downloads');
+      return out ? (cumAt(main, d, 'sales') / out) * 100 : null;
+    });
+    drawChart('trRolling', {
+      x: days.map(dayX), height: 260, format: fmtPct, xLabel: 'Day',
+      yTickFormat: function (v) { return v.toFixed(v < 10 ? 1 : 0) + '%'; },
+      series: [
+        { key: 'r7', name: 'Last 7 days', color: COLOR.s1, type: 'line', format: fmtPct, values: line(7) },
+        { key: 'r30', name: 'Last 30 days', color: ENTITY.trialEnd, type: 'line', format: fmtPct, values: line(30) },
+        { key: 'life', name: 'Lifetime', color: COLOR.muted, type: 'line', dashed: true, format: fmtPct, values: lifetime }
+      ],
+      emptyText: 'No one has finished the trial in this range yet.'
+    });
+  }
+
   function renderTrial() {
     var r = activeRange();
     var main = isCompare() ? 'all' : platKeys()[0];
@@ -1347,6 +1482,9 @@
         split: splitOf(function (x) { return fmtInt(x.inTrial); })
       })
     ].join('');
+
+    renderRecentConversion(main);
+    renderRollingConversion(main, r);
 
     /* Funnel — a true nested funnel: every step after "downloads" is a subset of the
        installs in this range, aged forward to today. (Using crossings that happened

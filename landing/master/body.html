@@ -295,6 +295,18 @@
     <div class="grid cards" id="trTiles"></div>
 
     <div class="card" style="margin-bottom:14px">
+      <header><h2>Recent conversion</h2><span class="spacer"></span>
+        <span class="note" id="trRecentScope"></span></header>
+      <p class="hint">Where the rate is heading, over fixed windows that end on the latest reported day, whatever range is selected above. Each rate is <b>paid in the window ÷ installs that finished the trial in the window</b>, so a surge of installs does not dilute it: those people enter the denominator only once they reach day <span class="trExitDay">15</span> and have had the whole trial to decide. <b>vs the window before</b> is the same rate over the N days before, in points. <b>± range</b> is a 95% interval — on a few dozen people a 7-day rate can move several points on one purchase, so read the short windows for direction and the long ones for level. <b>Paid ÷ installs</b> is the surge-sensitive read, shown for contrast: it drops the moment a surge lands, because its denominator includes people still inside their trial.</p>
+      <div id="trRecent"></div>
+      <div class="sub-head with-action" style="margin-top:16px"><h3>Rolling conversion rate</h3>
+        <button class="btn sm" data-table-toggle="trRolling">Table</button></div>
+      <p class="hint">The same rate recomputed for every day in the selected range, over the 7 and 30 days ending that day, against the lifetime rate. A 7-day line above the 30-day one means conversion is improving; below means it is slipping. Gaps are days when no one finished the trial.</p>
+      <div id="trRolling"></div>
+      <div id="trRolling-table" class="hidden" style="margin-top:12px"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
       <header><h2>Install → paid funnel</h2><span class="spacer"></span>
         <span class="note" id="trFunnelScope"></span></header>
       <p class="hint">A nested funnel: the cohort step is the <em>same installs</em> from the downloads step, aged forward to the latest reporting day — so each step is a subset of the one above it and the drop-off is purely how much time has passed. Day 14 is inclusive, so a cohort leaves the trial on day 15.</p>
