@@ -6619,7 +6619,10 @@
         cohort: (n === 1 && cohortVal) ? cohortVal : undefined,
         cancelled: cancelledVal || undefined,
         refunded: !!document.getElementById('slRefunded').value,
-        note: document.getElementById('slNote').value.trim() || undefined
+        note: document.getElementById('slNote').value.trim() || undefined,
+        /* The ping a draft came from rides on the purchase for good, and an
+           edit keeps it, so that ping row stays Recorded. */
+        ping: sale ? sale.ping : pre ? pre.ping : undefined
       };
       putSale(rec);
       if (!sale) salePrefill = null;
@@ -10263,20 +10266,22 @@
      year. The ledger records the TERM (it is what MRR is computed from), so
      all three become `annual` and the note keeps which one it was.
 
-     A row is "recorded" when the ledger already holds purchases on the same
-     day, store and install date — the fields a draft from this row would
-     carry. It is a match, not a link: the ping has no id to store, and the
-     store's purchase date can land a day either side of the Eastern arrival
-     day, in which case the row keeps its button and the draft's date is yours
-     to correct. */
+     A saved draft is TIED to its ping: the purchase stores `ping`, the row's
+     own identity (`pingRef`: arrival day + stored cohort key, which already
+     carries platform, plan and tier), and the row reads Recorded once that
+     many purchases point at it. A tie rather than a match on date, store and
+     install date, because the store's date can land a day either side of the
+     arrival day and correcting it must not un-record the row, and because a
+     purchase typed in by hand for the same buyer must not record it either.
+     Deleting the purchase unties it. */
   var PING_PLAN_TO_SALE = { Y: 'annual', P: 'annual', F: 'annual', M: 'monthly' };
 
-  function salesMatchingPing(x) {
-    var plat = x.platform === 'A' ? 'android' : x.platform === 'I' ? 'ios' : null;
+  function pingRef(x) { return x.arrived + '|' + x.key; }
+
+  function salesForPing(x) {
+    var ref = pingRef(x);
     return salesList().reduce(function (n, raw) {
-      if (!raw || raw.date !== x.arrived || raw.cohort !== x.cohort) return n;
-      if (plat && raw.platform !== plat) return n;
-      return n + (Math.max(1, +raw.qty || 1));
+      return raw && raw.ping === ref ? n + Math.max(1, +raw.qty || 1) : n;
     }, 0);
   }
 
@@ -10311,7 +10316,8 @@
       hint += ' This row holds <b>' + fmtInt(x.remaining) + '</b> unrecorded purchases from that install day; ' +
         'add them one at a time.';
     }
-    hint += ' The store can date a purchase a day either side of when the ping arrived.';
+    hint += ' The store can date a purchase a day either side of when the ping arrived; correct the date ' +
+      'freely, the purchase stays tied to this ping.';
     salePrefill = {
       date: x.arrived,
       platform: platform,
@@ -10319,6 +10325,7 @@
       price: '',
       cohort: x.cohort,
       note: 'From subscribe ping' + (planLetter ? ' · ' + A.planName(planLetter) : ''),
+      ping: pingRef(x),
       hint: hint
     };
     setView('data');
@@ -10397,7 +10404,7 @@
     var hasSub = shown.some(function (x) { return x.kind === 'sub'; });
     shown.forEach(function (x) {
       if (x.kind !== 'sub') return;
-      x.recorded = Math.min(x.count, salesMatchingPing(x));
+      x.recorded = Math.min(x.count, salesForPing(x));
       x.remaining = x.count - x.recorded;
     });
     function saleCell(x, i) {

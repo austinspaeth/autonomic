@@ -1370,11 +1370,20 @@ restore or a second phone. It drafts with the plan `unknown` and a warning to
 check that it was a sale. The draft survives re-renders of the Data view until
 it is added or cancelled.
 
-A row reads **Recorded** once the ledger holds that many purchases on the same
-day, store and install date — a match, not a link, since a ping has no id. The
-store can date a purchase a day either side of the Eastern arrival day; if you
-correct the date, the row keeps its button. Pinned by
-`landing/tests/master-pings-tab.test.mjs`.
+A saved draft is **tied** to its ping: the purchase stores `ping`, the row's own
+identity (`<arrival day>|<stored cohort key>`, and the key already carries
+platform, plan and tier), and the row reads **Recorded** once that many
+purchases point at it. It is a tie rather than a match on date, store and install
+date for two reasons: the store can date a purchase a day either side of the
+Eastern arrival day, and correcting the date must not un-record the row; and a
+purchase typed in by hand for the same buyer must not record it either. Editing
+the purchase keeps the tie, and deleting it unties the row. **The field is
+whitelisted in three places that must agree** — `cleanSale` in
+`sls/lambdas/api/main.js` (the server drops any field it does not know),
+`normalizeSale` in `sync.js` (its mirror, or the diff re-sends the row forever)
+and `normalize` in `sales.js` — each with the same `PING_REF` check. Pinned by
+`landing/tests/master-pings-tab.test.mjs` (including what actually syncs) and
+`sls/tests/sale.test.mjs`.
 
 ## Trial & conversion: the recent-conversion card
 

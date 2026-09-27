@@ -136,6 +136,8 @@ window.Sales = (function () {
     if (qty === 1 && isDate(raw.cohort) && raw.cohort <= raw.date) out.cohort = raw.cohort;
     if (isDate(raw.cancelled) && raw.cancelled >= raw.date) out.cancelled = raw.cancelled;
     if (raw.note) out.note = String(raw.note);
+    // The subscribe ping it was recorded from (see recordSaleFromPing in app.js).
+    if (typeof raw.ping === 'string' && raw.ping) out.ping = raw.ping;
     return out.id ? out : null;
   }
 

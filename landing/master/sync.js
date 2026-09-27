@@ -172,8 +172,11 @@ window.Sync = (function () {
     }
     if (raw.refunded) out.refunded = true;
     if (raw.note) out.note = String(raw.note).slice(0, 2000);
+    // The subscribe ping it was recorded from — the lambda's PING_REF, verbatim.
+    if (typeof raw.ping === 'string' && PING_REF.test(raw.ping)) out.ping = raw.ping;
     return out;
   }
+  var PING_REF = /^\d{4}-\d{2}-\d{2}\|[0-9A-Z]{6,8}(-[A-Z])?$/;
 
   /* Unattached churn, reshaped exactly as the lambda's `cleanChurn` does — same
      rule as the sale above: a field the server drops or rewrites has to be
