@@ -160,6 +160,11 @@ describe('cohort ping wire format', () => {
       .toBe('https://api.autonomic.care/ping/rdg/D082126IM-TT-V1.30.0');
   });
 
+  it('sends the review ask with no letter', () => {
+    expect(pingUrl('rvw', '2026-08-21', 'A', undefined, 'F', '1.31.0'))
+      .toBe('https://api.autonomic.care/ping/rvw/D082126A-TF-V1.31.0');
+  });
+
   it('decides the day\'s first baseline from trusted baselines only', () => {
     expect(isFirstBaseline(undefined)).toBe(true);
     expect(isFirstBaseline([])).toBe(true);

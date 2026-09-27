@@ -377,6 +377,11 @@ card: shown `S`, took the reading `T`, closed `X`, on *What they
 dig into*; one card's outcomes on one route, read `S` against the rest), drawn
 on *What they log* and *What they dig into* — are capped once per install per
 day **per letter**, not per route.
+`rvw` (the store review prompt REQUESTED; no letter, whole-route daily cap, so a
+headcount) is the one letterless line on *What people do in there*. It is asks,
+not showings: neither store says whether the prompt appeared and iOS drops every
+ask past three a year, so read it as a ceiling and against the stores' own review
+counts.
 Their letters are choices the user made between real alternatives — a stand test
 is not an episode, Insights is not Progress — and a whole-route cap would have
 silently dropped whichever came second, which on a bad day is exactly the one

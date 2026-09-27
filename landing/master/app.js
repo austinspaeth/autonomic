@@ -4216,17 +4216,30 @@
     { kind: 'pot', slot: 'E', name: 'POTS episode', color: COLOR.s8 },
     { kind: 'not', slot: 'M', name: 'Reminder on', color: COLOR.s4 },
     { kind: 'not', slot: 'C', name: 'Crash warning on', color: COLOR.s2 },
-    { kind: 'not', slot: 'P', name: 'Pacing alerts on', color: COLOR.s6 }
+    { kind: 'not', slot: 'P', name: 'Pacing alerts on', color: COLOR.s6 },
+    /* No slot: `rvw` carries no letter, so the line is the route's own daily
+       total (a headcount — whole-route cap). It counts the prompt being
+       REQUESTED; neither store says whether it was shown, and iOS drops every
+       ask past three a year, so this is a ceiling on prompts seen. */
+    { kind: 'rvw', slot: null, name: 'Store review asked', color: COLOR.green }
   ];
+
+  /* A line's count on one day: its letter's, or the whole route's for a
+     letterless line. */
+  function eventLineOn(ix, L, d) {
+    return L.slot ? A.slotOn(ix, L.kind, d, L.slot) : A.eventsOn(ix, L.kind, d);
+  }
 
   function renderEvents(ix, days) {
     var lines = EVENT_LINES.map(function (L) {
       return {
         L: L,
         values: days.map(function (d) {
-          return A.kindKnown(ix, L.kind, d) ? A.slotOn(ix, L.kind, d, L.slot) : null;
+          return A.kindKnown(ix, L.kind, d) ? eventLineOn(ix, L, d) : null;
         }),
-        total: A.slotOver(ix, L.kind, days, L.slot)
+        total: days.reduce(function (a, d) {
+          return a + (A.kindKnown(ix, L.kind, d) ? eventLineOn(ix, L, d) : 0);
+        }, 0)
       };
     });
     /* A line that is flat zero across the whole range is dropped rather than
@@ -4237,7 +4250,7 @@
     drawChart('pgEvents', {
       x: days.map(dayX), height: 240, format: fmtInt, xLabel: 'Day',
       series: live.map(function (l) {
-        return { key: l.L.kind + l.L.slot, name: l.L.name, color: l.L.color, type: 'line', values: l.values };
+        return { key: l.L.kind + (l.L.slot || ''), name: l.L.name, color: l.L.color, type: 'line', values: l.values };
       }),
       emptyText: 'No product events in this range.'
     });
@@ -10003,7 +10016,8 @@
     { key: 'fnd', label: 'Finding', color: COLOR.s7, note: 'opened a finding\'s deep dive' },
     { key: 'rpt', label: 'AI report', color: COLOR.s4, note: 'built an AI report' },
     { key: 'rdg', label: 'Reading kind', color: PC.reading, note: 'morning baseline, later baseline or training' },
-    { key: 'mbp', label: 'Morning card', color: COLOR.s5, note: 'shown, took it, closed' }
+    { key: 'mbp', label: 'Morning card', color: COLOR.s5, note: 'shown, took it, closed' },
+    { key: 'rvw', label: 'Review asked', color: COLOR.green, note: 'store review prompt requested (not necessarily shown)' }
   ];
 
   /**

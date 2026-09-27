@@ -513,7 +513,7 @@
       <div class="card">
         <header><h2>What people do in there</h2><span class="spacer"></span>
           <button class="btn sm" data-table-toggle="pgEvents">Table</button></header>
-        <p class="hint">The rest of the counters, per day: the two gated views being <b>opened</b> (every tier — for a free user this is the demand side of the paywall counter, for a paying one it is whether the thing they bought is the thing they use), <b>POTS captures</b> finishing, and <b>notifications being turned on</b>. These routes are capped once per install per day <em>per letter</em> rather than per route, so each line is a headcount for that one thing and somebody who did two of them is counted in both — a stand test and an episode on the same bad day are not one event.</p>
+        <p class="hint">The rest of the counters, per day: the two gated views being <b>opened</b> (every tier — for a free user this is the demand side of the paywall counter, for a paying one it is whether the thing they bought is the thing they use), <b>POTS captures</b> finishing, <b>notifications being turned on</b>, and the app <b>asking for a store review</b> — asked, not shown: neither store says whether the prompt appeared, and iOS drops every ask past three a year, so that line is a ceiling on prompts seen and is checked against the store's own review count. These routes are capped once per install per day <em>per letter</em> rather than per route, so each line is a headcount for that one thing and somebody who did two of them is counted in both — a stand test and an episode on the same bad day are not one event.</p>
         <div id="pgEvents"></div>
         <div id="pgEvents-table" class="hidden" style="margin-top:12px"></div>
         <div id="pgEventNote"></div>
@@ -1124,6 +1124,7 @@
           <button data-v="rpt" aria-pressed="false">AI reports</button>
           <button data-v="rdg" aria-pressed="false">Reading kinds</button>
           <button data-v="mbp" aria-pressed="false">Morning card</button>
+          <button data-v="rvw" aria-pressed="false">Review asks</button>
           <button data-v="err" aria-pressed="false">Failures</button>
         </div>
         <button class="btn sm" id="pgRawExport">Export CSV</button></header>

@@ -644,6 +644,9 @@ check('the morning card letters are named',
   A.slotName('mbp', 'T') === 'Took the reading' && A.slotName('mbp', 'X') === 'Closed',
   A.slotName('mbp', 'X'));
 
+check('the review-ask route is reported, carries no letter, and is a headcount',
+  A.KINDS.includes('rvw') && A.isHeadcount('rvw') && !A.PER_LETTER.rvw);
+
 /* ---------------------------------------------------------- activation */
 
 /* Activation is the one counter whose rows really do count people, since the

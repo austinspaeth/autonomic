@@ -1,7 +1,7 @@
 /**
  * Cohort ping — the only endpoint the mobile app itself talks to.
  *
- * Twenty routes. Nineteen public writers, no auth, no response payload, and no
+ * Twenty-one routes. Twenty public writers, no auth, no response payload, and no
  * body on any of them but the one POST:
  *
  *   GET /ping/open/D082126I   the app was opened today by an install from that cohort
@@ -31,6 +31,9 @@
  *   GET /ping/fnd/D082126IR   an install opened a FINDING's deep dive (E early,
  *                             U unconfirmed, C biggest change, R correlation)
  *   GET /ping/rpt/D082126IH   an install built an AI REPORT (D data, H health, C doctor)
+ *   GET /ping/rvw/D082126I    the app REQUESTED the store review prompt today. Never
+ *                             "shown": neither store says whether the sheet appeared,
+ *                             and iOS swallows asks past three a year. No letter.
  *
  * The last four are all capped per install per day PER LETTER, like `see`.
  *
@@ -203,7 +206,7 @@ const KINDS = {
   pay: 'PAY', not: 'NOT', pot: 'POT', see: 'SEE', err: 'ERR',
   osh: 'OSH', odm: 'ODM', oac: 'OAC', ofl: 'OFL',
   log: 'LOG', use: 'USE', fnd: 'FND', rpt: 'RPT',
-  rdg: 'RDG', mbp: 'MBP',
+  rdg: 'RDG', mbp: 'MBP', rvw: 'RVW',
 };
 
 /** The routes whose slot letter is a capture SENSOR. */

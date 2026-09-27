@@ -121,6 +121,7 @@ const KEY_LAST_FND = 'pingLastFnd';     // + the finding letter
 const KEY_LAST_RPT = 'pingLastRpt';     // + the report letter
 const KEY_LAST_RDG = 'pingLastRdg';     // + the reading-kind letter
 const KEY_LAST_MBP = 'pingLastMbp';     // + the morning-prompt letter
+const KEY_LAST_RVW = 'pingLastRvw';     // ISO date (Eastern) of the last review-ask ping
 /** Written by ./tier.ts on first launch: this install's birthday. */
 const KEY_TRIAL_STARTED = 'trialStartedAt';
 
@@ -658,6 +659,25 @@ export function pingReadingKind(kind: 'hrv' | 'breathHrv', firstBaselineToday: b
  *  today", or closed with the ✕. */
 export function pingMorningPrompt(action: 'shown' | 'take' | 'closed'): void {
   pingPerLetter('mbp', KEY_LAST_MBP, morningPromptCode(action));
+}
+
+/**
+ * The store review prompt was REQUESTED — never "shown", because neither store
+ * will say. `requestReview()` returns nothing on iOS, which silently swallows
+ * everything past three prompts a year, and Play's flow reports "complete"
+ * whether or not a card was drawn. So this is the one fact the app actually
+ * knows, and the dashboard reads it as asks, with that ceiling stated: on iOS
+ * the shown count is at most this and may be lower.
+ *
+ * Fired from `maybeAskForReview` (lib/review) only once every eligibility rule
+ * has passed and the ask has been stamped, so it moves exactly when the ask
+ * does — at most once per app version and ~120 days apart — and never for the
+ * dev-only forced prompt, which stamps nothing. No letter: there is one
+ * trigger, and the platform already rides every ping. Whole-route daily cap,
+ * so the day's total is a headcount like `open`'s.
+ */
+export function pingReviewAsked(): void {
+  pingDaily('rvw', KEY_LAST_RVW);
 }
 
 /**
