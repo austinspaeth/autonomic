@@ -1228,7 +1228,7 @@
    * **Each event has its own metal, and the metal IS the news.** Told apart
    * across a room and with the sound off:
    *
-   *   sale      GOLD    20 seconds, bursting from both edges
+   *   sale      GOLD    until its card is dismissed, bursting from both edges
    *   download  SILVER  10 seconds, falling from the top
    *   visitor   COLOUR   3 seconds, a light puff from the top
    *
@@ -1445,24 +1445,58 @@
        heavier as well as longer. */
     e.boost = Math.min(2.2, 1 + (e.seen - 1) * 0.25);
 
-    var shoot = function () {
-      var w = Math.round((WAVE_N[kind] || WAVE_N.visit) * e.boost);
-      if (kind === 'sale') burst(pal, w);
-      else if (kind === 'download') rain(pal, w);
-      else puff(pal, w);
-      if (!raf) raf = window.requestAnimationFrame(step);
-      if (Date.now() >= e.until) {
-        window.clearInterval(e.timer);
-        e.timer = 0;
-        e.seen = 0;
-        e.boost = 1;
-      }
+    /* A SALE runs until its card is dismissed rather than for a fixed time:
+       the gold is the news, and it stays up for as long as the news does. The
+       card is what you dismiss — the toast carrying the same line hides itself
+       after a few seconds — so the emitter is held open while any sale card is
+       in the stack and stops within one wave of the last one being pressed or
+       cleared. If no card could be raised (no stack on the page) it falls back
+       to its duration, so it can never run with nothing to dismiss. */
+    var held = function () { return kind === 'sale' && saleCardOpen(); };
+
+    var stop = function () {
+      window.clearInterval(e.timer);
+      e.timer = 0;
+      e.seen = 0;
+      e.boost = 1;
+      e.until = 0;
     };
 
+    var shoot = function () {
+      var open = held();
+      if (kind === 'sale' && e.sticky && !open) { stop(); return; }
+      if (open) e.sticky = true;
+      /* A tab in the background keeps its timers but not its animation frames,
+         so a wave shot there would pile shards up that nothing draws. Skip the
+         wave; the emitter stays alive and resumes on return. */
+      if (!(typeof document !== 'undefined' && document.hidden)) {
+        var w = Math.round((WAVE_N[kind] || WAVE_N.visit) * e.boost);
+        if (kind === 'sale') burst(pal, w);
+        else if (kind === 'download') rain(pal, w);
+        else puff(pal, w);
+        if (!raf) raf = window.requestAnimationFrame(step);
+      }
+      if (!open && Date.now() >= e.until) stop();
+    };
+
+    e.sticky = false;
     shoot();
-    if (!e.timer && e.until > Date.now() + 60) {
+    if (!e.timer && (held() || e.until > Date.now() + 60)) {
       e.timer = window.setInterval(shoot, WAVE_MS[kind] || WAVE_MS.visit);
     }
+  }
+
+  /** Is a sale card still waiting to be dismissed? */
+  function saleCardOpen() {
+    if (!hasDom()) return false;
+    var stack = document.getElementById('alertStack');
+    return !!(stack && stack.querySelector('.alert-card.sale:not(.leaving)'));
+  }
+
+  /** Whether `kind`'s emitter is still shooting — for the tests. */
+  function emitting(kind) {
+    var e = EMITTERS[kind];
+    return !!(e && e.timer);
   }
 
   /* ---------------------------------------------------------------- cards
@@ -1494,6 +1528,7 @@
 
   function remove(el) {
     el.classList.remove('on');
+    el.classList.add('leaving');
     window.setTimeout(function () {
       if (el.parentNode) el.parentNode.removeChild(el);
       syncClear();
@@ -2175,6 +2210,7 @@
     init: init, sync: sync, reset: reset, announce: announce, clearAll: clearAll,
     openHistory: openHistory, closeHistory: closeHistory, toggleHistory: toggleHistory,
     renderHistory: renderHistory, dayHeading: dayHeading,
-    isMuted: function () { return muted; }, setMuted: setMuted
+    isMuted: function () { return muted; }, setMuted: setMuted,
+    emitting: emitting
   };
 })();

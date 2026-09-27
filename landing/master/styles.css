@@ -235,14 +235,39 @@ input[type="number"] { -moz-appearance: textfield; }
 /* A button whose icon is the point, and whose label is a courtesy the phone
    layout drops. */
 .icon-btn { display: inline-flex; align-items: center; gap: 7px; }
-.refresh-icon { width: 15px; height: 15px; flex: none; display: block; }
+.refresh-icon { width: 15px; height: 15px; flex: none; display: block; overflow: visible; }
 .icon-btn[data-busy="true"] { color: var(--text-secondary); pointer-events: none; }
-.icon-btn[data-busy="true"] .refresh-icon { animation: spin .8s linear infinite; }
+
+/* Three states on `data-busy` (app.js `spinWhile`): `true` spins the arrows
+   for as long as anything is still loading, `done` turns them into a
+   checkmark once everything has landed, and `false` turns the check back into
+   the arrows. The arrows keep spinning THROUGH the fade-out into the check, so
+   stopping the wheel never snaps it back to upright in plain sight. */
+.refresh-icon .ri-arrows {
+  transform-box: view-box; transform-origin: 12px 12px;
+  transition: opacity .22s ease, transform .32s cubic-bezier(.2, .8, .2, 1.2);
+}
+.refresh-icon .ri-check {
+  stroke-dasharray: 22; stroke-dashoffset: 22; opacity: 0;
+  transition: stroke-dashoffset .18s ease, opacity .18s ease;
+}
+.icon-btn[data-busy="true"] .ri-arrows { animation: spin .8s linear infinite; }
+.icon-btn[data-busy="done"] .ri-arrows {
+  animation: spin .8s linear infinite; opacity: 0; transform: scale(.4);
+}
+.icon-btn[data-busy="done"] .ri-check {
+  stroke-dashoffset: 0; opacity: 1;
+  transition: stroke-dashoffset .36s cubic-bezier(.3, .7, .3, 1) .12s, opacity .1s ease .12s;
+}
 @keyframes spin { to { transform: rotate(360deg); } }
 @media (prefers-reduced-motion: reduce) {
   /* Still say "working", just without the wheel: the pulse carries the same
-     information to someone who asked the OS for less movement. */
-  .icon-btn[data-busy="true"] .refresh-icon { animation: pulse 1.2s ease-in-out infinite; }
+     information to someone who asked the OS for less movement. The check is
+     swapped in rather than drawn. */
+  .icon-btn[data-busy="true"] .ri-arrows { animation: pulse 1.2s ease-in-out infinite; }
+  .icon-btn[data-busy="done"] .ri-arrows { animation: none; transform: none; }
+  .refresh-icon .ri-arrows, .refresh-icon .ri-check { transition: opacity .15s ease; }
+  .icon-btn[data-busy="done"] .ri-check { transition: opacity .15s ease; stroke-dashoffset: 0; }
   @keyframes pulse { 50% { opacity: .35; } }
 }
 

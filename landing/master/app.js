@@ -9604,14 +9604,70 @@
      40ms: a control that flashes reads as broken rather than fast. */
 
   var MIN_SPIN_MS = 480;
+  /* How long the checkmark holds before it turns back into the arrows. */
+  var CHECK_HOLD_MS = 1100;
   var refreshing = false;
 
   /**
-   * `opts.silent` suppresses the "Refreshed." confirmation, and nothing else.
-   * It is what the five-minute auto-refresh below passes: a toast every five
-   * minutes for a thing nobody asked for is furniture, the same reason the sync
-   * pill went away. A refresh that FAILS still says so however it was started —
-   * that one is worth interrupting for, and it can only appear once per cycle.
+   * Spin the refresh button until `p` — and everything else handed to this
+   * while it runs — has settled, then turn it into a checkmark and back.
+   *
+   * One owner for the button, because a refresh is several loads that finish
+   * at different times: the boot pull, the ping counter `init` starts beside
+   * it, a refresh's push-pull-render chain. Each one counts itself in, and the
+   * wheel stops only when the count reaches zero, so it never goes still while
+   * a load it stands for is still arriving. A load that FAILED leaves the
+   * arrows with no check: the check says "everything is current", and the
+   * failure has its own words (the refresh toast, the ping view's status).
+   * There is no "Refreshed." toast any more — the check is the confirmation.
+   */
+  var spin = { n: 0, failed: false, startedAt: 0, holdTimer: 0 };
+
+  function setSpin(v) {
+    var btn = document.getElementById('btnRefresh');
+    if (btn) btn.dataset.busy = v;
+  }
+
+  function spinWhile(p) {
+    if (!spin.n) {
+      spin.failed = false;
+      spin.startedAt = Date.now();
+      clearTimeout(spin.holdTimer);
+    }
+    spin.n += 1;
+    setSpin('true');
+    var settle = function (ok) {
+      if (!ok) spin.failed = true;
+      /* A load that answers in 40ms still spins for MIN_SPIN_MS: a control
+         that flashes reads as broken rather than fast. */
+      var wait = Math.max(0, MIN_SPIN_MS - (Date.now() - spin.startedAt));
+      setTimeout(function () {
+        spin.n -= 1;
+        if (spin.n > 0) return;
+        if (spin.failed) { setSpin('false'); return; }
+        setSpin('done');
+        spin.holdTimer = setTimeout(function () { if (!spin.n) setSpin('false'); }, CHECK_HOLD_MS);
+      }, wait);
+    };
+    Promise.resolve(p).then(function () { settle(true); }, function () { settle(false); });
+    return p;
+  }
+
+  /* `pingLoad` never rejects — a failed fetch is recorded in `pings.status`
+     for the view to show — so the spinner asks that instead. */
+  function pingLoadSpun(force) {
+    return spinWhile(pingLoad(force).then(function () {
+      if (pings.status === 'error') throw new Error(pings.error);
+    }));
+  }
+
+  /**
+   * `opts.silent` is what the five-minute auto-refresh below passes, and all it
+   * changes now is that the store versions come from the Lambda's cache rather
+   * than a forced check. There is no "Refreshed." toast on any path any more:
+   * the button's checkmark is the confirmation (`spinWhile`). A refresh that
+   * FAILS still says so however it was started — that one is worth
+   * interrupting for, and it can only appear once per cycle.
    *
    * `opts.keepScreen` pulls and hydrates without re-rendering, and exists for
    * exactly one case: an unattended refresh landing on **Edit data**. That view
@@ -9627,11 +9683,8 @@
     if (refreshing) return;
     var silent = !!(opts && opts.silent);
     var keepScreen = !!(opts && opts.keepScreen);
-    var btn = document.getElementById('btnRefresh');
     refreshing = true;
     lastAutoAt = Date.now();
-    if (btn) btn.dataset.busy = 'true';
-    var startedAt = Date.now();
 
     var work = Promise.resolve(window.Sync ? window.Sync.flush() : null)
       .then(function () { return window.Sync ? window.Sync.pull() : null; })
@@ -9650,7 +9703,10 @@
        Costs page was announced whenever you next happened to open App usage —
        by which time it was not news, and the confetti was for something that
        had happened an hour ago. It is one small GET every five minutes. */
-    work = work.then(function () { return pingLoad(true); });
+    var pingsOk = true;
+    work = work.then(function () {
+      return pingLoad(true).then(function () { pingsOk = pings.status !== 'error'; });
+    });
 
     /* The stores, on the view that shows them. A refresh you PRESSED forces a
        real check; the five-minute one takes whatever the Lambda's half-hour
@@ -9660,18 +9716,17 @@
       work = work.then(function () { return storeLoad(!silent); });
     }
 
-    work.then(function () {
+    /* The wheel runs until the repaint is done, not until the fetches are:
+       "completely set" means the numbers on screen are the new ones. */
+    var done = work.then(function () {
       if (!keepScreen) renderAll();
-      if (!silent) toast('Refreshed.');
-    }).catch(function (err) {
-      toast('Could not refresh: ' + ((err && err.message) || 'no answer from the server') + '.');
-    }).then(function () {
-      var wait = Math.max(0, MIN_SPIN_MS - (Date.now() - startedAt));
-      setTimeout(function () {
-        refreshing = false;
-        if (btn) btn.dataset.busy = 'false';
-      }, wait);
     });
+    spinWhile(done.then(function () {
+      if (!pingsOk) throw new Error(pings.error);
+    }));
+    done.catch(function (err) {
+      toast('Could not refresh: ' + ((err && err.message) || 'no answer from the server') + '.');
+    }).then(function () { refreshing = false; });
   }
 
   /* -------------------------------------------------------- auto-refresh
@@ -11486,7 +11541,7 @@
        diff against, so it is fetched at boot everywhere rather than on arrival
        at App usage — otherwise the first thing a session hears about a sale is
        nothing at all. */
-    pingLoad();
+    pingLoadSpun();
 
     /* --- data entry --- */
     wireBulk();
@@ -11763,6 +11818,10 @@
     toast: toast,
     hasCache: hasCache,
     skeleton: skeleton,
-    adopted: adopted
+    adopted: adopted,
+    /* boot.js hands the first pull to the refresh button's spinner, so the
+       wheel on first arrival runs until the pull AND the ping counter `start`
+       kicks off beside it have both landed. */
+    spinWhile: spinWhile
   };
 })();

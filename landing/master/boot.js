@@ -67,29 +67,29 @@
     if (window.Dashboard.hasCache()) {
       window.Dashboard.start();
       painted = true;
-      var btn = document.getElementById('btnRefresh');
-      if (btn) btn.dataset.busy = 'true';
     } else {
       window.Dashboard.skeleton(true);
     }
 
-    window.Sync.pull().then(function (remote) {
+    /* The refresh button spins for the whole of this — the pull, the hydrate
+       and the repaint — and `start` adds the ping counter to the same wheel,
+       so it turns into a checkmark only once every one of them has landed. */
+    var loaded = window.Sync.pull().then(function (remote) {
       window.Dashboard.hydrate(remote, painted);
       var store = window.Dashboard.store();
       // Baseline == what we just received, so booting doesn't push anything back.
       window.Sync.adopt(store.db, store.state);
       if (painted) {
-        var b = document.getElementById('btnRefresh');
-        if (b) b.dataset.busy = 'false';
         // Migrations + repaint, both of which must follow the adopt.
         window.Dashboard.adopted();
       } else {
         window.Dashboard.skeleton(false);
         window.Dashboard.start();
       }
-    }).catch(function (err) {
-      var b = document.getElementById('btnRefresh');
-      if (b) b.dataset.busy = 'false';
+    });
+    if (window.Dashboard.spinWhile) window.Dashboard.spinWhile(loaded);
+
+    loaded.catch(function (err) {
       if (err.status === 403) {
         // Signed in fine, just not on the allowlist. Signing them out would
         // only send them round the same loop, so say so and stop.

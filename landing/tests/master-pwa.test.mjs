@@ -226,8 +226,12 @@ async function signIn(window) {
 
   release();
   await wait(200);
-  check('the server\'s copy lands over the top when it arrives',
-    $('btnRefresh').dataset.busy === 'false', $('btnRefresh').dataset.busy);
+  /* The wheel on first arrival covers the pull AND the ping counter, and ends
+     as a checkmark once both have landed. */
+  check('the server\'s copy lands over the top, and the wheel turns into a check',
+    $('btnRefresh').dataset.busy === 'done', $('btnRefresh').dataset.busy);
+  await wait(1300);
+  check('then back into the refresh icon', $('btnRefresh').dataset.busy === 'false', $('btnRefresh').dataset.busy);
   check('no page errors', errors.length === 0, errors.join(' | '));
 }
 

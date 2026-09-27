@@ -936,8 +936,22 @@ on its next launch — so they should track, not match.
 The page refetches itself **every 5 minutes while it is visible, on every
 view**, and announces what changed. `alerts.js` is the announcement; the timer
 is `initAutoRefresh()` in `app.js`, which reuses the header refresh's own path
-with `{ silent: true }` — the "Refreshed." toast is suppressed, and nothing else
-is.
+with `{ silent: true }`, which only lets it take the store-versions cache
+rather than forcing a fresh check.
+
+**The refresh button is the progress indicator, and a checkmark is the
+confirmation** — there is no "Refreshed." toast. `spinWhile` in `app.js` owns
+the button: every load it stands for counts itself in, and the arrows spin until
+the count is back to zero. On first arrival that is `boot.js`'s pull (handed over
+through `Dashboard.spinWhile`) AND the ping counter `init` starts beside it; on a
+press or the timer it is push, pull, hydrate, the counter and the repaint. When
+all of it has landed the arrows fade out still spinning (so the wheel never snaps
+upright in view) while a checkmark draws in, holds for `CHECK_HOLD_MS`, and turns
+back into the arrows. A load that failed ends on the arrows with no check — the
+check means "everything is current", and a failure has its own words (the
+refresh toast, the ping view's status). `pingLoad` never rejects, so
+`pingLoadSpun` reads `pings.status` for it. Pinned by
+`landing/tests/master-refresh.test.mjs`.
 
 Two conditions gate the timer, both load-bearing:
 
@@ -980,7 +994,7 @@ a CSV paste would be an alert about your own typing.
 | Activations | a rise in activation pings — an install saved its **first HRV reading** | two-note settling chime, a card + a toast + a notification naming the sensor(s). **No confetti.** |
 | Readings | a rise in daily reading pings — an install measured **today** | one struck note, a card + a toast + a notification naming the sensor(s). **No confetti**, and it yields every channel to anything above it in this table — it is the app being used, which is what this dashboard hopes to see all day |
 | Downloads | a rise in **first runs** — an open ping whose cohort key IS the day it arrived on | three-note rising chime, **ten seconds** of SILVER glitter falling from the top, a card + a toast + a notification naming the store(s) |
-| Sales | a rise in subscribe pings (`sub`), with or without a plan letter | brass fanfare, **twenty seconds** of GOLD glitter from the top AND the bottom, a card + a toast + a notification naming the store(s) that paid. Each row wears its **plan** (Yearly / Monthly / Promo year / Founder year) so it can be matched to a store order; a letterless row is an older build and reads "Plan unknown", with a footer saying it may be a reinstall or restore |
+| Sales | a rise in subscribe pings (`sub`), with or without a plan letter | brass fanfare, GOLD glitter from the top AND the bottom **until the sale card is dismissed**, a card + a toast + a notification naming the store(s) that paid. Each row wears its **plan** (Yearly / Monthly / Promo year / Founder year) so it can be matched to a store order; a letterless row is an older build and reads "Plan unknown", with a footer saying it may be a reinstall or restore |
 | Restores / lapses | a rise in `rst` (an existing subscription arriving on a new install) or `lap` (a subscription that lapsed) | a card each naming store, plan, tier and age; a toast only when nothing else wants the slot. **No sound, no confetti, no notification, never counted as a sale** |
 
 `sub` changed meaning with the plan letter: new builds send it only for a
@@ -1012,8 +1026,8 @@ most easily made useless: the first version was a single sine at 0.055 gain, a
 sound you have to already know is coming to hear at all.
 
 **The metal is the news and the duration is the ranking.** Gold for money for
-twenty seconds, silver for a new install for ten, house colours for somebody
-coming back for three — told apart across a room with the sound off. Ordinary
+as long as its card is up, silver for a new install for ten seconds, house
+colours for somebody coming back for three — told apart across a room with the sound off. Ordinary
 usage is celebrated only because it is over before it registers as an
 interruption; an ACTIVATION still gets no canvas at all, because it lands in the
 same refresh as the download that caused it often enough that its own puff would
@@ -1070,10 +1084,17 @@ of cohort maps is most of a localStorage quota. A baseline day with no map
 (written before this shipped) contributes counts as before and no age detail,
 or every cohort in it would read as new.
 
-**A sale runs for twenty seconds**, and the length is deliberate: this is the
-event the whole page exists for, and it is long enough to walk back to the desk
-for. Duration is a function of the COUNT and not of the wave, per the decay rule
-above.
+**A sale runs until its card is dismissed.** This is the event the whole page
+exists for, so the gold stays up for as long as the news does: the emitter is
+held open while any sale card is in the stack and stops within one wave of the
+last one being pressed or cleared (a removed card is marked `.leaving` at once,
+before its exit transition, so the stop is not delayed by it). It is the CARD
+that holds it, because the toast carrying the same line hides itself after a few
+seconds. If no card could be raised it falls back to twenty seconds, so it can
+never run with nothing to dismiss, and while the tab is hidden it skips its waves
+rather than piling up shards no frame will draw. The download and visitor
+celebrations keep their fixed durations, stacked by COUNT per the decay rule
+above. `Alerts.emitting(kind)` reports an emitter for the tests.
 
 `snapshot` / `diff` are pure and are what `tests/alerts.test.mjs` pins;
 `tests/master-alerts.test.mjs` covers the cards on the built page. The rules:
