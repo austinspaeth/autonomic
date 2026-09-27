@@ -158,6 +158,14 @@ await new Promise((r) => window.addEventListener('load', r));
 await new Promise((r) => setTimeout(r, 200));
 const $ = (id) => window.document.getElementById(id);
 
+/* A release of the fixture's OWN, dated inside its weeks. The ping fixture is
+   relative to today and the real release log (releases.js, generated from the
+   app) is not, so the trend chart's "releases it can reach" check only passed
+   while a real version happened to ship within the last couple of weeks — and
+   failed on every run once the newest one aged out of the window. Pinning one
+   here makes the check about the chart, not about the release calendar. */
+window.RELEASES = (window.RELEASES || []).concat([{ version: '9.9', date: T(3), notes: ['Test fixture release.'] }]);
+
 $('gateEmail').value = 'austinspaeth@msn.com';
 $('gateSubmit').click();
 await new Promise((r) => setTimeout(r, 150));
@@ -622,7 +630,7 @@ check('and every age band either carries a figure or says why not',
    cohort, releases drawn over it. */
 check('the trend chart rendered', !!$('pgTrend').querySelector('svg'));
 check('it draws the releases it can reach as rules on the axis',
-  /v1\.2/.test($('pgTrend').textContent), $('pgTrend').textContent.slice(-60));
+  /v9\.9/.test($('pgTrend').textContent), $('pgTrend').textContent.slice(-60));
 
 const trendNote = $('pgTrendNote').textContent;
 check('the trend note carries a denominator, never a bare percentage',
