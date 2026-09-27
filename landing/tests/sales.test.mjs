@@ -63,6 +63,10 @@ check('the index runs in date order',
 check('a qty>1 row cannot carry an install date',
   S.normalize({ id: 'x', date: '2026-01-01', plan: 'unknown', price: 5, qty: 3, cohort: '2025-12-01' }).cohort === undefined);
 check('a qty 1 row can', S.normalize({ id: 'x', date: '2026-01-01', plan: 'monthly', price: 5, cohort: '2025-12-01' }).cohort === '2025-12-01');
+check('a purchase keeps the subscribe ping it was recorded from',
+  S.normalize({ id: 'x', date: '2026-01-01', plan: 'annual', price: 5, ping: '2026-01-01|122525IP-T' }).ping === '2026-01-01|122525IP-T');
+check('and a purchase typed in by hand has none',
+  S.normalize({ id: 'x', date: '2026-01-01', plan: 'annual', price: 5 }).ping === undefined);
 check('an install date AFTER the purchase is refused, not stored backwards',
   S.normalize({ id: 'x', date: '2026-01-01', plan: 'monthly', price: 5, cohort: '2026-02-01' }).cohort === undefined);
 check('a cancellation before the purchase is refused',

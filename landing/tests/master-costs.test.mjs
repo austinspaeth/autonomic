@@ -273,7 +273,13 @@ $('btnRefresh').click();
 check('refresh says it is working', $('btnRefresh').dataset.busy === 'true');
 await settle(900);
 check('refresh refetched from the server', loads === loadsBefore + 1, `${loadsBefore} -> ${loads}`);
-check('refresh stopped spinning', $('btnRefresh').dataset.busy === 'false');
+/* Done means the icon turns into a checkmark — and that is the whole
+   confirmation now: there is no "Refreshed." toast. */
+check('refresh turned into a checkmark once everything landed', $('btnRefresh').dataset.busy === 'done',
+  $('btnRefresh').dataset.busy);
+check('and said nothing else about it', !/Refreshed/.test($('toast').textContent), $('toast').textContent);
+await settle(1300);
+check('then turned back into the refresh icon', $('btnRefresh').dataset.busy === 'false', $('btnRefresh').dataset.busy);
 /* The whole point of the button is not reloading. A refresh that adopted the
    server's stored UI would also throw the reader off whichever view they were
    on the moment another device changed tabs. */

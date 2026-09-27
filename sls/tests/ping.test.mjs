@@ -129,14 +129,14 @@ test('each route validates the slot against ITS OWN alphabet', () => {
   assert.ok(!speaks('SUB', 'A'));     // ...and neither is an offer card
 
   // And the routes that carry nothing accept nothing.
-  ['OPEN', 'ERR'].forEach((k) => assert.equal(ALPHABET[k], undefined));
+  ['OPEN', 'ERR', 'RVW'].forEach((k) => assert.equal(ALPHABET[k], undefined));
 });
 
 test('every route name the client can send has a storage kind', () => {
   // The handler resolves a route by name, so a route added to serverless.yml
   // but not here answers 204 and counts nothing — silently.
   ['open', 'sub', 'rst', 'lap', 'act', 'cap', 'hrv', 'pay', 'not', 'pot', 'see', 'err', 'osh', 'odm', 'oac', 'ofl',
-    'log', 'use', 'fnd', 'rpt', 'rdg', 'mbp']
+    'log', 'use', 'fnd', 'rpt', 'rdg', 'mbp', 'rvw']
     .forEach((k) => assert.ok(KINDS[k], `no storage kind for /ping/${k}`));
 });
 

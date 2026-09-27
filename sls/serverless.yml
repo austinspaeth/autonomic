@@ -278,6 +278,11 @@ functions:
       - httpApi:
           method: GET
           path: /ping/mbp/{cohort}
+      # The store review prompt was REQUESTED. Not "shown": neither store says
+      # whether the sheet appeared. No letter; whole-route daily cap like /open.
+      - httpApi:
+          method: GET
+          path: /ping/rvw/{cohort}
       # A FAULT report — the one route here that is not a counter. Its own path
       # prefix on purpose: every route above is a fixed alphabet and a number
       # that means "how many people", and this one carries text (a tag naming

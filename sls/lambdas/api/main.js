@@ -213,8 +213,15 @@ const cleanSale = (raw) => {
   if (isIsoDate(raw.cancelled) && raw.cancelled >= out.date) out.cancelled = raw.cancelled;
   if (raw.refunded) out.refunded = true;
   if (raw.note) out.note = String(raw.note).slice(0, 2000);
+  // The subscribe ping this purchase was recorded from, as `<arrival day>|<key>`
+  // (the Pings tab's own row identity), so that row can say it is recorded.
+  // Checked rather than cleaned: anything else is not a ping reference.
+  if (typeof raw.ping === 'string' && PING_REF.test(raw.ping)) out.ping = raw.ping;
   return out;
 };
+
+/** `2026-09-26|092326IP-T`: an arrival day, then a stored cohort key. */
+const PING_REF = /^\d{4}-\d{2}-\d{2}\|[0-9A-Z]{6,8}(-[A-Z])?$/;
 
 /* One UNATTACHED churn event: revenue that stopped, with no purchase row
    behind it. A store report says how many subscriptions ended and roughly what
@@ -817,4 +824,4 @@ const handler = async (event) => {
   }
 };
 
-module.exports = { handler };
+module.exports = { handler, cleanSale };

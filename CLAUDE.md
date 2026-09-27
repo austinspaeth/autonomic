@@ -520,7 +520,8 @@ old web app so old `export.json` files import directly.
   than the OS quota (once per app version, ~120 days apart) because iOS allows
   only 3 prompts a year and silently swallows the rest; the ask is therefore
   stamped BEFORE it's requested, since nothing tells us whether the sheet
-  appeared. `<ReviewPrompt/>` (root layout) owns the "calm moment" half: sheet
+  appeared. Each ask is counted on the anonymous `rvw` ping, as an ask and not a
+  showing. `<ReviewPrompt/>` (root layout) owns the "calm moment" half: sheet
   stack empty, app foreground, 25s after launch, 4s after a journal change.
 - **Capture is never metered; Pro is what the app makes of the readings.**
   The freemium line runs between *taking* a measurement and *analysing* it.
@@ -1451,7 +1452,12 @@ old web app so old `export.json` files import directly.
   training; fired beside `hrv` from the engine and the wrist receivers,
   `isFirstBaseline` in `lib/ping.ts`) and `mbp` (the morning baseline card:
   `S` shown, `T` capture tapped, `X` closed — one card's outcomes on
-  one route, each letter a headcount; `pingMorningPrompt`). The lambda must be
+  one route, each letter a headcount; `pingMorningPrompt`). And `rvw`, no letter,
+  whole-route daily cap: the store review prompt was REQUESTED (`pingReviewAsked`,
+  fired from `maybeAskForReview` beside the ask's own stamp, never for the dev
+  force). Never "shown" — neither store reports that and iOS drops asks past three
+  a year — so it is a ceiling on prompts seen, drawn as "Store review asked" on
+  the dashboard's *What people do in there*. The lambda must be
   deployed before a build sending them ships.
   **An accepted offer that did not become a subscription is `POST /ping/ofl`,
   the one ping with a BODY** (`reportOfferOutcome`, fed by `onPurchaseOutcome`

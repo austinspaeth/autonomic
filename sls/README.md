@@ -33,6 +33,7 @@ GET  https://api.autonomic.care/ping/fnd/D082126IR   (finding opened: E early, U
 GET  https://api.autonomic.care/ping/rpt/D082126IH   (AI report built: D data for prompt, H full health report, C doctor summary)
 GET  https://api.autonomic.care/ping/rdg/D082126IM   (HRV reading completed, by kind: M the day's first baseline, B a later baseline, T training)
 GET  https://api.autonomic.care/ping/mbp/D082126IS   (morning baseline prompt card: S shown, T take reading, N not today, X closed)
+GET  https://api.autonomic.care/ping/rvw/D082126I    (the store review prompt was REQUESTED — never "shown", which neither store reports; no letter)
 GET  https://api.autonomic.care/ping/report?key=...&since=2026-08-01
 
 GET  https://api.autonomic.care/fault/D082126I-TP-V1.26.0?t=health.check&m=timeout+after+%3Cn%3Ems&n=17&d=1
@@ -383,10 +384,18 @@ so these rows rank front doors and not lock frequency.
 
 ### Two shapes of daily cap, and the difference is load-bearing
 
-`open`, `cap`, `hrv` and `pay` are capped once per install per Eastern day for
+`open`, `cap`, `hrv`, `pay` and `rvw` are capped once per install per Eastern day for
 the WHOLE route. A day's rows therefore sum to a headcount, which is what makes
 `hrv[day] / open[day]` a share of people — and it is also why the letter on those
 routes can only ever describe the FIRST event of the day.
+
+`rvw` counts the store review prompt being REQUESTED, and cannot count it being
+shown: `requestReview()` returns nothing on iOS, which silently drops every ask
+past three a year, and Play's in-app review flow reports "complete" whether or not
+a card appeared. The app's own rules already keep the ask to once per version and
+~120 days apart, so the cap only matters as a guard. Read it as an upper bound on
+prompts shown, and against the review totals in App Store Connect / the Play
+Console, never against anything else here.
 
 `not`, `pot`, `see`, `osh`, `odm`, `oac`, `log`, `use`, `fnd`, `rpt`, `rdg` and
 `mbp` are capped per LETTER. Their letters are choices the user made between real
@@ -660,7 +669,7 @@ Two doors onto the same function, because they have different callers:
   the shared key. The email allowlist guards it like everything else there.
 
 Both answer one key per route — `{ since, open, sub, rst, lap, act, cap, hrv, pay, not,
-pot, see, err, osh, odm, oac, ofl, log, use, fnd, rpt, rdg, mbp }` — each row
+pot, see, err, osh, odm, oac, ofl, log, use, fnd, rpt, rdg, mbp, rvw }` — each row
 
 ```jsonc
 {

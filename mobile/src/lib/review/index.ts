@@ -26,6 +26,7 @@ import * as StoreReview from 'expo-store-review';
 import { todayKey } from '../dates';
 import { resolveProtocol } from '../scoring/day';
 import { getState } from '../../store/store';
+import { pingReviewAsked } from '../../store/ping';
 import { shouldAskForReview, type ReviewMemory, type ReviewVerdict } from './eligibility';
 
 export { engagedDayCount, shouldAskForReview, MIN_ENGAGED_DAYS, MIN_DAYS_BETWEEN_ASKS } from './eligibility';
@@ -94,7 +95,8 @@ export function reviewVerdict(): ReviewVerdict {
 
 /**
  * Ask, if this is a moment worth asking on. Returns true when the prompt was
- * requested (not when it was shown — the OS never tells us that).
+ * requested (not when it was shown — the OS never tells us that). A request
+ * is also counted on the anonymous `rvw` ping, as an ask.
  */
 export async function maybeAskForReview(): Promise<boolean> {
   try {
@@ -110,6 +112,9 @@ export async function maybeAskForReview(): Promise<boolean> {
     if (!FORCE_REVIEW_PROMPT) {
       writeFlag(KEY_LAST_ASKED, String(Date.now()));
       writeFlag(KEY_ASKED_VERSION, appVersion());
+      // Counted as an ASK, not a showing — the OS never says which (see
+      // pingReviewAsked). Beside the stamp so the two cannot disagree.
+      pingReviewAsked();
     }
     await StoreReview.requestReview();
     return true;

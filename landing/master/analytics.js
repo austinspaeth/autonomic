@@ -253,7 +253,7 @@ window.Analytics = (function () {
      two subscription events that are NOT purchases (a subscription arriving
      on a new install, one going away) and are never folded into `sub`. */
   var KINDS = ['open', 'sub', 'rst', 'lap', 'act', 'cap', 'hrv', 'pay', 'not', 'pot', 'see', 'err',
-    'osh', 'odm', 'oac', 'log', 'use', 'fnd', 'rpt', 'rdg', 'mbp'];
+    'osh', 'odm', 'oac', 'log', 'use', 'fnd', 'rpt', 'rdg', 'mbp', 'rvw'];
 
   /* The report's platform letters, and the names the filter bar speaks. */
   var PLATFORM_LETTER = { ios: 'I', android: 'A', unknown: 'U', I: 'I', A: 'A', U: 'U' };
@@ -685,7 +685,7 @@ window.Analytics = (function () {
      screen rather than hiding:
 
      (1) Some routes are capped once per install per Eastern day for the WHOLE
-     route (`open`, `cap`, `hrv`, `pay`), so their daily TOTAL is a headcount and
+     route (`open`, `cap`, `hrv`, `pay`, `rvw`), so their daily TOTAL is a headcount and
      their letter describes only the first event of the day. Others are capped
      per LETTER (`not`, `pot`, `see`, the three offer routes, and `log`, `use`,
      `fnd`, `rpt`, `rdg`, `mbp`), so each LETTER'S count is a headcount and the route's total

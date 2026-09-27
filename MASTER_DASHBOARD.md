@@ -377,6 +377,11 @@ card: shown `S`, took the reading `T`, closed `X`, on *What they
 dig into*; one card's outcomes on one route, read `S` against the rest), drawn
 on *What they log* and *What they dig into* — are capped once per install per
 day **per letter**, not per route.
+`rvw` (the store review prompt REQUESTED; no letter, whole-route daily cap, so a
+headcount) is the one letterless line on *What people do in there*. It is asks,
+not showings: neither store says whether the prompt appeared and iOS drops every
+ask past three a year, so read it as a ceiling and against the stores' own review
+counts.
 Their letters are choices the user made between real alternatives — a stand test
 is not an episode, Insights is not Progress — and a whole-route cap would have
 silently dropped whichever came second, which on a bad day is exactly the one
@@ -931,8 +936,22 @@ on its next launch — so they should track, not match.
 The page refetches itself **every 5 minutes while it is visible, on every
 view**, and announces what changed. `alerts.js` is the announcement; the timer
 is `initAutoRefresh()` in `app.js`, which reuses the header refresh's own path
-with `{ silent: true }` — the "Refreshed." toast is suppressed, and nothing else
-is.
+with `{ silent: true }`, which only lets it take the store-versions cache
+rather than forcing a fresh check.
+
+**The refresh button is the progress indicator, and a checkmark is the
+confirmation** — there is no "Refreshed." toast. `spinWhile` in `app.js` owns
+the button: every load it stands for counts itself in, and the arrows spin until
+the count is back to zero. On first arrival that is `boot.js`'s pull (handed over
+through `Dashboard.spinWhile`) AND the ping counter `init` starts beside it; on a
+press or the timer it is push, pull, hydrate, the counter and the repaint. When
+all of it has landed the arrows fade out still spinning (so the wheel never snaps
+upright in view) while a checkmark draws in, holds for `CHECK_HOLD_MS`, and turns
+back into the arrows. A load that failed ends on the arrows with no check — the
+check means "everything is current", and a failure has its own words (the
+refresh toast, the ping view's status). `pingLoad` never rejects, so
+`pingLoadSpun` reads `pings.status` for it. Pinned by
+`landing/tests/master-refresh.test.mjs`.
 
 Two conditions gate the timer, both load-bearing:
 
@@ -975,7 +994,7 @@ a CSV paste would be an alert about your own typing.
 | Activations | a rise in activation pings — an install saved its **first HRV reading** | two-note settling chime, a card + a toast + a notification naming the sensor(s). **No confetti.** |
 | Readings | a rise in daily reading pings — an install measured **today** | one struck note, a card + a toast + a notification naming the sensor(s). **No confetti**, and it yields every channel to anything above it in this table — it is the app being used, which is what this dashboard hopes to see all day |
 | Downloads | a rise in **first runs** — an open ping whose cohort key IS the day it arrived on | three-note rising chime, **ten seconds** of SILVER glitter falling from the top, a card + a toast + a notification naming the store(s) |
-| Sales | a rise in subscribe pings (`sub`), with or without a plan letter | brass fanfare, **twenty seconds** of GOLD glitter from the top AND the bottom, a card + a toast + a notification naming the store(s) that paid. Each row wears its **plan** (Yearly / Monthly / Promo year / Founder year) so it can be matched to a store order; a letterless row is an older build and reads "Plan unknown", with a footer saying it may be a reinstall or restore |
+| Sales | a rise in subscribe pings (`sub`), with or without a plan letter | brass fanfare, GOLD glitter from the top AND the bottom **until the sale card is dismissed**, a card + a toast + a notification naming the store(s) that paid. Each row wears its **plan** (Yearly / Monthly / Promo year / Founder year) so it can be matched to a store order; a letterless row is an older build and reads "Plan unknown", with a footer saying it may be a reinstall or restore |
 | Restores / lapses | a rise in `rst` (an existing subscription arriving on a new install) or `lap` (a subscription that lapsed) | a card each naming store, plan, tier and age; a toast only when nothing else wants the slot. **No sound, no confetti, no notification, never counted as a sale** |
 
 `sub` changed meaning with the plan letter: new builds send it only for a
@@ -1007,8 +1026,8 @@ most easily made useless: the first version was a single sine at 0.055 gain, a
 sound you have to already know is coming to hear at all.
 
 **The metal is the news and the duration is the ranking.** Gold for money for
-twenty seconds, silver for a new install for ten, house colours for somebody
-coming back for three — told apart across a room with the sound off. Ordinary
+as long as its card is up, silver for a new install for ten seconds, house
+colours for somebody coming back for three — told apart across a room with the sound off. Ordinary
 usage is celebrated only because it is over before it registers as an
 interruption; an ACTIVATION still gets no canvas at all, because it lands in the
 same refresh as the download that caused it often enough that its own puff would
@@ -1065,10 +1084,17 @@ of cohort maps is most of a localStorage quota. A baseline day with no map
 (written before this shipped) contributes counts as before and no age detail,
 or every cohort in it would read as new.
 
-**A sale runs for twenty seconds**, and the length is deliberate: this is the
-event the whole page exists for, and it is long enough to walk back to the desk
-for. Duration is a function of the COUNT and not of the wave, per the decay rule
-above.
+**A sale runs until its card is dismissed.** This is the event the whole page
+exists for, so the gold stays up for as long as the news does: the emitter is
+held open while any sale card is in the stack and stops within one wave of the
+last one being pressed or cleared (a removed card is marked `.leaving` at once,
+before its exit transition, so the stop is not delayed by it). It is the CARD
+that holds it, because the toast carrying the same line hides itself after a few
+seconds. If no card could be raised it falls back to twenty seconds, so it can
+never run with nothing to dismiss, and while the tab is hidden it skips its waves
+rather than piling up shards no frame will draw. The download and visitor
+celebrations keep their fixed durations, stacked by COUNT per the decay rule
+above. `Alerts.emitting(kind)` reports an emitter for the tests.
 
 `snapshot` / `diff` are pure and are what `tests/alerts.test.mjs` pins;
 `tests/master-alerts.test.mjs` covers the cards on the built page. The rules:
@@ -1345,6 +1371,63 @@ still syncs:
 The store CSV out (**Backup → Export CSV**) is store days only and says so: a
 purchase is not a property of a day any more. The ledger has its own CSV, and
 the JSON backup carries everything.
+
+## Pings → Sales: drafting a purchase from a subscribe ping
+
+Every `sub` row on the raw **Pings** tab carries a **Record sale** button
+(`recordSaleFromPing` in `app.js`). A subscribe ping already holds everything a
+purchase record needs except the money, so the button opens **Edit data** with
+the purchase form drafted from it: the arrival day as the purchase date, the
+store, the install date from the cohort, and the plan. Y becomes `annual` and M
+`monthly`. The promo and founder years (P, F) are also `annual`, because the
+ledger records the TERM, and the note keeps which one it was. **The price is left
+blank on purpose**: the ping never carries one, and those two years sell below
+list, so a guessed price would be a wrong number in every revenue figure. The
+hint names the last price on record for that store and plan as a reference.
+Nothing is written until **Add purchase**.
+
+A letterless `sub` row comes from an older build, whose ping also fired on a
+restore or a second phone. It drafts with the plan `unknown` and a warning to
+check that it was a sale. The draft survives re-renders of the Data view until
+it is added or cancelled.
+
+A saved draft is **tied** to its ping: the purchase stores `ping`, the row's own
+identity (`<arrival day>|<stored cohort key>`, and the key already carries
+platform, plan and tier), and the row reads **Recorded** once that many
+purchases point at it. It is a tie rather than a match on date, store and install
+date for two reasons: the store can date a purchase a day either side of the
+Eastern arrival day, and correcting the date must not un-record the row; and a
+purchase typed in by hand for the same buyer must not record it either. Editing
+the purchase keeps the tie, and deleting it unties the row. **The field is
+whitelisted in three places that must agree** — `cleanSale` in
+`sls/lambdas/api/main.js` (the server drops any field it does not know),
+`normalizeSale` in `sync.js` (its mirror, or the diff re-sends the row forever)
+and `normalize` in `sales.js` — each with the same `PING_REF` check. Pinned by
+`landing/tests/master-pings-tab.test.mjs` (including what actually syncs) and
+`sls/tests/sale.test.mjs`.
+
+## Trial & conversion: the recent-conversion card
+
+**Recent conversion** answers "where is my rate heading" over fixed windows —
+7, 14, 30, 60 and 90 days ending on the latest reported day — regardless of the
+range selector, plus a **rolling** chart (7-day and 30-day lines against the
+lifetime rate) over the selected range. All of it is `windowConv` in `app.js`.
+
+**The denominator is the installs that FINISHED the trial in the window**
+(installed `trialExit()` days before each day in it), never the window's own
+installs. That is what keeps a surge from diluting the rate: surge installs enter
+only once they have had the whole trial to decide. `Paid ÷ installs` sits in the
+last column purely as the contrast — it is the read a surge destroys.
+
+What the store data cannot do is tie a purchase back to its install, so the
+numerator is sales by purchase DATE. A surge that buys during its trial therefore
+lifts the short windows early; the card says so under the table, together with
+how many installs are still inside the trial (in no rate yet) and, when the last
+trial-length of installs is 1.5× or more the one before, that a surge is in
+progress. Each rate carries a 95% Wilson interval (omitted when paid exceeds the
+denominator, which can happen for the reason above), and the change against the
+N days before is in POINTS and left blank when that earlier window runs past the
+history. Pinned by `landing/tests/master-trial.test.mjs`.
 
 ## The forecast, and why it has two prices
 

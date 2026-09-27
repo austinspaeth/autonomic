@@ -100,7 +100,8 @@ export type PingKind =
   | 'fnd'                           // opened an Insights finding's deep dive
   | 'rpt'                           // built an AI report
   | 'rdg'                           // an HRV reading completed, by KIND
-  | 'mbp';                          // the morning baseline prompt card
+  | 'mbp'                           // the morning baseline prompt card
+  | 'rvw';                          // the store review prompt was REQUESTED
 
 /**
  * The platform marker carried by a ping: one letter, appended to the cohort

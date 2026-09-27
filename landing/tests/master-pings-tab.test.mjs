@@ -33,6 +33,7 @@ const actRows = [{ day: T(0), total: 2, cohorts: [{ key: cd(T(0))+'IB', cohortDa
    ever name whichever reading came first — so its rows must render a dash in
    the Sensor column rather than inventing one. */
 const hrvRows = [{ day: T(0), total: 3, cohorts: [{ key: cd(T(10))+'I', cohortDate: cd(T(10)), cohort: T(10), platform: 'I', method: null, count: 3 }] }];
+const synced = [];
 const b64u = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
 const idToken = [b64u({alg:'RS256'}), b64u({email:'austinspaeth@msn.com', exp: Math.floor(Date.now()/1000)+3600}), 'sig'].join('.');
 const dom = new JSDOM(fs.readFileSync(PAGE,'utf8'), { url:'https://autonomic.care/master/', runScripts:'dangerously', pretendToBeVisual:true });
@@ -47,6 +48,7 @@ window.fetch = (url, opts) => {
   // A LEGACY settings record: the old two-boundary build's 7-day trial.
   if (body.action==='LOAD') return reply({ entries:[{date:T(4),platform:'ios',downloads:20,impressions:1000,pageViews:100,sales:1}], events:[], settings:{trialDays:7,wallDays:14,currency:'$'}, ui:{view:'overview'} });
   if (body.action==='PINGS') return reply({ open:openRows, sub:subRows, rst:rstRows, lap:lapRows, act:actRows, hrv:hrvRows });
+  if (body.action==='SYNC') synced.push(body.payload||{});
   return reply({ok:true});
 };
 const errors=[]; window.addEventListener('error',(e)=>errors.push(String(e.error||e.message)));
@@ -105,6 +107,58 @@ hrvBtn.click(); await new Promise(r=>setTimeout(r,250));
 const hrvTxt=$('pgRawTable').textContent;
 ok('route filter narrows to readings', $('pgRawTable').querySelectorAll('tbody tr').length===1, String($('pgRawTable').querySelectorAll('tbody tr').length));
 ok('a reading row names no sensor', /Reading/.test(hrvTxt)&&!/Chest strap/.test(hrvTxt), hrvTxt.slice(0,200));
+// a subscribe ping drafted into a sale
+const subBtn=[...$('pgRawKind').querySelectorAll('button')].find(b=>b.dataset.v==='sub');
+subBtn.click(); await new Promise(r=>setTimeout(r,250));
+const saleBtns=()=>[...$('pgRawTable').querySelectorAll('[data-ping-sale]')];
+ok('each unrecorded subscribe row offers Record sale', saleBtns().length===2, String(saleBtns().length));
+ok('only subscribe rows carry the button',
+  [...$('pgRawTable').querySelectorAll('tbody tr')].every(tr=>/Subscribe/.test(tr.textContent)), 'non-sub row');
+const promoBtn=saleBtns().find(b=>/Promo year/.test(b.closest('tr').textContent));
+promoBtn.click(); await new Promise(r=>setTimeout(r,300));
+ok('Record sale opens Edit data', !$('view-data').classList.contains('hidden'), 'data view hidden');
+ok('drafts the purchase date from the arrival day', $('slDate').value===T(0), $('slDate').value);
+ok('drafts the store', $('slPlatform').value==='ios', $('slPlatform').value);
+ok('a promo year is recorded as an annual term', $('slPlan').value==='annual', $('slPlan').value);
+ok('drafts the install date from the cohort', $('slCohort').value===T(3), $('slCohort').value);
+ok('leaves the price for you', $('slPrice').value==='', $('slPrice').value);
+ok('the note keeps which year it was', /Promo year/.test($('slNote').value), $('slNote').value);
+ok('says where the draft came from', /Drafted from a subscribe ping/.test(($('slPrefillNote')||{}).textContent||''), 'no note');
+$('slPrice').value='14.99';
+/* The store dated it a day before the ping arrived. Correcting the date must
+   not un-record the row: the purchase is tied to the ping, not matched to it. */
+$('slDate').value=T(1);
+$('slSave').click(); await new Promise(r=>setTimeout(r,300));
+const tied = () => synced.flatMap(p=>p.saleUpserts||[]).find(x=>x.price===14.99) || {};
+ok('the draft is cleared once added', !$('slPrefillNote'), 'note still shown');
+ok('the sale is on the ledger', /14\.99/.test($('slSaleTable').textContent), $('slSaleTable').textContent.slice(0,200));
+tab.click(); await new Promise(r=>setTimeout(r,400));
+[...$('pgRawKind').querySelectorAll('button')].find(b=>b.dataset.v==='sub').click();
+await new Promise(r=>setTimeout(r,250));
+// Sync debounces pushes (~900ms), so outwait it before reading what was sent.
+await new Promise(r=>setTimeout(r,1100));
+ok('the purchase synced to the server carries its ping', tied().ping===T(0)+'|'+cd(T(3))+'IP', JSON.stringify(tied()));
+ok('and keeps the corrected date', tied().date===T(1), tied().date);
+ok('a corrected date still reads as Recorded — the tie survives it',
+  /Recorded/.test([...$('pgRawTable').querySelectorAll('tbody tr')].find(tr=>/Promo year/.test(tr.textContent)).textContent)
+  && saleBtns().length===1, String(saleBtns().length));
+/* A purchase typed in by hand for the same day, store and install date as the
+   older ping must NOT record it: only a purchase drafted from that ping does. */
+[...window.document.querySelectorAll('button')].find(b=>/Edit data/.test(b.textContent)).click();
+await new Promise(r=>setTimeout(r,300));
+$('slDate').value=T(0); $('slPlatform').value='ios'; $('slPlan').value='monthly';
+$('slPrice').value='4.99'; $('slCohort').value=T(10);
+$('slSave').click(); await new Promise(r=>setTimeout(r,300));
+tab.click(); await new Promise(r=>setTimeout(r,400));
+[...$('pgRawKind').querySelectorAll('button')].find(b=>b.dataset.v==='sub').click();
+await new Promise(r=>setTimeout(r,250));
+ok('a hand-typed purchase for the same buyer does not record the ping', saleBtns().length===1, String(saleBtns().length));
+// the older, letterless ping warns it may be a restore and leaves the plan unknown
+saleBtns()[0].click(); await new Promise(r=>setTimeout(r,300));
+ok('a letterless ping leaves the plan unknown', $('slPlan').value==='unknown', $('slPlan').value);
+ok('and warns it may not be a sale', /older build/.test($('slPrefillNote').textContent), $('slPrefillNote').textContent);
+$('slCancelPrefill').click(); await new Promise(r=>setTimeout(r,200));
+ok('Cancel drops the draft', !$('slPrefillNote') && $('slCohort').value==='', $('slCohort').value);
 ok('no page errors', errors.length===0, errors.join(' | '));
 out.forEach(l=>console.log(l));
 const fails=out.filter(l=>l.startsWith('  FAIL')).length;

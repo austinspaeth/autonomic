@@ -1302,6 +1302,141 @@
 
   /* ------------------------------------------------------- view: trial */
 
+  /* The recent-conversion windows, in days. Fixed rather than following the
+     range selector: "where is the rate heading" is a question about the last
+     week against the last quarter, and a range picked for some other view
+     should not change which windows answer it. */
+  var CONV_WINDOWS = [7, 14, 30, 60, 90];
+
+  /**
+   * Conversion over the `n` days ending on `end`: paid in the window over the
+   * installs that FINISHED THE TRIAL in the window (installed `trialExit()`
+   * days before each day in it). That denominator is the whole point — a surge
+   * of installs enters it only once it has had the full trial to decide, so a
+   * spike in downloads cannot dilute the rate the way paid ÷ installs is
+   * diluted. `installs` is carried for exactly that contrast.
+   *
+   * The numerator is sales by purchase date, which the store data cannot tie
+   * back to an install, so a surge that buys DURING its trial lifts the rate
+   * early. The UI says so rather than pretending the two sides are one cohort.
+   *
+   * `covered` is how many of the window's days the data spine reaches; a
+   * window longer than the history is reported as partial, not as zero.
+   */
+  function windowConv(p, end, n) {
+    var T = trialExit();
+    var b = base();
+    var from = addDays(end, -(n - 1));
+    var out = { from: from, to: end, days: n, covered: 0, paid: 0, crossed: 0, installs: 0 };
+    if (!b.dates.length) return finishConv(out);
+    for (var d = from; d <= end; d = addDays(d, 1)) {
+      if (d >= b.start && d <= b.end) out.covered += 1;
+      var r = dayRec(p, d);
+      out.paid += r.sales;
+      out.installs += r.downloads;
+      out.crossed += dayRec(p, addDays(d, -T)).downloads;
+    }
+    return finishConv(out);
+  }
+  function finishConv(o) {
+    o.rate = o.crossed ? (o.paid / o.crossed) * 100 : null;
+    o.installRate = o.installs ? (o.paid / o.installs) * 100 : null;
+    o.partial = o.covered < o.days;
+    var ci = wilson(o.paid, o.crossed);
+    o.lo = ci ? ci.lo : null;
+    o.hi = ci ? ci.hi : null;
+    return o;
+  }
+
+  /**
+   * 95% Wilson score interval for k of n, in percent — the honest width of a
+   * small-sample rate. Null when it does not apply: no one in the denominator,
+   * or more purchases than people finishing the trial (possible here, since
+   * the numerator is not a subset of the denominator), where a binomial
+   * interval would be describing something that did not happen.
+   */
+  function wilson(k, n) {
+    if (!n || k < 0 || k > n) return null;
+    var z = 1.96, p = k / n, z2 = z * z;
+    var den = 1 + z2 / n;
+    var mid = (p + z2 / (2 * n)) / den;
+    var half = (z * Math.sqrt((p * (1 - p)) / n + z2 / (4 * n * n))) / den;
+    return { lo: Math.max(0, mid - half) * 100, hi: Math.min(1, mid + half) * 100 };
+  }
+
+  function renderRecentConversion(main) {
+    var end = asOf();
+    var T = trialExit();
+    document.querySelectorAll('.trExitDay').forEach(function (el) { el.textContent = String(T); });
+    var scope = document.getElementById('trRecentScope');
+    if (scope) scope.textContent = 'through ' + labelFull(end) + (main === 'all' ? '' : ' · ' + platName(main));
+
+    var rows = CONV_WINDOWS.map(function (n) {
+      var cur = windowConv(main, end, n);
+      var prev = windowConv(main, addDays(end, -n), n);
+      var move = cur.rate !== null && prev.rate !== null && !prev.partial ? cur.rate - prev.rate : null;
+      return '<tr><td>Last ' + n + ' days' +
+          (cur.partial ? ' <span class="na">(' + cur.covered + ' days of data)</span>' : '') + '</td>' +
+        '<td>' + fmtInt(cur.paid) + '</td>' +
+        '<td>' + fmtInt(cur.crossed) + '</td>' +
+        '<td><b>' + fmtPct(cur.rate) + '</b></td>' +
+        '<td>' + (cur.lo === null ? '<span class="na">–</span>'
+          : '<span class="na">' + cur.lo.toFixed(1) + '–' + cur.hi.toFixed(1) + '%</span>') + '</td>' +
+        '<td>' + (move === null ? '<span class="na">–</span>' : ptsSpan(move)) + '</td>' +
+        '<td>' + fmtPct(cur.installRate) + '</td></tr>';
+    }).join('');
+
+    /* The surge itself, stated: everyone still inside the trial is in NO rate
+       above yet, and saying how many is what makes a flat rate during a surge
+       readable as "not decided yet" rather than "not converting". */
+    var s = summarize(main, end, end);
+    var waiting = s.inTrial;
+    /* The cohorts still inside the trial are the last T days' (ages 0 to
+       trialDays inclusive), so the surge test compares exactly those days
+       with the T days before them. */
+    var trialDaysBack = windowConv(main, end, T).installs;
+    var prevBack = windowConv(main, addDays(end, -T), T).installs;
+    var surge = prevBack > 0 && trialDaysBack >= prevBack * 1.5;
+
+    document.getElementById('trRecent').innerHTML =
+      '<div class="table-scroll"><table><thead><tr><th>Window</th><th>Paid</th><th>Finished trial</th>' +
+      '<th>Conversion</th><th>± range</th><th>vs the window before</th><th>Paid ÷ installs</th></tr></thead>' +
+      '<tbody>' + rows + '</tbody></table></div>' +
+      '<p class="hint" style="margin:8px 0 0"><b>' + fmtInt(waiting) + '</b> ' +
+        (waiting === 1 ? 'install is' : 'installs are') + ' still inside the ' + trialDays() +
+        '-day trial and in none of the conversion rates yet — they enter as they reach day ' + T + '.' +
+        (surge
+          ? ' That is <b>' + (trialDaysBack / prevBack).toFixed(1) + '×</b> the installs of the ' + (T - 1) +
+            ' days before, so the short windows will move a lot over the next two weeks as those people ' +
+            'finish the trial. Purchases they make <em>during</em> the trial are already counted, which lifts ' +
+            'the short windows early; the rate settles once they have all finished.'
+          : '') +
+      '</p>';
+  }
+
+  function renderRollingConversion(main, r) {
+    var days = [];
+    for (var d = r.from; d <= r.to; d = addDays(d, 1)) days.push(d);
+    var T = trialExit();
+    var line = function (n) {
+      return days.map(function (d) { return windowConv(main, d, n).rate; });
+    };
+    var lifetime = days.map(function (d) {
+      var out = cumAt(main, addDays(d, -T), 'downloads');
+      return out ? (cumAt(main, d, 'sales') / out) * 100 : null;
+    });
+    drawChart('trRolling', {
+      x: days.map(dayX), height: 260, format: fmtPct, xLabel: 'Day',
+      yTickFormat: function (v) { return v.toFixed(v < 10 ? 1 : 0) + '%'; },
+      series: [
+        { key: 'r7', name: 'Last 7 days', color: COLOR.s1, type: 'line', format: fmtPct, values: line(7) },
+        { key: 'r30', name: 'Last 30 days', color: ENTITY.trialEnd, type: 'line', format: fmtPct, values: line(30) },
+        { key: 'life', name: 'Lifetime', color: COLOR.muted, type: 'line', dashed: true, format: fmtPct, values: lifetime }
+      ],
+      emptyText: 'No one has finished the trial in this range yet.'
+    });
+  }
+
   function renderTrial() {
     var r = activeRange();
     var main = isCompare() ? 'all' : platKeys()[0];
@@ -1347,6 +1482,9 @@
         split: splitOf(function (x) { return fmtInt(x.inTrial); })
       })
     ].join('');
+
+    renderRecentConversion(main);
+    renderRollingConversion(main, r);
 
     /* Funnel — a true nested funnel: every step after "downloads" is a subset of the
        installs in this range, aged forward to today. (Using crossings that happened
@@ -4216,17 +4354,30 @@
     { kind: 'pot', slot: 'E', name: 'POTS episode', color: COLOR.s8 },
     { kind: 'not', slot: 'M', name: 'Reminder on', color: COLOR.s4 },
     { kind: 'not', slot: 'C', name: 'Crash warning on', color: COLOR.s2 },
-    { kind: 'not', slot: 'P', name: 'Pacing alerts on', color: COLOR.s6 }
+    { kind: 'not', slot: 'P', name: 'Pacing alerts on', color: COLOR.s6 },
+    /* No slot: `rvw` carries no letter, so the line is the route's own daily
+       total (a headcount — whole-route cap). It counts the prompt being
+       REQUESTED; neither store says whether it was shown, and iOS drops every
+       ask past three a year, so this is a ceiling on prompts seen. */
+    { kind: 'rvw', slot: null, name: 'Store review asked', color: COLOR.green }
   ];
+
+  /* A line's count on one day: its letter's, or the whole route's for a
+     letterless line. */
+  function eventLineOn(ix, L, d) {
+    return L.slot ? A.slotOn(ix, L.kind, d, L.slot) : A.eventsOn(ix, L.kind, d);
+  }
 
   function renderEvents(ix, days) {
     var lines = EVENT_LINES.map(function (L) {
       return {
         L: L,
         values: days.map(function (d) {
-          return A.kindKnown(ix, L.kind, d) ? A.slotOn(ix, L.kind, d, L.slot) : null;
+          return A.kindKnown(ix, L.kind, d) ? eventLineOn(ix, L, d) : null;
         }),
-        total: A.slotOver(ix, L.kind, days, L.slot)
+        total: days.reduce(function (a, d) {
+          return a + (A.kindKnown(ix, L.kind, d) ? eventLineOn(ix, L, d) : 0);
+        }, 0)
       };
     });
     /* A line that is flat zero across the whole range is dropped rather than
@@ -4237,7 +4388,7 @@
     drawChart('pgEvents', {
       x: days.map(dayX), height: 240, format: fmtInt, xLabel: 'Day',
       series: live.map(function (l) {
-        return { key: l.L.kind + l.L.slot, name: l.L.name, color: l.L.color, type: 'line', values: l.values };
+        return { key: l.L.kind + (l.L.slot || ''), name: l.L.name, color: l.L.color, type: 'line', values: l.values };
       }),
       emptyText: 'No product events in this range.'
     });
@@ -6354,6 +6505,12 @@
 
   var lastSale = null;
 
+  /* A purchase drafted from a `sub` ping on the Pings tab (`recordSaleFromPing`).
+     It survives re-renders of this view until it is saved or cancelled, since
+     the Data view repaints the form on every renderAll and a draft that vanished
+     on the next refresh would have you retyping it. */
+  var salePrefill = null;
+
   function renderSaleEntry() {
     renderSaleForm(null);
     renderSaleTable();
@@ -6368,7 +6525,8 @@
     var host = document.getElementById('slSaleForm');
     if (!host) return;
     var sale = id ? saleById(id) : null;
-    var d = sale || saleFormDefaults();
+    var pre = sale ? null : salePrefill;
+    var d = sale || pre || saleFormDefaults();
     var plans = Sales.PLAN_KEYS.map(function (k) {
       return '<option value="' + k + '"' + (d.plan === k ? ' selected' : '') + '>' + esc(planLabel(k)) + '</option>';
     }).join('');
@@ -6376,27 +6534,29 @@
       return '<option value="' + p[0] + '"' + (d.platform === p[0] ? ' selected' : '') + '>' + p[1] + '</option>';
     }).join('');
 
-    host.innerHTML = '<div class="event-form">' +
+    host.innerHTML = (pre ? '<p class="hint" id="slPrefillNote" style="margin:0 0 10px">' + pre.hint + '</p>' : '') +
+      '<div class="event-form">' +
       '<div class="field"><label for="slDate">Purchase date</label>' +
-        '<input type="date" id="slDate" value="' + esc(sale ? sale.date : today()) + '"></div>' +
+        '<input type="date" id="slDate" value="' + esc(sale ? sale.date : pre ? pre.date : today()) + '"></div>' +
       '<div class="field"><label for="slPlatform">Store</label><select id="slPlatform">' + plats + '</select></div>' +
       '<div class="field"><label for="slPlan">Plan</label><select id="slPlan">' + plans + '</select></div>' +
       '<div class="field"><label for="slPrice">Price paid</label>' +
         '<input type="number" id="slPrice" min="0" step="0.01" placeholder="0.00" value="' +
-        esc(sale ? sale.price : (d.price === '' ? '' : d.price)) + '"></div>' +
+        esc(sale ? sale.price : pre ? '' : (d.price === '' ? '' : d.price)) + '"></div>' +
       '<div class="field"><label for="slQty">Count</label>' +
         '<input type="number" id="slQty" min="1" step="1" value="' + esc(sale ? sale.qty : 1) + '"></div>' +
       '<div class="field"><label for="slCohort">Install date (optional)</label>' +
-        '<input type="date" id="slCohort" value="' + esc(sale && sale.cohort ? sale.cohort : '') + '"></div>' +
+        '<input type="date" id="slCohort" value="' + esc(sale && sale.cohort ? sale.cohort : pre ? pre.cohort : '') + '"></div>' +
       '<div class="field"><label for="slCancelled">Cancelled on (optional)</label>' +
         '<input type="date" id="slCancelled" value="' + esc(sale && sale.cancelled ? sale.cancelled : '') + '"></div>' +
       '<div class="field"><label for="slRefunded">Refunded</label>' +
         '<select id="slRefunded"><option value="">No</option><option value="1"' +
         (sale && sale.refunded ? ' selected' : '') + '>Yes — remove from every money figure</option></select></div>' +
       '<div class="field grow"><label for="slNote">Note</label>' +
-        '<input type="text" id="slNote" maxlength="200" value="' + esc(sale && sale.note ? sale.note : '') + '"></div>' +
+        '<input type="text" id="slNote" maxlength="200" value="' + esc(sale && sale.note ? sale.note : pre ? pre.note : '') + '"></div>' +
       '<div class="event-form-actions">' +
       '<button class="btn primary" id="slSave">' + (sale ? 'Save purchase' : 'Add purchase') + '</button>' +
+      (pre ? '<button class="btn" id="slCancelPrefill">Cancel</button>' : '') +
       (sale ? '<button class="btn" id="slCancelEdit">Cancel</button>' +
         '<span class="spacer"></span><button class="btn danger" id="slDelete">Delete</button>' : '') +
       '</div>' +
@@ -6419,6 +6579,13 @@
     }
     qty.addEventListener('input', syncQty);
     syncQty();
+
+    if (pre) {
+      document.getElementById('slCancelPrefill').addEventListener('click', function () {
+        salePrefill = null;
+        renderSaleForm(null);
+      });
+    }
 
     if (sale) {
       document.getElementById('slCancelEdit').addEventListener('click', function () { renderSaleForm(null); });
@@ -6452,9 +6619,13 @@
         cohort: (n === 1 && cohortVal) ? cohortVal : undefined,
         cancelled: cancelledVal || undefined,
         refunded: !!document.getElementById('slRefunded').value,
-        note: document.getElementById('slNote').value.trim() || undefined
+        note: document.getElementById('slNote').value.trim() || undefined,
+        /* The ping a draft came from rides on the purchase for good, and an
+           edit keeps it, so that ping row stays Recorded. */
+        ping: sale ? sale.ping : pre ? pre.ping : undefined
       };
       putSale(rec);
+      if (!sale) salePrefill = null;
       lastSale = { platform: rec.platform, plan: rec.plan, price: rec.price };
       renderSaleEntry();
       renderAll();
@@ -9433,14 +9604,70 @@
      40ms: a control that flashes reads as broken rather than fast. */
 
   var MIN_SPIN_MS = 480;
+  /* How long the checkmark holds before it turns back into the arrows. */
+  var CHECK_HOLD_MS = 1100;
   var refreshing = false;
 
   /**
-   * `opts.silent` suppresses the "Refreshed." confirmation, and nothing else.
-   * It is what the five-minute auto-refresh below passes: a toast every five
-   * minutes for a thing nobody asked for is furniture, the same reason the sync
-   * pill went away. A refresh that FAILS still says so however it was started —
-   * that one is worth interrupting for, and it can only appear once per cycle.
+   * Spin the refresh button until `p` — and everything else handed to this
+   * while it runs — has settled, then turn it into a checkmark and back.
+   *
+   * One owner for the button, because a refresh is several loads that finish
+   * at different times: the boot pull, the ping counter `init` starts beside
+   * it, a refresh's push-pull-render chain. Each one counts itself in, and the
+   * wheel stops only when the count reaches zero, so it never goes still while
+   * a load it stands for is still arriving. A load that FAILED leaves the
+   * arrows with no check: the check says "everything is current", and the
+   * failure has its own words (the refresh toast, the ping view's status).
+   * There is no "Refreshed." toast any more — the check is the confirmation.
+   */
+  var spin = { n: 0, failed: false, startedAt: 0, holdTimer: 0 };
+
+  function setSpin(v) {
+    var btn = document.getElementById('btnRefresh');
+    if (btn) btn.dataset.busy = v;
+  }
+
+  function spinWhile(p) {
+    if (!spin.n) {
+      spin.failed = false;
+      spin.startedAt = Date.now();
+      clearTimeout(spin.holdTimer);
+    }
+    spin.n += 1;
+    setSpin('true');
+    var settle = function (ok) {
+      if (!ok) spin.failed = true;
+      /* A load that answers in 40ms still spins for MIN_SPIN_MS: a control
+         that flashes reads as broken rather than fast. */
+      var wait = Math.max(0, MIN_SPIN_MS - (Date.now() - spin.startedAt));
+      setTimeout(function () {
+        spin.n -= 1;
+        if (spin.n > 0) return;
+        if (spin.failed) { setSpin('false'); return; }
+        setSpin('done');
+        spin.holdTimer = setTimeout(function () { if (!spin.n) setSpin('false'); }, CHECK_HOLD_MS);
+      }, wait);
+    };
+    Promise.resolve(p).then(function () { settle(true); }, function () { settle(false); });
+    return p;
+  }
+
+  /* `pingLoad` never rejects — a failed fetch is recorded in `pings.status`
+     for the view to show — so the spinner asks that instead. */
+  function pingLoadSpun(force) {
+    return spinWhile(pingLoad(force).then(function () {
+      if (pings.status === 'error') throw new Error(pings.error);
+    }));
+  }
+
+  /**
+   * `opts.silent` is what the five-minute auto-refresh below passes, and all it
+   * changes now is that the store versions come from the Lambda's cache rather
+   * than a forced check. There is no "Refreshed." toast on any path any more:
+   * the button's checkmark is the confirmation (`spinWhile`). A refresh that
+   * FAILS still says so however it was started — that one is worth
+   * interrupting for, and it can only appear once per cycle.
    *
    * `opts.keepScreen` pulls and hydrates without re-rendering, and exists for
    * exactly one case: an unattended refresh landing on **Edit data**. That view
@@ -9456,11 +9683,8 @@
     if (refreshing) return;
     var silent = !!(opts && opts.silent);
     var keepScreen = !!(opts && opts.keepScreen);
-    var btn = document.getElementById('btnRefresh');
     refreshing = true;
     lastAutoAt = Date.now();
-    if (btn) btn.dataset.busy = 'true';
-    var startedAt = Date.now();
 
     var work = Promise.resolve(window.Sync ? window.Sync.flush() : null)
       .then(function () { return window.Sync ? window.Sync.pull() : null; })
@@ -9479,7 +9703,10 @@
        Costs page was announced whenever you next happened to open App usage —
        by which time it was not news, and the confetti was for something that
        had happened an hour ago. It is one small GET every five minutes. */
-    work = work.then(function () { return pingLoad(true); });
+    var pingsOk = true;
+    work = work.then(function () {
+      return pingLoad(true).then(function () { pingsOk = pings.status !== 'error'; });
+    });
 
     /* The stores, on the view that shows them. A refresh you PRESSED forces a
        real check; the five-minute one takes whatever the Lambda's half-hour
@@ -9489,18 +9716,17 @@
       work = work.then(function () { return storeLoad(!silent); });
     }
 
-    work.then(function () {
+    /* The wheel runs until the repaint is done, not until the fetches are:
+       "completely set" means the numbers on screen are the new ones. */
+    var done = work.then(function () {
       if (!keepScreen) renderAll();
-      if (!silent) toast('Refreshed.');
-    }).catch(function (err) {
-      toast('Could not refresh: ' + ((err && err.message) || 'no answer from the server') + '.');
-    }).then(function () {
-      var wait = Math.max(0, MIN_SPIN_MS - (Date.now() - startedAt));
-      setTimeout(function () {
-        refreshing = false;
-        if (btn) btn.dataset.busy = 'false';
-      }, wait);
     });
+    spinWhile(done.then(function () {
+      if (!pingsOk) throw new Error(pings.error);
+    }));
+    done.catch(function (err) {
+      toast('Could not refresh: ' + ((err && err.message) || 'no answer from the server') + '.');
+    }).then(function () { refreshing = false; });
   }
 
   /* -------------------------------------------------------- auto-refresh
@@ -10003,7 +10229,8 @@
     { key: 'fnd', label: 'Finding', color: COLOR.s7, note: 'opened a finding\'s deep dive' },
     { key: 'rpt', label: 'AI report', color: COLOR.s4, note: 'built an AI report' },
     { key: 'rdg', label: 'Reading kind', color: PC.reading, note: 'morning baseline, later baseline or training' },
-    { key: 'mbp', label: 'Morning card', color: COLOR.s5, note: 'shown, took it, closed' }
+    { key: 'mbp', label: 'Morning card', color: COLOR.s5, note: 'shown, took it, closed' },
+    { key: 'rvw', label: 'Review asked', color: COLOR.green, note: 'store review prompt requested (not necessarily shown)' }
   ];
 
   /**
@@ -10056,6 +10283,8 @@
                resolves it, so the table can print a name without holding a copy
                of every alphabet. */
             label: c.label || slotLabel(k.key, c),
+            plan: c.plan || null,
+            slotLetter: c.slot || null,
             tier: c.tier,
             /* Age can legitimately be negative by a day: the cohort date is the
                install's own local day and the arrival day is stamped US
@@ -10077,6 +10306,93 @@
       return a.key < b.key ? -1 : 1;
     });
     return out;
+  }
+
+  /* ------------------------------------------ a subscribe ping as a sale
+
+     A `sub` row already holds everything a purchase record needs except the
+     money: the day it arrived, the store, the plan letter and the install date.
+     `recordSaleFromPing` drafts that purchase into the Edit data form and leaves
+     the price for you, because the ping never carries one — the promo and
+     founder years are sold below the list price, and a guessed price would be a
+     wrong number in every revenue figure. Nothing is written until Add.
+
+     The ping's plan letter is finer than the ledger's: Y, P and F are all a
+     year. The ledger records the TERM (it is what MRR is computed from), so
+     all three become `annual` and the note keeps which one it was.
+
+     A saved draft is TIED to its ping: the purchase stores `ping`, the row's
+     own identity (`pingRef`: arrival day + stored cohort key, which already
+     carries platform, plan and tier), and the row reads Recorded once that
+     many purchases point at it. A tie rather than a match on date, store and
+     install date, because the store's date can land a day either side of the
+     arrival day and correcting it must not un-record the row, and because a
+     purchase typed in by hand for the same buyer must not record it either.
+     Deleting the purchase unties it. */
+  var PING_PLAN_TO_SALE = { Y: 'annual', P: 'annual', F: 'annual', M: 'monthly' };
+
+  function pingRef(x) { return x.arrived + '|' + x.key; }
+
+  function salesForPing(x) {
+    var ref = pingRef(x);
+    return salesList().reduce(function (n, raw) {
+      return raw && raw.ping === ref ? n + Math.max(1, +raw.qty || 1) : n;
+    }, 0);
+  }
+
+  function lastPriceFor(platform, plan) {
+    var best = null;
+    salesList().forEach(function (raw) {
+      if (!raw || raw.refunded || raw.platform !== platform || raw.plan !== plan) return;
+      if (!(+raw.price > 0)) return;
+      if (!best || raw.date > best.date) best = raw;
+    });
+    return best;
+  }
+
+  function recordSaleFromPing(x) {
+    var planLetter = x.plan || x.slotLetter || null;
+    var plan = PING_PLAN_TO_SALE[planLetter] || 'unknown';
+    var platform = x.platform === 'A' ? 'android' : 'ios';
+    var ref = plan === 'unknown' ? null : lastPriceFor(platform, plan);
+    var hint = '<b>Drafted from a subscribe ping</b> that arrived ' + esc(labelFull(x.arrived)) +
+      ' from an install of ' + esc(labelFull(x.cohort)) + '. Enter the <b>price paid</b> and press Add.';
+    if (x.platform !== 'A' && x.platform !== 'I') hint += ' The ping named no store, so check it.';
+    if (!planLetter) {
+      hint += ' It came from an older build, whose subscribe ping also fired on a restore or a second phone — ' +
+        'make sure this was a sale, and set the plan.';
+    } else if (planLetter === 'P' || planLetter === 'F') {
+      hint += ' This was the <b>' + esc(A.planName(planLetter).toLowerCase()) + '</b>, sold below the list price.';
+    } else if (ref) {
+      hint += ' The last ' + esc(planLabel(plan).toLowerCase()) + ' ' + PLATFORMS[platform] +
+        ' purchase on record was ' + fmtMoney(+ref.price) + '.';
+    }
+    if (x.remaining > 1) {
+      hint += ' This row holds <b>' + fmtInt(x.remaining) + '</b> unrecorded purchases from that install day; ' +
+        'add them one at a time.';
+    }
+    hint += ' The store can date a purchase a day either side of when the ping arrived; correct the date ' +
+      'freely, the purchase stays tied to this ping.';
+    salePrefill = {
+      date: x.arrived,
+      platform: platform,
+      plan: plan,
+      price: '',
+      cohort: x.cohort,
+      note: 'From subscribe ping' + (planLetter ? ' · ' + A.planName(planLetter) : ''),
+      ping: pingRef(x),
+      hint: hint
+    };
+    setView('data');
+    window.requestAnimationFrame(function () {
+      var form = document.getElementById('slSaleForm');
+      if (!form) return;
+      var acc = form.closest('details');
+      if (acc) acc.open = true;
+      form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      var price = document.getElementById('slPrice');
+      if (price) price.focus();
+    });
   }
 
   function renderPings() {
@@ -10138,13 +10454,29 @@
     var CAP = 500;
     var shown = rows.slice(0, CAP);
 
+    /* Subscribe rows get a Record button that drafts the purchase into Edit
+       data; a row the ledger already covers says so instead. */
+    var hasSub = shown.some(function (x) { return x.kind === 'sub'; });
+    shown.forEach(function (x) {
+      if (x.kind !== 'sub') return;
+      x.recorded = Math.min(x.count, salesForPing(x));
+      x.remaining = x.count - x.recorded;
+    });
+    function saleCell(x, i) {
+      if (x.kind !== 'sub') return '';
+      if (!x.remaining) return '<span class="pill green">Recorded</span>';
+      return '<button class="btn sm" data-ping-sale="' + i + '">Record sale' +
+        (x.count > 1 ? ' (' + fmtInt(x.remaining) + ' left)' : '') + '</button>';
+    }
+
     host.innerHTML =
       '<div class="table-scroll"><table><thead><tr>' +
       '<th style="text-align:left">Route</th><th>Arrived</th><th>Cohort</th><th>Age</th>' +
       '<th style="text-align:left">Platform</th><th style="text-align:left">Sensor / surface / plan</th>' +
       '<th style="text-align:left">Tier</th><th style="text-align:left">Key</th><th>Count</th>' +
+      (hasSub ? '<th></th>' : '') +
       '</tr></thead><tbody>' +
-      shown.map(function (x) {
+      shown.map(function (x, i) {
         return '<tr>' +
           '<td style="text-align:left"><span class="swatch" style="background:' + x.color + '"></span>' + esc(x.kindLabel) + '</td>' +
           '<td>' + esc(labelDay(x.arrived)) + '</td>' +
@@ -10160,6 +10492,7 @@
             (x.tier ? esc(A.tierName(x.tier)) : '<span class="na">–</span>') + '</td>' +
           '<td style="text-align:left"><code>' + esc(x.key) + '</code></td>' +
           '<td>' + fmtInt(x.count) + '</td>' +
+          (hasSub ? '<td>' + saleCell(x, i) + '</td>' : '') +
           '</tr>';
       }).join('') +
       '</tbody></table></div>' +
@@ -10167,6 +10500,10 @@
         ? '<p class="hint" style="margin-top:8px">Showing the ' + fmtInt(CAP) + ' most recent of ' +
           fmtInt(rows.length) + ' rows. Narrow the range, or export the CSV for all of them.</p>'
         : '');
+
+    host.querySelectorAll('[data-ping-sale]').forEach(function (b) {
+      b.addEventListener('click', function () { recordSaleFromPing(shown[+b.dataset.pingSale]); });
+    });
   }
 
 
@@ -11204,7 +11541,7 @@
        diff against, so it is fetched at boot everywhere rather than on arrival
        at App usage — otherwise the first thing a session hears about a sale is
        nothing at all. */
-    pingLoad();
+    pingLoadSpun();
 
     /* --- data entry --- */
     wireBulk();
@@ -11481,6 +11818,10 @@
     toast: toast,
     hasCache: hasCache,
     skeleton: skeleton,
-    adopted: adopted
+    adopted: adopted,
+    /* boot.js hands the first pull to the refresh button's spinner, so the
+       wheel on first arrival runs until the pull AND the ping counter `start`
+       kicks off beside it have both landed. */
+    spinWhile: spinWhile
   };
 })();
