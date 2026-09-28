@@ -54,6 +54,8 @@ export interface RecommendInput {
   /** The upright signature's source, so a default band asks for a stand test. */
   signatureSource: 'standTest' | 'orthostatic' | 'default' | null;
   hasHrSeries: boolean;
+  /** The reader has a way to take a stand test (`hasStandTestDevice`). */
+  canStandTest?: boolean;
   /** The reader has tapped the stand-test Todo before. It is asked once. */
   standTestAsked?: boolean;
   stepsGranted: boolean;
@@ -81,7 +83,9 @@ export function nextRecommendation(input: RecommendInput): Recommendation | null
   // 3. A standing test, but only when there is a heart-rate series for it to
   //    calibrate. Without one there is no standing band to fit. Asked ONCE:
   //    a reader who tapped it and walked away from the test has answered.
-  if (input.hasHrSeries && input.signatureSource === 'default' && !input.standTestAsked) {
+  //    And only for somebody who owns the kit: the test runs on the Apple
+  //    Watch app or a chest strap, and a Todo nobody can do is a nag.
+  if (input.hasHrSeries && input.signatureSource === 'default' && input.canStandTest && !input.standTestAsked) {
     return { id: 'orthostatic', title: 'Todo: Log a standing test', actionable: true };
   }
 
@@ -102,6 +106,24 @@ export function nextRecommendation(input: RecommendInput): Recommendation | null
   }
 
   return null;
+}
+
+/**
+ * Can this person take a stand test? It runs on the Apple Watch app or a
+ * Bluetooth chest strap, so: a strap is saved, or the journal holds a reading
+ * captured with either. A reading IMPORTED from Apple Health says 'watch' too,
+ * but only proves a watch wrote to Health, not that the app is on it, so it
+ * does not count.
+ */
+export function hasStandTestDevice(days: DaysMap, strapSaved: boolean): boolean {
+  if (strapSaved) return true;
+  for (const dk in days) {
+    for (const r of days[dk]?.readings || []) {
+      if (r.imported) continue;
+      if (r.source === 'watch' || r.source === 'polar') return true;
+    }
+  }
+  return false;
 }
 
 /** Re-exported for the sheet's empty state, which asks the same question. */

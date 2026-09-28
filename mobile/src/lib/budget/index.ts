@@ -42,7 +42,7 @@ import { paceAt, type Pace } from './pace';
 import { buildAccuracy, type Accuracy } from './accuracy';
 import { ceilingMove } from './calibrate';
 import { makeScoreLookup, makeSetLookup } from './outcome';
-import { nextRecommendation, type Recommendation } from './recommend';
+import { hasStandTestDevice, nextRecommendation, type Recommendation } from './recommend';
 import { PAUSED_TODAY_SUB, pauseReasonText, pauseRunBefore, unpausedBy, unpausedText, type Unpaused } from './pause';
 import { uprightSignature } from './upright';
 
@@ -310,6 +310,10 @@ export function buildBudgetAt(
         : envelope.confidence === 'medium' ? 'Medium confidence'
           : null;
 
+  // Once per build, and only when the stand-test Todo could still be asked.
+  const canStandTest = !past && !opts.standTestAsked
+    && hasStandTestDevice(days, !!state.settings?.lastBleDeviceId);
+
   return nows.map((now) => {
     const nowMin = now.getHours() * 60 + now.getMinutes();
     // A finished day has no "where should you be by now": the day is where it
@@ -322,6 +326,7 @@ export function buildBudgetAt(
       heldDays: envelope.heldDays,
       signatureSource: sig?.source ?? null,
       hasHrSeries: days[dk]?.load?.hrCoverageMin != null,
+      canStandTest,
       standTestAsked: opts.standTestAsked,
       stepsGranted: opts.stepsGranted !== false && days[dk]?.load?.steps != null,
       spentShare: fill,

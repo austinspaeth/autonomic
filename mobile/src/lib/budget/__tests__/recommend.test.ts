@@ -1,4 +1,4 @@
-import { nextRecommendation } from '../recommend';
+import { hasStandTestDevice, nextRecommendation } from '../recommend';
 import type { DayRecord, Entry } from '../../types';
 
 const DK = '2026-08-22';
@@ -27,15 +27,33 @@ describe('the HRV todo asks for the baseline', () => {
   });
 });
 
-describe('the stand-test todo is asked once', () => {
-  const stand = (standTestAsked: boolean) => nextRecommendation({
+describe('the stand-test todo', () => {
+  const stand = (standTestAsked: boolean, canStandTest = true) => nextRecommendation({
     days: { [DK]: day([base]) }, dk: DK, nowMin: 9 * 60, signatureSource: 'default', learning: 1, heldDays: 30,
-    hasHrSeries: true, standTestAsked, stepsGranted: true, spentShare: 0,
+    hasHrSeries: true, canStandTest, standTestAsked, stepsGranted: true, spentShare: 0,
   });
   it('asks while it has never been tapped', () => {
     expect(stand(false)?.id).toBe('orthostatic');
   });
   it('moves on once the reader has tapped it, test taken or not', () => {
     expect(stand(true)?.id).not.toBe('orthostatic');
+  });
+  it('is never asked of somebody with no watch app or strap', () => {
+    expect(stand(false, false)?.id).not.toBe('orthostatic');
+  });
+});
+
+describe('hasStandTestDevice', () => {
+  const days = (r: Partial<Entry>) => ({ [DK]: day([{ id: 'x', type: 'hrv', time: '07:00', ...r } as Entry]) });
+  it('counts a saved strap', () => {
+    expect(hasStandTestDevice({}, true)).toBe(true);
+  });
+  it('counts a reading captured with the watch app or a strap', () => {
+    expect(hasStandTestDevice(days({ source: 'watch' }), false)).toBe(true);
+    expect(hasStandTestDevice(days({ source: 'polar' }), false)).toBe(true);
+  });
+  it('does not count the camera, or a watch reading imported from Health', () => {
+    expect(hasStandTestDevice(days({ source: 'camera' }), false)).toBe(false);
+    expect(hasStandTestDevice(days({ source: 'watch', imported: true }), false)).toBe(false);
   });
 });
