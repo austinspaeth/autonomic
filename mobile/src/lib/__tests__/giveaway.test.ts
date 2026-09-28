@@ -1,5 +1,5 @@
 import {
-  GIVEAWAY_END, GIVEAWAY_MAX_ENTRIES, giveawayBody, giveawayEntries, giveawayEntryList, giveawayOpen, isPlausibleEmail,
+  GIVEAWAY_END, GIVEAWAY_START, GIVEAWAY_MAX_ENTRIES, giveawayBody, giveawayEntries, giveawayEntryList, giveawayOpen, isPlausibleEmail,
 } from '../giveaway';
 import { blankDay } from '../migrate';
 import type { AppState, DayRecord, Entry } from '../types';
@@ -45,8 +45,9 @@ describe('giveaway entries', () => {
     expect(giveawayEntries({ [oct(1)]: days[oct(1)] }, oct(31))).toBe(0);
   });
 
-  it('shows the card until the window closes', () => {
-    expect(giveawayOpen('2026-09-27')).toBe(true);
+  it('shows the card only inside the window', () => {
+    expect(giveawayOpen('2026-09-30')).toBe(false);
+    expect(giveawayOpen(GIVEAWAY_START)).toBe(true);
     expect(giveawayOpen(GIVEAWAY_END)).toBe(true);
     expect(giveawayOpen('2026-11-01')).toBe(false);
   });

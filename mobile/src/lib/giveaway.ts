@@ -18,8 +18,10 @@ export const GIVEAWAY_END = '2026-10-31';
 export const GIVEAWAY_MAX_ENTRIES = 10;
 export const GIVEAWAY_INFO_URL = 'https://autonomic.care/dysautonomia-awareness-giveaway/';
 
-/** Is the card shown on this day? From now until the last day of the window. */
-export const giveawayOpen = (dk: string): boolean => dk <= GIVEAWAY_END;
+/** Is the card shown on this day? Only inside the window: before it opens a
+ *  reading earns nothing, and a card saying "take a reading, earn an entry"
+ *  that then fills no dot reads as a broken feature. */
+export const giveawayOpen = (dk: string): boolean => dk >= GIVEAWAY_START && dk <= GIVEAWAY_END;
 
 /** One earned entry as the sign-up sends it: the day, and the sensor letter of
  *  that day's first counting reading (`null` for one with no live sensor, e.g.
