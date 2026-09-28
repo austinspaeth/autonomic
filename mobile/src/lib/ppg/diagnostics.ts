@@ -178,6 +178,10 @@ export interface PpgTraceState {
   frameFaults: number;
   /** What the last unreadable frame said. */
   lastFrameFault: string | null;
+  /** How the worklet reads a frame: the native `ppgMeanRgb` plugin (Android,
+   *  image planes) or `frame.toArrayBuffer()` (iOS, and any Android build
+   *  without the plugin). The two fail differently, so the report names it. */
+  frameReader: string | null;
   firstFrameMs: number | null;
   lastFrameMs: number | null;
   /** Inferred frame-timestamp unit; null means the scale was never resolved. */
@@ -210,6 +214,7 @@ function emptyState(): PpgTraceState {
     frames: 0,
     frameFaults: 0,
     lastFrameFault: null,
+    frameReader: null,
     firstFrameMs: null,
     lastFrameMs: null,
     tScale: null,
@@ -478,6 +483,7 @@ export function formatCameraDiagnostics(d: CameraDiagnostics): string {
   out.push(line('torch prop', t.torch));
   out.push(line('device has torch', yn(t.hasTorch)));
   out.push(line('fps applied', t.fps));
+  out.push(line('frame reader', t.frameReader));
   out.push(line('frames', t.frames));
   out.push(line('unreadable frames', t.frameFaults));
   out.push(line('last unreadable frame', t.lastFrameFault));

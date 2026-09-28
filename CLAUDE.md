@@ -1839,6 +1839,18 @@ old web app so old `export.json` files import directly.
   tells them apart, in `cameraVerdict`, in the collected notes, and in the
   setup card's own `frames` fault card ("close the other app using the camera"
   is useless advice when there is nothing to close).
+  **Android no longer calls `toArrayBuffer()` at all.** On a Galaxy S25
+  (Android 16) EVERY lock was refused, on every rung — upstream locks with
+  `AHARDWAREBUFFER_USAGE_CPU_READ_MASK`, a mask rather than a usage, and a
+  strict gralloc rejects it — so the catch above turned a crash into a camera
+  that could never read. The frame is now read by `ppgMeanRgb`, a VisionCamera
+  frame processor plugin in the local `modules/ppg-frame` (Android-only Expo
+  module), which computes the same strided centre-crop mean from
+  `Image.getPlanes()` and never touches an AHardwareBuffer, so it cannot leak
+  one either. Its arithmetic mirrors the worklet's JS read (same crop, same
+  `TARGET_SAMPLES` stride rule — move both); iOS, and any Android binary without
+  the plugin, keep the JS read and every guard above. The report's SESSION
+  block names which path ran (`frame reader`). Native: needs a build, not OTA.
 - **The app's whole state is diagnosable too.** An 8-second hold on the brand
   card at the top of Settings collects the general support dump
   (`src/lib/diagnostics/collectApp.ts` → `formatAppDiagnostics`), rendered into

@@ -29,6 +29,7 @@ import {
   ATTEMPT_FRAME_TIMEOUT_MS, ATTEMPT_INIT_TIMEOUT_MS, FRAME_FAULT_LIMIT, PPG_ATTEMPTS, ppgTrace,
 } from './diagnostics';
 import { describeError } from '../diagnostics/env';
+import { PPG_FRAME_PLUGIN, installPpgFrameReader } from '../../../modules/ppg-frame';
 
 let vc: typeof import('react-native-vision-camera') | null = null;
 let worklets: typeof import('react-native-worklets-core') | null = null;
@@ -57,6 +58,36 @@ export function probePpgModules(): boolean {
   );
   if (ok) ppgTrace.mark('module-loaded');
   return ok;
+}
+
+/** The slice of VisionCamera's `FrameProcessorPlugin` the worklet calls. */
+type FrameReader = { call: (frame: never) => unknown };
+let reader: FrameReader | null | undefined;
+
+/**
+ * The native frame read on Android, or null to use `frame.toArrayBuffer()`.
+ *
+ * `toArrayBuffer()` locks the frame's HardwareBuffer with a usage MASK rather
+ * than a usage, and a strict gralloc refuses every such lock: on a Galaxy S25
+ * (Android 16) not one frame could be read, on any format, so the camera could
+ * never take a reading at all. The `ppgMeanRgb` plugin (`modules/ppg-frame`)
+ * reads the same pixels through the image planes instead, which never locks a
+ * HardwareBuffer and so also cannot leak one. iOS keeps `toArrayBuffer`, which
+ * works there, and so does any Android build that predates the plugin.
+ * Resolved once per process: the plugin's identity is a worklet dependency.
+ */
+function frameReader(): FrameReader | null {
+  if (reader !== undefined) return reader;
+  reader = null;
+  if (Platform.OS === 'android' && vc && installPpgFrameReader()) {
+    try {
+      reader = (vc.VisionCameraProxy.initFrameProcessorPlugin(PPG_FRAME_PLUGIN, {}) as FrameReader | undefined) ?? null;
+    } catch (e) {
+      ppgTrace.note('frame-reader', `plugin unavailable (${describeError(e)})`);
+      reader = null;
+    }
+  }
+  return reader;
 }
 
 export function PpgCameraView({ preview }: { preview?: number }) {
@@ -105,6 +136,13 @@ function PpgCameraInner({ preview }: { preview?: number }) {
   // the camera thread. `useSharedValue` is a `useRef` over a thread-safe box,
   // so its identity is as fixed as every other worklet dependency here.
   const frameFaults = useSharedValue(0);
+
+  // Fixed for the life of the process, so as stable a worklet dependency as the
+  // rest. Stated in the trace on every mount, since the trace resets per card.
+  const [nativeRead] = useState(frameReader);
+  useEffect(() => {
+    ppgTrace.set({ frameReader: nativeRead ? 'native (image planes)' : 'toArrayBuffer' });
+  }, [nativeRead]);
 
   const device = useCameraDevice('back');
   useEffect(() => {
@@ -245,8 +283,17 @@ function PpgCameraInner({ preview }: { preview?: number }) {
     // torn down.
     if (frameFaults.value >= FRAME_FAULT_LIMIT) return;
     try {
+      if (nativeRead) {
+        // Android: the same strided mean, computed natively from the image
+        // planes — see frameReader(). A result that is not three numbers is a
+        // fault like any other, never a silent gap in the trace.
+        const m = nativeRead.call(frame as never) as number[] | undefined;
+        if (!m || m.length !== 3) throw new Error('native frame reader returned no means');
+        push(frame.timestamp, m[0], m[1], m[2]);
+        return;
+      }
       // Strided mean over the center half of the frame — keep the worklet
-      // trivial, detection happens in JS.
+      // trivial, detection happens in JS. Mirrored in PpgMeanRgbPlugin.kt.
       const data = new Uint8Array(frame.toArrayBuffer());
       const w = frame.width, h = frame.height;
       // frame.bytesPerRow is not reliable on every Android device (undefined /
@@ -282,7 +329,8 @@ function PpgCameraInner({ preview }: { preview?: number }) {
       if (count > 0) push(frame.timestamp, r / count, g / count, b / count);
     } catch (e) {
       // `frame.toArrayBuffer()` throws `Failed to lock HardwareBuffer for
-      // reading!` on some Android devices. VisionCamera catches whatever a
+      // reading!` on some Android devices (the native reader above exists so
+      // Android no longer calls it, but a build without it still does). VisionCamera catches whatever a
       // worklet throws and rethrows it on the JS thread as
       // "Frame Processor Error: …", where nothing catches it — so an
       // unreadable frame was an uncaught fatal, which on Android is a process
@@ -297,7 +345,7 @@ function PpgCameraInner({ preview }: { preview?: number }) {
       frameFaults.value = n;
       noteFrameFault(String((e as { message?: string } | undefined)?.message ?? e), n);
     }
-  }, [push, noteFrameFault, frameFaults, rOff, bOff]);
+  }, [push, noteFrameFault, frameFaults, nativeRead, rOff, bOff]);
 
   if (!device || !hasPermission) {
     ppgTrace.set({
