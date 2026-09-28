@@ -68,9 +68,10 @@ ok('Compare button removed', window.document.querySelector('#fPlatform [data-v="
 // pings tab
 const tab=[...window.document.querySelectorAll('.tab')].find(t=>t.dataset.view==='pings');
 // Pings is the last of the DATA tabs. Links, which is a tool rather than a
-// view of the numbers, was added after it and is the only thing past it.
+// view of the numbers, was added after it, and Giveaway (a list of sign-ups,
+// not a reading of the counters) after that; nothing else may follow it.
 const tabs=[...window.document.querySelectorAll('.tab')];
-ok('Pings is the last data tab', !!tab && tabs.slice(tabs.indexOf(tab)+1).every(t=>t.dataset.view==='links'),
+ok('Pings is the last data tab', !!tab && tabs.slice(tabs.indexOf(tab)+1).every(t=>t.dataset.view==='links'||t.dataset.view==='giveaway'),
    'missing, or a data tab follows it');
 tab.click();
 await new Promise(r=>setTimeout(r,400));
