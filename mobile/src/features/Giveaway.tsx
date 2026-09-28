@@ -176,7 +176,7 @@ export function GiveawayCard({ dk }: { dk: string }) {
             </View>
           </View>
           <Text style={{ fontSize: 13.5, lineHeight: 20, color: p.textDim, marginBottom: 15 }}>
-            Take an HRV reading, earn an entry. One per day, up to {GIVEAWAY_MAX_ENTRIES}. Other prizes available.
+            Starting October 1st, take an HRV reading, earn an entry. One per day, up to {GIVEAWAY_MAX_ENTRIES}. Other prizes available. Ends October 31st.
           </Text>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 15 }}>
