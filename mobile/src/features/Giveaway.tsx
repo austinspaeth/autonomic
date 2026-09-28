@@ -65,12 +65,14 @@ const writeCollapsed = (v: boolean) => { try { flags()?.set(COLLAPSED_KEY, v); }
  * tinted icon tile, a title over a one-line count, a thin progress track, and a
  * chevron — the ribbon in the tile where their icons sit.
  */
-const MORPH_MS = 560;
+/** The clean-day accordion's pace (useAccordion: 220-260ms), and overlapped
+ *  like it, so the three phases read as one quick motion rather than a sequence. */
+const MORPH_MS = 260;
 const EASE = Easing.inOut(Easing.cubic);
-const OUT_END = 0.3;     // outgoing layout gone by here
-const H_START = 0.22;    // height moves between these two
-const H_END = 0.78;
-const IN_START = 0.68;   // incoming layout starts appearing here
+const OUT_END = 0.4;     // outgoing layout gone by here
+const H_START = 0.1;     // height moves between these two
+const H_END = 0.9;
+const IN_START = 0.55;   // incoming layout starts appearing here
 const RIB_ROW = { w: 20, h: 28 };
 const ICON_TILE = 42;
 const CHEV_BOX = 44;
