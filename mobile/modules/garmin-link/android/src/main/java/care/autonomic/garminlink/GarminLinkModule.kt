@@ -7,6 +7,7 @@ import com.garmin.android.connectiq.IQDevice
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Connect IQ companion link, Android side.
@@ -36,6 +37,25 @@ class GarminLinkModule : Module() {
   private val context: Context
     get() = appContext.reactContext ?: throw IllegalStateException("No react context")
 
+  /**
+   * Settle a promise at most once, and never throw doing it.
+   *
+   * Every Connect IQ callback here can fire more than once — `onSdkReady` again
+   * when Garmin Connect rebinds, a send-status callback per delivery attempt —
+   * and a second `resolve` on an expo Promise throws "already settled". These
+   * callbacks run inside the SDK's own BroadcastReceiver on the main thread, so
+   * that throw was a process kill ("Error receiving broadcast Intent
+   * SEND_MESSAGE_STATUS") where no catch of ours could reach it.
+   */
+  private fun once(promise: Promise): (Any?) -> Unit {
+    val settled = AtomicBoolean(false)
+    return { value ->
+      if (settled.compareAndSet(false, true)) {
+        try { promise.resolve(value) } catch (e: Exception) { /* bridge gone */ }
+      }
+    }
+  }
+
   override fun definition() = ModuleDefinition {
     Name("GarminLink")
 
@@ -46,20 +66,21 @@ class GarminLinkModule : Module() {
     // platforms present one interface to JS.
     AsyncFunction("initialize") { _: String, promise: Promise ->
       if (ready) { promise.resolve(true); return@AsyncFunction }
+      val settle = once(promise)
       val iq = ConnectIQ.getInstance(context, ConnectIQ.IQConnectType.WIRELESS)
       connectIQ = iq
       iq.initialize(context, /* autoUI = */ false, object : ConnectIQ.ConnectIQListener {
         override fun onSdkReady() {
           ready = true
-          promise.resolve(true)
+          settle(true)
         }
 
         override fun onInitializeError(status: ConnectIQ.IQSdkErrorStatus) {
           ready = false
           // Surfaced rather than thrown: a missing Garmin Connect is a state
           // the app explains, not an error it crashes on.
-          sendEvent("onNeedsGarminConnect", mapOf("reason" to status.name))
-          promise.resolve(false)
+          try { sendEvent("onNeedsGarminConnect", mapOf("reason" to status.name)) } catch (e: Exception) { /* no JS listener */ }
+          settle(false)
         }
 
         override fun onSdkShutDown() {
@@ -89,10 +110,11 @@ class GarminLinkModule : Module() {
         promise.resolve(mapOf("installed" to false, "version" to 0, "known" to false))
         return@AsyncFunction
       }
+      val settle = once(promise)
       try {
         iq.getApplicationInfo(watchAppId, device, object : ConnectIQ.IQApplicationInfoListener {
           override fun onApplicationInfoReceived(app: IQApp) {
-            promise.resolve(mapOf(
+            settle(mapOf(
               "installed" to true,
               "version" to app.version(),
               "known" to true,
@@ -100,11 +122,11 @@ class GarminLinkModule : Module() {
           }
 
           override fun onApplicationNotInstalled(applicationId: String) {
-            promise.resolve(mapOf("installed" to false, "version" to 0, "known" to true))
+            settle(mapOf("installed" to false, "version" to 0, "known" to true))
           }
         })
       } catch (e: Exception) {
-        promise.resolve(mapOf("installed" to false, "version" to 0, "known" to false))
+        settle(mapOf("installed" to false, "version" to 0, "known" to false))
       }
     }
 
@@ -112,12 +134,16 @@ class GarminLinkModule : Module() {
       val iq = connectIQ ?: return@AsyncFunction false
       val device = devices[deviceId] ?: return@AsyncFunction false
       try {
+        // Both listeners run inside the SDK's BroadcastReceiver, where a throw is
+        // a process kill (see `once`), so neither may let one escape.
         iq.registerForDeviceEvents(device) { d, status ->
-          sendEvent("onDeviceStatus", mapOf(
-            "id" to d.deviceIdentifier.toString(),
-            "status" to statusName(status),
-            "connected" to (status == IQDevice.IQDeviceStatus.CONNECTED),
-          ))
+          try {
+            sendEvent("onDeviceStatus", mapOf(
+              "id" to d.deviceIdentifier.toString(),
+              "status" to statusName(status),
+              "connected" to (status == IQDevice.IQDeviceStatus.CONNECTED),
+            ))
+          } catch (e: Exception) { /* JS side torn down */ }
         }
         iq.registerForAppEvents(device, IQApp(watchAppId)) { d, _, messageData, _ ->
           // The watch sends one dictionary; the SDK hands it back as a list of
@@ -125,12 +151,16 @@ class GarminLinkModule : Module() {
           // guessed at — mapWatchPayload owns validation.
           for (item in messageData) {
             val map = item as? Map<*, *> ?: continue
-            val payload = map.entries
-              .filter { it.key is String }
-              .associate { (it.key as String) to it.value }
-              .toMutableMap()
-            payload["deviceId"] = d.deviceIdentifier.toString()
-            sendEvent("onMessage", payload)
+            try {
+              val payload = map.entries
+                .filter { it.key is String }
+                .associate { (it.key as String) to it.value }
+                .toMutableMap()
+              payload["deviceId"] = d.deviceIdentifier.toString()
+              sendEvent("onMessage", payload)
+            } catch (e: Exception) {
+              // Unacked, so the watch keeps it queued and resends it.
+            }
           }
         }
         true
@@ -151,12 +181,13 @@ class GarminLinkModule : Module() {
       val iq = connectIQ
       val device = devices[deviceId]
       if (iq == null || device == null) { promise.resolve(false); return@AsyncFunction }
+      val settle = once(promise)
       try {
         iq.sendMessage(device, IQApp(watchAppId), mapOf("ack" to id)) { _, _, status ->
-          promise.resolve(status == ConnectIQ.IQMessageStatus.SUCCESS)
+          settle(status == ConnectIQ.IQMessageStatus.SUCCESS)
         }
       } catch (e: Exception) {
-        promise.resolve(false)
+        settle(false)
       }
     }
 
