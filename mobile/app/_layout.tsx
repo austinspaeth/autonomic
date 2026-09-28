@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { Slot } from 'expo-router';
+import { Slot, usePathname } from 'expo-router';
 import { InteractionManager, Platform, View } from 'react-native';
 import * as Updates from 'expo-updates';
 import { useFonts } from 'expo-font';
@@ -39,6 +39,8 @@ import { initInsightsBadge } from '../src/store/insightsBadge';
 import { loadIssue } from '../src/store/store';
 import { drainNativeCrashes, installErrorLogging, logError } from '../src/lib/diagnostics/errorLog';
 import { usePalette } from '../src/theme';
+import { RootErrorBoundary } from '../src/components/RootErrorBoundary';
+import { noteRoute } from '../src/lib/diagnostics/crashContext';
 
 function Themed({ children }: { children: React.ReactNode }) {
   const p = usePalette();
@@ -48,6 +50,14 @@ function Themed({ children }: { children: React.ReactNode }) {
       {children}
     </View>
   );
+}
+
+/** Tells the crash context which screen is showing (lib/diagnostics/crashContext).
+ *  A leaf of its own so a route change re-renders nothing but this. */
+function RouteBreadcrumb() {
+  const pathname = usePathname();
+  useEffect(() => { noteRoute(pathname); }, [pathname]);
+  return null;
 }
 
 export default function RootLayout() {
@@ -150,50 +160,53 @@ export default function RootLayout() {
   // numeric readouts never flash in a fallback font first.
   if (!fontsLoaded) return <View style={{ flex: 1, backgroundColor: '#000' }} />;
   return (
-    <GestureHandlerRootView style={{ flex: 1 }}>
-      <SafeAreaProvider>
-        <Themed>
-          <ToastProvider>
-            <SheetProvider>
-              <Slot />
-              {/* "See what's new in x.x" — mounted FIRST of the pills on
-                  purpose: siblings paint in order, so it sits behind the two
-                  below and can recede into the stacked-card look when either
-                  of them takes the slot. */}
-              <WhatsNewPill />
-              {/* A reading in progress: the pill it folds into when minimized,
-                  and the hand-off to the results card when it ends (both have
-                  to outlive the card, which the user can close mid-reading). */}
-              <HrvSessionHost />
-              {/* Watch companion overlays (iOS only): results card on arrival +
-                  "Waiting for watch…" pill while the sync card is minimized. */}
-              {/* NOT iOS-gated: the Apple Watch is iOS-only, but Garmin
-                  delivers readings on both platforms, and a reading that lands
-                  with nothing listening drops the user on the Journal with no
-                  sign their reading arrived. */}
-              <WatchArrivalCards />
-              {Platform.OS === 'ios' ? <WatchSyncPill /> : null}
-              {/* Garmin ships on both platforms, so this one is not iOS-gated. */}
-              <GarminSyncPill />
-              {/* Hourly "anything new in the health store?" pill (both
-                  platforms — it no-ops until Health is connected). */}
-              <HealthUpdatePill />
-              {/* Store review ask — renders nothing; waits for a day that's
-                  trending up and a calm moment (src/lib/review). */}
-              <ReviewPrompt />
-              {/* The day's first open, before 1pm, with no baseline yet: the
-                  morning card asks for it once (src/features/MorningBaseline). */}
-              <MorningBaselinePrompt />
-              {/* Freemium: no blocking paywall. Locked surfaces raise the
-                  PaywallCard sheet on demand (src/features/Paywall.tsx). */}
-              {/* First-run welcome wizard — overlays the tabs until completed,
-                  then fades to black and reveals the app beneath. Deferred
-                  until any launch-time restore offer is resolved. */}
-              {restoreResolved ? <OnboardingGate /> : <RestoreGate onDone={() => setRestoreResolved(true)} />}
-            </SheetProvider>
-          </ToastProvider>
-        </Themed>
-      </SafeAreaProvider>
-    </GestureHandlerRootView>
+    <RootErrorBoundary>
+      <GestureHandlerRootView style={{ flex: 1 }}>
+        <SafeAreaProvider>
+          <Themed>
+            <ToastProvider>
+              <SheetProvider>
+                <RouteBreadcrumb />
+                <Slot />
+                {/* "See what's new in x.x" — mounted FIRST of the pills on
+                    purpose: siblings paint in order, so it sits behind the two
+                    below and can recede into the stacked-card look when either
+                    of them takes the slot. */}
+                <WhatsNewPill />
+                {/* A reading in progress: the pill it folds into when minimized,
+                    and the hand-off to the results card when it ends (both have
+                    to outlive the card, which the user can close mid-reading). */}
+                <HrvSessionHost />
+                {/* Watch companion overlays (iOS only): results card on arrival +
+                    "Waiting for watch…" pill while the sync card is minimized. */}
+                {/* NOT iOS-gated: the Apple Watch is iOS-only, but Garmin
+                    delivers readings on both platforms, and a reading that lands
+                    with nothing listening drops the user on the Journal with no
+                    sign their reading arrived. */}
+                <WatchArrivalCards />
+                {Platform.OS === 'ios' ? <WatchSyncPill /> : null}
+                {/* Garmin ships on both platforms, so this one is not iOS-gated. */}
+                <GarminSyncPill />
+                {/* Hourly "anything new in the health store?" pill (both
+                    platforms — it no-ops until Health is connected). */}
+                <HealthUpdatePill />
+                {/* Store review ask — renders nothing; waits for a day that's
+                    trending up and a calm moment (src/lib/review). */}
+                <ReviewPrompt />
+                {/* The day's first open, before 1pm, with no baseline yet: the
+                    morning card asks for it once (src/features/MorningBaseline). */}
+                <MorningBaselinePrompt />
+                {/* Freemium: no blocking paywall. Locked surfaces raise the
+                    PaywallCard sheet on demand (src/features/Paywall.tsx). */}
+                {/* First-run welcome wizard — overlays the tabs until completed,
+                    then fades to black and reveals the app beneath. Deferred
+                    until any launch-time restore offer is resolved. */}
+                {restoreResolved ? <OnboardingGate /> : <RestoreGate onDone={() => setRestoreResolved(true)} />}
+              </SheetProvider>
+            </ToastProvider>
+          </Themed>
+        </SafeAreaProvider>
+      </GestureHandlerRootView>
+    </RootErrorBoundary>
   );
 }

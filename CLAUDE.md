@@ -1881,7 +1881,16 @@ old web app so old `export.json` files import directly.
   survives `redactMessage` intact. iOS is deliberately a stub:
   `NSSetUncaughtExceptionHandler` catches ObjC exceptions, and almost nothing
   that kills an iOS build is one, so installing it would report a handful of
-  crashes and imply we were watching for the rest. Call `logError('area.thing', e)` from a catch that would otherwise
+  crashes and imply we were watching for the rest. **An uncaught error carries WHERE, because
+  its tag cannot**: the global hook and `<RootErrorBoundary/>` (around the whole root layout)
+  prefix the message with `crashContext` (`diagnostics/crashContext.ts`, pure + tested) —
+  route, open sheet count, `bg` — and condense React's invariant boilerplate so it fits the
+  fault budget: `[insights, 2 sheets] Maximum update depth exceeded`. Keep that context
+  low-cardinality (no times, no counts that vary per occurrence): faults group by message.
+  The boundary exists because React Native hands an unhandled RENDER error to
+  `ExceptionsManager.handleException` directly, bypassing `ErrorUtils`, so a render crash
+  left a blank screen and an empty log; it logs `render.uncaught` and offers a Restart.
+  Call `logError('area.thing', e)` from a catch that would otherwise
   be silent (already wired: store persist/load, the waveform sidecar, IAP,
   health reads + the one-shot history backfill, the strap connect loop,
   reminders, backups, widgets, Garmin, Insights), and prefer an existing tag
