@@ -20,7 +20,14 @@ export function runBudgetAction(id: RecommendationId | undefined, openSheet: Ope
   // from a file the pure-ish sheet imports creates a cycle through
   // DaySummary -> Strip -> here -> forms -> DaySummary.
   /* eslint-disable @typescript-eslint/no-require-imports */
-  if (id === 'hrv' || id === 'orthostatic') {
+  // 'orthostatic' is the stand-test Todo ("Log a standing test"), which fits
+  // the upright band. It used to share the HRV branch and opened a reading.
+  if (id === 'orthostatic') {
+    const { openPotsCapture } = require('../forms') as typeof import('../forms');
+    openPotsCapture(openSheet, 'standTest');
+    return;
+  }
+  if (id === 'hrv') {
     const { HrvSetup, suggestedKind } = require('../hrv/Setup') as typeof import('../hrv/Setup');
     const kind = suggestedKind();
     openSheet((c) => React.createElement(HrvSetup, { kind, controls: c }));
