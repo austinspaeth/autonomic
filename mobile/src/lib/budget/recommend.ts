@@ -112,16 +112,26 @@ export function nextRecommendation(input: RecommendInput): Recommendation | null
 const HRV_TYPES = new Set(['hrv', 'breathHrv']);
 
 /**
- * Can this person take a stand test? It runs on the Apple Watch app or a
- * Bluetooth chest strap, so the bar is one HRV reading taken with either. A
- * reading IMPORTED from Apple Health says 'watch' too, but only proves a watch
- * wrote to Health, not that the app is on it, so it does not count.
+ * Can this person take a stand test? It runs on the Apple Watch or a Bluetooth
+ * chest strap, so the bar is evidence of owning either:
+ *   - an HRV reading taken with a strap;
+ *   - anything from an Apple Watch: an entry whose source is 'watch' (the watch
+ *     app's readings, or Apple Watch samples imported from Health), or a day
+ *     holding Apple Stand Time, which only a paired watch writes.
+ * Evidence of a WATCH is enough even if our watch app has never been used:
+ * the test's card points them at it.
  */
 export function hasStandTestDevice(days: DaysMap): boolean {
   for (const dk in days) {
-    for (const r of days[dk]?.readings || []) {
-      if (!HRV_TYPES.has(r.type) || r.imported) continue;
-      if (r.source === 'watch' || r.source === 'polar') return true;
+    const d = days[dk];
+    if (!d) continue;
+    if ((d.load?.standMin ?? 0) > 0) return true;
+    for (const r of d.readings || []) {
+      if (r.source === 'watch') return true;
+      if (r.source === 'polar' && HRV_TYPES.has(r.type)) return true;
+    }
+    for (const a of d.activities || []) {
+      if (a.source === 'watch') return true;
     }
   }
   return false;
