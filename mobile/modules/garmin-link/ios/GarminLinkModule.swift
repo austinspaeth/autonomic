@@ -140,8 +140,15 @@ public class GarminLinkModule: Module {
         promise.resolve(false)
         return
       }
+      // The completion can fire more than once; a second resolve on an expo
+      // Promise is an error, so only the first answer counts.
+      var settled = false
       ConnectIQ.sharedInstance().sendMessage(["ack": id], to: app, progress: nil) { result in
-        promise.resolve(result == .success)
+        DispatchQueue.main.async {
+          if settled { return }
+          settled = true
+          promise.resolve(result == .success)
+        }
       }
     }
 

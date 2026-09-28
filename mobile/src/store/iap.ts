@@ -338,13 +338,20 @@ const isDisconnected = (e: unknown) =>
  *  support log and inflate the fault report's occurrence count off a handful of
  *  devices. */
 function noteBlocked(e: unknown): boolean {
-  const msg = blockedMessage(responseCodeOf(e));
+  const byCode = blockedMessage(responseCodeOf(e));
+  // `iap-not-available` is `connect()`'s own refusal: purchases switched off
+  // under Screen Time or by device management. Just as terminal until the user
+  // changes a setting, and unlatched it was logged again by every retry and
+  // every entitlement check (iap.init, iap.retryProducts, iap.entitlement) off
+  // the same handful of phones. `retryBlockedStore` is the way back.
+  const msg = byCode ?? (codeOf(e) === 'iap-not-available' ? purchaseMessage(e) : null);
   if (!msg) return false;
   if (!state.blocked) {
     logError('iap.storeIncapable', iapDetail(e));
     blockedFault = e;
     set({ blocked: msg, ready: true });
-    void probeOneTime(e);
+    // The one-time probe asks Play a question only a response code raises.
+    if (byCode) void probeOneTime(e);
   }
   return true;
 }
@@ -632,7 +639,10 @@ export async function refreshEntitlement(): Promise<boolean> {
       && (hit as { isAcknowledgedAndroid?: boolean | null }).isAcknowledgedAndroid === false) {
       noteNewPurchase(hit.productId, await acknowledge(hit, 'iap.ackRetry'));
     }
-  } catch (e) { logError('iap.entitlement', iapDetail(e)); /* keep last known entitlement */ }
+  } catch (e) {
+    // Keep the last known entitlement.
+    if (!noteBlocked(e)) logError('iap.entitlement', iapDetail(e));
+  }
   return state.isPro;
 }
 
