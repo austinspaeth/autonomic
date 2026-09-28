@@ -5,7 +5,8 @@ recovery. The app is a native **Expo / React Native (iOS + Android)** build that
 lives in **`mobile/`**. **All state is on-device** — no accounts, no sync, no
 health data ever leaves the phone. The app makes exactly one network call of
 its own, the anonymous cohort ping in `src/store/ping.ts` (one date, one
-platform letter, no identifier); everything else in `sls/` belongs to the
+platform letter, no identifier), plus the opt-in giveaway sign-up (below), the
+one request that carries anything personal; everything else in `sls/` belongs to the
 private store-analytics dashboard at `/master`, not to the product. (A
 previous pure-static-HTML PWA under `docs/` has been removed; the mobile app is
 the app.) Platform split: the Apple Watch companion, HealthKit and ECG are
@@ -1930,6 +1931,21 @@ old web app so old `export.json` files import directly.
   (`expiresAt`, TTL on the table): diagnostic, not a series. Read back under
   `faults` on the same report call; drawn by the dashboard's **Failures** tab,
   which ranks by breadth and keeps the two counters visibly apart.
+- **The Dysautonomia Awareness giveaway is the ONE request carrying anything
+  personal, and only because the user typed it in.** `<GiveawayCard/>`
+  (`features/Giveaway.tsx`) sits under the Outlook on today's Journal until
+  `GIVEAWAY_END`; an entry is a day in the window holding a trusted baseline OR
+  training reading, capped at 10 (`lib/giveaway.ts`, pure + tested). Signing up
+  POSTs `/ping/gvw/{install code}` with the address and the entry days plus
+  each day's sensor letter, never a result. Unlike every ping it ANSWERS (200 /
+  400 / 500), and the card says "You're signed up" only after a 200.
+  `store/giveaway.ts` then re-sends only when the entry COUNT rises (one send
+  per earning day, none past the cap), from a root-layout watcher. It ignores
+  `__DEV__` and the exclusion switch (rows carry `dev` instead). Server side is
+  `sls/lambdas/ping/giveaway.js`: one upserted row per lowercased address
+  (`PK GIVEAWAY`), read ONLY through the authenticated `/master` API
+  (`GIVEAWAY`, the dashboard's Giveaway tab), never the shared-key report. The
+  lambda must be deployed before a build carrying the card ships.
 - **Types come in two layers.** Built-ins live in the `*_TYPES` maps in
   `src/lib/registry.ts` (add an icon in `src/components/Icon.tsx` when adding one).
   Users can also create their own activities, meds/supplements, symptoms and

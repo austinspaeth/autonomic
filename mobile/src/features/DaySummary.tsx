@@ -14,6 +14,7 @@ import { SumCard, MetricRow } from '../components/summary';
 import { Button, useAccordion } from '../components/ui';
 import { AnnualOfferCard } from './AnnualOffer';
 import { FounderOfferCard } from './FounderOffer';
+import { GiveawayCard } from './Giveaway';
 import { TrendCard } from './TrendCard';
 import { HrvSetup } from './hrv/Setup';
 import { MilestoneProgressCard } from './Milestones';
@@ -330,6 +331,8 @@ export function DaySummary({ dk }: { dk: string }) {
           )}
         </GradientBorderCard>
       )}
+      {/* The awareness-month giveaway: today only, until the window closes. */}
+      <GiveawayCard dk={dk} />
       {/* Directly under the Outlook: the half-off year, time-boxed to 24h. */}
       <AnnualOfferCard />
       {/* The one-day founding-member offer. It and the card above share ONE

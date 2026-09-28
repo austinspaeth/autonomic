@@ -857,6 +857,26 @@ async function flushOfferFailures(): Promise<void> {
   }
 }
 
+/* ------------------------------------------------------ giveaway sign-up */
+
+/**
+ * `POST /ping/gvw/{code}`: the giveaway sign-up, with its body built by
+ * `giveawayBody` in ../lib/giveaway. Resolves true only when the server says
+ * the row was written — unlike every ping here, this one answers, because the
+ * card says "You're signed up" only once that is true.
+ *
+ * Deliberately NOT subject to `__DEV__` or to the exclusion switch: it is a
+ * sign-up the user asked for, not a count, and a development build must be able
+ * to exercise it (its row is marked `dev` instead). The memory of what was sent
+ * lives in ./giveaway.
+ */
+export function postGiveaway(body: unknown): Promise<boolean> {
+  const url = pingUrl(
+    'gvw', cohortDate(Date.now()), platformCode(Platform.OS), undefined, tierCode(getTier()), appVersion(),
+  );
+  return post(url, body);
+}
+
 let started = false;
 
 /**

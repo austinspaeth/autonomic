@@ -35,6 +35,9 @@
  *                             "shown": neither store says whether the sheet appeared,
  *                             and iOS swallows asks past three a year. No letter.
  *
+ * and one route that shares the plumbing and NOT the promises: POST /ping/gvw,
+ * the giveaway sign-up, which carries an email address. See ./giveaway.js.
+ *
  * The last four are all capped per install per day PER LETTER, like `see`.
  *
  * plus ONE route that is not a ping at all:
@@ -183,6 +186,7 @@
  */
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, UpdateCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
+const { readGiveaway, writeGiveaway } = require('./giveaway');
 
 const TABLE = process.env.DYNAMO_TABLE_NAME;
 
@@ -1219,8 +1223,40 @@ const handleOfferFailure = async (event) => {
   return noContent;
 };
 
+/* ----------------------------------------------------- giveaway sign-up */
+
+/**
+ * `POST /ping/gvw/{code}`: the awareness-month giveaway sign-up. NOT a ping —
+ * it carries an email address and it answers — which is why its parsing and
+ * storage live in ./giveaway.js and none of the promises at the top of this
+ * file apply to it. See that file.
+ */
+const handleGiveaway = async (event) => {
+  if (event?.requestContext?.http?.method !== 'POST') return json(405, { error: 'POST only.' });
+  const install = decodeCohort(event?.pathParameters?.cohort);
+  if (!install) return json(400, { error: 'Unreadable install code.' });
+  const now = Date.now();
+  if (install.iso < EPOCH || Date.parse(`${install.iso}T00:00:00Z`) > now + SKEW_MS) {
+    return json(400, { error: 'Unreadable install code.' });
+  }
+  const g = readGiveaway(event);
+  if (!g) return json(400, { error: 'Not a valid sign-up.' });
+  await writeGiveaway(ddb, TABLE, g, install, now);
+  return json(200, { ok: true, entries: g.entries.length });
+};
+
 const handler = async (event) => {
   const path = event?.requestContext?.http?.path || '';
+
+  if (path.startsWith('/ping/gvw/')) {
+    try {
+      return await handleGiveaway(event);
+    } catch (err) {
+      // Without the body: it holds an address.
+      console.error('giveaway write failed', err?.name || err);
+      return json(500, { error: 'Could not save the sign-up.' });
+    }
+  }
 
   if (path.endsWith('/ping/report')) {
     try {

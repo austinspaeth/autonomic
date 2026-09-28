@@ -246,6 +246,13 @@ functions:
       - httpApi:
           method: POST
           path: /ping/ofl/{cohort}
+      # The awareness-month giveaway sign-up. NOT a counter: it carries the
+      # email address the user typed in, answers 200/400/500 so the app knows
+      # it was saved, and is read back only through the authenticated /master
+      # API (GIVEAWAY), never the shared-key report. See lambdas/ping/giveaway.js.
+      - httpApi:
+          method: POST
+          path: /ping/gvw/{cohort}
       # What people do in the journal and around it. All four capped once per
       # install per Eastern day PER LETTER, like /ping/see:
       #   log  logged by hand (S sleep / A activity / M med / Y symptom /

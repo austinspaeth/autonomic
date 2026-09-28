@@ -30,6 +30,7 @@ import { initWatchReceiver } from '../src/lib/watch/receiver';
 import { runDailyBackup } from '../src/lib/backup';
 import { initCrashWatcher, initMorningWatcher, syncReminder } from '../src/lib/reminders';
 import { initWidgetSync } from '../src/lib/widgets';
+import { initGiveawaySync } from '../src/store/giveaway';
 import { initBudgetSync } from '../src/store/budget';
 import { initPressureWatch } from '../src/store/pressure';
 import { initPacingAlertWatcher } from '../src/store/pacingAlerts';
@@ -115,6 +116,8 @@ export default function RootLayout() {
     // Home-screen widgets: push today's payload now, after journal changes,
     // and on foreground (which also covers the midnight rollover).
     initWidgetSync();
+    // Giveaway: once signed up, send a new entry the first time a day earns one.
+    initGiveawaySync();
     // The Insights tab's unseen-findings dot: derive it now and after journal
     // changes, so a new finding lights the tab before the user thinks to look.
     initInsightsBadge();

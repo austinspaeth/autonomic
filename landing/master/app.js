@@ -9874,7 +9874,7 @@
   var VIEW_TITLES = {
     overview: 'Overview', ping: 'App usage', timeline: 'Timeline', trial: 'Trial & conversion', cohorts: 'Cohorts',
     platforms: 'iOS vs Android', sales: 'Sales', costs: 'Costs', forecast: 'Forecast',
-    faults: 'Failures', pings: 'Pings', links: 'Links', data: 'Edit data'
+    faults: 'Failures', pings: 'Pings', links: 'Links', giveaway: 'Giveaway', data: 'Edit data'
   };
 
   function renderAll() {
@@ -9891,7 +9891,7 @@
        forms, the other is a list of URLs. A filter bar over either is a control
        that changes nothing. */
     document.getElementById('filterbar').classList.toggle('hidden',
-      state.view === 'data' || state.view === 'links');
+      state.view === 'data' || state.view === 'links' || state.view === 'giveaway');
     // the forecast is driven by its own assumptions — only the platform filter applies
     ['fgRange', 'fgGrain'].forEach(function (id) {
       var g = document.getElementById(id);
@@ -9953,7 +9953,7 @@
     var empty = !db.entries.length && !salesList().length && state.view !== 'data' &&
       state.view !== 'ping' && state.view !== 'timeline' && state.view !== 'costs' &&
       state.view !== 'sales' && state.view !== 'pings' && state.view !== 'faults' &&
-      state.view !== 'links';
+      state.view !== 'links' && state.view !== 'giveaway';
     document.getElementById('emptyState').classList.toggle('hidden', !empty);
     if (empty) {
       document.getElementById('view-' + state.view).classList.add('hidden');
@@ -9973,6 +9973,7 @@
     else if (state.view === 'faults') { pingLoad(); renderFaults(); }
     else if (state.view === 'pings') { pingLoad(); renderPings(); }
     else if (state.view === 'links') renderLinks();
+    else if (state.view === 'giveaway') { giveawayLoad(); renderGiveaway(); }
     else if (state.view === 'data') renderData();
 
     layoutTiles();
@@ -10591,6 +10592,117 @@
   function removeLink(slug) {
     db.links = linkList().filter(function (l) { return l.slug !== slug; });
     save();
+  }
+
+  /* ------------------------------------------------ view: giveaway --------
+   *
+   * The awareness-month giveaway sign-ups, straight from the table: one row per
+   * address, its entry days and the install it last wrote from. Fetched on
+   * opening the view (and by its Refresh button), never by the five-minute
+   * tick and never cached to localStorage — these are email addresses, and a
+   * dashboard's browser storage is not where they should sit.
+   */
+  var giveaway = { data: null, status: 'idle', error: '' };
+  var GV_SENSORS = { W: 'Apple Watch', B: 'Strap', F: 'Camera', G: 'Garmin' };
+  var GV_TIERS = { F: 'Free', T: 'Trial', P: 'Pro' };
+  var GV_PLATFORMS = { I: 'iOS', A: 'Android', U: 'Unknown' };
+
+  function giveawayLoad(force) {
+    if (giveaway.status === 'loading') return Promise.resolve();
+    if (giveaway.data && !force) return Promise.resolve();
+    giveaway.status = 'loading';
+    if (state.view === 'giveaway') renderGiveaway();
+    return window.Api.call('GIVEAWAY').then(function (res) {
+      giveaway.data = res || { rows: [] };
+      giveaway.status = 'ready';
+      giveaway.error = '';
+    }).catch(function (err) {
+      giveaway.status = 'error';
+      giveaway.error = (err && err.message) || 'Could not load the sign-ups.';
+    }).then(function () {
+      if (state.view === 'giveaway') renderGiveaway();
+    });
+  }
+
+  function giveawayRows() {
+    var rows = (giveaway.data && giveaway.data.rows) || [];
+    var dev = document.getElementById('gvShowDev');
+    return dev && dev.checked ? rows : rows.filter(function (r) { return !r.dev; });
+  }
+
+  function renderGiveaway() {
+    var host = document.getElementById('gvTable');
+    var tiles = document.getElementById('gvTiles');
+    if (!host || !tiles) return;
+    var d = giveaway.data;
+    var max = (d && d.maxEntries) || 10;
+    if (d && d.start && d.end) {
+      document.getElementById('gvWindow').textContent =
+        labelFull(d.start) + ' → ' + labelFull(d.end) + ' · one entry per day with a reading, up to ' + max;
+    }
+    if (!d) {
+      tiles.innerHTML = '';
+      host.innerHTML = '<div class="empty">' + (giveaway.status === 'error'
+        ? esc(giveaway.error) : 'Loading sign-ups…') + '</div>';
+      return;
+    }
+
+    var rows = giveawayRows();
+    var entries = rows.reduce(function (a, r) { return a + r.entryCount; }, 0);
+    var full = rows.filter(function (r) { return r.entryCount >= max; }).length;
+    var byPlat = {};
+    var byTier = {};
+    rows.forEach(function (r) {
+      byPlat[r.platform] = (byPlat[r.platform] || 0) + 1;
+      var t = r.tier || '?';
+      byTier[t] = (byTier[t] || 0) + 1;
+    });
+    tiles.innerHTML = [
+      tile({ label: 'Sign-ups', value: fmtInt(rows.length),
+        meta: Object.keys(byPlat).map(function (p) { return (GV_PLATFORMS[p] || p) + ' ' + byPlat[p]; }).join(' · ') || 'none yet' }),
+      tile({ label: 'Entries', value: fmtInt(entries),
+        meta: rows.length ? (entries / rows.length).toFixed(1) + ' per person' : '–' }),
+      tile({ label: 'Maxed out', value: fmtInt(full), meta: 'reached ' + max + ' entries' }),
+      tile({ label: 'By tier', value: fmtInt(byTier.P || 0), smallValue: true,
+        meta: 'Pro · ' + (byTier.T || 0) + ' trial · ' + (byTier.F || 0) + ' free' })
+    ].join('');
+
+    if (!rows.length) {
+      host.innerHTML = '<div class="empty">No sign-ups yet.</div>';
+      return;
+    }
+    host.innerHTML = '<table><thead><tr><th>Email</th><th>Entries</th><th>Days · sensor</th>' +
+      '<th>Cohort</th><th>Platform</th><th>Tier</th><th>Build</th><th>Signed up</th><th>Updated</th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        var days = r.entries.map(function (e) {
+          return '<span class="note" title="' + esc(GV_SENSORS[e.m] || 'No live sensor') + '">' +
+            esc(String(e.d).slice(5)) + ' ' + esc(e.m || '–') + '</span>';
+        }).join(' ');
+        return '<tr><td>' + esc(r.email) + (r.dev ? ' <span class="na">dev</span>' : '') + '</td>' +
+          '<td><b>' + r.entryCount + '</b> / ' + max + '</td>' +
+          '<td>' + (days || '<span class="na">none yet</span>') + '</td>' +
+          '<td>' + esc(r.cohort ? labelFull(r.cohort) : '–') + '</td>' +
+          '<td>' + esc(GV_PLATFORMS[r.platform] || r.platform) + '</td>' +
+          '<td>' + esc(GV_TIERS[r.tier] || '–') + '</td>' +
+          '<td>' + esc(r.version || '–') + '</td>' +
+          '<td>' + esc(r.firstAt ? relTime(Date.parse(r.firstAt)) : '–') + '</td>' +
+          '<td>' + esc(r.lastAt ? relTime(Date.parse(r.lastAt)) : '–') + '</td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  function giveawayCsv() {
+    var q = function (v) { return '"' + String(v == null ? '' : v).replace(/"/g, '""') + '"'; };
+    var lines = [['email', 'entries', 'days', 'sensors', 'cohort', 'platform', 'tier', 'version', 'dev', 'signed_up', 'updated'].join(',')];
+    giveawayRows().forEach(function (r) {
+      lines.push([
+        r.email, r.entryCount,
+        r.entries.map(function (e) { return e.d; }).join(' '),
+        r.entries.map(function (e) { return e.m || '-'; }).join(' '),
+        r.cohort, GV_PLATFORMS[r.platform] || r.platform, GV_TIERS[r.tier] || '', r.version, r.dev ? 'yes' : '',
+        r.firstAt, r.lastAt
+      ].map(q).join(','));
+    });
+    return lines.join('\n');
   }
 
   function renderLinks() {
@@ -11397,6 +11509,15 @@
        from campaigns to ad spots. */
     migrateSales();
     migrateAdSpots();
+
+    var gvRefresh = document.getElementById('gvRefresh');
+    if (gvRefresh) gvRefresh.addEventListener('click', function () { giveawayLoad(true); });
+    var gvShowDev = document.getElementById('gvShowDev');
+    if (gvShowDev) gvShowDev.addEventListener('change', renderGiveaway);
+    var gvExport = document.getElementById('gvExport');
+    if (gvExport) gvExport.addEventListener('click', function () {
+      download('giveaway-' + today() + '.csv', giveawayCsv(), 'text/csv');
+    });
 
     document.querySelector('.tabs').addEventListener('click', function (ev) {
       var t = ev.target.closest('.tab');

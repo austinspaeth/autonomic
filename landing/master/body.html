@@ -138,6 +138,7 @@
     <button class="tab" role="tab" data-view="faults" aria-selected="false">Failures</button>
     <button class="tab" role="tab" data-view="pings" aria-selected="false">Pings</button>
     <button class="tab" role="tab" data-view="links" aria-selected="false">Links</button>
+    <button class="tab" role="tab" data-view="giveaway" aria-selected="false">Giveaway</button>
   </nav>
   </div>
 
@@ -1176,6 +1177,32 @@
       <div id="lkForm" class="hidden" style="margin-bottom:12px"></div>
       <div class="table-scroll" id="lkTable"></div>
     </details>
+  </section>
+
+  <!-- ================= GIVEAWAY ================= -->
+  <!-- The awareness-month giveaway sign-ups. The one view here that holds
+       people's email addresses, which is why it is read through the
+       authenticated API alone (GIVEAWAY) and never rides the ping report. -->
+  <section id="view-giveaway" class="view hidden">
+
+    <div class="section-head">
+      <h2 class="section-title">Dysautonomia awareness giveaway</h2>
+      <span class="section-note" id="gvWindow">One entry per day with a reading, up to 10</span>
+    </div>
+
+    <div class="grid cards">
+      <div class="tile-group" id="gvTiles"></div>
+    </div>
+
+    <div class="card" style="margin-bottom:14px">
+      <header><h2>Sign-ups</h2><span class="spacer"></span>
+        <label class="note" style="display:flex;align-items:center;gap:6px;margin-right:10px">
+          <input type="checkbox" id="gvShowDev"> Show dev builds</label>
+        <button class="btn sm" id="gvRefresh">Refresh</button>
+        <button class="btn sm" id="gvExport">Export CSV</button></header>
+      <p class="hint">One row per <b>email address</b>. The app sends again each time a new day earns an entry, so a row is that person's current count, and a second phone signing up with the same address updates the same row. <b>Entries</b> are the days they took a baseline or training reading, with the sensor that took the day's first one: <b>W</b> Apple Watch, <b>B</b> strap, <b>F</b> camera, <b>G</b> Garmin, <b>–</b> an import. <b>Cohort</b> is the day the install first ran; <b>tier</b> is what it was on at its last update.</p>
+      <div class="table-scroll" id="gvTable"></div>
+    </div>
   </section>
 
   <section id="view-data" class="view hidden">
