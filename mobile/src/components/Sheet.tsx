@@ -23,6 +23,7 @@ import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { radius, usePalette } from '../theme';
 import { notifyChartsBlur } from './charts';
 import { Icon } from './Icon';
+import { noteSheetDepth } from '../lib/diagnostics/crashContext';
 
 /** The pill's delete tint: the Button `danger` red (#d63b3b) lifted a step,
  *  because the pill it sits in is near-black glass and the darker red reads as
@@ -112,9 +113,13 @@ export function SheetProvider({ children }: { children: React.ReactNode }) {
     return s;
   });
   const closeAll = () => setStack((s) => s.map((e) => ({ ...e, closing: true })));
+  const depth = stack.filter((e) => !e.closing).length;
+  // Told to the crash context, so an uncaught error says whether it happened
+  // under a sheet (lib/diagnostics/crashContext). A module write, no render.
+  useEffect(() => { noteSheetDepth(depth); }, [depth]);
 
   return (
-    <Ctx.Provider value={{ openSheet, closeSheet: closeTop, closeAll, depth: stack.filter((e) => !e.closing).length }}>
+    <Ctx.Provider value={{ openSheet, closeSheet: closeTop, closeAll, depth }}>
       {children}
       {stack.length > 0 && (
         <SheetHost onRequestClose={closeTop}>

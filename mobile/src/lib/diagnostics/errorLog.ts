@@ -20,6 +20,7 @@ import { MMKV } from 'react-native-mmkv';
 import { describeError } from './env';
 import { MAX_ERRORS, parseErrorLog, pushError, type LoggedError } from './errorBuffer';
 import { describeNativeCrash, NATIVE_CRASH_TAG, parseNativeCrashes } from './nativeCrash';
+import { crashContext, withContext } from './crashContext';
 
 export type { LoggedError };
 
@@ -48,10 +49,15 @@ function load(): LoggedError[] {
  * Record a failure. `tag` is a stable dotted key naming the site
  * (`store.persist`, `iap.init`, `health.check`) — it's what makes a dump
  * skimmable, so prefer an existing tag over a new phrasing of one.
+ *
+ * `context` is for the paths whose tag CANNOT say where (the uncaught hooks
+ * and the root error boundary): it is prefixed to the message, see
+ * ./crashContext. A catch site's tag already locates it, so it passes none.
  */
-export function logError(tag: string, err: unknown, opts?: { fatal?: boolean }): void {
+export function logError(tag: string, err: unknown, opts?: { fatal?: boolean; context?: string }): void {
   try {
-    const msg = describeError(err);
+    const described = describeError(err);
+    const msg = opts?.context !== undefined ? withContext(described, opts.context) : described;
     mem = pushError(load(), {
       at: new Date().toISOString(),
       tag,
@@ -132,10 +138,20 @@ export function installErrorLogging(): void {
     if (!EU?.setGlobalHandler) return;
     const prev = EU.getGlobalHandler();
     EU.setGlobalHandler((e, isFatal) => {
-      logError(isFatal ? 'uncaught.fatal' : 'uncaught', e, { fatal: !!isFatal });
+      logError(isFatal ? 'uncaught.fatal' : 'uncaught', e, { fatal: !!isFatal, context: uncaughtContext() });
       prev?.(e, isFatal);
     });
   } catch { /* no ErrorUtils here — explicit logError calls still work */ }
+}
+
+/** Where the app was, for an error whose tag cannot say (./crashContext). */
+export function uncaughtContext(): string {
+  let background = false;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    background = require('react-native').AppState.currentState === 'background';
+  } catch { /* no AppState here; say nothing rather than guess */ }
+  try { return crashContext({ background }); } catch { return ''; }
 }
 
 /**

@@ -7,6 +7,7 @@ import com.garmin.android.connectiq.IQDevice
 import expo.modules.kotlin.Promise
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
+import java.util.concurrent.atomic.AtomicBoolean
 
 /**
  * Connect IQ companion link, Android side.
@@ -45,13 +46,14 @@ class GarminLinkModule : Module() {
     // handshake, which Android does not use. Kept in the signature so the two
     // platforms present one interface to JS.
     AsyncFunction("initialize") { _: String, promise: Promise ->
-      if (ready) { promise.resolve(true); return@AsyncFunction }
+      val once = Once(promise)
+      if (ready) { once.resolve(true); return@AsyncFunction }
       val iq = ConnectIQ.getInstance(context, ConnectIQ.IQConnectType.WIRELESS)
       connectIQ = iq
       iq.initialize(context, /* autoUI = */ false, object : ConnectIQ.ConnectIQListener {
         override fun onSdkReady() {
           ready = true
-          promise.resolve(true)
+          once.resolve(true)
         }
 
         override fun onInitializeError(status: ConnectIQ.IQSdkErrorStatus) {
@@ -59,7 +61,7 @@ class GarminLinkModule : Module() {
           // Surfaced rather than thrown: a missing Garmin Connect is a state
           // the app explains, not an error it crashes on.
           sendEvent("onNeedsGarminConnect", mapOf("reason" to status.name))
-          promise.resolve(false)
+          once.resolve(false)
         }
 
         override fun onSdkShutDown() {
@@ -83,16 +85,17 @@ class GarminLinkModule : Module() {
     }
 
     AsyncFunction("getAppStatus") { deviceId: String, promise: Promise ->
+      val once = Once(promise)
       val iq = connectIQ
       val device = devices[deviceId]
       if (iq == null || device == null) {
-        promise.resolve(mapOf("installed" to false, "version" to 0, "known" to false))
+        once.resolve(mapOf("installed" to false, "version" to 0, "known" to false))
         return@AsyncFunction
       }
       try {
         iq.getApplicationInfo(watchAppId, device, object : ConnectIQ.IQApplicationInfoListener {
           override fun onApplicationInfoReceived(app: IQApp) {
-            promise.resolve(mapOf(
+            once.resolve(mapOf(
               "installed" to true,
               "version" to app.version(),
               "known" to true,
@@ -100,11 +103,11 @@ class GarminLinkModule : Module() {
           }
 
           override fun onApplicationNotInstalled(applicationId: String) {
-            promise.resolve(mapOf("installed" to false, "version" to 0, "known" to true))
+            once.resolve(mapOf("installed" to false, "version" to 0, "known" to true))
           }
         })
       } catch (e: Exception) {
-        promise.resolve(mapOf("installed" to false, "version" to 0, "known" to false))
+        once.resolve(mapOf("installed" to false, "version" to 0, "known" to false))
       }
     }
 
@@ -148,15 +151,22 @@ class GarminLinkModule : Module() {
     }
 
     AsyncFunction("ackMessage") { deviceId: String, id: String, promise: Promise ->
+      val once = Once(promise)
       val iq = connectIQ
       val device = devices[deviceId]
-      if (iq == null || device == null) { promise.resolve(false); return@AsyncFunction }
+      if (iq == null || device == null) { once.resolve(false); return@AsyncFunction }
       try {
+        // This listener runs inside the SDK's BroadcastReceiver for
+        // SEND_MESSAGE_STATUS, and it is NOT one-shot: it reports status
+        // transitions, and the SDK keeps it registered, so a later ack's
+        // status can land on it too (the watch re-delivers until acked, so
+        // acks come in bursts). A second resolve throws inside onReceive —
+        // "Error receiving broadcast Intent", a process kill. Hence `once`.
         iq.sendMessage(device, IQApp(watchAppId), mapOf("ack" to id)) { _, _, status ->
-          promise.resolve(status == ConnectIQ.IQMessageStatus.SUCCESS)
+          once.resolve(status == ConnectIQ.IQMessageStatus.SUCCESS)
         }
       } catch (e: Exception) {
-        promise.resolve(false)
+        once.resolve(false)
       }
     }
 
@@ -175,6 +185,26 @@ class GarminLinkModule : Module() {
       } catch (e: Exception) {
         // Never initialised.
       }
+    }
+  }
+
+  /**
+   * Settles a Promise at most once. expo-modules-core throws on a second
+   * settle, on whatever thread it arrives — here a Connect IQ callback or the
+   * SDK's own BroadcastReceiver, where no catch of ours can reach it — so a
+   * double settle is a process kill (`native.crash` on the Failures tab).
+   *
+   * Dropping the later settles is right, not merely safe: the FIRST answer is
+   * the real one. A second status is the same send being narrated (or another
+   * send's status reaching a listener the SDK never unregistered), and an
+   * exception after a listener already answered is the SDK unwinding.
+   * `onSdkReady` can also fire again when Garmin Connect's service rebinds.
+   * Atomic because the callback thread and the caller's thread both touch it.
+   */
+  private class Once(private val promise: Promise) {
+    private val settled = AtomicBoolean(false)
+    fun resolve(value: Any?) {
+      if (settled.compareAndSet(false, true)) promise.resolve(value)
     }
   }
 

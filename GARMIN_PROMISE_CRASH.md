@@ -1,7 +1,24 @@
 # The Garmin double-settle crash
 
-**Status:** diagnosed, NOT fixed. Deferred out of 1.29.0 deliberately — the
-Android AAB was already built and the crash is not new. Do this in 1.29.1.
+**Status:** FIXED after 1.31.0 — the `Once` latch below is in
+`GarminLinkModule.kt` on all three functions. It was deferred out of 1.29.0 and
+then missed 1.29.1, 1.30.0 and 1.31.0, so every build up to and including 1.31.0
+carries the crash. It ships with the next native build.
+
+**It files under TWO signatures, and both are this bug.** By late September the
+Failures tab showed, beside the original row:
+
+```
+RuntimeException: Error receiving broadcast Intent { act=com.garmin.android.connectiq.SEND_MESSAGE_STATUS … }
+native.crash    5 occurrences    4 install-days    1.29.0 75%    android    since Sep 23
+```
+
+That is Android's own wrapper for an exception thrown inside a
+`BroadcastReceiver.onReceive` — here the Connect IQ SDK's receiver for
+SEND_MESSAGE_STATUS, which is where `ackMessage`'s send listener runs. The
+second `resolve` throws inside it. It is the same double settle arriving by the
+broadcast path rather than the reflective one, and it confirms the prediction
+below that the signature would reappear under 1.29.0.
 
 **Needs a native build.** It is Kotlin, so it cannot go out as an OTA update.
 
