@@ -54,10 +54,10 @@ const writeCollapsed = (v: boolean) => { try { flags()?.set(COLLAPSED_KEY, v); }
 /* -------------------------------------------------------------------- card */
 
 /**
- * Open and collapsed are two layouts in one card, and NOTHING travels between
- * them: the outgoing layout fades out where it stands, the card's height
- * settles, and the incoming layout fades in already in its own place. One
- * timeline drives all three, so collapsing and expanding are the same motion
+ * Open and collapsed are two layouts in one card, and only the chevron carries
+ * between them, turning in place. Everything else fades: the outgoing layout
+ * fades out where it stands, the card's height settles, and the incoming
+ * layout fades in already in its own place. One timeline drives it all, so collapsing and expanding are the same motion
  * played in either direction. Both layouts stay mounted and absolutely
  * positioned so each measures at its natural height whatever the card is doing.
  *
@@ -73,6 +73,8 @@ const H_END = 0.78;
 const IN_START = 0.68;   // incoming layout starts appearing here
 const RIB_ROW = { w: 20, h: 28 };
 const ICON_TILE = 42;
+const CHEV_BOX = 44;
+const CHEV_SIZE = 18;
 
 export function GiveawayCard({ dk }: { dk: string }) {
   const p = usePalette();
@@ -100,6 +102,10 @@ export function GiveawayCard({ dk }: { dk: string }) {
   }));
   const rowLayer = useAnimatedStyle(() => ({
     opacity: interpolate(t.value, [IN_START, 1], [0, 1], Extrapolation.CLAMP),
+  }));
+  const chevron = useAnimatedStyle(() => ({
+    top: rowH.value > 0 ? (rowH.value - CHEV_BOX) / 2 : 12,
+    transform: [{ rotate: `${-90 * EASE(t.value)}deg` }],
   }));
 
   if (dk !== todayKey() || !giveawayOpen(dk)) return null;
@@ -137,9 +143,6 @@ export function GiveawayCard({ dk }: { dk: string }) {
         </View>
         <View pointerEvents="none" style={{ position: 'absolute', right: 34, top: 42, width: 44, height: 62 }}>
           <Ribbon bloom />
-        </View>
-        <View pointerEvents="none" style={{ position: 'absolute', right: 0, top: 6, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
-          <Icon name="chevron" size={16} color={p.textDim} strokeWidth={2.4} />
         </View>
 
         <Pressable onPress={() => toggle(true)} accessibilityLabel="Collapse giveaway card" style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 14 }}>
@@ -221,8 +224,19 @@ export function GiveawayCard({ dk }: { dk: string }) {
             </Text>
             <View style={{ marginTop: 10 }}><Dots filled={entries} height={4} /></View>
           </View>
-          <Icon name="chevronRight" size={18} color={p.textDim} />
+          {/* The shared chevron below sits over this slot. */}
+          <View style={{ width: CHEV_SIZE }} />
         </Pressable>
+      </Animated.View>
+
+      {/* One chevron for both states, pinned where the row's sits and turning
+          on the same timeline: down while open, right while collapsed. It is
+          the one thing that does not fade. Taps go to the card beneath it. */}
+      <Animated.View pointerEvents="none" style={[{
+        position: 'absolute', right: 15 - (CHEV_BOX - CHEV_SIZE) / 2, width: CHEV_BOX, height: CHEV_BOX,
+        alignItems: 'center', justifyContent: 'center',
+      }, chevron]}>
+        <Icon name="chevron" size={CHEV_SIZE} color={p.textDim} />
       </Animated.View>
     </Animated.View>
   );
