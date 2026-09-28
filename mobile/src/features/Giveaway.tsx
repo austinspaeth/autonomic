@@ -32,7 +32,7 @@ import {
 
 const TEAL = '#2dd4bf';
 const TEAL_INK = '#042f2e';
-/** The collapsed row's icon tile in dark mode: the ribbon's teal taken down to a deep, solid shade. */
+/** The collapsed row's icon tile: the ribbon's teal taken down to a deep, solid shade. */
 const TEAL_TILE = '#0d3b37';
 const PRIZE_TITLE = Platform.OS === 'android' ? 'Win a Polar H10 strap' : 'Win an Apple Watch Series 12';
 /** Wide enough for "Win an Apple Watch", too narrow for "Series 12" beside it. */
@@ -210,7 +210,7 @@ export function GiveawayCard({ dk }: { dk: string }) {
         >
           <View style={{
             width: ICON_TILE, height: ICON_TILE, borderRadius: 9, alignItems: 'center', justifyContent: 'center',
-            backgroundColor: p.dark ? TEAL_TILE : hexA(TEAL, 0.16), borderWidth: 1, borderColor: hexA(TEAL, p.dark ? 0.14 : 0.22),
+            backgroundColor: TEAL_TILE, borderWidth: 1, borderColor: hexA(TEAL, 0.14),
           }}>
             <View style={{ width: RIB_ROW.w, height: RIB_ROW.h }}><Ribbon /></View>
           </View>
