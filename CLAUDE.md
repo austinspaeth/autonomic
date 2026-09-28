@@ -1933,8 +1933,9 @@ old web app so old `export.json` files import directly.
   which ranks by breadth and keeps the two counters visibly apart.
 - **The Dysautonomia Awareness giveaway is the ONE request carrying anything
   personal, and only because the user typed it in.** `<GiveawayCard/>`
-  (`features/Giveaway.tsx`) sits under the Outlook on today's Journal until
-  `GIVEAWAY_END`; an entry is a day in the window holding a trusted baseline OR
+  (`features/Giveaway.tsx`) sits under the Outlook on today's Journal from
+  `GIVEAWAY_START` to `GIVEAWAY_END` only (a card before the window promised
+  entries a reading could not yet earn); an entry is a day in the window holding a trusted baseline OR
   training reading, capped at 10 (`lib/giveaway.ts`, pure + tested). Signing up
   POSTs `/ping/gvw/{install code}` with the address and the entry days plus
   each day's sensor letter, never a result. Unlike every ping it ANSWERS (200 /
