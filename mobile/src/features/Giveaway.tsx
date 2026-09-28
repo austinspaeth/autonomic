@@ -75,6 +75,11 @@ const RIB_ROW = { w: 20, h: 28 };
 const ICON_TILE = 42;
 const CHEV_BOX = 44;
 const CHEV_SIZE = 18;
+const PAD = 16;
+const RIB_GAP = 14;
+/** The ribbon's own viewBox is 100 x 140. */
+const RIB_ASPECT = 100 / 140;
+const GLOW = 190;
 
 export function GiveawayCard({ dk }: { dk: string }) {
   const p = usePalette();
@@ -82,6 +87,9 @@ export function GiveawayCard({ dk }: { dk: string }) {
   const entries = useStore((s) => giveawayEntries(s.state.days, todayKey()));
   const [collapsed, setCollapsed] = useState(readCollapsed);
   const [entered, setEntered] = useState(isGiveawaySignedUp);
+  // The open layout's title block, which the ribbon beside it matches.
+  const [headH, setHeadH] = useState(0);
+  const ribW = headH * RIB_ASPECT;
 
   // 0 = open, 1 = collapsed. Measured sizes live in shared values so the
   // animated styles never wait on a React render.
@@ -129,36 +137,45 @@ export function GiveawayCard({ dk }: { dk: string }) {
         onLayout={(e) => { openH.value = e.nativeEvent.layout.height; }}
         style={[{ position: 'absolute', left: 0, right: 0, top: 0 }, openLayer]}
       >
-        {/* The soft teal light behind the ribbon. */}
-        <View pointerEvents="none" style={{ position: 'absolute', right: -40, top: -50, width: 210, height: 210 }}>
-          <Svg width="100%" height="100%">
-            <Defs>
-              <RadialGradient id="gw-glow" cx="50%" cy="50%" r="50%">
-                <Stop offset="0" stopColor={TEAL} stopOpacity={0.12} />
-                <Stop offset="0.65" stopColor={TEAL} stopOpacity={0} />
-              </RadialGradient>
-            </Defs>
-            <Rect width="100%" height="100%" fill="url(#gw-glow)" />
-          </Svg>
-        </View>
-        <View pointerEvents="none" style={{ position: 'absolute', right: 34, top: 42, width: 44, height: 62 }}>
-          <Ribbon bloom />
-        </View>
-
-        <Pressable onPress={() => toggle(true)} accessibilityLabel="Collapse giveaway card" style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 14 }}>
-          <View style={{ paddingRight: 78 }}>
-            <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: '700', letterSpacing: 1.2, color: TEAL, marginBottom: 6, marginRight: -34 }}>
-              DYSAUTONOMIA AWARENESS
-            </Text>
-            {/* Narrower than the column so the prize breaks after its brand
-                ("Win an Apple Watch / Series 12") rather than wherever it runs out. */}
-            <Text style={{ maxWidth: TITLE_MAX_W, fontSize: 21, fontWeight: '700', letterSpacing: -0.4, lineHeight: 25, color: p.text, marginBottom: 7 }}>
-              {PRIZE_TITLE}
-            </Text>
-            <Text style={{ fontSize: 13.5, lineHeight: 20, color: p.textDim, marginBottom: 15 }}>
-              Take a reading, earn an entry. One per day, up to {GIVEAWAY_MAX_ENTRIES}. Other prizes available.
-            </Text>
+        {/* The soft teal light behind the ribbon, centred on it. */}
+        {headH > 0 ? (
+          <View pointerEvents="none" style={{
+            position: 'absolute', width: GLOW, height: GLOW,
+            left: PAD + ribW / 2 - GLOW / 2, top: PAD + headH / 2 - GLOW / 2,
+          }}>
+            <Svg width="100%" height="100%">
+              <Defs>
+                <RadialGradient id="gw-glow" cx="50%" cy="50%" r="50%">
+                  <Stop offset="0" stopColor={TEAL} stopOpacity={0.12} />
+                  <Stop offset="0.65" stopColor={TEAL} stopOpacity={0} />
+                </RadialGradient>
+              </Defs>
+              <Rect width="100%" height="100%" fill="url(#gw-glow)" />
+            </Svg>
           </View>
+        ) : null}
+
+        <Pressable onPress={() => toggle(true)} accessibilityLabel="Collapse giveaway card" style={{ paddingHorizontal: PAD, paddingTop: PAD, paddingBottom: 14 }}>
+          {/* The ribbon stands beside the two titles, exactly as tall as they
+              are: measured, since the prize wraps to one line or two. */}
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: RIB_GAP, marginBottom: 12 }}>
+            <View pointerEvents="none" style={{ width: ribW, height: headH, opacity: headH > 0 ? 1 : 0 }}>
+              <Ribbon bloom />
+            </View>
+            <View style={{ flex: 1, paddingRight: 28 }} onLayout={(e) => setHeadH(Math.round(e.nativeEvent.layout.height))}>
+              <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: '700', letterSpacing: 1.2, color: TEAL, marginBottom: 6 }}>
+                DYSAUTONOMIA AWARENESS
+              </Text>
+              {/* Narrower than the column so the prize breaks after its brand
+                  ("Win an Apple Watch / Series 12") rather than wherever it runs out. */}
+              <Text style={{ maxWidth: TITLE_MAX_W, fontSize: 21, fontWeight: '700', letterSpacing: -0.4, lineHeight: 25, color: p.text }}>
+                {PRIZE_TITLE}
+              </Text>
+            </View>
+          </View>
+          <Text style={{ fontSize: 13.5, lineHeight: 20, color: p.textDim, marginBottom: 15 }}>
+            Take a reading, earn an entry. One per day, up to {GIVEAWAY_MAX_ENTRIES}. Other prizes available.
+          </Text>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 15 }}>
             <View style={{ flex: 1 }}><Dots filled={entries} height={6} glow /></View>
