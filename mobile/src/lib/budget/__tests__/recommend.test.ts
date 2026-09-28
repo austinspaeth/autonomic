@@ -45,15 +45,14 @@ describe('the stand-test todo', () => {
 
 describe('hasStandTestDevice', () => {
   const days = (r: Partial<Entry>) => ({ [DK]: day([{ id: 'x', type: 'hrv', time: '07:00', ...r } as Entry]) });
-  it('counts a saved strap', () => {
-    expect(hasStandTestDevice({}, true)).toBe(true);
+  it('counts an HRV reading taken with the watch app or a strap', () => {
+    expect(hasStandTestDevice(days({ source: 'watch' }))).toBe(true);
+    expect(hasStandTestDevice(days({ source: 'polar' }))).toBe(true);
+    expect(hasStandTestDevice(days({ type: 'breathHrv', source: 'polar' }))).toBe(true);
   });
-  it('counts a reading captured with the watch app or a strap', () => {
-    expect(hasStandTestDevice(days({ source: 'watch' }), false)).toBe(true);
-    expect(hasStandTestDevice(days({ source: 'polar' }), false)).toBe(true);
-  });
-  it('does not count the camera, or a watch reading imported from Health', () => {
-    expect(hasStandTestDevice(days({ source: 'camera' }), false)).toBe(false);
-    expect(hasStandTestDevice(days({ source: 'watch', imported: true }), false)).toBe(false);
+  it('does not count the camera, a Health import, or a non-HRV reading', () => {
+    expect(hasStandTestDevice(days({ source: 'camera' }))).toBe(false);
+    expect(hasStandTestDevice(days({ source: 'watch', imported: true }))).toBe(false);
+    expect(hasStandTestDevice(days({ type: 'restingHr', source: 'polar' }))).toBe(false);
   });
 });

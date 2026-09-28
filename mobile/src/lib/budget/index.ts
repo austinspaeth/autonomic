@@ -312,7 +312,7 @@ export function buildBudgetAt(
 
   // Once per build, and only when the stand-test Todo could still be asked.
   const canStandTest = !past && !opts.standTestAsked
-    && hasStandTestDevice(days, !!state.settings?.lastBleDeviceId);
+    && hasStandTestDevice(days);
 
   return nows.map((now) => {
     const nowMin = now.getHours() * 60 + now.getMinutes();

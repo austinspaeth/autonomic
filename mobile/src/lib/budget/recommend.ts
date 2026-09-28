@@ -108,18 +108,19 @@ export function nextRecommendation(input: RecommendInput): Recommendation | null
   return null;
 }
 
+/** The HRV reading types: the baseline and the paced training reading. */
+const HRV_TYPES = new Set(['hrv', 'breathHrv']);
+
 /**
  * Can this person take a stand test? It runs on the Apple Watch app or a
- * Bluetooth chest strap, so: a strap is saved, or the journal holds a reading
- * captured with either. A reading IMPORTED from Apple Health says 'watch' too,
- * but only proves a watch wrote to Health, not that the app is on it, so it
- * does not count.
+ * Bluetooth chest strap, so the bar is one HRV reading taken with either. A
+ * reading IMPORTED from Apple Health says 'watch' too, but only proves a watch
+ * wrote to Health, not that the app is on it, so it does not count.
  */
-export function hasStandTestDevice(days: DaysMap, strapSaved: boolean): boolean {
-  if (strapSaved) return true;
+export function hasStandTestDevice(days: DaysMap): boolean {
   for (const dk in days) {
     for (const r of days[dk]?.readings || []) {
-      if (r.imported) continue;
+      if (!HRV_TYPES.has(r.type) || r.imported) continue;
       if (r.source === 'watch' || r.source === 'polar') return true;
     }
   }
