@@ -249,6 +249,9 @@
             if (el.closest('.gvm')) return 'giveaway_blog_mobile_banner';
             if (el.closest('.gvp-hero')) return 'giveaway_page_hero';
             if (el.closest('.gvp-end')) return 'giveaway_page_end';
+            // The launch article's countdown card and closing card.
+            if (el.closest('.gvx-clock')) return 'giveaway_article_top';
+            if (el.closest('.gvx-end')) return 'giveaway_article_end';
             if (el.closest('#enter')) return 'giveaway_page_enter';
             if (el.closest('#rules')) return 'giveaway_page_rules';
             if (el.closest('#dlModal')) return 'download_modal';
@@ -1013,7 +1016,7 @@
                 ajEvent('giveaway_promo_view', { placement: where });
               });
             }, { threshold: 0.5 });
-            document.querySelectorAll('.gva, .gvs, .gvm').forEach(function (n) { gvObs.observe(n); });
+            document.querySelectorAll('.gva, .gvs, .gvm, .gvx-clock, .gvx-end').forEach(function (n) { gvObs.observe(n); });
           }
 
           var gvPage = document.querySelector('.gvp');

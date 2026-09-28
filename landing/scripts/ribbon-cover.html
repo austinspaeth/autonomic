@@ -1,0 +1,36 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+  /* Ribbon centred at y=330, not 540: the article header shows only the top
+     260px of this 16:9 cover (about the top 60% of it at desktop width). */
+  html, body { margin: 0; width: 1920px; height: 1080px; overflow: hidden; }
+  /* Never pure black: the far edge is a deep teal-charcoal. */
+  body { background: #071c1b; position: relative; }
+  .glow { position: absolute; inset: 0;
+    background:
+      radial-gradient(circle 1150px at 50% 330px, rgba(94,234,212,0.5) 0%, rgba(45,212,191,0.36) 12%, rgba(20,184,166,0.26) 26%, rgba(15,148,136,0.17) 42%, rgba(15,118,110,0.1) 60%, rgba(13,80,76,0.05) 80%, rgba(6,26,25,0) 100%),
+      radial-gradient(ellipse 130% 110% at 50% 330px, #0f3b38 0%, #0b2b29 50%, #08201f 85%, #071c1b 100%); }
+  .halo { position: absolute; left: 50%; top: 330px; width: 1300px; height: 1300px; margin: -650px 0 0 -650px; border-radius: 50%;
+    background: radial-gradient(circle, rgba(153,246,228,0.32) 0%, rgba(45,212,191,0.18) 22%, rgba(20,184,166,0.07) 48%, rgba(20,184,166,0) 72%); filter: blur(40px); }
+  .rib { position: absolute; left: 50%; top: 330px; width: 270px; height: 378px; margin: -196px 0 0 -135px; }
+</style></head><body>
+<div class="glow"></div><div class="halo"></div>
+<div class="rib">
+<svg viewBox="0 0 100 140" width="100%" height="100%" style="display:block;overflow:visible">
+  <defs>
+    <linearGradient id="g" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="100" y2="140">
+      <stop offset="0%" stop-color="#5eead4"/><stop offset="55%" stop-color="#14b8a6"/><stop offset="100%" stop-color="#0f766e"/>
+    </linearGradient>
+    <linearGradient id="s" gradientUnits="userSpaceOnUse" x1="10" y1="10" x2="70" y2="60">
+      <stop offset="0%" stop-color="#ecfeff" stop-opacity="0"/><stop offset="50%" stop-color="#ecfeff" stop-opacity="0.55"/><stop offset="100%" stop-color="#ecfeff" stop-opacity="0"/>
+    </linearGradient>
+    <filter id="b" x="-80%" y="-80%" width="260%" height="260%"><feGaussianBlur stdDeviation="9"/></filter>
+    <filter id="b2" x="-150%" y="-150%" width="400%" height="400%"><feGaussianBlur stdDeviation="22"/></filter>
+  </defs>
+  <path d="M80 134 L43 63 C29 37 32 9 50 9 C68 9 71 37 57 63 L20 134" fill="none" stroke="#2dd4bf" stroke-width="30" stroke-linejoin="round" filter="url(#b2)" opacity="0.55"/>
+  <path d="M80 134 L43 63 C29 37 32 9 50 9 C68 9 71 37 57 63 L20 134" fill="none" stroke="url(#g)" stroke-width="20" stroke-linejoin="round" filter="url(#b)" opacity="0.8"/>
+  <path d="M80 134 L43 63 C29 37 32 9 50 9 C68 9 71 37 57 63 L20 134" fill="none" stroke="url(#g)" stroke-width="17" stroke-linejoin="round"/>
+  <path d="M80 134 L43 63 C29 37 32 9 50 9 C68 9 71 37 57 63 L20 134" fill="none" stroke="url(#s)" stroke-width="17" stroke-linejoin="round" style="mix-blend-mode:screen"/>
+  <path d="M80 134 L43 63 C29 37 32 9 50 9 C68 9 71 37 57 63 L20 134" fill="none" stroke="#ecfeff" stroke-opacity="0.22" stroke-width="1.4" stroke-linejoin="round" transform="translate(-4 -2)"/>
+</svg>
+</div>
+</body></html>
