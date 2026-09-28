@@ -1,7 +1,7 @@
 /**
  * The Dysautonomia Awareness Month giveaway card — Claude Design "Giveaway
  * Journal Card" (51a). Sits directly under the Autonomic Outlook on today's
- * Journal, open by default, and collapses to one row that remembers itself.
+ * Journal, open by default, and collapses to a Milestones-style row that remembers itself.
  *
  * Teal is borrowed from the awareness ribbon and used ONLY inside this card and
  * its entry sheet, so it reads as an event rather than as a new brand colour.
@@ -15,8 +15,7 @@
 import React, { useEffect, useState } from 'react';
 import { Linking, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import Animated, {
-  Easing, Extrapolation, interpolate, useAnimatedStyle, useSharedValue, withRepeat, withSpring, withTiming,
-  type SharedValue,
+  Easing, Extrapolation, interpolate, useAnimatedStyle, useSharedValue, withRepeat, withTiming,
 } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { MMKV } from 'react-native-mmkv';
@@ -33,6 +32,8 @@ import {
 
 const TEAL = '#2dd4bf';
 const TEAL_INK = '#042f2e';
+/** The collapsed row's icon tile in dark mode: the ribbon's teal taken down to a deep, solid shade. */
+const TEAL_TILE = '#0d3b37';
 const PRIZE_TITLE = Platform.OS === 'android' ? 'Win a Polar H10 strap' : 'Win an Apple Watch Series 12';
 /** Wide enough for "Win an Apple Watch", too narrow for "Series 12" beside it. */
 const TITLE_MAX_W = 205;
@@ -53,18 +54,25 @@ const writeCollapsed = (v: boolean) => { try { flags()?.set(COLLAPSED_KEY, v); }
 /* -------------------------------------------------------------------- card */
 
 /**
- * Open and collapsed are ONE card that changes shape, not two cards swapped.
- * Both layouts are mounted, each measured at its natural height, and a single
- * spring drives the card between them: the height (a touch of overshoot is
- * what makes it read as liquid), a cross-fade that lets the
- * outgoing layout drift out as the incoming one settles, and the ribbon, which
- * is the one element both states share and so travels and shrinks from the
- * corner of the open card to the head of the row rather than fading.
+ * Open and collapsed are two layouts in one card, and NOTHING travels between
+ * them: the outgoing layout fades out where it stands, the card's height
+ * settles, and the incoming layout fades in already in its own place. One
+ * timeline drives all three, so collapsing and expanding are the same motion
+ * played in either direction. Both layouts stay mounted and absolutely
+ * positioned so each measures at its natural height whatever the card is doing.
+ *
+ * Collapsed, it is the same object as the cards below it (Milestones): a 42pt
+ * tinted icon tile, a title over a one-line count, a thin progress track, and a
+ * chevron — the ribbon in the tile where their icons sit.
  */
-const SPRING = { damping: 17, stiffness: 150, mass: 1 };
-const RIB_OPEN = { right: 34, top: 42, w: 44, h: 62 };
-const RIB_ROW = { left: 16, w: 20, h: 28 };
-const CHEV_BOX = 44;
+const MORPH_MS = 560;
+const EASE = Easing.inOut(Easing.cubic);
+const OUT_END = 0.3;     // outgoing layout gone by here
+const H_START = 0.22;    // height moves between these two
+const H_END = 0.78;
+const IN_START = 0.68;   // incoming layout starts appearing here
+const RIB_ROW = { w: 20, h: 28 };
+const ICON_TILE = 42;
 
 export function GiveawayCard({ dk }: { dk: string }) {
   const p = usePalette();
@@ -78,37 +86,21 @@ export function GiveawayCard({ dk }: { dk: string }) {
   const t = useSharedValue(collapsed ? 1 : 0);
   const openH = useSharedValue(0);
   const rowH = useSharedValue(0);
-  const innerW = useSharedValue(0);
-  useEffect(() => { t.value = withSpring(collapsed ? 1 : 0, SPRING); }, [collapsed, t]);
+  useEffect(() => { t.value = withTiming(collapsed ? 1 : 0, { duration: MORPH_MS, easing: Easing.linear }); }, [collapsed, t]);
 
   const shell = useAnimatedStyle(() => {
-    const measured = openH.value > 0 && rowH.value > 0;
-    return { height: measured ? openH.value + (rowH.value - openH.value) * t.value : undefined };
+    if (!(openH.value > 0 && rowH.value > 0)) return { height: undefined };
+    const k = EASE(interpolate(t.value, [H_START, H_END], [0, 1], Extrapolation.CLAMP));
+    return { height: openH.value + (rowH.value - openH.value) * k };
   });
+  // Symmetric about the middle: whichever layout is leaving goes first, the
+  // arriving one comes last, in both directions.
   const openLayer = useAnimatedStyle(() => ({
-    opacity: interpolate(t.value, [0, 0.55], [1, 0], Extrapolation.CLAMP),
-    transform: [{ translateY: -10 * t.value }, { scale: 1 - 0.03 * t.value }],
+    opacity: interpolate(t.value, [0, OUT_END], [1, 0], Extrapolation.CLAMP),
   }));
   const rowLayer = useAnimatedStyle(() => ({
-    opacity: interpolate(t.value, [0.4, 1], [0, 1], Extrapolation.CLAMP),
-    transform: [{ translateY: 10 * (1 - t.value) }],
+    opacity: interpolate(t.value, [IN_START, 1], [0, 1], Extrapolation.CLAMP),
   }));
-  const glow = useAnimatedStyle(() => ({ opacity: interpolate(t.value, [0, 0.6], [1, 0], Extrapolation.CLAMP) }));
-  const chevron = useAnimatedStyle(() => ({
-    top: rowH.value > 0 ? (rowH.value - CHEV_BOX) / 2 : 12,
-    transform: [{ rotate: `${-90 * t.value}deg` }],
-  }));
-  const ribbon = useAnimatedStyle(() => {
-    const k = t.value;
-    const openLeft = innerW.value - RIB_OPEN.right - RIB_OPEN.w;
-    const rowTop = (rowH.value - RIB_ROW.h) / 2;
-    return {
-      left: openLeft + (RIB_ROW.left - openLeft) * k,
-      top: RIB_OPEN.top + (rowTop - RIB_OPEN.top) * k,
-      width: RIB_OPEN.w + (RIB_ROW.w - RIB_OPEN.w) * k,
-      height: RIB_OPEN.h + (RIB_ROW.h - RIB_OPEN.h) * k,
-    };
-  });
 
   if (dk !== todayKey() || !giveawayOpen(dk)) return null;
 
@@ -119,33 +111,37 @@ export function GiveawayCard({ dk }: { dk: string }) {
 
   return (
     <Animated.View
-      onLayout={(e) => { innerW.value = e.nativeEvent.layout.width - 2; }}
       style={[{
         overflow: 'hidden', marginBottom: 12, backgroundColor: p.surface,
         borderWidth: 1, borderColor: p.border, borderRadius: radius.card,
       }, shell]}
     >
-      {/* The soft teal light behind the ribbon. */}
-      <Animated.View pointerEvents="none" style={[{ position: 'absolute', right: -40, top: -50, width: 210, height: 210 }, glow]}>
-        <Svg width="100%" height="100%">
-          <Defs>
-            <RadialGradient id="gw-glow" cx="50%" cy="50%" r="50%">
-              <Stop offset="0" stopColor={TEAL} stopOpacity={0.12} />
-              <Stop offset="0.65" stopColor={TEAL} stopOpacity={0} />
-            </RadialGradient>
-          </Defs>
-          <Rect width="100%" height="100%" fill="url(#gw-glow)" />
-        </Svg>
-      </Animated.View>
-
-      {/* Open. Absolute, so it measures at its own height whatever the card's
-          animated height is doing. A tap anywhere but a button collapses it:
-          the buttons are nested Pressables and claim their own touches. */}
+      {/* Open. A tap anywhere but a button collapses it: the buttons are nested
+          Pressables and claim their own touches. */}
       <Animated.View
         pointerEvents={collapsed ? 'none' : 'auto'}
         onLayout={(e) => { openH.value = e.nativeEvent.layout.height; }}
         style={[{ position: 'absolute', left: 0, right: 0, top: 0 }, openLayer]}
       >
+        {/* The soft teal light behind the ribbon. */}
+        <View pointerEvents="none" style={{ position: 'absolute', right: -40, top: -50, width: 210, height: 210 }}>
+          <Svg width="100%" height="100%">
+            <Defs>
+              <RadialGradient id="gw-glow" cx="50%" cy="50%" r="50%">
+                <Stop offset="0" stopColor={TEAL} stopOpacity={0.12} />
+                <Stop offset="0.65" stopColor={TEAL} stopOpacity={0} />
+              </RadialGradient>
+            </Defs>
+            <Rect width="100%" height="100%" fill="url(#gw-glow)" />
+          </Svg>
+        </View>
+        <View pointerEvents="none" style={{ position: 'absolute', right: 34, top: 42, width: 44, height: 62 }}>
+          <Ribbon bloom />
+        </View>
+        <View pointerEvents="none" style={{ position: 'absolute', right: 0, top: 6, width: 44, height: 44, alignItems: 'center', justifyContent: 'center' }}>
+          <Icon name="chevron" size={16} color={p.textDim} strokeWidth={2.4} />
+        </View>
+
         <Pressable onPress={() => toggle(true)} accessibilityLabel="Collapse giveaway card" style={{ paddingHorizontal: 16, paddingTop: 16, paddingBottom: 14 }}>
           <View style={{ paddingRight: 78 }}>
             <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: '700', letterSpacing: 1.2, color: TEAL, marginBottom: 6, marginRight: -34 }}>
@@ -201,8 +197,7 @@ export function GiveawayCard({ dk }: { dk: string }) {
         </Pressable>
       </Animated.View>
 
-      {/* Collapsed: one row. The ribbon's slot is left empty, since the shared
-          ribbon below lands in it. */}
+      {/* Collapsed: Milestones' own row, measure for measure. */}
       <Animated.View
         pointerEvents={collapsed ? 'auto' : 'none'}
         onLayout={(e) => { rowH.value = e.nativeEvent.layout.height; }}
@@ -211,43 +206,35 @@ export function GiveawayCard({ dk }: { dk: string }) {
         <Pressable
           onPress={() => toggle(false)}
           accessibilityLabel="Expand giveaway card"
-          style={({ pressed }) => [{
-            flexDirection: 'row', alignItems: 'center', gap: 12,
-            paddingVertical: 18, paddingLeft: RIB_ROW.left, paddingRight: 14,
-          }, pressed && { opacity: 0.8 }]}
+          style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 13, padding: 15 }, pressed && { opacity: 0.8 }]}
         >
-          <View style={{ width: RIB_ROW.w, height: RIB_ROW.h }} />
-          <View style={{ flex: 1, minWidth: 0 }}>
-            <Text style={{ fontSize: 14.5, fontWeight: '700', color: p.text }}>Giveaway entries</Text>
-            <View style={{ marginTop: 10, maxWidth: 150 }}><Dots filled={entries} height={5} /></View>
+          <View style={{
+            width: ICON_TILE, height: ICON_TILE, borderRadius: 9, alignItems: 'center', justifyContent: 'center',
+            backgroundColor: p.dark ? TEAL_TILE : hexA(TEAL, 0.16), borderWidth: 1, borderColor: hexA(TEAL, p.dark ? 0.14 : 0.22),
+          }}>
+            <View style={{ width: RIB_ROW.w, height: RIB_ROW.h }}><Ribbon /></View>
           </View>
-          <Count n={entries} big />
-          {/* The shared chevron below sits over this slot. */}
-          <View style={{ width: 16 }} />
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={{ fontSize: 15, color: p.text, fontWeight: '700' }}>Giveaway entries</Text>
+            <Text style={{ fontSize: 13, color: p.textDim, marginTop: 2 }}>
+              {`${entries} of ${GIVEAWAY_MAX_ENTRIES} earned`}
+            </Text>
+            <View style={{ marginTop: 10 }}><Dots filled={entries} height={4} /></View>
+          </View>
+          <Icon name="chevronRight" size={18} color={p.textDim} />
         </Pressable>
-      </Animated.View>
-
-      {/* One chevron for both states, pinned where the row's sits and turning
-          on the same spring: down while open, right while collapsed. Taps go to
-          the card beneath it, which toggles either way. */}
-      <Animated.View pointerEvents="none" style={[{ position: 'absolute', right: 0, width: CHEV_BOX, height: CHEV_BOX, alignItems: 'center', justifyContent: 'center' }, chevron]}>
-        <Icon name="chevron" size={16} color={p.textDim} strokeWidth={2.4} />
-      </Animated.View>
-
-      <Animated.View pointerEvents="none" style={[{ position: 'absolute' }, ribbon]}>
-        <Ribbon bloom fade={t} />
       </Animated.View>
     </Animated.View>
   );
 }
 
-function Count({ n, big }: { n: number; big?: boolean }) {
+function Count({ n }: { n: number }) {
   const p = usePalette();
   return (
-    <Text style={{ fontSize: big ? 22 : 15, fontWeight: '700', color: p.text, fontVariant: ['tabular-nums'], marginRight: big ? 8 : 0 }}>
+    <Text style={{ fontSize: 15, fontWeight: '700', color: p.text, fontVariant: ['tabular-nums'] }}>
       {n}
-      <Text style={{ fontSize: big ? 14 : 11.5, fontWeight: '500', color: p.textDim }}>
-        {big ? ` / ${GIVEAWAY_MAX_ENTRIES}` : ` / ${GIVEAWAY_MAX_ENTRIES} entries`}
+      <Text style={{ fontSize: 11.5, fontWeight: '500', color: p.textDim }}>
+        {` / ${GIVEAWAY_MAX_ENTRIES} entries`}
       </Text>
     </Text>
   );
@@ -261,7 +248,7 @@ function Dots({ filled, height, glow }: { filled: number; height: number; glow?:
         const on = i < filled;
         return (
           <View key={i} style={[
-            { flex: 1, height, borderRadius: 999, backgroundColor: on ? TEAL : hexA(p.text, 0.07) },
+            { flex: 1, height, borderRadius: 999, backgroundColor: on ? TEAL : hexA(p.text, 0.16) },
             on && glow && { shadowColor: TEAL, shadowOpacity: 0.33, shadowRadius: 5, shadowOffset: { width: 0, height: 0 } },
           ]} />
         );
@@ -279,16 +266,13 @@ const RIBBON = 'M80 134 L43 63 C29 37 32 9 50 9 C68 9 71 37 57 63 L20 134';
  * seven-second cycle; here it is two wide, faint strokes under the ribbon doing
  * the same breath, which reads the same at this size without an SVG filter.
  */
-function Ribbon({ bloom, fade }: { bloom?: boolean; fade?: SharedValue<number> }) {
+function Ribbon({ bloom }: { bloom?: boolean }) {
   const breath = useSharedValue(0);
   useEffect(() => {
     if (!bloom) return;
     breath.value = withRepeat(withTiming(1, { duration: 3500, easing: Easing.inOut(Easing.sin) }), -1, true);
   }, [bloom, breath]);
-  // `fade` (0 open, 1 collapsed) dims the bloom as the ribbon shrinks into the row.
-  const bloomStyle = useAnimatedStyle(() => ({
-    opacity: (0.45 + 0.55 * breath.value) * (1 - Math.min(1, Math.max(0, fade?.value ?? 0))),
-  }));
+  const bloomStyle = useAnimatedStyle(() => ({ opacity: 0.45 + 0.55 * breath.value }));
   const id = bloom ? 'gw-rib-b' : 'gw-rib';
   const grad = (
     <Defs>
