@@ -5,11 +5,17 @@
     REDIRECT_EVENT,
     REDIRECT_EVENT_BY_PLATFORM,
     REDIRECT_MAX_WAIT_MS,
+    VIDEO_CAMPAIGN,
     VIDEO_CAMPAIGN_SLUG,
+    redirectTitle,
+    site,
     videoAppStoreLink,
     videoPlayStoreLink,
     videoSiteLink
   } from '$lib/site';
+
+  const title = redirectTitle(VIDEO_CAMPAIGN);
+  const description = 'Get Autonomic for iPhone or Android.';
 
   /* The sniffer. The site ships no framework runtime, so this rides along as a
      plain inline script in the prerendered HTML (emitted via {@html redirect}
@@ -106,8 +112,19 @@
 </script>
 
 <svelte:head>
-  <title>Download Autonomic</title>
-  <meta name="description" content="Get Autonomic for iPhone or Android." />
+  <title>{title}</title>
+  <meta name="description" content={description} />
+  <!-- Shared links (a video description, a DM) still unfurl with a card: the
+       site's own, which already carries both store badges. -->
+  <meta property="og:type" content="website" />
+  <meta property="og:url" content={`${site.url}/download/`} />
+  <meta property="og:title" content={title} />
+  <meta property="og:description" content={description} />
+  <meta property="og:image" content={site.ogImage} />
+  <meta name="twitter:card" content="summary_large_image" />
+  <meta name="twitter:title" content={title} />
+  <meta name="twitter:description" content={description} />
+  <meta name="twitter:image" content={site.ogImage} />
   <!-- A redirect is not a page of the site: keep it out of the index and out of
        the sitemap (which is hand-listed in routes/sitemap.xml). -->
   <meta name="robots" content="noindex, nofollow" />

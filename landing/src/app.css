@@ -24,6 +24,7 @@
   --orange: #f97316;
   --red: #ef4444;
   --purple: #a78bfa;
+  --teal: #2ec4b6;         /* Dysautonomia awareness ribbon */
 
   --r: 16px;
   --r-lg: 24px;
@@ -191,6 +192,14 @@ a { color: inherit; text-decoration: none; }
   font-family: var(--display); font-weight: 700; font-size: 19px; letter-spacing: -0.01em;
 }
 .brand-mark { width: 26px; height: 26px; color: var(--accent); }
+/* Awareness ribbon + hairline divider, left of the brand. The row's 20px gap
+   is pulled in so the three read as one group. */
+.awareness { display: inline-flex; align-items: center; flex: none; padding: 6px 4px; margin: -6px -4px; transition: transform 0.18s var(--bounce); }
+.awareness:hover { transform: translateY(-2px); }
+.awareness-ribbon { width: 18px; height: 24px; fill: none; stroke-width: 3.6; stroke-linejoin: round; }
+.awareness-back { stroke: color-mix(in srgb, var(--teal) 72%, #000); }
+.awareness-front { stroke: var(--teal); }
+.nav-divider { width: 1px; height: 24px; background: var(--line-2); flex: none; margin: 0 -6px; }
 /* The app's real mark is wide (651.59 x 348.34), so it sizes by width. */
 .brand-mark-app { width: 34px; height: 18px; }
 .nav-links { display: flex; gap: 4px; margin-left: auto; }
@@ -1207,7 +1216,7 @@ a { color: inherit; text-decoration: none; }
   .nav-cta { margin-left: auto; }                 /* anchors download + burger to the right */
   .nav-burger { display: flex; margin-left: 0; }
   /* Keep the bar row above the open overlay so nothing shifts when it opens. */
-  .brand, .nav-cta, .nav-burger { position: relative; z-index: 101; }
+  .awareness, .nav-divider, .brand, .nav-cta, .nav-burger { position: relative; z-index: 101; }
   .nav.open { -webkit-backdrop-filter: none; backdrop-filter: none; }
   /* Inline: keep only Blog among the links; the rest live in the burger menu. */
   .nav:not(.open) .nav-links a:not(.nav-blog) { display: none; }

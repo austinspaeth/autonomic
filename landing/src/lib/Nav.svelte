@@ -1,10 +1,18 @@
 <script lang="ts">
   import BrandMark from './BrandMark.svelte';
-  import { appStoreLink, playStoreLink, pricing } from './site';
+  import { appStoreLink, playStoreLink, pricing, giveawayUrl } from './site';
 </script>
 
 <header class="nav" id="nav">
   <div class="wrap nav-row">
+    <!-- October: Dysautonomia Awareness Month (the cause's colour is turquoise). -->
+    <a class="awareness" href={giveawayUrl} aria-label="Dysautonomia Awareness Month giveaway" title="October is Dysautonomia Awareness Month">
+      <svg class="awareness-ribbon" viewBox="0 0 24 32" aria-hidden="true">
+        <path class="awareness-back" d="M18.5 30 9.6 14.6C7.2 10.4 8.6 3.6 12 3.6" />
+        <path class="awareness-front" d="M12 3.6c3.4 0 4.8 6.8 2.4 11L5.5 30" />
+      </svg>
+    </a>
+    <span class="nav-divider" aria-hidden="true"></span>
     <a class="brand" href="/" aria-label="Autonomic home">
       <BrandMark size={26} />
       <span>Autonomic</span>

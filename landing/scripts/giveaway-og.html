@@ -1,0 +1,118 @@
+<!doctype html>
+<!--
+  The giveaway page's social card, rendered by gen-giveaway-og.mjs into
+  static/giveaway/og.png (1200x630). The %%…%% placeholders are filled in from BrandMark.svelte, PrizeWatchArt.svelte and PrizeStrapArt.svelte, so the
+  card cannot drift from the art the site draws.
+-->
+<html><head><meta charset="utf-8"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --accent:#e03127; --teal:#2dd4bf; --teal-l:#5eead4; --text:#f5f5f7; --dim:#a8a8b0;
+    --display:"Space Grotesk",sans-serif; --body:-apple-system,"Helvetica Neue",Arial,sans-serif;
+  }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#060607}
+  body{width:1200px;height:630px;overflow:hidden;color:var(--text);font-family:var(--body);-webkit-font-smoothing:antialiased}
+
+  .card{position:relative;width:1200px;height:630px;overflow:hidden;
+    background:
+      radial-gradient(560px 420px at 905px 300px, rgba(45,212,191,.20), rgba(45,212,191,0) 70%),
+      radial-gradient(520px 360px at 60px -40px, rgba(45,212,191,.10), rgba(45,212,191,0) 70%),
+      #060607;}
+  /* A hairline lit from the top right, the prize cards' treatment, around the whole card. */
+  .card::after{content:'';position:absolute;inset:0;padding:1.5px;pointer-events:none;
+    background:linear-gradient(225deg, rgba(45,212,191,.7) 0%, rgba(45,212,191,.18) 30%, rgba(45,212,191,0) 55%);
+    -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor}
+
+
+  .copy{position:absolute;left:64px;top:50px;width:600px}
+  .eyebrow{display:flex;align-items:center;gap:14px;margin-bottom:22px}
+  .ribbon{width:30px;height:42px;flex:none;filter:drop-shadow(0 0 10px rgba(45,212,191,.55))}
+  .kicker{font-size:15px;font-weight:700;letter-spacing:.14em;text-transform:uppercase;color:var(--teal-l);line-height:1.35}
+
+  h1{font-family:var(--display);font-weight:700;font-size:56px;line-height:1.02;letter-spacing:-.035em;margin-bottom:18px}
+  h1 .t{color:var(--teal-l)}
+  .sub{font-size:23px;line-height:1.4;color:#c9c9d0;max-width:540px;margin-bottom:22px}
+  .sub b{color:var(--text);font-weight:600}
+
+
+  .foot{position:absolute;left:64px;right:56px;bottom:44px;display:flex;align-items:center;justify-content:space-between}
+  .brand{display:flex;align-items:center;gap:14px}
+  .mark{height:30px;width:auto;color:var(--accent)}
+  .word{font-family:var(--display);font-weight:700;font-size:28px;letter-spacing:-.02em}
+  .free{display:inline-flex;align-items:center;gap:10px;height:46px;padding:0 22px;border-radius:99px;
+    background:rgba(45,212,191,.10);border:1px solid rgba(45,212,191,.4);
+    font-size:17px;font-weight:700;color:var(--teal-l);letter-spacing:.01em}
+
+  .badges{display:flex;gap:12px}
+  .badge{display:flex;align-items:center;gap:11px;height:56px;padding:0 18px 0 16px;
+    border:1px solid rgba(255,255,255,.5);border-radius:11px;background:#000}
+  .glyph{flex:none}
+  .bt{display:flex;flex-direction:column;justify-content:center;line-height:1}
+  .bt .small{font-size:11px;margin-bottom:4px;color:#e4e4e8}
+  .bt .big{font-size:21px;font-weight:500;letter-spacing:-.01em}
+
+  /* the prizes, floating on the right like the page hero */
+  .prize{position:absolute}
+  .prize .glow{position:absolute;background:var(--teal);filter:blur(50px);border-radius:99px}
+  .prize svg{position:relative;display:block;overflow:visible}
+  .cap{position:absolute;white-space:nowrap}
+  .cap small{display:block;font-size:12.5px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:var(--teal-l);margin-bottom:3px}
+  .cap strong{display:block;font-family:var(--display);font-size:21px;font-weight:700;letter-spacing:-.01em}
+
+  .watch{left:808px;top:62px;width:224px;height:280px}
+  .watch .glow{left:40px;right:40px;top:70px;bottom:70px;opacity:.22}
+  .watch-cap{left:1028px;top:160px}
+
+  .strap{left:700px;top:300px;width:440px;height:220px}
+  .strap .glow{left:110px;right:110px;top:70px;height:80px;opacity:.18}
+  .strap-cap{left:712px;top:318px}
+</style></head>
+<body>
+<div class="card">
+  <div class="copy">
+    <div class="eyebrow">
+      <svg class="ribbon" viewBox="0 0 100 140">
+        <defs><linearGradient id="rg" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="100" y2="140">
+          <stop offset="0%" stop-color="#5eead4"/><stop offset="55%" stop-color="#14b8a6"/><stop offset="100%" stop-color="#0f766e"/>
+        </linearGradient></defs>
+        <path d="M80 134 L43 63 C29 37 32 9 50 9 C68 9 71 37 57 63 L20 134" fill="none" stroke="url(#rg)" stroke-width="17" stroke-linejoin="round"/>
+        <path d="M80 134 L43 63 C29 37 32 9 50 9 C68 9 71 37 57 63 L20 134" fill="none" stroke="#ecfeff" stroke-opacity=".25" stroke-width="1.4" stroke-linejoin="round" transform="translate(-4 -2)"/>
+      </svg>
+      <div class="kicker">October · Dysautonomia<br/>Awareness Month giveaway</div>
+    </div>
+    <h1>Your daily reading could win you an <span class="t">Apple&nbsp;Watch</span> or a <span class="t">Polar&nbsp;H10.</span></h1>
+    <p class="sub">One entry for every day you take an HRV reading in October, <b>up to 10</b>.</p>
+    <div class="free">Free to enter · Plus more prizes</div>
+  </div>
+
+  <div class="prize watch"><div class="glow"></div>%%WATCH%%</div>
+  <div class="cap watch-cap"><small>iPhone</small><strong>Apple Watch<br/>Series 12</strong></div>
+
+  <div class="prize strap"><div class="glow"></div>%%STRAP%%</div>
+  <div class="cap strap-cap"><small>Android</small><strong>Polar H10</strong></div>
+
+  <div class="foot">
+    <div class="brand">
+      <svg class="mark" viewBox="0 0 651.59 348.34" fill="currentColor"><path d="%%MARK%%"/></svg>
+      <div class="word">Autonomic</div>
+    </div>
+    <div class="badges">
+      <div class="badge">
+        <svg class="glyph" width="24" height="29" viewBox="0 0 384 512" fill="#fff"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>
+        <div class="bt"><span class="small">Download on the</span><span class="big">App Store</span></div>
+      </div>
+      <div class="badge">
+        <svg class="glyph" width="25" height="28" viewBox="0 0 24 24">
+          <path fill="#00D3FF" d="M3.6 1.8 13.8 12 3.6 22.2A2 2 0 0 1 3 20.77V3.23c0-.55.24-1.05.6-1.43z"/>
+          <path fill="#FFCE00" d="M16.8 15 13.8 12l3-3 3.86 2.19c.66.38.66 1.24 0 1.62L16.8 15z"/>
+          <path fill="#FF3A44" d="M16.8 15 6.05 21.11c-.6.34-1.28.24-1.74-.18l.05-.05L13.8 12l3 3z"/>
+          <path fill="#00C853" d="M4.36 3.07 4.31 3.02c.46-.42 1.14-.52 1.74-.18L16.8 9l-3 3L4.36 3.07z"/>
+        </svg>
+        <div class="bt"><span class="small">Get it on</span><span class="big">Google Play</span></div>
+      </div>
+    </div>
+  </div>
+</body></html>

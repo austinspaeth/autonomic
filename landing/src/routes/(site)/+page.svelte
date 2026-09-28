@@ -3,6 +3,7 @@
   import JournalMock from '$lib/JournalMock.svelte';
   import BrandMark from '$lib/BrandMark.svelte';
   import Stars from '$lib/Stars.svelte';
+  import GiveawayBanner from '$lib/GiveawayBanner.svelte';
   import { demoReports as reports } from '$lib/demoPrompts';
 
   const monthly = priceLabel(pricing.monthly);
@@ -575,6 +576,9 @@
   {@html `<script type="application/ld+json">${JSON.stringify(softwareLd)}<\/script>`}
   {@html `<script type="application/ld+json">${JSON.stringify(faqLd)}<\/script>`}
 </svelte:head>
+
+<!-- ============ GIVEAWAY (October) ============ -->
+<GiveawayBanner />
 
 <!-- ============ HERO ============ -->
 <section class="hero" id="home">

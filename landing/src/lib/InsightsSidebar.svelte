@@ -1,6 +1,7 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import JournalMock from './JournalMock.svelte';
+  import GiveawaySideCard from './GiveawaySideCard.svelte';
   import type { Article } from '../routes/api/articles/types';
   import { getTopic, topicLabel } from './topics';
   import { articleHref, formatDate, PILLARS, PILLAR_LABELS, appStoreLink, playStoreLink } from './site';
@@ -41,6 +42,8 @@
       </ul>
     </section>
   {/if}
+
+  <GiveawaySideCard />
 
   <section class="side-card side-get">
     <div class="side-get-glow" aria-hidden="true"></div>

@@ -241,6 +241,16 @@
           // Ordered most-specific first; falls back to the enclosing section.
           function placementOf(el) {
             if (!el || !el.closest) return 'unknown';
+            // Dysautonomia Awareness Month surfaces. Before #nav and the blog
+            // sidebar, which contain two of them.
+            if (el.closest('.awareness')) return 'nav_awareness';
+            if (el.closest('.gva')) return 'giveaway_home_banner';
+            if (el.closest('.gvs')) return 'giveaway_blog_sidebar';
+            if (el.closest('.gvm')) return 'giveaway_blog_mobile_banner';
+            if (el.closest('.gvp-hero')) return 'giveaway_page_hero';
+            if (el.closest('.gvp-end')) return 'giveaway_page_end';
+            if (el.closest('#enter')) return 'giveaway_page_enter';
+            if (el.closest('#rules')) return 'giveaway_page_rules';
             if (el.closest('#dlModal')) return 'download_modal';
             if (el.closest('#aj-sticky-cta')) return 'sticky_cta';
             if (el.closest('#nav')) return 'nav';
@@ -254,6 +264,12 @@
             var sec = el.closest('section[id], section[aria-label]');
             if (sec) return sec.id || (sec.getAttribute('aria-label') || '').toLowerCase().replace(/[^a-z0-9]+/g, '-');
             return 'page';
+          }
+
+          // Which promo brought this visitor to the giveaway page, if any
+          // (set by giveaway_promo_click on the way in; 'direct' otherwise).
+          function gvFrom() {
+            try { return sessionStorage.getItem('aj-gv-from') || 'direct'; } catch (e) { return 'direct'; }
           }
 
           // Slug of an article an anchor points at (for card / list clicks).
@@ -808,6 +824,36 @@
             // platform first); skip them here so nothing double-counts.
             if (t.closest('[data-dl-cta],[data-dl-store]')) return;
             var el;
+            // Giveaway page store badges are wired in the giveaway block below.
+            if (t.closest('.gvp-badge')) return;
+            if ((el = t.closest('a[href*="dysautonomia-awareness-giveaway"]'))) {
+              // Any promo INTO the giveaway page (nav ribbon, home banner, blog
+              // sidebar card, blog mobile banner, a link in an article). The
+              // placement is also remembered for the page's own arrival event.
+              var gvPlace = placementOf(el);
+              try { sessionStorage.setItem('aj-gv-from', gvPlace); } catch (e) { /* private mode */ }
+              ajEvent('giveaway_promo_click', { placement: gvPlace });
+              return;
+            }
+            if ((el = t.closest('.gvp a, .gvp .gvp-social'))) {
+              // On the giveaway page itself.
+              var gh = el.getAttribute('href') || '';
+              if (el.classList.contains('gvp-cta')) {
+                ajEvent('giveaway_cta_click', { placement: placementOf(el), from: gvFrom() });
+              } else if (el.classList.contains('gvp-social')) {
+                // Also counts taps on a platform whose post is not up yet:
+                // that is demand for it.
+                var net = (el.getAttribute('aria-label') || '').replace(/^Tag a friend on\s+|\s+post coming soon$/g, '');
+                ajEvent('giveaway_social_click', { network: net, available: el.classList.contains('is-off') ? 'no' : 'yes' });
+              } else if (gh === '#rules') {
+                ajEvent('giveaway_rules_click', { placement: placementOf(el) });
+              } else if (/^mailto:/i.test(gh)) {
+                ajEvent('giveaway_email_click', { placement: placementOf(el) });
+              } else {
+                ajEvent('giveaway_link_click', { target: gh, placement: placementOf(el) });
+              }
+              return;
+            }
             if ((el = t.closest('[data-wa-go],[data-wa-act],[data-wa-log]'))) {
               // Watch interactive (#watch): which face/button was tapped.
               var action = el.getAttribute('data-wa-log') ? 'log:' + el.getAttribute('data-wa-log')
@@ -946,6 +992,102 @@
             document.querySelectorAll('section').forEach(function (s) {
               if (s.id || s.getAttribute('aria-label')) sectionObs.observe(s);
             });
+          }
+          // --------------------------------------------------------------
+
+          // ---- Dysautonomia Awareness Month giveaway -------------------
+          // Promo IMPRESSIONS, so every giveaway_promo_click has a denominator:
+          // once per page load per surface, when half of it is on screen (a
+          // surface hidden at this width, like the mobile banner on desktop,
+          // never intersects and so never counts). The nav ribbon is on every
+          // page and needs none: page views are its denominator.
+          if (window.IntersectionObserver) {
+            var gvSeen = {};
+            var gvObs = new IntersectionObserver(function (entries) {
+              entries.forEach(function (en) {
+                if (!en.isIntersecting) return;
+                var where = placementOf(en.target);
+                gvObs.unobserve(en.target);
+                if (gvSeen[where]) return;
+                gvSeen[where] = true;
+                ajEvent('giveaway_promo_view', { placement: where });
+              });
+            }, { threshold: 0.5 });
+            document.querySelectorAll('.gva, .gvs, .gvm').forEach(function (n) { gvObs.observe(n); });
+          }
+
+          var gvPage = document.querySelector('.gvp');
+          if (gvPage) {
+            var from = gvFrom();
+            ajEvent('giveaway_page_arrival', { from: from, referrer: document.referrer ? (function () {
+              try { return new URL(document.referrer).hostname; } catch (e) { return 'unknown'; }
+            })() : 'none' });
+
+            // Store badges: counted as downloads like every other store CTA
+            // (so the site-wide download numbers include them), and again as a
+            // giveaway download carrying the promo that brought them here.
+            gvPage.querySelectorAll('.gvp-badge').forEach(function (b) {
+              b.addEventListener('click', function () {
+                var platform = /play\.google/.test(b.getAttribute('href') || '') ? 'android' : 'ios';
+                var place = placementOf(b);
+                if (typeof window.ajTrackDownload === 'function') window.ajTrackDownload(platform, b, place);
+                ajEvent('giveaway_download_click', { platform: platform, placement: place, from: from });
+              });
+            });
+
+            // Which parts of the page were actually reached. Its sections carry
+            // no ids, so the site-wide section_view cannot see most of them.
+            if (window.IntersectionObserver) {
+              var gvSections = [
+                ['hero', '.gvp-hero'], ['letter', '.gvp-letter'], ['how_to_enter', '#enter'],
+                ['prizes', '.gvp-grand'], ['dates', '.gvp-dates'], ['rules', '#rules'], ['closing', '.gvp-end']
+              ];
+              var gvSecObs = new IntersectionObserver(function (entries) {
+                entries.forEach(function (en) {
+                  if (!en.isIntersecting) return;
+                  gvSecObs.unobserve(en.target);
+                  ajEvent('giveaway_section_view', { section: en.target.getAttribute('data-gv-sec'), from: from });
+                });
+              }, { rootMargin: '-40% 0px -40% 0px', threshold: 0 });
+              gvSections.forEach(function (pair) {
+                var n = gvPage.querySelector(pair[1]);
+                if (!n) return;
+                n.setAttribute('data-gv-sec', pair[0]);
+                gvSecObs.observe(n);
+              });
+            }
+
+            // Scroll depth through the whole page, 25/50/75/100 once each.
+            var gvDepth = {};
+            var onGvDepth = function () {
+              var box = gvPage.getBoundingClientRect();
+              if (box.height <= 0) return;
+              var pct = Math.floor((Math.min(box.height, Math.max(0, window.innerHeight - box.top)) / box.height) * 100);
+              [25, 50, 75, 100].forEach(function (m) {
+                if (pct >= m && !gvDepth[m]) { gvDepth[m] = true; ajEvent('giveaway_scroll', { percent: m, from: from }); }
+              });
+              if (gvDepth[100]) window.removeEventListener('scroll', onGvDepth);
+            };
+            window.addEventListener('scroll', onGvDepth, { passive: true });
+            onGvDepth();
+
+            // Time actually spent reading: one event at 15s and one at 60s of
+            // the tab being visible, so a bounce and a read are told apart.
+            var gvVisibleMs = 0;
+            var gvLast = Date.now();
+            var gvMarks = { 15: false, 60: false };
+            var gvTick = setInterval(function () {
+              var now = Date.now();
+              if (!document.hidden) gvVisibleMs += now - gvLast;
+              gvLast = now;
+              [15, 60].forEach(function (sec) {
+                if (!gvMarks[sec] && gvVisibleMs >= sec * 1000) {
+                  gvMarks[sec] = true;
+                  ajEvent('giveaway_engaged', { seconds: sec, from: from });
+                }
+              });
+              if (gvMarks[60]) clearInterval(gvTick);
+            }, 1000);
           }
           // --------------------------------------------------------------
 

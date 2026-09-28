@@ -101,7 +101,7 @@ export type PingKind =
   | 'rpt'                           // built an AI report
   | 'rdg'                           // an HRV reading completed, by KIND
   | 'mbp'                           // the morning baseline prompt card
-  | 'rvw'                          // the store review prompt was REQUESTED
+  | 'rvw'                           // the store review prompt was REQUESTED
   | 'gvw';                          // the giveaway sign-up (POST, carries an email; NOT a counter)
 
 /**

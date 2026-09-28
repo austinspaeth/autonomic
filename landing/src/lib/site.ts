@@ -13,6 +13,20 @@ export const site = {
  * anywhere a machine reads the URL. Human-facing CTAs should use `storeUrl()`
  * below so the download is credited to the site.
  */
+/** The October giveaway page. Every giveaway banner's "Learn more" and the
+ *  nav's awareness ribbon point here. */
+export const giveawayUrl = '/dysautonomia-awareness-giveaway/';
+
+/** The official giveaway post on each platform, where tagging a friend earns a
+ *  bonus entry. A platform left null renders as a disabled tile rather than a
+ *  dead link. */
+export const giveawayPosts: Record<'facebook' | 'instagram' | 'tiktok' | 'x', string | null> = {
+  facebook: null,
+  instagram: null,
+  tiktok: null,
+  x: null
+};
+
 export const appStoreUrl = 'https://apps.apple.com/app/id6789786971';
 export const playStoreUrl =
   'https://play.google.com/store/apps/details?id=com.autonomic.journal';
@@ -72,6 +86,9 @@ const VIDEO_UTM = 'utm_source=video&utm_medium=referral&utm_campaign=videos';
 export const videoAppStoreLink = storeUrl('ios', VIDEO_CAMPAIGN);
 export const videoPlayStoreLink = `${playStoreUrl}&referrer=${encodeURIComponent(VIDEO_UTM)}`;
 export const videoSiteLink = `${site.url}/?${VIDEO_UTM}`;
+
+/** Every redirect page's title (and share title): "Autonomic App - <campaign>". */
+export const redirectTitle = (campaign: string): string => `Autonomic App - ${campaign}`;
 
 /** The campaign slug `/download` reports itself under, matching its utm_campaign. */
 export const VIDEO_CAMPAIGN_SLUG = 'videos';
