@@ -139,6 +139,9 @@ export interface BuildBudgetOpts {
   /** A named multiplier from the user's own confirmed correlations. */
   multiplier?: BudgetMultiplier | null;
   stepsGranted?: boolean;
+  /** The reader has tapped the stand-test Todo once, so it is not asked again
+   *  (src/store/standTestAsk.ts). */
+  standTestAsked?: boolean;
   /** This day is finished. Set by the caller rather than derived, because a
    *  past day is built with `now` pinned to its own end and would otherwise
    *  look like today to the engine. */
@@ -319,6 +322,7 @@ export function buildBudgetAt(
       heldDays: envelope.heldDays,
       signatureSource: sig?.source ?? null,
       hasHrSeries: days[dk]?.load?.hrCoverageMin != null,
+      standTestAsked: opts.standTestAsked,
       stepsGranted: opts.stepsGranted !== false && days[dk]?.load?.steps != null,
       spentShare: fill,
     });

@@ -121,6 +121,8 @@ export interface WidgetOpts {
   /** A free install: the pacing widgets show the Pro line, never a number. */
   locked?: boolean;
   stepsGranted?: boolean;
+  /** The stand-test Todo was tapped once and is not asked again. */
+  standTestAsked?: boolean;
   /** The pause override, forwarded verbatim to `buildBudgetAt`. The home
    *  screen and the wrist follow the Journal here: a reader who has revealed
    *  today's number has revealed it, and a widget still showing the pause
@@ -421,6 +423,7 @@ function buildPacing(state: AppState, days: DaysMap, dk: string, ctx: ScoreConte
     strain: strain ? strain.severity : null,
     past: !isToday,
     stepsGranted: opts.stepsGranted,
+    standTestAsked: opts.standTestAsked,
     userUnpaused: opts.userUnpaused,
     pausedDays: opts.pausedDays,
     brief: true,
@@ -548,12 +551,17 @@ export function liveWidgetOpts(): WidgetOpts {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     stepsGranted = !(require('../store/budget') as typeof import('../store/budget')).stepsMissing();
   } catch { /* unknown: the engine treats undefined as granted */ }
+  let standTestAsked: boolean | undefined;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    standTestAsked = (require('../store/standTestAsk') as typeof import('../store/standTestAsk')).standTestAsked();
+  } catch { /* unknown: the Todo may still be asked */ }
   let pause: { userUnpaused: boolean; pausedDays: string[] } | null = null;
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     pause = (require('../store/budgetPause') as typeof import('../store/budgetPause')).pauseOpts(todayKey());
   } catch { /* no override: the day pauses as the engine decided */ }
-  return { locked, stepsGranted, ...(pause || {}) };
+  return { locked, stepsGranted, standTestAsked, ...(pause || {}) };
 }
 
 /** The payload for right now, from the live store. */

@@ -22,7 +22,11 @@ export function runBudgetAction(id: RecommendationId | undefined, openSheet: Ope
   /* eslint-disable @typescript-eslint/no-require-imports */
   // 'orthostatic' is the stand-test Todo ("Log a standing test"), which fits
   // the upright band. It used to share the HRV branch and opened a reading.
+  // Tapping it is the one ask: whether or not the test is then taken, the
+  // Todo is retired and the strip moves on (src/store/standTestAsk.ts).
   if (id === 'orthostatic') {
+    const { noteStandTestAsked } = require('../../store/standTestAsk') as typeof import('../../store/standTestAsk');
+    noteStandTestAsked();
     const { openPotsCapture } = require('../forms') as typeof import('../forms');
     openPotsCapture(openSheet, 'standTest');
     return;

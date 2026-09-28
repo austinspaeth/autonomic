@@ -26,3 +26,16 @@ describe('the HRV todo asks for the baseline', () => {
     expect(rec([base], 9 * 60)?.id).not.toBe('hrv');
   });
 });
+
+describe('the stand-test todo is asked once', () => {
+  const stand = (standTestAsked: boolean) => nextRecommendation({
+    days: { [DK]: day([base]) }, dk: DK, nowMin: 9 * 60, signatureSource: 'default', learning: 1, heldDays: 30,
+    hasHrSeries: true, standTestAsked, stepsGranted: true, spentShare: 0,
+  });
+  it('asks while it has never been tapped', () => {
+    expect(stand(false)?.id).toBe('orthostatic');
+  });
+  it('moves on once the reader has tapped it, test taken or not', () => {
+    expect(stand(true)?.id).not.toBe('orthostatic');
+  });
+});

@@ -54,6 +54,8 @@ export interface RecommendInput {
   /** The upright signature's source, so a default band asks for a stand test. */
   signatureSource: 'standTest' | 'orthostatic' | 'default' | null;
   hasHrSeries: boolean;
+  /** The reader has tapped the stand-test Todo before. It is asked once. */
+  standTestAsked?: boolean;
   stepsGranted: boolean;
   spentShare: number;
 }
@@ -77,8 +79,9 @@ export function nextRecommendation(input: RecommendInput): Recommendation | null
   if (sleepHours(days, dk) == null) return { id: 'sleep', title: 'Todo: Log your sleep', actionable: true };
 
   // 3. A standing test, but only when there is a heart-rate series for it to
-  //    calibrate. Without one there is no standing band to fit.
-  if (input.hasHrSeries && input.signatureSource === 'default') {
+  //    calibrate. Without one there is no standing band to fit. Asked ONCE:
+  //    a reader who tapped it and walked away from the test has answered.
+  if (input.hasHrSeries && input.signatureSource === 'default' && !input.standTestAsked) {
     return { id: 'orthostatic', title: 'Todo: Log a standing test', actionable: true };
   }
 
