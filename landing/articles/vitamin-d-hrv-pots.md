@@ -8,8 +8,8 @@ keywords: "vitamin D and HRV, vitamin D for POTS, does vitamin D improve HRV, 25
 date: 2026-09-28
 updated: 2026-09-28
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=1600&auto=format&fit=crop"
-photoAttribution: "Jared Rice / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1532911557891-d12f6b98dddc?q=80&w=777&auto=format&fit=crop"
+photoAttribution: "Unsplash"
 tldr: "Vitamin D deficiency is common when you are indoors and unwell, and low levels track with worse cardiac autonomic function and lower HRV in observational studies. Correcting a real deficiency is a reasonable, plausible way to help. But there is no strong trial showing that adding vitamin D to an already sufficient person raises HRV, so do not expect a switch. The test that matters is serum 25-hydroxyvitamin D, aim for the sufficient range rather than the highest number, and remember vitamin D is fat-soluble and can build up, so more is not better. Magnesium is needed to activate it. As with any supplement, hold your dose steady and read your own HRV trend against your baseline."
 categories:
   - food
