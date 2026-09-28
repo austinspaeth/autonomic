@@ -176,7 +176,7 @@ export function GiveawayCard({ dk }: { dk: string }) {
             </View>
           </View>
           <Text style={{ fontSize: 13.5, lineHeight: 20, color: p.textDim, marginBottom: 15 }}>
-            Take a reading, earn an entry. One per day, up to {GIVEAWAY_MAX_ENTRIES}. Other prizes available.
+            Take an HRV reading, earn an entry. One per day, up to {GIVEAWAY_MAX_ENTRIES}. Other prizes available.
           </Text>
 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 11, marginBottom: 15 }}>
@@ -367,7 +367,7 @@ function GiveawayEntrySheet({ controls, onEntered }: { controls: SheetControls; 
       <Text style={{ color: TEAL, fontSize: 11, fontWeight: '800', letterSpacing: 1.4, marginBottom: 8 }}>DYSAUTONOMIA AWARENESS</Text>
       <Text style={{ color: p.text, fontSize: 20, fontWeight: '700', letterSpacing: -0.3, marginBottom: 8 }}>Enter the giveaway</Text>
       <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 21, marginBottom: 16 }}>
-        Each day you take a reading earns an entry, up to {GIVEAWAY_MAX_ENTRIES}. We need an email to reach you if you win.
+        Each day you take an HRV reading earns an entry, up to {GIVEAWAY_MAX_ENTRIES}. We need an email to reach you if you win.
       </Text>
 
       {point('No health data is collected. We only receive the days you took a reading and which sensor you used, never the results.')}
@@ -412,6 +412,20 @@ function GiveawayEntrySheet({ controls, onEntered }: { controls: SheetControls; 
           {busy ? 'Signing up…' : 'Enter giveaway'}
         </Text>
       </Pressable>
+
+      {/* App Review 5.3.2: the rules must be reachable from inside the app and
+          say Apple is neither a sponsor nor involved. Said here, where the
+          entry is actually made, rather than only on the linked page. */}
+      <Text style={{ fontSize: 12, lineHeight: 17, color: p.textDim, textAlign: 'center', marginTop: 14 }}>
+        By entering you agree to the{' '}
+        <Text
+          onPress={() => { Linking.openURL(GIVEAWAY_INFO_URL).catch(() => {}); }}
+          style={{ color: TEAL, fontWeight: '600' }}
+        >
+          official rules
+        </Text>
+        .{Platform.OS === 'ios' ? ' Apple is not a sponsor of, and is not involved in, this giveaway in any way.' : ''}
+      </Text>
     </View>
   );
 }
