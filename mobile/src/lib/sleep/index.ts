@@ -66,8 +66,8 @@ const hoursText = (h: number) => fmtMin(Math.round(h * 60));
  * Built from `sleepGradeParts`, so the explanation cannot drift from the
  * grade — if a threshold moves in the scoring engine, this moves with it.
  */
-export function gradeReasons(days: DaysMap, dk: string): GradeReason[] {
-  const parts = sleepGradeParts(days, dk);
+export function gradeReasons(days: DaysMap, dk: string, ctx: ScoreContext = {}): GradeReason[] {
+  const parts = sleepGradeParts(days, dk, ctx);
   if (!parts) return [];
   const out: GradeReason[] = [];
   const night = nightOf(days, dk);
@@ -90,7 +90,12 @@ export function gradeReasons(days: DaysMap, dk: string): GradeReason[] {
   });
 
   if (parts.hrLow != null) {
-    out.push(parts.demoteLow
+    out.push(parts.pacedLow
+      ? {
+        cat: null,
+        text: `Overnight low of ${Math.round(parts.hrLow)} bpm. Not graded, since your pacemaker sets the floor it can drop to.`,
+      }
+      : parts.demoteLow
       ? {
         cat: parts.demoteLow >= 2 ? 'crash' : 'bad',
         text: `Overnight low of ${Math.round(parts.hrLow)} bpm. Anything at or above ${SLEEP_HR_LOW_1} costs a step, at or above ${SLEEP_HR_LOW_2} costs two.`,
@@ -112,12 +117,13 @@ export function gradeReasons(days: DaysMap, dk: string): GradeReason[] {
 
 /** The footnote under the reasons — it says what the grade could see, which is
  *  the honest difference between a watch-staged night and a hand-logged one. */
-export function gradeNote(days: DaysMap, dk: string): string {
-  const parts = sleepGradeParts(days, dk);
+export function gradeNote(days: DaysMap, dk: string, ctx: ScoreContext = {}): string {
+  const parts = sleepGradeParts(days, dk, ctx);
   if (!parts) return '';
   if (parts.hrLow == null && parts.hrHigh == null) {
     return 'This night has no overnight heart rate recorded, so times and interruption are all this grade used.';
   }
+  if (parts.pacedLow) return 'Duration and interruption set the base grade. Only a very high overnight peak can demote it, since your pacemaker sets the floor of your overnight low.';
   return 'Duration and interruption set the base grade. An elevated overnight low then demotes it.';
 }
 
@@ -277,6 +283,8 @@ export interface SleepReport {
   grade: ScoreCat | null;
   reasons: GradeReason[];
   gradeNote: string;
+  /** The user has a pacemaker: the overnight HR is shown but not graded. */
+  paced: boolean;
   hrLow: number | null;
   hrHigh: number | null;
   /** The dip, when both an overnight low and a real baseline exist. */
@@ -343,7 +351,7 @@ export function buildSleepReport(
 ): SleepReport | null {
   const night = nightOf(days, dk);
   if (!night) return null;
-  const parts = sleepGradeParts(days, dk);
+  const parts = sleepGradeParts(days, dk, ctx);
   const nights = recentNights(days, dk, REPORT_WINDOW_NIGHTS, addDays);
   const target = resolveProtocol(protocol).sleep.hours;
 
@@ -367,8 +375,9 @@ export function buildSleepReport(
     night,
     staged: !!night.stages,
     grade: parts ? parts.cat : null,
-    reasons: gradeReasons(days, dk),
-    gradeNote: gradeNote(days, dk),
+    reasons: gradeReasons(days, dk, ctx),
+    gradeNote: gradeNote(days, dk, ctx),
+    paced: !!ctx.pacemaker,
     hrLow: parts ? parts.hrLow : null,
     hrHigh: parts ? parts.hrHigh : null,
     dip,

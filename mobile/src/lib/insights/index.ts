@@ -32,7 +32,7 @@
  * Pure: no store, no MMKV, no expo, no React.
  */
 import { addDays, dateFromKey } from '../dates';
-import type { ScoreContext } from '../scoring';
+import { profileCtx, type ScoreContext } from '../scoring';
 import { detectDownturn } from '../scoring/downturn';
 import { resolveProtocol } from '../scoring/day';
 import { INSIGHT_OUTCOMES, OUTCOME_FAMILY, keyRange } from '../trends';
@@ -234,8 +234,7 @@ export function buildInsights(state: AppState, dk: string, opts: {
 } = {}): InsightReport {
   const started = Date.now();
   const ctx: ScoreContext = opts.ctx || {
-    sex: state.profile.sex,
-    height: state.profile.height,
+    ...profileCtx(state.profile),
     protocol: resolveProtocol(state.settings.protocol),
     customTypes: state.customTypes,
   };

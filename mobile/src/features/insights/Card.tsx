@@ -25,6 +25,7 @@ import { INSIGHTS_HELP } from '../../lib/insights';
 import type { HelpContent } from '../../lib/help';
 import type { BiggestChange, Correlation } from '../../lib/insights';
 import * as S from './style';
+import { profileCtx } from '../../lib/scoring';
 
 const GOOD = S.GOOD;
 const ROW_BG = S.ROW_BG;
@@ -258,8 +259,7 @@ export function CorrelationsAiButton({ list, change, label }: {
     // this view has no sample-month fallback, so neither does the prompt.
     const state = getState();
     const ctx = {
-      sex: state.profile.sex,
-      height: state.profile.height,
+      ...profileCtx(state.profile),
       protocol: resolveProtocol(state.settings.protocol),
       customTypes: state.customTypes,
     };

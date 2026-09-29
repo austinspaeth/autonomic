@@ -42,6 +42,7 @@ import { pressureLink } from './insights/pressureMemory';
 import { pressureNotificationBody } from './insights/pressureCopy';
 import { pressureAlertVerdict } from './notifications';
 import { getState, save, subscribeStore } from '../store/store';
+import { profileCtx } from './scoring';
 
 /** Stable id so scheduling twice replaces rather than stacks. */
 // NEVER change this id. It is what cancelReminder targets, so a rename would
@@ -396,7 +397,7 @@ export async function checkCrashRisk(): Promise<void> {
     const dk = todayKey();
     if (!ca?.enabled || ca.lastFired === dk) return;
     if (!(await Notifications.getPermissionsAsync()).granted) return;
-    const ctx = { sex: s.profile.sex, height: s.profile.height };
+    const ctx = profileCtx(s.profile);
     const w = detectDownturn(s.days, dk, ctx, resolveProtocol(s.settings.protocol), s.customTypes);
     if (!w) return;
     await ensureCrashChannel();
@@ -454,7 +455,7 @@ export async function checkPressureAlert(): Promise<void> {
     const low = !!readPressure(s.pressure, dk)?.low;
     const link = low ? pressureLink() : null;
     if (!link) return;
-    const ctx = { sex: s.profile.sex, height: s.profile.height };
+    const ctx = profileCtx(s.profile);
     const downturn = detectDownturn(s.days, dk, ctx, resolveProtocol(s.settings.protocol), s.customTypes);
     const otherWarning = s.settings.crashAlert?.lastFired === dk || !!downturn || !!detectStrain(s.days, dk, ctx);
     const verdict = pressureAlertVerdict({

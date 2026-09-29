@@ -25,7 +25,7 @@ import { StoreError, StoreOkNotice, usePaywall } from './Paywall';
 import { healthAppName } from '../lib/health';
 import { DevicesScreen } from './Devices';
 import { HealthScreen } from './Health';
-import { NotificationsRow } from './Reminders';
+import { CheckBox, NotificationsRow } from './Reminders';
 import { showWelcomeAgain } from './Onboarding';
 import { PromptSheet } from './PromptSheet';
 import { openWhatsNew } from './WhatsNew';
@@ -132,7 +132,7 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
         <BrandMark size={26} />
         <Text style={{ fontSize: 22, fontWeight: '800', color: p.text, letterSpacing: -0.3 }}>Autonomic</Text>
       </Pressable>
-      {item('user', 'Profile', 'Sex, birthday, height, weight', () => openSheet((c) => <ProfileSheet controls={c} />))}
+      {item('user', 'Profile', 'Sex, birthday, height, weight, pacemaker', () => openSheet((c) => <ProfileSheet controls={c} />))}
       <NotificationsRow />
       {item('bluetooth', 'Devices', 'Heart-rate straps', () => openSheet(() => <DevicesScreen />), !!state.settings.lastBleDeviceId)}
       {item('heart', healthAppName(), 'Read & write health data', () => openSheet(() => <HealthScreen />), !!state.settings.healthEnabled)}
@@ -195,13 +195,36 @@ function PressureSettingsSheet({ controls }: { controls: SheetControls }) {
   );
 }
 
+/** Said once, as the switch goes on: flipping it re-grades history, so the
+ *  user should know what it does before they meet a different score. */
+function PacemakerNoticeSheet({ controls }: { controls: SheetControls }) {
+  const p = usePalette();
+  return (
+    <View>
+      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 8 }}>Scoring with a pacemaker</Text>
+      <Text style={{ fontSize: 14, color: p.textDim, lineHeight: 20, marginBottom: 10 }}>
+        A pacemaker sets the lowest rate your heart can drop to, so a low overnight or resting heart rate says more about its
+        setting than about your recovery.
+      </Text>
+      <Text style={{ fontSize: 14, color: p.textDim, lineHeight: 20, marginBottom: 20 }}>
+        This changes how your sleep and resting heart rate are computed. Your overnight low will no longer lower your sleep
+        grade, and resting heart rate will no longer count toward your daily score. Both are still recorded and shown. Past
+        days are re-scored the same way.
+      </Text>
+      <Button title="OK" variant="primary" onPress={() => controls.close()} />
+    </View>
+  );
+}
+
 function ProfileSheet({ controls }: { controls: SheetControls }) {
   const p = usePalette();
+  const { openSheet } = useSheets();
   const prof = getState().profile;
   const [sex, setSex] = useState(prof.sex || '');
   const [birthday, setBirthday] = useState(prof.birthday || '');
   const [weight, setWeight] = useState(prof.weight || '');
   const [height, setHeight] = useState(prof.height || '');
+  const [pacemaker, setPacemaker] = useState(!!prof.pacemaker);
   const age = ageFromBirthday(birthday);
   return (
     <View>
@@ -219,7 +242,25 @@ function ProfileSheet({ controls }: { controls: SheetControls }) {
       <HeightField label="Height" value={height} onChange={setHeight} placeholder="Set height" />
       <TextField label="Weight (lb)" value={weight} onChange={(t) => setWeight(onlyNumeric(t))} keyboardType="decimal-pad" />
       <Text style={{ color: p.textDim, fontSize: 13, marginBottom: 12 }}>Age and sex set the healthy HRV ranges shown on your readings and your heart rate zones.</Text>
-      <Button title="Save" variant="primary" onPress={() => { getState().profile = { sex, birthday, weight: weight.trim(), height: height.trim() }; save(); controls.close(); }} />
+      {/* A checkbox row, the Notifications sheet's own control, rather than a
+          Switch: the system switch picks its own thumb colour per platform. */}
+      <Pressable
+        onPress={() => {
+          const v = !pacemaker;
+          setPacemaker(v);
+          if (v) openSheet((c) => <PacemakerNoticeSheet controls={c} />, { fitContent: true });
+        }}
+        accessibilityRole="checkbox"
+        accessibilityState={{ checked: pacemaker }}
+        style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }, pressed && { opacity: 0.5 }]}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: p.text, fontSize: 16 }}>I have a pacemaker</Text>
+          <Text style={{ color: p.textDim, fontSize: 13, marginTop: 2 }}>A pacemaker sets the lowest rate your heart can drop to, so your resting and overnight heart rate are shown but no longer graded or counted in your scores.</Text>
+        </View>
+        <CheckBox on={pacemaker} tone={{ accent: p.accent, border: p.border }} />
+      </Pressable>
+      <Button title="Save" variant="primary" onPress={() => { getState().profile = { sex, birthday, weight: weight.trim(), height: height.trim(), ...(pacemaker ? { pacemaker: true } : {}) }; save(); controls.close(); }} />
       <View style={{ height: 20 }} />
     </View>
   );

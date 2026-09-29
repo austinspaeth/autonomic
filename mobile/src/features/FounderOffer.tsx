@@ -54,6 +54,7 @@ import { noteOfferShown, offerPacingClear } from '../lib/upsell/pacingMemory';
 import { liveOffer } from '../lib/upsell/annual';
 import { annualMemory } from '../lib/upsell/annualMemory';
 import { pingOfferAccepted, pingOfferDismissed, pingOfferShown } from '../store/ping';
+import { profileCtx } from '../lib/scoring';
 
 /**
  * What the money buys, in the reader's terms. Three lines, because the card has
@@ -130,7 +131,7 @@ export function FounderOfferCard() {
     // only happens once they've all passed.
     let v = forced ? { ok: true as const, claim: true } : ask(false);
     if (v.ok && !forced) {
-      const ctx = { sex: state.profile.sex, height: state.profile.height };
+      const ctx = profileCtx(state.profile);
       // Either detector behind the Journal's warning card defers this offer.
       // It only lives for one day, so a bad day must not spend it.
       const downturn = !!detectDownturn(state.days, dk, ctx, resolveProtocol(state.settings.protocol), state.customTypes)

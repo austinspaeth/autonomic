@@ -80,6 +80,7 @@ import { insightsShape, noteInsightsShape } from '../../src/lib/insights/shapeMe
 import { insightsAnchor } from '../../src/lib/insights/anchorMemory';
 import { markInsightsSeen } from '../../src/store/insightsBadge';
 import { peekInsightsCard, takeInsightsCard, useInsightsCardSignal } from '../../src/store/nav';
+import { profileCtx } from '../../src/lib/scoring';
 
 /**
  * How long after interactions finish before the real content mounts.
@@ -156,8 +157,7 @@ export default function InsightsScreen() {
       source,
       anchor: insightsAnchor(),
       ctx: {
-        sex: source.profile.sex,
-        height: source.profile.height,
+        ...profileCtx(source.profile),
         protocol: resolveProtocol(source.settings.protocol),
         customTypes: source.customTypes,
       },

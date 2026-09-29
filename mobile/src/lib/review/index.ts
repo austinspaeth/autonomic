@@ -28,6 +28,7 @@ import { resolveProtocol } from '../scoring/day';
 import { getState } from '../../store/store';
 import { pingReviewAsked } from '../../store/ping';
 import { shouldAskForReview, type ReviewMemory, type ReviewVerdict } from './eligibility';
+import { profileCtx } from '../scoring';
 
 export { engagedDayCount, shouldAskForReview, MIN_ENGAGED_DAYS, MIN_DAYS_BETWEEN_ASKS } from './eligibility';
 export type { ReviewMemory, ReviewVerdict } from './eligibility';
@@ -82,7 +83,7 @@ export function reviewVerdict(): ReviewVerdict {
   return shouldAskForReview({
     days: s.days,
     dk,
-    ctx: { sex: s.profile.sex, height: s.profile.height },
+    ctx: profileCtx(s.profile),
     protocol: resolveProtocol(s.settings.protocol),
     custom: s.customTypes,
     memory: reviewMemory(),

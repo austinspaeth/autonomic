@@ -19,7 +19,7 @@ import { Button } from '../../components/ui';
 import { usePalette, GRADE_COLORS, WATER_BLUE } from '../../theme';
 import { ble } from '../../lib/ble/manager';
 import { buildStandTestFields, restingBaseline, type HrPoint } from '../../lib/pots/live';
-import { computeScores } from '../../lib/scoring';
+import { computeScores, profileCtx } from '../../lib/scoring';
 import { getState } from '../../store/store';
 import { pingPots } from '../../store/ping';
 import { ageFromBirthday, keyOf, pad, uid } from '../../lib/dates';
@@ -107,7 +107,7 @@ export function StandTestSession({ controls }: { controls: SheetControls }) {
       ...fields,
       sampledHr: seriesRef.current,
     };
-    entry.scores = computeScores(entry, { sex: profile?.sex, height: profile?.height });
+    entry.scores = computeScores(entry, profileCtx(profile));
 
     const dur = testElapsedNow();
     openSheet((c) => (

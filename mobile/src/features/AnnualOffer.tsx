@@ -44,6 +44,7 @@ import { discountPct } from '../lib/upsell/founder';
 import { FORCE_ANNUAL_OFFER, annualMemory, noteAnnualOfferDismissed, noteAnnualOfferStarted } from '../lib/upsell/annualMemory';
 import { noteOfferShown, offerPacingClear } from '../lib/upsell/pacingMemory';
 import { pingOfferAccepted, pingOfferDismissed, pingOfferShown } from '../store/ping';
+import { profileCtx } from '../lib/scoring';
 
 /**
  * Monthly equivalent of a localized yearly price, keeping whatever currency
@@ -125,11 +126,11 @@ export function AnnualOfferCard() {
     // Never raise it on a day the user is already having a bad time. The
     // milestone is not spent, so it lands on a calmer open instead.
     if (state.settings.crashAlert?.lastFired === todayKey()) return;
-    if (detectDownturn(state.days, todayKey(), { sex: state.profile.sex, height: state.profile.height },
+    if (detectDownturn(state.days, todayKey(), profileCtx(state.profile),
       resolveProtocol(state.settings.protocol), state.customTypes)) return;
     // Same for the warning card's other detector: a caution on the Journal and
     // an ask for money under it is exactly the pairing to avoid.
-    if (detectStrain(state.days, todayKey(), { sex: state.profile.sex, height: state.profile.height })) return;
+    if (detectStrain(state.days, todayKey(), profileCtx(state.profile))) return;
 
     settled.current = true;
     noteAnnualOfferStarted(due, now);

@@ -509,7 +509,12 @@ function profileAge(profile: AppState['profile']): number | null {
  */
 export function profileLine(profile: AppState['profile']): string {
   const age = profileAge(profile);
-  return [age != null ? `Age: ${age}` : '', profile && profile.sex ? `Sex: ${profile.sex}` : ''].filter(Boolean).join(' | ');
+  return [
+    age != null ? `Age: ${age}` : '',
+    profile && profile.sex ? `Sex: ${profile.sex}` : '',
+    // Without this a model reads a paced floor as a resting rate that never settles.
+    profile && profile.pacemaker ? 'Has a pacemaker (its lower rate sets a heart-rate floor; resting and overnight HR are not graded)' : '',
+  ].filter(Boolean).join(' | ');
 }
 
 /** `profileLine` as a prompt block, with the blank lines around it; '' if empty. */

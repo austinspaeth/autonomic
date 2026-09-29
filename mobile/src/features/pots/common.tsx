@@ -13,7 +13,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { SheetControls, useSheets } from '../../components/Sheet';
 import { NoteDraftCard, ReadingSummary } from '../../components/summary';
 import { usePalette, GRADE_COLORS } from '../../theme';
-import { BANDS, catFromBands } from '../../lib/scoring';
+import { BANDS, catFromBands, profileCtx } from '../../lib/scoring';
 import { ble } from '../../lib/ble/manager';
 import { getState, storeWaveform, upsertEntry } from '../../store/store';
 import { splitWaveform } from '../../lib/waveforms';
@@ -158,7 +158,7 @@ export function PotsResultsSheet({ entry, dayKey, title, sub, controls }: {
 }) {
   const p = usePalette();
   const { openSheet } = useSheets();
-  const ctx = { sex: getState().profile.sex, height: getState().profile.height };
+  const ctx = profileCtx(getState().profile);
 
   // Sparklines should already include this result — hand the summary a days map
   // with the reading appended to its day.

@@ -32,7 +32,7 @@ import { pingReadingKind, pingWristReading } from '../../store/ping';
 import { isFirstBaseline } from '../ping';
 import { todayKey } from '../dates';
 import { logError } from '../diagnostics/errorLog';
-import { computeScores } from '../scoring';
+import { computeScores, profileCtx } from '../scoring';
 import type { Entry } from '../types';
 import { mapWatchPayload } from '../watch/payload';
 import { applyIntent, claimGarminIntent } from './intent';
@@ -196,7 +196,7 @@ function receive(msg: GarminMessage) {
   if (mapped.waveform) storeWaveform(mapped.entry.id, mapped.waveform);
   if (mapped.section === 'readings') {
     const profile = getState().profile;
-    mapped.entry.scores = computeScores(mapped.entry, { sex: profile?.sex, height: profile?.height });
+    mapped.entry.scores = computeScores(mapped.entry, profileCtx(profile));
   }
   upsertEntry(mapped.dayKey, mapped.section, mapped.entry);
   flushSave();

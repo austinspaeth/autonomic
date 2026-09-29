@@ -193,7 +193,20 @@ export interface ScoreContext {
    *  so the pure scoring/analysis libs never import the store. Used by the POTS
    *  Episodes card to grade each event on its max delta. */
   hrCurve?: (id: string) => { t: number; bpm: number }[] | null;
+  /** profile.pacemaker: a paced floor makes resting HR and the overnight low
+   *  meaningless as grades, so neither is scored (restingHr entries carry no
+   *  `hr` grade, the day score drops its Resting HR input, the sleep grade
+   *  ignores the overnight low). */
+  pacemaker?: boolean;
 }
+
+/** The profile half of a ScoreContext. Build contexts through this so a new
+ *  profile-driven scoring input cannot be forgotten at one of the call sites. */
+export const profileCtx = (profile?: { sex?: string; height?: string | number; pacemaker?: boolean } | null): ScoreContext => ({
+  sex: profile?.sex,
+  height: profile?.height,
+  pacemaker: !!profile?.pacemaker,
+});
 
 export function computeScores(r: Entry, ctx: ScoreContext = {}): Record<string, ScoreCat> {
   const s: Record<string, ScoreCat> = {};
@@ -246,7 +259,7 @@ export function computeScores(r: Entry, ctx: ScoreContext = {}): Record<string, 
       put('sys', sSys(r.sys)); put('dia', sDia(r.dia)); put('bp', sBP(r.sys, r.dia));
       break;
     case 'restingHr':
-      put('hr', sRestingHr(r.hr, r.position));
+      if (!ctx.pacemaker) put('hr', sRestingHr(r.hr, r.position));
       break;
     case 'orthostatic': {
       const before = numOr(r.beforeHr), after = numOr(r.afterHr), min1 = numOr(r.hr1min);

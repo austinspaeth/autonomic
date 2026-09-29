@@ -23,6 +23,7 @@ import { useAppState } from '../store/store';
 import { resolveProtocol } from '../lib/scoring/day';
 import { findTrend, trendGate, type TrendMetricId } from '../lib/trends';
 import { noteTrendShown, trendMemory } from '../lib/trends/memory';
+import { profileCtx } from '../lib/scoring';
 
 /** Which Progress section each metric was computed from (category ids in
  *  src/lib/analysis/categories.ts), so a tap lands on that chart rather than the
@@ -107,12 +108,12 @@ export function TrendCard({ dk }: { dk: string }) {
   const found = useMemo(
     () => (search === null ? null : findTrend(
       state.days, dk,
-      { sex: state.profile.sex, height: state.profile.height },
+      profileCtx({ sex: state.profile.sex, height: state.profile.height, pacemaker: state.profile.pacemaker }),
       resolveProtocol(state.settings.protocol),
       state.customTypes,
       search,
     )),
-    [search, state.days, dk, state.profile.sex, state.profile.height, state.settings.protocol, state.customTypes],
+    [search, state.days, dk, state.profile.sex, state.profile.height, state.profile.pacemaker, state.settings.protocol, state.customTypes],
   );
 
   // A pinned claim and a fresh finding both carry `metric` + `headline`, which

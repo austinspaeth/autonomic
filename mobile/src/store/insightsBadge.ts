@@ -24,6 +24,7 @@ import { computeInsights } from '../lib/insights/cache';
 import { insightsAnchor } from '../lib/insights/anchorMemory';
 import { reportFindingIds, seenFindingIds, stampInsightsSeen, unseenIds } from '../lib/insights/seen';
 import { todayKey } from '../lib/dates';
+import { profileCtx } from '../lib/scoring';
 
 let unseen = false;
 const subs = new Set<() => void>();
@@ -80,8 +81,7 @@ function refresh(): void {
       // instead — never a dot, and no reason to pay for the build.
       if (!hasOwnData(state.days)) { set(false); return; }
       const ctx = {
-        sex: state.profile.sex,
-        height: state.profile.height,
+        ...profileCtx(state.profile),
         protocol: resolveProtocol(state.settings.protocol),
         customTypes: state.customTypes,
       };

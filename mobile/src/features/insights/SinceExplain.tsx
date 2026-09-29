@@ -33,6 +33,7 @@ import type { SinceStart } from '../../lib/insights';
 import { Calendar } from '../Calendar';
 import * as S from './style';
 import { GOOD } from './style';
+import { profileCtx } from '../../lib/scoring';
 
 /** Points of the final score, signed, so a column of them reads as a ledger. */
 const signed = (v: number) => `${v > 0 ? '+' : v < 0 ? '−' : ''}${Math.abs(v).toFixed(1)} pt`;
@@ -48,8 +49,7 @@ function computeSince(anchor: string | null): SinceStart | null {
   // sample month, so a claim opened from its header must not either.
   const state = getState();
   const ctx = {
-    sex: state.profile.sex,
-    height: state.profile.height,
+    ...profileCtx(state.profile),
     protocol: resolveProtocol(state.settings.protocol),
     customTypes: state.customTypes,
   };

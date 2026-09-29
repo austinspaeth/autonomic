@@ -11,7 +11,7 @@
 import { Platform } from 'react-native';
 import { MMKV } from 'react-native-mmkv';
 import type { Entry } from '../types';
-import { computeScores } from '../scoring';
+import { computeScores, profileCtx } from '../scoring';
 import { addDays, todayKey, uid } from '../dates';
 import { typesFor } from '../typeCatalog';
 import { rrCoverageSec } from '../hrvQuality';
@@ -96,7 +96,7 @@ export interface ImportResult { added: number; workouts: Entry[] }
 export function importUpdates(set: HealthUpdateSet, selected: Set<string> | null): ImportResult {
   const take = (key: string) => selected == null || selected.has(key);
   const s = getState();
-  const ctx = { sex: s.profile.sex, height: s.profile.height };
+  const ctx = profileCtx(s.profile);
   // Match the one-time history import's provenance so journal rows label
   // identically ("Apple Watch HRV" / "Imported HRV").
   const source = Platform.OS === 'android' ? 'health' : 'watch';

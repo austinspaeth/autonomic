@@ -36,6 +36,7 @@ import { PromptSheet } from '../PromptSheet';
 import { usePaywall } from '../Paywall';
 import { useTier } from '../../store/tier';
 import { pingReport } from '../../store/ping';
+import { profileCtx } from '../../lib/scoring';
 
 /* ---------- pill chrome, matched to HealthUpdates / WhatsNew ---------- */
 
@@ -220,8 +221,7 @@ export function AiReportsSheet(_props: { controls?: SheetControls }) {
     // the picker below, which is a visible answer rather than an invisible one.
     const { rangeText } = reportDateRange(range, todayKey(), state.days);
     const ctx = {
-      sex: state.profile.sex,
-      height: state.profile.height,
+      ...profileCtx(state.profile),
       protocol: resolveProtocol(state.settings.protocol),
       customTypes: state.customTypes,
     };

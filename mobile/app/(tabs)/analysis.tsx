@@ -16,7 +16,7 @@ import { LockedOverlay } from '../../src/features/LockedOverlay';
 import { usePaywall } from '../../src/features/Paywall';
 import { pingViewOpened } from '../../src/store/ping';
 import { buildCategories, type AnalysisCard, type BpPeriod, type MarginChart, type OrthoTransition } from '../../src/lib/analysis/categories';
-import { SCORE_COLORS } from '../../src/lib/scoring';
+import { SCORE_COLORS, profileCtx } from '../../src/lib/scoring';
 import { hexA } from '../../src/lib/color';
 import { resolveProtocol, type DaysMap } from '../../src/lib/scoring/day';
 import { catFromBands, type BucketView, type CustomRange, type Mode } from '../../src/lib/analysis/buckets';
@@ -51,6 +51,7 @@ export default function AnalysisScreen() {
   const [hrvFilt, setHrvFilt] = useState<Filt>('all');
   const sex = state.profile.sex;
   const height = state.profile.height;
+  const pacemaker = state.profile.pacemaker;
 
   const scrollRef = useRef<ScrollView>(null);
   // Seeded to the header's exact height (see Screen) so the sticky bar and the
@@ -725,6 +726,7 @@ export default function AnalysisScreen() {
             custom={chartCustom}
             sex={sex}
             height={height}
+            pacemaker={pacemaker}
             hrvFilt={hrvFilt}
             setHrvFilt={setHrvFilt}
             revealed={revealed}
@@ -879,7 +881,7 @@ function ColdSkeleton() {
 
 /** The whole document of category sections, memoized as one unit so pinned-bar
  *  handoffs (parent state flipping mid-scroll) never touch the chart trees. */
-const SectionsBody = React.memo(function SectionsBody({ sections, demo, days, mode, custom, sex, height, hrvFilt, setHrvFilt, revealed, onSectionLayout, onCardLayout }: {
+const SectionsBody = React.memo(function SectionsBody({ sections, demo, days, mode, custom, sex, height, pacemaker, hrvFilt, setHrvFilt, revealed, onSectionLayout, onCardLayout }: {
   sections: Section[];
   demo: boolean;
   days: DaysMap;
@@ -887,6 +889,7 @@ const SectionsBody = React.memo(function SectionsBody({ sections, demo, days, mo
   custom: CustomRange | null;
   sex?: string;
   height?: string;
+  pacemaker?: boolean;
   hrvFilt: Filt;
   setHrvFilt: (f: Filt) => void;
   revealed: number;
@@ -897,7 +900,7 @@ const SectionsBody = React.memo(function SectionsBody({ sections, demo, days, mo
 }) {
   const p = usePalette();
   // Stable identity — HrvProgress keys its aggregation memo on `ctx`.
-  const ctx = useMemo(() => ({ sex, height }), [sex, height]);
+  const ctx = useMemo(() => profileCtx({ sex, height, pacemaker }), [sex, height, pacemaker]);
   return (
     <>
       {demo ? <DemoBanner text={DEMO_PROGRESS_TEXT} /> : null}

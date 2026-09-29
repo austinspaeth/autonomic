@@ -2072,6 +2072,18 @@ old web app so old `export.json` files import directly.
   and it alone may reach 0.6 where every other input floors at 0.7. A later
   training reading can never move it. With no baseline to compare it falls back
   to the `Training HRV` component in ms, as before.
+- **A pacemaker switches off heart-rate FLOOR grading, nothing else.**
+  `profile.pacemaker` (Settings → Profile) rides every `ScoreContext` as
+  `pacemaker`, and every context is built through `profileCtx(profile)` in
+  `lib/scoring` so no call site can forget it. Its lower rate is a floor the
+  heart cannot drop under, so a 70 bpm overnight low or resting rate is the
+  device, not a system that never settled: `sleepGradeParts` stops demoting on
+  the overnight low (the 110 bpm PEAK still costs a step, and the report's chart
+  draws only that line, `PACED_OVERNIGHT_HR_BANDS`), `computeScores` gives a
+  `restingHr` entry no grade, and `scoreSet` drops the Resting HR input from
+  EVERY source (the HRV readings' average HR too), redistributing its weight.
+  Resting HR is still shown everywhere, just uncoloured. It does not touch HRV,
+  the nocturnal dip, strain or the budget.
 - **Reading scoring**: on render, `computeScores(r, ctx)` categorizes each scorable
   metric (great/good/ok/bad/crash|concerning, plus a `warning` blue zone) per the
   framework thresholds; rows tint their value via the score category and sparklines

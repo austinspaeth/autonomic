@@ -228,15 +228,16 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext, cu
     const layingCur = layingLi >= 0 ? laying[layingLi] : null;
     if (acPresent(laying).length) cards.push({
       title: 'Resting Heart Rate', sub: range,
-      cat: layingCur != null ? catFromBands(layingCur, restingHrBands('Laying')) : null,
-      catBands: restingHrBands('Laying'),
-      desc: 'Laying heart rate over the range.',
+      // A pacemaker's floor makes the value ungradable: charted, never graded.
+      cat: layingCur != null && !ctx.pacemaker ? catFromBands(layingCur, restingHrBands('Laying')) : null,
+      catBands: ctx.pacemaker ? undefined : restingHrBands('Laying'),
+      desc: ctx.pacemaker ? 'Laying heart rate over the range. Not graded, since your pacemaker sets its floor.' : 'Laying heart rate over the range.',
       help: {
         what: 'Heart rate from readings you logged while laying down, which is the cleanest resting baseline you can take. The shaded zones are the grade bands; the readout follows the most recent point, or whichever point you tap.',
         why: 'A gradually falling laying HR usually tracks improving autonomic recovery, and it moves earlier than how you feel does. A sustained rise you cannot explain by illness, heat or a hard week is worth noting alongside your symptoms and sleep.',
         learnMore: '/insights/basics/resting-heart-rate-and-mean-rr/',
       },
-      charts: [{ label: '', series: [series(laying, SCORE_COLORS.bad)], zones: acBandsToZones(restingHrBands('Laying')), integer: true, selectStat: true }],
+      charts: [{ label: '', series: [series(laying, SCORE_COLORS.bad)], zones: ctx.pacemaker ? undefined : acBandsToZones(restingHrBands('Laying')), integer: true, selectStat: true }],
       stats: [{ label: 'Laying HR', value: layingCur != null ? Math.round(layingCur) : null, sub: 'bpm', when: bucketWhen(mode, buckets[layingLi]) }],
     });
     return cards;

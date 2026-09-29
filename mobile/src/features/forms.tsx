@@ -36,6 +36,7 @@ import { OrthostaticSession } from './pots/OrthostaticSession';
 // Re-exported so `./forms` stays the one import site for entry editing; they
 // live in their own module to keep the capture sheets out of a require cycle.
 import { confirmDelete, EntryForm, type ArrKey } from './EntryForm';
+import { profileCtx } from '../lib/scoring';
 export { confirmDelete, EntryForm };
 export type { ArrKey };
 
@@ -596,7 +597,7 @@ export function ReadingSummarySheet({ r, dk }: { r: Entry; dk: string }) {
   useAppState(); // re-render on edits
   const state = getState();
   const live = (state.days[dk]?.readings || []).find((x) => x.id === r.id) || r;
-  const ctx = { sex: state.profile.sex, height: state.profile.height };
+  const ctx = profileCtx(state.profile);
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
       {/* The edit + close pill floats top-right — keep the header text clear of it. */}
@@ -632,7 +633,7 @@ export function WorkoutSummarySheet({ r, dk, justImported, onEdit }: { r: Entry;
   const state = getState();
   const live = (state.days[dk]?.activities || []).find((x) => x.id === r.id) || r;
   const def = typesFor(state, 'activities')[live.type];
-  const ctx = { sex: state.profile.sex, height: state.profile.height };
+  const ctx = profileCtx(state.profile);
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
       {/* The edit + close pill floats top-right — keep the header text clear of it. */}

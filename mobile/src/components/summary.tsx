@@ -842,9 +842,13 @@ export function RestingHrSummary({ r, days, ctx }: SummaryProps) {
     great: 'Resting heart rate is in a strong range.', good: 'Resting heart rate is healthy.',
     ok: 'Slightly elevated for rest.', bad: 'Elevated resting heart rate; note context.', concerning: 'High resting heart rate; consider rechecking and context.',
   };
-  const band = restingHrBands(r.position);
-  const hrCat = r.hr !== '' && r.hr != null ? catFromBands(+(r.hr as number), band) : null;
-  const posLine = `Measured ${((r.position as string) || 'laying').toLowerCase()}; thresholds differ for laying vs sitting.`;
+  // With a pacemaker the lower rate is the device's, so the value is shown
+  // but never graded (profile.pacemaker, the same rule the day score follows).
+  const band = ctx.pacemaker ? null : restingHrBands(r.position);
+  const hrCat = band && r.hr !== '' && r.hr != null ? catFromBands(+(r.hr as number), band) : null;
+  const posLine = ctx.pacemaker
+    ? 'Not graded, since your pacemaker sets the floor your heart rate can drop to.'
+    : `Measured ${((r.position as string) || 'laying').toLowerCase()}; thresholds differ for laying vs sitting.`;
   return (
     <>
       <MetricSection
