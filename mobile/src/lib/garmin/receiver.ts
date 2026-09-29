@@ -35,6 +35,7 @@ import { logError } from '../diagnostics/errorLog';
 import { computeScores } from '../scoring';
 import type { Entry } from '../types';
 import { mapWatchPayload } from '../watch/payload';
+import { applyIntent, claimGarminIntent } from './intent';
 import { GARMIN_RELEASED } from '../watch/release';
 
 export type { GarminDevice };
@@ -173,7 +174,24 @@ function receive(msg: GarminMessage) {
   if (named?.name && !mapped.entry.sourceName) mapped.entry.sourceName = named.name;
 
   const existing = getState().days[mapped.dayKey]?.[mapped.section] || [];
-  const fresh = !existing.some((e) => e.id === mapped.entry.id);
+  const prior = existing.find((e) => e.id === mapped.entry.id);
+  const fresh = !prior;
+
+  // The watch always says `hrv`; whether it was a baseline or paced training
+  // is the phone session's answer (./intent). A re-delivery keeps the label
+  // the first delivery was filed under, or a retry after a lost ack would
+  // quietly turn a training reading back into a baseline.
+  if (mapped.section === 'readings') {
+    if (prior) {
+      mapped.entry.type = prior.type;
+      for (const k of ['style', 'period'] as const) {
+        if (prior[k] !== undefined) mapped.entry[k] = prior[k];
+      }
+    } else {
+      const intent = claimGarminIntent(mapped.entry);
+      if (intent) mapped.entry = applyIntent(mapped.entry, intent);
+    }
+  }
 
   if (mapped.waveform) storeWaveform(mapped.entry.id, mapped.waveform);
   if (mapped.section === 'readings') {
@@ -196,10 +214,11 @@ function receive(msg: GarminMessage) {
     // and none of the capture counters fired. Counted here instead, and only
     // for a reading that belongs to TODAY: the watch queues while the phone is
     // unreachable, so last night's reading can land on this morning's launch.
-    if (mapped.entry.type === 'hrv' && mapped.dayKey === todayKey()) {
+    const kind = mapped.entry.type;
+    if ((kind === 'hrv' || kind === 'breathHrv') && mapped.dayKey === todayKey()) {
       pingWristReading('garmin');
       // Already written above, so it excludes itself from "the day's first".
-      pingReadingKind('hrv', isFirstBaseline(getState().days[mapped.dayKey]?.readings, mapped.entry.id));
+      pingReadingKind(kind, isFirstBaseline(getState().days[mapped.dayKey]?.readings, mapped.entry.id));
     }
     arrivalListeners.forEach((fn) => fn(mapped.dayKey, mapped.entry));
   }
