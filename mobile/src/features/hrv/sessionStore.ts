@@ -43,6 +43,7 @@ import {
 import { pingActivation, pingCaptureCompleted, pingCaptureStarted, pingReadingKind } from '../../store/ping';
 import { isFirstBaseline } from '../../lib/ping';
 import { todayKey } from '../../lib/dates';
+import { armGarminIntent } from '../../lib/garmin/intent';
 
 export interface SessionConfig {
   kind: 'breath' | 'unstructured';
@@ -461,6 +462,12 @@ export function beginCollection() {
   const src = snap.config?.source;
   const connected = (src === 'watch' || src === 'garmin' || src === 'camera') ? true : snap.connected;
   bump({ status: 'running', connected, elapsed: 0, startedAtMs });
+  // The watch records beats and nothing else: which KIND of reading this was
+  // is only known here, and the receiver files the arriving reading under it.
+  if (src === 'garmin' && snap.config) {
+    const { kind, style, period } = snap.config;
+    armGarminIntent({ kind, style, period, armedAtMs: startedAtMs });
+  }
   // A reading has genuinely begun — the counterpart of the completion ping in
   // `finishSession`. Counted in the engine rather than where the card is
   // mounted because this is the one path a running reading can start from,

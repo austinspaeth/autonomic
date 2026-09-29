@@ -422,6 +422,14 @@ old web app so old `export.json` files import directly.
   trace reads as the app failing rather than as the device declining — and Start
   is DISABLED, the impossible option made unavailable rather than
   tappable-then-refused.
+- **A Garmin reading takes its KIND from the phone, not the watch.** The watch
+  app records beats and always sends `type: 'hrv'`; whether it was a baseline
+  or paced training is chosen on the phone. `beginCollection` arms an intent
+  (`src/lib/garmin/intent.ts`, pure + tested) for a Garmin session, and the
+  receiver files the arriving reading as `breathHrv` (with `style` / `period`)
+  when its own `startedAt` is within `INTENT_WINDOW_MS` of the phone's start.
+  One intent claims one reading; a re-delivery keeps the label it was first
+  filed under. Before this every Garmin training reading landed as a baseline.
 - **The app's local notifications live in `src/lib/reminders.ts`, plus pacing
   alerts in `src/store/pacingAlerts.ts` (next bullet).**
   (1) The morning reminder: `settings.reminder` is the source of truth and the OS
