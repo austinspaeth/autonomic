@@ -17,7 +17,7 @@ import { Button, ConfirmDeleteSheet, DaySaveButton } from '../components/ui';
 import { useToast } from '../components/Toast';
 import { usePalette } from '../theme';
 import { entryFields, isDivider, isNumberField } from '../lib/registry';
-import { computeScores } from '../lib/scoring';
+import { computeScores, profileCtx } from '../lib/scoring';
 import { health, healthAppName } from '../lib/health';
 import { deleteEntry, getState, storeWaveform, upsertEntry } from '../store/store';
 import { pingLogged } from '../store/ping';
@@ -31,7 +31,7 @@ type OpenSheet = ReturnType<typeof useSheets>['openSheet'];
 
 function scoreCtx() {
   const p = getState().profile;
-  return { sex: p.sex, height: p.height };
+  return profileCtx(p);
 }
 
 

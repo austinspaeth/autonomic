@@ -51,7 +51,7 @@ import { health, healthAppName, type HistoryProgress } from '../lib/health';
 import { workoutCandidateOf } from '../lib/health/workoutCandidate';
 import { dayAlreadyHas } from '../lib/health/updateSet';
 import { typesFor } from '../lib/typeCatalog';
-import { computeScores } from '../lib/scoring';
+import { computeScores, profileCtx } from '../lib/scoring';
 import { rrCoverageSec } from '../lib/hrvQuality';
 import { blankDay, getState, mutate, save, storeSleepSeries, storeWaveform, useAppState } from '../store/store';
 import { DevicesScreen } from './Devices';
@@ -118,7 +118,7 @@ async function importHealthHistory(onProgress?: (p: HistoryProgress) => void): P
     onProgress,
   });
   const st = getState();
-  const ctx = { sex: st.profile.sex, height: st.profile.height };
+  const ctx = profileCtx(st.profile);
   const note = `From ${healthAppName()}`;
   const source = Platform.OS === 'android' ? 'health' : 'watch';
   // Doses come back under the health app's own name; only those matching a med

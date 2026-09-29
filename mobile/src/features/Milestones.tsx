@@ -12,23 +12,24 @@ import { useAppState } from '../store/store';
 import { pingFeature } from '../store/ping';
 import { buildMilestoneDays, buildMilestoneGroups } from '../lib/analysis/milestones';
 import { resolveProtocol } from '../lib/scoring/day';
+import { profileCtx } from '../lib/scoring';
 
 export function useMilestones() {
   const state = useAppState();
   const { days, customTypes } = state;
-  const { sex, height } = state.profile;
+  const { sex, height, pacemaker } = state.profile;
   const { protocol, protocolSetOn } = state.settings;
   // Rebuilding every milestone from all days is O(days × milestones) — memoize
   // so unrelated re-renders (theme, sheet state) don't recompute it.
   return React.useMemo(() => {
-    const ctx = { sex, height, protocol: resolveProtocol(protocol), customTypes };
+    const ctx = { ...profileCtx({ sex, height, pacemaker }), protocol: resolveProtocol(protocol), customTypes };
     const md = buildMilestoneDays(days, ctx);
     const groups = buildMilestoneGroups(md, { protocolSetOn });
     let done = 0, total = 0;
     groups.forEach((g) => g.items.forEach((it) => { total++; if (it.done) done++; }));
     const pct = total ? Math.round((done / total) * 100) : 0;
     return { groups, done, total, pct };
-  }, [days, sex, height, protocol, protocolSetOn, customTypes]);
+  }, [days, sex, height, pacemaker, protocol, protocolSetOn, customTypes]);
 }
 
 /** Compact card for the journal view; taps open the full tracker in a sheet.

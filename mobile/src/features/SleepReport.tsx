@@ -26,12 +26,12 @@ import { useAccordion } from '../components/ui';
 import { useSheets } from '../components/Sheet';
 import { fonts, radius, usePalette } from '../theme';
 import type { HelpContent } from '../lib/help';
-import { SCORE_COLORS, catFromBands } from '../lib/scoring';
+import { SCORE_COLORS, catFromBands, profileCtx } from '../lib/scoring';
 import { resolveProtocol, scoreCat } from '../lib/scoring/day';
 import { addDays, fmtDateLong, fmtShort, fmtTime12 } from '../lib/dates';
 import { acBandsToZones, onDay } from '../lib/analysis/buckets';
 import {
-  DIP_BANDS, DIP_TREND_NIGHTS, OVERNIGHT_HR_BANDS, STAGE_COLORS, STAGE_LABEL, STAGE_ORDER,
+  DIP_BANDS, DIP_TREND_NIGHTS, OVERNIGHT_HR_BANDS, PACED_OVERNIGHT_HR_BANDS, STAGE_COLORS, STAGE_LABEL, STAGE_ORDER,
   WAKE_MINUTES_BANDS, buildSleepReport, clockFromNoon, dipBandFor, fmtMin,
   WAKEUP_MIN_SEC, nightMinutes, overnightMean, respMedian, timeToFloor, wakeCat,
   type DipResult, type GradeReason, type HrPoint, type SleepReport, type StageKey,
@@ -94,7 +94,7 @@ export function SleepReportSheet({ dk }: { dk: string }) {
   useAppState(); // re-render after an edit underneath
   const state = getState();
   const report = useMemo(() => {
-    const ctx = { sex: state.profile.sex, height: state.profile.height };
+    const ctx = profileCtx({ sex: state.profile.sex, height: state.profile.height, pacemaker: state.profile.pacemaker });
     // The night's series lives in the waveform sidecar, never the journal, so
     // it is read here and handed to the (store-free) builder.
     const w = getSleepSeries(dk);
@@ -109,7 +109,7 @@ export function SleepReportSheet({ dk }: { dk: string }) {
     return buildSleepReport(state.days, dk, addDays, ctx, state.settings.protocol, {
       hr: w?.sampledHr, resp: w?.sampledResp, spans: w?.stageSpans, hrByDay,
     });
-  }, [state.days, dk, state.settings.protocol, state.profile.sex, state.profile.height]);
+  }, [state.days, dk, state.settings.protocol, state.profile.sex, state.profile.height, state.profile.pacemaker]);
 
   if (!report) return null;
   // "Logged by hand" is the honest label for a night with no heart rate and no
@@ -252,6 +252,7 @@ function OvernightHr({ report }: { report: SleepReport }) {
   const hr = report.hr;
   const low = report.hrLow, high = report.hrHigh;
   if (!hr && low == null && high == null) return null;
+  const bands = report.paced ? PACED_OVERNIGHT_HR_BANDS : OVERNIGHT_HR_BANDS;
 
   const settle = hr ? timeToFloor(hr) : null;
   const shownVal = sel ? Math.round(sel.v) : low;
@@ -264,7 +265,7 @@ function OvernightHr({ report }: { report: SleepReport }) {
       <SectionHead
         title="Overnight heart rate"
         help={SLEEP_HELP.hr}
-        cat={shownVal != null ? (catFromBands(shownVal, OVERNIGHT_HR_BANDS) as never) : null}
+        cat={shownVal != null ? (catFromBands(shownVal, bands) as never) : null}
         value={shownVal != null ? String(shownVal) : '–'}
         unit="bpm"
         when={shownWhen}
@@ -278,7 +279,7 @@ function OvernightHr({ report }: { report: SleepReport }) {
             points={hr.map((q) => ({ t: q.t, v: q.bpm }))}
             bedAt={report.night.bedAt}
             color={p.text}
-            bands={OVERNIGHT_HR_BANDS}
+            bands={bands}
             scatter
             refLine={report.typicalLow != null
               ? { v: report.typicalLow, label: `typical low ${Math.round(report.typicalLow)}`, color: SCORE_COLORS.good }

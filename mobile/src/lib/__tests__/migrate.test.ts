@@ -229,6 +229,12 @@ describe('migrate: top-level sections', () => {
       .toEqual({ sex: 'Male', birthday: '', weight: '', height: '' });
   });
 
+  it('keeps the pacemaker flag, and only a real true', () => {
+    // The profile is rebuilt field by field, so a field it forgets is erased on launch.
+    expect(migrate({ profile: { pacemaker: true } }).profile.pacemaker).toBe(true);
+    expect(migrate({ profile: { pacemaker: 'yes' } }).profile).not.toHaveProperty('pacemaker');
+  });
+
   it('sanitizes meta and custom/hidden types', () => {
     const out = migrate({
       meta: { lastUpdated: 42, lastImport: { name: 'x.json' }, onboarded: '2026-01-01T00:00:00Z' },

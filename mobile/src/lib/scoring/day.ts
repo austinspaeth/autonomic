@@ -140,6 +140,8 @@ export interface SleepGradeParts {
   demoteHigh: number;
   /** Steps actually applied (the larger of the two, not their sum). */
   demote: number;
+  /** The low was read but not graded: a pacemaker sets its floor. */
+  pacedLow: boolean;
   cat: ScoreCat;
 }
 
@@ -148,7 +150,7 @@ export interface SleepGradeParts {
  * is this function's `cat` — the report explains the grade from the same
  * computation rather than a second copy of the thresholds.
  */
-export function sleepGradeParts(days: DaysMap, dk: string): SleepGradeParts | null {
+export function sleepGradeParts(days: DaysMap, dk: string, ctx: ScoreContext = {}): SleepGradeParts | null {
   const dur = sleepHours(days, dk);
   if (dur == null) return null;
   const d = days[dk];
@@ -163,13 +165,16 @@ export function sleepGradeParts(days: DaysMap, dk: string): SleepGradeParts | nu
   const num = (x: unknown) => { const v = parseFloat(String(x)); return isNaN(v) ? null : v; };
   const lo = d && d.sleep ? num(d.sleep.hrLow) : null;
   const hi = d && d.sleep ? num(d.sleep.hrHigh) : null;
-  const demoteLow = lo != null ? (lo >= SLEEP_HR_LOW_2 ? 2 : lo >= SLEEP_HR_LOW_1 ? 1 : 0) : 0;
+  // A pacemaker's lower rate is a floor the low cannot go under, so the low
+  // says nothing about whether the system settled. The peak is still real.
+  const pacedLow = !!ctx.pacemaker && lo != null;
+  const demoteLow = lo != null && !pacedLow ? (lo >= SLEEP_HR_LOW_2 ? 2 : lo >= SLEEP_HR_LOW_1 ? 1 : 0) : 0;
   const demoteHigh = hi != null && hi >= SLEEP_HR_HIGH ? 1 : 0;
   const demote = Math.max(demoteLow, demoteHigh);
   if (demote) {
     cat = SLEEP_GRADE_ORDER[Math.min(SLEEP_GRADE_ORDER.length - 1, SLEEP_GRADE_ORDER.indexOf(cat) + demote)];
   }
-  return { hours: dur, interrupted: !good, base, hrLow: lo, hrHigh: hi, demoteLow, demoteHigh, demote, cat };
+  return { hours: dur, interrupted: !good, base, hrLow: lo, hrHigh: hi, demoteLow, demoteHigh, demote, pacedLow, cat };
 }
 
 /** Sleep recovery grade for the night before `dk`. Duration + quality set the
@@ -177,8 +182,8 @@ export function sleepGradeParts(days: DaysMap, dk: string): SleepGradeParts | nu
  *  spent at a high rate is not restorative sleep. The sleeping low is the
  *  strongest signal (a low that never dropped under ~65 bpm means the system
  *  never settled); a very high overnight peak also costs a step. */
-export function sleepGrade(days: DaysMap, dk: string): ScoreCat | null {
-  const parts = sleepGradeParts(days, dk);
+export function sleepGrade(days: DaysMap, dk: string, ctx: ScoreContext = {}): ScoreCat | null {
+  const parts = sleepGradeParts(days, dk, ctx);
   return parts ? parts.cat : null;
 }
 
@@ -362,6 +367,9 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
     const fromStruct = blendOf(gStruct, 'hr');
     if (fromStruct.p != null) { rhrPts = fromStruct.p; rhrN = fromStruct.n; }
   }
+  // A pacemaker's floor makes any resting rate uninformative, whichever reading
+  // it came from, so the input drops out and its weight is redistributed.
+  if (ctx.pacemaker) { rhrPts = null; rhrN = 0; }
 
   // ---- Per-component detail (raw values + bands) for the score-explain sheet ----
   // The grade is blended across the day, so there IS no single raw value behind
@@ -426,7 +434,9 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
   const sleepDetail: CompDetail = {
     value: slH != null ? `${slH.toFixed(1)} h${slInt ? ', interrupted' : ''}` : 'not logged',
     metrics: [],
-    note: 'Targets 7h or more for a good grade; 8h+ and uninterrupted scores best. An elevated overnight heart rate (sleeping low of 65+ bpm) lowers the grade, since restorative sleep needs the rate to settle. An earlier, consistent bedtime is usually the single biggest lever.',
+    note: ctx.pacemaker
+      ? 'Targets 7h or more for a good grade; 8h+ and uninterrupted scores best. Your overnight low is not graded, since your pacemaker sets its floor; a very high overnight peak (110+ bpm) still lowers the grade. An earlier, consistent bedtime is usually the single biggest lever.'
+      : 'Targets 7h or more for a good grade; 8h+ and uninterrupted scores best. An elevated overnight heart rate (sleeping low of 65+ bpm) lowers the grade, since restorative sleep needs the rate to settle. An earlier, consistent bedtime is usually the single biggest lever.',
   };
 
   const actDetail: CompDetail = {
@@ -446,7 +456,7 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
     'LF peak': { p: lfB.p, detail: lfDetail, readings: lfB.n },
     'Blood pressure': { p: bpPts, detail: bpDetail, readings: bp ? 1 : 0 },
     'Resting HR': { p: rhrPts, detail: rhrDetail, readings: rhrN },
-    'Sleep': { p: pts(sleepGrade(days, dk)), detail: sleepDetail, readings: 1 },
+    'Sleep': { p: pts(sleepGrade(days, dk, ctx)), detail: sleepDetail, readings: 1 },
     'Activity': { p: pts(activityGrade(d.activities)), detail: actDetail, readings: 1 },
   };
   const comps = SCORE_WEIGHTS

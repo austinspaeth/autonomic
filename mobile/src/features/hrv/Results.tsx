@@ -17,7 +17,7 @@ import { refusalSignature } from '../../lib/hrv/refusal';
 import { reportFault } from '../../store/errorReport';
 import { troubleSourceFor } from '../../lib/ppg/tips';
 import { TroubleSheet } from './Trouble';
-import { computeScores } from '../../lib/scoring';
+import { computeScores, profileCtx } from '../../lib/scoring';
 import { getState, storeWaveform, upsertEntry } from '../../store/store';
 import { splitWaveform } from '../../lib/waveforms';
 import { health, healthAppName } from '../../lib/health';
@@ -59,7 +59,7 @@ export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, 
 }) {
   const p = usePalette();
   const { openSheet } = useSheets();
-  const ctx = { sex: getState().profile.sex, height: getState().profile.height };
+  const ctx = profileCtx(getState().profile);
 
   const result = useMemo(
     () => computeHrv(rr, { style: config.style, source: config.source, durationSec, segmentStarts }),

@@ -19,7 +19,7 @@ import { Icon } from '../../components/Icon';
 import { radius, usePalette, GRADE_COLORS, WATER_BLUE } from '../../theme';
 import { ble } from '../../lib/ble/manager';
 import { meanBpm, type HrPoint } from '../../lib/pots/live';
-import { computeScores } from '../../lib/scoring';
+import { computeScores, profileCtx } from '../../lib/scoring';
 import { getState } from '../../store/store';
 import { pingPots } from '../../store/ping';
 import { keyOf, pad, uid } from '../../lib/dates';
@@ -115,7 +115,7 @@ export function OrthostaticSession({ controls }: { controls: SheetControls }) {
     if (hr1min != null) entry.hr1min = Math.round(hr1min);
     if (transitionAtRef.current != null) entry.transitionAt = transitionAtRef.current;
     if (completedAtRef.current != null) entry.completedAt = completedAtRef.current;
-    entry.scores = computeScores(entry, { sex: profile?.sex, height: profile?.height });
+    entry.scores = computeScores(entry, profileCtx(profile));
 
     openSheet((c) => (
       <PotsResultsSheet

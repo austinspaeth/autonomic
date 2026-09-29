@@ -8,6 +8,7 @@ import { usePalette } from '../theme';
 import { dateFromKey, keyOf, todayKey } from '../lib/dates';
 import { getState } from '../store/store';
 import { scoreCat, scoreSet } from '../lib/scoring/day';
+import { profileCtx } from '../lib/scoring';
 
 const hexA = (hex: string, a: number) => {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex);
@@ -34,7 +35,7 @@ function dayColor(k: string): string | null {
   const state = getState();
   const d = state.days[k];
   if (!d || !d.readings || !d.readings.length) return null;
-  const ctx = { sex: state.profile.sex, height: state.profile.height };
+  const ctx = profileCtx(state.profile);
   const all = scoreSet(d.readings, d, k, state.days, ctx);
   if (all.score == null || !(all.hasStruct || all.hasUnstruct)) return null;
   return scoreCat(all.score).color;

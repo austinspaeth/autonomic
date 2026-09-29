@@ -132,7 +132,7 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
         <BrandMark size={26} />
         <Text style={{ fontSize: 22, fontWeight: '800', color: p.text, letterSpacing: -0.3 }}>Autonomic</Text>
       </Pressable>
-      {item('user', 'Profile', 'Sex, birthday, height, weight', () => openSheet((c) => <ProfileSheet controls={c} />))}
+      {item('user', 'Profile', 'Sex, birthday, height, weight, pacemaker', () => openSheet((c) => <ProfileSheet controls={c} />))}
       <NotificationsRow />
       {item('bluetooth', 'Devices', 'Heart-rate straps', () => openSheet(() => <DevicesScreen />), !!state.settings.lastBleDeviceId)}
       {item('heart', healthAppName(), 'Read & write health data', () => openSheet(() => <HealthScreen />), !!state.settings.healthEnabled)}
@@ -202,6 +202,7 @@ function ProfileSheet({ controls }: { controls: SheetControls }) {
   const [birthday, setBirthday] = useState(prof.birthday || '');
   const [weight, setWeight] = useState(prof.weight || '');
   const [height, setHeight] = useState(prof.height || '');
+  const [pacemaker, setPacemaker] = useState(!!prof.pacemaker);
   const age = ageFromBirthday(birthday);
   return (
     <View>
@@ -219,7 +220,9 @@ function ProfileSheet({ controls }: { controls: SheetControls }) {
       <HeightField label="Height" value={height} onChange={setHeight} placeholder="Set height" />
       <TextField label="Weight (lb)" value={weight} onChange={(t) => setWeight(onlyNumeric(t))} keyboardType="decimal-pad" />
       <Text style={{ color: p.textDim, fontSize: 13, marginBottom: 12 }}>Age and sex set the healthy HRV ranges shown on your readings and your heart rate zones.</Text>
-      <Button title="Save" variant="primary" onPress={() => { getState().profile = { sex, birthday, weight: weight.trim(), height: height.trim() }; save(); controls.close(); }} />
+      <CheckField label="I have a pacemaker" value={pacemaker} onChange={setPacemaker} />
+      <Text style={{ color: p.textDim, fontSize: 13, marginBottom: 12 }}>A pacemaker sets the lowest rate your heart can drop to, so your resting and overnight heart rate are shown but no longer graded or counted in your scores.</Text>
+      <Button title="Save" variant="primary" onPress={() => { getState().profile = { sex, birthday, weight: weight.trim(), height: height.trim(), ...(pacemaker ? { pacemaker: true } : {}) }; save(); controls.close(); }} />
       <View style={{ height: 20 }} />
     </View>
   );

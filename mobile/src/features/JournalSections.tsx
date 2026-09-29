@@ -15,7 +15,7 @@ import {
   bmLabel, readingLabel, readingRowValue, summarizeFields,
 } from '../lib/registry';
 import { typesFor } from '../lib/typeCatalog';
-import { orthoDeltaCat, orthoMaxDelta, rowScoreCategory, SCORE_COLORS, GRADE_LABEL } from '../lib/scoring';
+import { orthoDeltaCat, orthoMaxDelta, rowScoreCategory, SCORE_COLORS, GRADE_LABEL, profileCtx } from '../lib/scoring';
 import { sleepGrade, sleepHours, stagesForWindow, waterGoalL, type DaysMap } from '../lib/scoring/day';
 import type { SleepRecord, SleepStages } from '../lib/types';
 import { ensureDay, getState, getWaveform, save, storeSleepSeries, useAppState, useStore } from '../store/store';
@@ -37,7 +37,7 @@ export function JournalSections({ dk }: { dk: string }) {
   const p = usePalette();
   const state = useAppState();
   const d = state.days[dk];
-  const ctx = { sex: state.profile.sex, height: state.profile.height };
+  const ctx = profileCtx(state.profile);
   const forms = useEntryForms(dk);
   const drawers = useDrawers(dk);
   const day = d || { readings: [], activities: [], meds: [], symptoms: [], sleep: { bed: '', wake: '' }, food: { water: 0, meals: [], triggers: {} }, digestion: { movements: [] } };
@@ -350,7 +350,7 @@ function SleepGrade({ dk, sleep }: { dk: string; sleep: { bed: string; wake: str
   const { openSheet } = useSheets();
   const openEdit = () => openSheet((c) => <SleepEditSheet dk={dk} controls={c} />, { fitContent: true });
   const openReport = () => openSheet(() => <SleepReportSheet dk={dk} />, { action: { icon: 'edit', onPress: openEdit } });
-  const grade = sleepGrade(state.days, dk);
+  const grade = sleepGrade(state.days, dk, profileCtx(state.profile));
   // Stages only count when they still describe the recorded window — after a
   // hand-corrected bed/wake they don't, and duration comes from the times.
   const stages = stagesForWindow(sleep as SleepRecord);

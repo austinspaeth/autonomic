@@ -8,6 +8,10 @@ export interface Profile {
   birthday: string;
   weight: string;
   height: string;
+  /** Has a pacemaker. Its lower rate sets a floor the heart cannot drop under,
+   *  so the overnight low and resting HR say nothing about recovery: neither is
+   *  graded (see `ScoreContext.pacemaker`). */
+  pacemaker?: boolean;
 }
 
 /** Per-stage minutes for a night, when the Health source recorded stages

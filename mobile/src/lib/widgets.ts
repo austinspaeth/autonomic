@@ -19,6 +19,7 @@ import { hasOwnData } from './demo';
 import { emberStops } from './ember';
 import {
   BANDS, SCORE_COLORS, catFromBands, restingHrBands, type ScoreContext,
+  profileCtx,
 } from './scoring';
 import {
   scoreCat, scoreSet, sleepHours, sleepGrade,
@@ -153,18 +154,18 @@ function hrvDayAvg(d: DayRecord | undefined, key: string, unstructuredKey = key)
 
 /** Day-average resting HR, mirroring the day score's source preference:
  *  dedicated resting-HR readings, else training HR, else baseline avg. */
-function restingHrDay(d: DayRecord | undefined): { value: number; color: string } | null {
+function restingHrDay(d: DayRecord | undefined, pacemaker = false): { value: number; color: string } | null {
   if (!d) return null;
+  // A pacemaker's floor makes the value ungradable: shown, never coloured.
+  const tint = (cat: ReturnType<typeof catFromBands>) => (cat && !pacemaker ? SCORE_COLORS[cat] : DIM);
   const dedicated = (d.readings || []).filter((r) => r.type === 'restingHr');
   const fromDedicated = mean(acReadVals(d, 'restingHr', 'hr'));
   if (fromDedicated != null) {
-    const cat = catFromBands(fromDedicated, restingHrBands(dedicated[0]?.position));
-    return { value: fromDedicated, color: cat ? SCORE_COLORS[cat] : DIM };
+    return { value: fromDedicated, color: tint(catFromBands(fromDedicated, restingHrBands(dedicated[0]?.position))) };
   }
   const fallback = mean(acReadVals(d, 'breathHrv', 'hr')) ?? mean(acReadVals(d, 'hrv', 'avgHr'));
   if (fallback == null) return null;
-  const cat = catFromBands(fallback, BANDS.hrBreath);
-  return { value: fallback, color: cat ? SCORE_COLORS[cat] : DIM };
+  return { value: fallback, color: tint(catFromBands(fallback, BANDS.hrBreath)) };
 }
 
 /**
@@ -457,7 +458,7 @@ export function currentPacingFrame(p: WidgetPacing, now: Date = new Date()): Wid
 export function buildWidgetPayload(state: AppState, dk = todayKey(), opts: WidgetOpts = {}): WidgetPayload {
   const days: DaysMap = state.days || {};
   const d = days[dk];
-  const ctx: ScoreContext = { sex: state.profile?.sex, height: state.profile?.height };
+  const ctx: ScoreContext = profileCtx(state.profile);
 
   const all = scoreSet(d?.readings || [], d || ({} as DayRecord), dk, days, ctx);
   const hasScore = all.score != null;
@@ -469,9 +470,9 @@ export function buildWidgetPayload(state: AppState, dk = todayKey(), opts: Widge
   const rmssd = hrvDayAvg(d, 'rmssd');
   const rmssdBands = d && acReadVals(d, 'breathHrv', 'rmssd').length ? BANDS.rmssdS : BANDS.rmssdU;
   const pnn50 = hrvDayAvg(d, 'pnn50');
-  const rhr = restingHrDay(d);
+  const rhr = restingHrDay(d, !!ctx.pacemaker);
   const sleep = sleepHours(days, dk);
-  const sleepCat = sleepGrade(days, dk);
+  const sleepCat = sleepGrade(days, dk, ctx);
   const water = d?.food?.water ?? null;
 
   const gradeColor = (v: number | null, bands: (typeof BANDS)[string]) => {

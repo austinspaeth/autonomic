@@ -1,5 +1,6 @@
 import { addDays } from '../../dates';
-import { sleepGrade } from '../../scoring/day';
+import { scoreSet, sleepGrade } from '../../scoring/day';
+import { computeScores } from '../../scoring';
 import type { DayRecord, Entry } from '../../types';
 import {
   DIP_MIN_BASELINE, buildSleepReport, clockFromNoon, dipBandFor, dipHistory,
@@ -379,6 +380,39 @@ describe('grade reasons', () => {
 
   it('are empty without a night', () => {
     expect(gradeReasons({}, dk)).toEqual([]);
+  });
+});
+
+describe('pacemaker', () => {
+  // A pacemaker's lower rate is a floor: a 70 bpm overnight low is the device,
+  // not a system that never settled, so it must not cost the night a step.
+  const dk = '2026-08-10';
+  const paced = { pacemaker: true };
+
+  it('does not demote the sleep grade on the overnight low', () => {
+    const days: Days = { [dk]: night('23:12', '07:18', { hrLow: 78, hrHigh: 104 }) };
+    expect(sleepGrade(days, dk)).toBe('ok'); // two steps off great without the flag
+    expect(sleepGrade(days, dk, paced)).toBe('great');
+    const reasons = gradeReasons(days, dk, paced);
+    expect(reasons[1].cat).toBeNull();
+    expect(reasons[1].text).toContain('pacemaker');
+    expect(buildSleepReport(days, dk, addDays, paced)!.paced).toBe(true);
+  });
+
+  it('still demotes on a very high overnight peak', () => {
+    const days: Days = { [dk]: night('23:12', '07:18', { hrLow: 70, hrHigh: 120 }) };
+    expect(sleepGrade(days, dk, paced)).toBe('good');
+  });
+
+  it('drops resting HR from the day score, from every source', () => {
+    const rhr = { id: 'r', type: 'restingHr', time: '08:00', note: '', hr: 90, position: 'Laying' } as Entry;
+    const hrv = { id: 'h', type: 'hrv', time: '07:00', note: '', rmssd: 40, avgHr: 88 } as Entry;
+    expect(computeScores(rhr).hr).toBeDefined();
+    expect(computeScores(rhr, paced).hr).toBeUndefined();
+    const d = day({ readings: [rhr, hrv] });
+    const labels = (ctx = {}) => scoreSet([rhr, hrv], d, dk, { [dk]: d }, ctx).comps.map((c) => c.label);
+    expect(labels()).toContain('Resting HR');
+    expect(labels(paced)).not.toContain('Resting HR');
   });
 });
 

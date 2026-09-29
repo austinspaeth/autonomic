@@ -27,6 +27,7 @@ import { loadWaveformId } from '../lib/waveforms';
 import { isPacingUnlocked } from './pacingAccess';
 import { pingNotifyEnabled } from './ping';
 import { getState, getWaveform, save, subscribeStore } from './store';
+import { profileCtx } from '../lib/scoring';
 
 const CHANNEL = 'pacing-alerts';
 
@@ -67,7 +68,7 @@ async function run(now: Date): Promise<void> {
     if (!(await Notifications.getPermissionsAsync()).granted) return;
 
     const dk = todayKey();
-    const ctx = { sex: s.profile.sex, height: s.profile.height };
+    const ctx = profileCtx(s.profile);
     const protocol = resolveProtocol(s.settings.protocol);
     const downturn = detectDownturn(s.days, dk, ctx, protocol, s.customTypes);
     const strain = downturn ? null : detectStrain(s.days, dk, ctx);

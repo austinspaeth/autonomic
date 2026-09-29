@@ -29,6 +29,14 @@ export const OVERNIGHT_HR_BANDS: Band[] = [
   { max: Infinity, cat: 'crash' },
 ];
 
+/** The same rule for somebody with a pacemaker: the low is not graded (its
+ *  floor is the device's), so only the peak threshold the grade still demotes
+ *  on is drawn, in the colour its reason line wears. */
+export const PACED_OVERNIGHT_HR_BANDS: Band[] = [
+  { max: SLEEP_HR_HIGH, cat: 'good' },
+  { max: Infinity, cat: 'bad' },
+];
+
 export interface HrPoint { t: number; bpm: number }
 export interface RespPoint { t: number; br: number }
 export interface StageSpan { s: number; d: number; v: StageKey }

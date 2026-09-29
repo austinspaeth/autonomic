@@ -20,7 +20,7 @@ import { HrvSetup } from './hrv/Setup';
 import { MilestoneProgressCard } from './Milestones';
 import { ProtocolEditor } from './ProtocolEditor';
 import { fonts, radius, type as T, usePalette } from '../theme';
-import { SCORE_COLORS, GRADE_LABEL, GRADE_PTS, catFromBands } from '../lib/scoring';
+import { SCORE_COLORS, GRADE_LABEL, GRADE_PTS, catFromBands, profileCtx } from '../lib/scoring';
 import {
   OUTLOOK_GUIDE, SCORE_TOTAL_WEIGHT, SCORE_WEIGHTS, TOMORROW, SCORE_TIPS, blueZone, protocolCriteria,
   readingPeriod, resolveProtocol, scoreCat, scoreSet, sleepGrade, sleepHours, streakInfo, streakTier,
@@ -221,8 +221,8 @@ function GradientBorderCard({ color, trigger, corner = 'topLeft', glow: wash, fl
 export function DaySummary({ dk }: { dk: string }) {
   const { openSheet } = useSheets();
   const state = useAppState();
-  const { sex, height } = state.profile;
-  const ctx = useMemo(() => ({ sex, height }), [sex, height]);
+  const { sex, height, pacemaker } = state.profile;
+  const ctx = useMemo(() => profileCtx({ sex, height, pacemaker }), [sex, height, pacemaker]);
   // scoreSet makes several passes over the day's readings; memoize so renders
   // not caused by a data change (sheets, animations) don't re-score.
   const { d, readings, all } = useMemo(() => {
@@ -677,7 +677,7 @@ const KEY_FIGURES: { label: string; ghost: `${number}%`; delay: number; pick: (a
     pick: (all, days, dk) => {
       if (!all.comps.some((c) => c.label === 'Sleep')) return null;
       const h = sleepHours(days, dk);
-      return h == null ? null : { text: HOURS(h), unit: null, cat: sleepGrade(days, dk) };
+      return h == null ? null : { text: HOURS(h), unit: null, cat: sleepGrade(days, dk, profileCtx(getState().profile)) };
     },
   },
 ];
@@ -937,7 +937,7 @@ function InvestigateButton({ label, title, build }: {
   const press = () => {
     if (tier === 'free') { openPaywall(); return; }
     const s = getState();
-    const ctx = { sex: s.profile.sex, height: s.profile.height, protocol: resolveProtocol(s.settings.protocol) };
+    const ctx = { ...profileCtx(s.profile), protocol: resolveProtocol(s.settings.protocol) };
     const { prompt, rangeText } = build(s, ctx);
     openSheet((c) => <PromptSheet title={title} rangeText={rangeText} prompt={prompt} controls={c} />);
   };
