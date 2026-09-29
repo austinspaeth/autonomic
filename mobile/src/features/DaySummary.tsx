@@ -30,6 +30,7 @@ import { detectDownturn, type Downturn } from '../lib/scoring/downturn';
 import { buildBudget, type BudgetView } from '../lib/budget';
 import { PAUSE_ADVICE } from '../lib/budget/pause';
 import { notePausedShown, pauseOpts, showBudgetAnyway, usePauseVersion } from '../store/budgetPause';
+import { useStandTestAsked } from '../store/standTestAsk';
 import { useStepsMissing } from '../store/budget';
 import { BudgetStrip } from './budget/Strip';
 import { useBudgetPulse, type BudgetPulse } from './budget/pulse';
@@ -291,6 +292,7 @@ export function DaySummary({ dk }: { dk: string }) {
   // behind it. `pauseVersion` is what puts the memo back through the build
   // when either changes — the lists themselves live on disk, not in state.
   const pauseVersion = usePauseVersion();
+  const standAsked = useStandTestAsked();
   const budget = useMemo(
     () => buildBudget(state, dk, ctx, {
       now: isToday ? now : new Date(`${dk}T23:59:00`),
@@ -299,10 +301,11 @@ export function DaySummary({ dk }: { dk: string }) {
       strain: strain ? strain.severity : null,
       past: !isToday,
       stepsGranted: !stepsMiss,
+      standTestAsked: standAsked,
       ...pauseOpts(dk),
     }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [state, dk, ctx, now, isToday, downturn, strain, stepsMiss, pauseVersion],
+    [state, dk, ctx, now, isToday, downturn, strain, stepsMiss, pauseVersion, standAsked],
   );
   // The run valve counts days the budget was actually PAUSED ON SCREEN, so it
   // is recorded here rather than inside the engine, which is pure and is also

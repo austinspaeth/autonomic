@@ -1,4 +1,4 @@
-import { nextRecommendation } from '../recommend';
+import { hasStandTestDevice, nextRecommendation } from '../recommend';
 import type { DayRecord, Entry } from '../../types';
 
 const DK = '2026-08-22';
@@ -24,5 +24,40 @@ describe('the HRV todo asks for the baseline', () => {
   });
   it('is satisfied by a baseline reading', () => {
     expect(rec([base], 9 * 60)?.id).not.toBe('hrv');
+  });
+});
+
+describe('the stand-test todo', () => {
+  const stand = (standTestAsked: boolean, canStandTest = true) => nextRecommendation({
+    days: { [DK]: day([base]) }, dk: DK, nowMin: 9 * 60, signatureSource: 'default', learning: 1, heldDays: 30,
+    hasHrSeries: true, canStandTest, standTestAsked, stepsGranted: true, spentShare: 0,
+  });
+  it('asks while it has never been tapped', () => {
+    expect(stand(false)?.id).toBe('orthostatic');
+  });
+  it('moves on once the reader has tapped it, test taken or not', () => {
+    expect(stand(true)?.id).not.toBe('orthostatic');
+  });
+  it('is never asked of somebody with no watch app or strap', () => {
+    expect(stand(false, false)?.id).not.toBe('orthostatic');
+  });
+});
+
+describe('hasStandTestDevice', () => {
+  const days = (r: Partial<Entry>) => ({ [DK]: day([{ id: 'x', type: 'hrv', time: '07:00', ...r } as Entry]) });
+  it('counts an HRV reading taken with a strap', () => {
+    expect(hasStandTestDevice(days({ source: 'polar' }))).toBe(true);
+    expect(hasStandTestDevice(days({ type: 'breathHrv', source: 'polar' }))).toBe(true);
+  });
+  it('counts any evidence of an Apple Watch, imported or not', () => {
+    expect(hasStandTestDevice(days({ source: 'watch' }))).toBe(true);
+    expect(hasStandTestDevice(days({ source: 'watch', imported: true }))).toBe(true);
+    const stand = { [DK]: { ...day([]), load: { standMin: 40 } } } as unknown as Parameters<typeof hasStandTestDevice>[0];
+    expect(hasStandTestDevice(stand)).toBe(true);
+  });
+  it('does not count the camera, a generic Health import, or a non-HRV strap reading', () => {
+    expect(hasStandTestDevice(days({ source: 'camera' }))).toBe(false);
+    expect(hasStandTestDevice(days({ source: 'health', imported: true }))).toBe(false);
+    expect(hasStandTestDevice(days({ type: 'restingHr', source: 'polar' }))).toBe(false);
   });
 });

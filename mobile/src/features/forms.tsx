@@ -439,6 +439,51 @@ export function openWorkoutReport(openSheet: OpenSheet, r: Entry, dk: string, ju
 }
 
 
+// The in-app live POTS captures (Bluetooth strap): same stacked-card modal
+// treatment as a live HRV session. With no strap saved yet, the pairing
+// sheet opens first; saving a device there flows straight into the session.
+function startPotsLive(openSheet: OpenSheet, type: 'standTest' | 'orthostatic'): void {
+  const open = () => openSheet(
+    (c) => (type === 'standTest' ? <StandTestSession controls={c} /> : <OrthostaticSession controls={c} />),
+    { hideClose: true },
+  );
+  if (!getState().settings.lastBleDeviceId) {
+    openSheet((c) => (
+      <DevicesScreen controls={{
+        close: () => { c.close(); if (getState().settings.lastBleDeviceId) open(); },
+        closeAll: c.closeAll,
+        setOptions: c.setOptions,
+      }} />
+    ));
+    return;
+  }
+  open();
+}
+
+/**
+ * The one way into a POTS capture: the card pointing at the watch app's guided
+ * test (which syncs in by itself) with the in-app strap capture behind it.
+ * Shared by the Journal's reading picker and the pacing Todo, so "Log a
+ * standing test" can never open a different card from "+ Add reading".
+ * `onManual` is the episode's manual form; the stand test is live-only.
+ */
+export function openPotsCapture(openSheet: OpenSheet, type: 'standTest' | 'orthostatic', onManual?: () => void): void {
+  openSheet(() => (
+    <OrthostaticIntroSheet
+      title={`Add ${pickerLabel(type)}`}
+      subtitle={type === 'orthostatic'
+        ? (Platform.OS === 'ios'
+          ? 'Capture live from your watch or a chest strap, or enter an event manually.'
+          : 'Capture live from a chest strap, or enter an event manually.')
+        : (Platform.OS === 'ios'
+          ? 'Run the guided test from your Apple Watch or with a Bluetooth chest strap.'
+          : 'Run the guided test with a Bluetooth chest strap.')}
+      onManual={onManual}
+      onStrap={() => startPotsLive(openSheet, type)}
+    />
+  ), { fitContent: true });
+}
+
 export function useEntryForms(dk: string) {
   const { openSheet } = useSheets();
   const refresh = () => { /* store change triggers re-render */ };
@@ -456,27 +501,6 @@ export function useEntryForms(dk: string) {
       />
     ));
 
-  // The in-app live POTS captures (Bluetooth strap): same stacked-card modal
-  // treatment as a live HRV session. With no strap saved yet, the pairing
-  // sheet opens first; saving a device there flows straight into the session.
-  const startPotsLive = (type: string) => {
-    const open = () => openSheet(
-      (c) => (type === 'standTest' ? <StandTestSession controls={c} /> : <OrthostaticSession controls={c} />),
-      { hideClose: true },
-    );
-    if (!getState().settings.lastBleDeviceId) {
-      openSheet((c) => (
-        <DevicesScreen controls={{
-          close: () => { c.close(); if (getState().settings.lastBleDeviceId) open(); },
-          closeAll: c.closeAll,
-          setOptions: c.setOptions,
-        }} />
-      ));
-      return;
-    }
-    open();
-  };
-
   // Tapping a reading type: if Apple Health can supply it (and is connected),
   // open the import card (pick a sample or enter manually); otherwise go straight
   // to the blank manual form. Orthostatic gets its own card pointing at the
@@ -490,20 +514,7 @@ export function useEntryForms(dk: string) {
     // capture behind it. The episode keeps a manual form too; the stand test
     // is live-only, so no manual fallback.
     if (type === 'orthostatic' || type === 'standTest') {
-      openSheet(() => (
-        <OrthostaticIntroSheet
-          title={`Add ${pickerLabel(type)}`}
-          subtitle={type === 'orthostatic'
-            ? (Platform.OS === 'ios'
-              ? 'Capture live from your watch or a chest strap, or enter an event manually.'
-              : 'Capture live from a chest strap, or enter an event manually.')
-            : (Platform.OS === 'ios'
-              ? 'Run the guided test from your Apple Watch or with a Bluetooth chest strap.'
-              : 'Run the guided test with a Bluetooth chest strap.')}
-          onManual={type === 'orthostatic' ? () => openReadingForm(type, null) : undefined}
-          onStrap={() => startPotsLive(type)}
-        />
-      ), { fitContent: true });
+      openPotsCapture(openSheet, type, type === 'orthostatic' ? () => openReadingForm(type, null) : undefined);
       return;
     }
     const source = healthSourceFor(type);

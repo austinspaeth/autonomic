@@ -54,6 +54,10 @@ export interface RecommendInput {
   /** The upright signature's source, so a default band asks for a stand test. */
   signatureSource: 'standTest' | 'orthostatic' | 'default' | null;
   hasHrSeries: boolean;
+  /** The reader has a way to take a stand test (`hasStandTestDevice`). */
+  canStandTest?: boolean;
+  /** The reader has tapped the stand-test Todo before. It is asked once. */
+  standTestAsked?: boolean;
   stepsGranted: boolean;
   spentShare: number;
 }
@@ -77,8 +81,11 @@ export function nextRecommendation(input: RecommendInput): Recommendation | null
   if (sleepHours(days, dk) == null) return { id: 'sleep', title: 'Todo: Log your sleep', actionable: true };
 
   // 3. A standing test, but only when there is a heart-rate series for it to
-  //    calibrate. Without one there is no standing band to fit.
-  if (input.hasHrSeries && input.signatureSource === 'default') {
+  //    calibrate. Without one there is no standing band to fit. Asked ONCE:
+  //    a reader who tapped it and walked away from the test has answered.
+  //    And only for somebody who owns the kit: the test runs on the Apple
+  //    Watch app or a chest strap, and a Todo nobody can do is a nag.
+  if (input.hasHrSeries && input.signatureSource === 'default' && input.canStandTest && !input.standTestAsked) {
     return { id: 'orthostatic', title: 'Todo: Log a standing test', actionable: true };
   }
 
@@ -99,6 +106,35 @@ export function nextRecommendation(input: RecommendInput): Recommendation | null
   }
 
   return null;
+}
+
+/** The HRV reading types: the baseline and the paced training reading. */
+const HRV_TYPES = new Set(['hrv', 'breathHrv']);
+
+/**
+ * Can this person take a stand test? It runs on the Apple Watch or a Bluetooth
+ * chest strap, so the bar is evidence of owning either:
+ *   - an HRV reading taken with a strap;
+ *   - anything from an Apple Watch: an entry whose source is 'watch' (the watch
+ *     app's readings, or Apple Watch samples imported from Health), or a day
+ *     holding Apple Stand Time, which only a paired watch writes.
+ * Evidence of a WATCH is enough even if our watch app has never been used:
+ * the test's card points them at it.
+ */
+export function hasStandTestDevice(days: DaysMap): boolean {
+  for (const dk in days) {
+    const d = days[dk];
+    if (!d) continue;
+    if ((d.load?.standMin ?? 0) > 0) return true;
+    for (const r of d.readings || []) {
+      if (r.source === 'watch') return true;
+      if (r.source === 'polar' && HRV_TYPES.has(r.type)) return true;
+    }
+    for (const a of d.activities || []) {
+      if (a.source === 'watch') return true;
+    }
+  }
+  return false;
 }
 
 /** Re-exported for the sheet's empty state, which asks the same question. */

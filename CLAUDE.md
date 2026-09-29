@@ -1279,6 +1279,15 @@ old web app so old `export.json` files import directly.
   `HK_SET_KEY` are byte-identical to what they were, pinned by
   `health/__tests__/authSets.test.ts`, or every existing install would meet a
   HealthKit sheet it tapped nothing to get.
+- **The pacing stand-test Todo is asked ONCE, and only of somebody who can
+  take it.** "Log a standing test" (`nextRecommendation`, id `orthostatic`)
+  opens the stand test through `openPotsCapture` (`features/forms.tsx`), the
+  same card as + Add reading → Stand test; it once shared the HRV branch and
+  opened a reading. The first tap retires it for good (`store/standTestAsk.ts`,
+  flags MMKV): walking away from the test is an answer. And it needs
+  `hasStandTestDevice` — a strap HRV reading, any `watch`-sourced entry
+  (imported included) or a day holding Apple Stand Time — because a Todo the
+  user has no device for is a nag.
 - **The sleep report is the workout report's twin, and all its math is
   `src/lib/sleep/`.** Tapping the Journal's "Last night" card opens
   `<SleepReportSheet/>` (`src/features/SleepReport.tsx`) with the edit pencil in
