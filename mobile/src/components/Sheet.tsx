@@ -103,11 +103,35 @@ export function SheetProvider({ children }: { children: React.ReactNode }) {
   // Closing is a two-step dance so the animation stays fluid: flag the sheet
   // `closing` (it plays its exit AND the card beneath immediately un-recedes,
   // because `behind` ignores closing sheets), then `remove` once the exit lands.
-  const remove = (id: number) => setStack((s) => s.filter((e) => e.id !== id));
+  // Each card's LIVE options, patches included (`controls.setOptions` keeps its
+  // patch inside the card), so the back button below reads what the ✕ reads.
+  const liveOpts = useRef(new Map<number, SheetOptions>());
+  const remove = (id: number) => {
+    liveOpts.current.delete(id);
+    setStack((s) => s.filter((e) => e.id !== id));
+  };
   const requestClose = (id: number) => setStack((s) => s.map((e) => (e.id === id ? { ...e, closing: true } : e)));
   const closeTop = () => setStack((s) => {
     for (let i = s.length - 1; i >= 0; i -= 1) {
       if (!s[i].closing) { const c = s.slice(); c[i] = { ...c[i], closing: true }; return c; }
+    }
+    return s;
+  });
+  // The hardware back button (Android), kept apart from `closeTop` because code
+  // calls that directly to close its own card. Back must honour the top card's
+  // `hideClose` and `dismissAll` exactly as its ✕ does. Popping one card off a
+  // finished stack left a session card for an ended reading on screen with
+  // every button a no-op. And a card with no ✕ closes itself: back on a live
+  // camera reading popped the reading card while the capture kept running
+  // behind the setup card, with nothing on screen to stop it. Every `hideClose`
+  // card has its own way out (Cancel / Finish / Done).
+  const backPress = () => setStack((s) => {
+    for (let i = s.length - 1; i >= 0; i -= 1) {
+      if (s[i].closing) continue;
+      const o = liveOpts.current.get(s[i].id) ?? s[i].opts;
+      if (o.hideClose) return s;
+      if (o.dismissAll) return s.map((e) => ({ ...e, closing: true }));
+      const c = s.slice(); c[i] = { ...c[i], closing: true }; return c;
     }
     return s;
   });
@@ -117,7 +141,7 @@ export function SheetProvider({ children }: { children: React.ReactNode }) {
     <Ctx.Provider value={{ openSheet, closeSheet: closeTop, closeAll, depth: stack.filter((e) => !e.closing).length }}>
       {children}
       {stack.length > 0 && (
-        <SheetHost onRequestClose={closeTop}>
+        <SheetHost onRequestClose={backPress}>
           {/* Capture-phase touch hook (never claims the responder): any touch in
               the sheet stack blurs chart selections; a touched chart re-selects
               in the same event, so only taps *outside* a chart deselect. */}
@@ -135,6 +159,7 @@ export function SheetProvider({ children }: { children: React.ReactNode }) {
                 requestClose={() => requestClose(entry.id)}
                 onExited={() => remove(entry.id)}
                 closeAll={closeAll}
+                liveOpts={liveOpts.current}
               />
             ))}
           </View>
@@ -177,9 +202,10 @@ function SheetHost({ children, onRequestClose }: { children: React.ReactNode; on
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
-function SheetView({ entry, isTop, behind, closing, requestClose, onExited, closeAll }: {
+function SheetView({ entry, isTop, behind, closing, requestClose, onExited, closeAll, liveOpts }: {
   entry: SheetEntry; isTop: boolean; behind: boolean; closing: boolean;
   requestClose: () => void; onExited: () => void; closeAll: () => void;
+  liveOpts: Map<number, SheetOptions>;
 }) {
   const p = usePalette();
   const insets = useSafeAreaInsets();
@@ -233,6 +259,7 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
   // arming its own header buttons doesn't re-render the whole stack.
   const [optPatch, setOptPatch] = useState<Partial<SheetOptions>>({});
   const opts = React.useMemo(() => ({ ...entry.opts, ...optPatch }), [entry.opts, optPatch]);
+  liveOpts.set(entry.id, opts);
   const full = opts.fullscreen;
   const fit = opts.fitContent && !full;
   const hideClose = opts.hideClose;

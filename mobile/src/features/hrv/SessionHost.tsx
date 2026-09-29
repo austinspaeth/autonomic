@@ -101,9 +101,15 @@ export function HrvSessionHost() {
       // have its buttons clipped off the bottom. The default path measures
       // content against the viewport and enables scrolling only when it does
       // not fit, which is what a card of advice needs.
+      //
+      // `dismissAll`: the session card beneath is a view of a reading that has
+      // ended, and teardown waits for the stack to EMPTY. Closing just this card
+      // (its ✕, the backdrop, Android back) used to land the user on that dead
+      // card, frozen at its last second, with Finish and Having issues? both
+      // no-ops because the session was already finished.
       openSheet((c) => (
         <TroubleSheet config={cfg} stopped={stopped} controls={c} onRetry={() => retry(cfg)} />
-      ));
+      ), { dismissAll: true });
       return;
     }
 

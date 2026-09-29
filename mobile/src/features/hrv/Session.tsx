@@ -209,7 +209,7 @@ function SessionCard({ controls }: { controls: SheetControls }) {
       {hidden ? (
         <View style={{ marginTop: 'auto', width: '100%', paddingTop: 28, paddingBottom: insets.bottom }}>
           <Pressable
-            onPress={() => void finishSession()}
+            onPress={() => (finished ? controls.closeAll() : void finishSession())}
             style={{ height: 54, borderRadius: 16, borderWidth: 1, borderColor: '#ffffff1f', alignItems: 'center', justifyContent: 'center' }}
             accessibilityRole="button"
           >
@@ -231,9 +231,9 @@ function SessionCard({ controls }: { controls: SheetControls }) {
                   gets there first (`hopelessCoverage`); this is for the case
                   where the user knows before we do. */}
               {troubleSource ? (
-                <Button title="Having issues?" variant="ghost" onPress={() => void abandonSession('user')} />
+                <Button title="Having issues?" variant="ghost" onPress={() => (finished ? controls.closeAll() : void abandonSession('user'))} />
               ) : null}
-              <Button title="Finish now" variant="primary" onPress={() => void finishSession()} />
+              <Button title="Finish now" variant="primary" onPress={() => (finished ? controls.closeAll() : void finishSession())} />
             </>
           ) : (
             <>
