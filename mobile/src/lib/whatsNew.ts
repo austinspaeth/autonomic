@@ -54,6 +54,7 @@ export const RELEASES: Release[] = [
     date: '2026-09-27',
     notes: [
       'NEW: The Dysautonomia Awareness giveaway. October is Dysautonomia Awareness Month, and every day you take an HRV reading earns an entry, up to 10. Sign up from the card on your Journal. No purchase necessary, and no health data is shared.',
+      'Various bug fixes and performance improvements.',
     ],
   },
   {
