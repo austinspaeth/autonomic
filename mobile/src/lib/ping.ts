@@ -540,6 +540,11 @@ export function easternDay(ms: number): string {
  * Old builds send no tokens at all, so the format is backward compatible by
  * construction: every ping in the table today decodes under the new reader as
  * "no tier, no version", which is exactly what it is.
+ *
+ * `-E` rides only on `sub`: how the sale was known (`V` a buy tap the store
+ * then confirmed, `S` the store's word alone — see `purchaseEvidence` in
+ * ./subscriberPing). A lambda that predates it drops the token and still
+ * counts the ping, so it cannot break delivery the way a new HEAD letter would.
  */
 export function cohortCode(
   isoDate: string,
@@ -547,11 +552,12 @@ export function cohortCode(
   slot?: SlotCode,
   tier?: TierCode,
   version?: string,
+  evidence?: 'V' | 'S',
 ): string {
   const [y, m, d] = isoDate.split('-');
   const head = `D${m}${d}${y.slice(2)}${platform}${slot || ''}`;
   const v = versionCode(version);
-  return `${head}${tier ? `-T${tier}` : ''}${v ? `-V${v}` : ''}`;
+  return `${head}${tier ? `-T${tier}` : ''}${v ? `-V${v}` : ''}${evidence ? `-E${evidence}` : ''}`;
 }
 
 /** The full URL for one ping. */
@@ -562,8 +568,9 @@ export function pingUrl(
   slot?: SlotCode,
   tier?: TierCode,
   version?: string,
+  evidence?: 'V' | 'S',
 ): string {
-  return `${PING_BASE}/${kind}/${cohortCode(cohortIso, platform, slot, tier, version)}`;
+  return `${PING_BASE}/${kind}/${cohortCode(cohortIso, platform, slot, tier, version, evidence)}`;
 }
 
 /**

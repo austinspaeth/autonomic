@@ -629,6 +629,32 @@ const pr = A.purchaseRows(planIx);
 check('a purchase row carries its plan, a legacy one carries none',
   pr.some((r) => r.plan === 'Y') && pr.some((r) => r.plan === null) && pr.length === 2,
   JSON.stringify(pr.map((r) => r.plan)));
+/* How a sale was known: the lambda hands back `evidence` on sub rows, joined
+   to the cohort key the same ping was counted under. */
+const evRow = Object.assign(rrow(R1, [
+  { cohort: '2026-09-24', platform: 'A', slot: 'Y', plan: 'Y', count: 2, key: '092426AY-P' },
+  { cohort: '2026-09-01', platform: 'I', slot: 'M', plan: 'M', count: 1, key: '090126IM-P' },
+  { cohort: '2026-08-01', platform: 'I', slot: 'Y', plan: 'Y', count: 1, key: '080126IY-P' },
+]), { evidence: [
+  { key: '092426AY-P', evidence: 'V', count: 1 },
+  { key: '092426AY-P', evidence: 'S', count: 1 },
+  { key: '090126IM-P', evidence: 'V', count: 1 },
+] });
+const evIx = A.index({ open: [], sub: [evRow] });
+const ev = A.saleEvidenceOn(evIx, R1);
+check('a day\'s sales split by how they were known', ev.V === 2 && ev.S === 1, JSON.stringify(ev));
+check('and a sale with no evidence is neither, not store-only',
+  A.purchasesOn(evIx, R1) - ev.V - ev.S === 1, String(A.purchasesOn(evIx, R1)));
+const evAndroid = A.saleEvidenceOn(A.index({ open: [], sub: [evRow] }, 'android'), R1);
+check('the split obeys the platform filter', evAndroid.V === 1 && evAndroid.S === 1, JSON.stringify(evAndroid));
+const evRows = A.purchaseRows(evIx);
+const rowOf = (k) => evRows.find((r) => r.key === k);
+check('a purchase row carries its own evidence',
+  rowOf('092426AY-P').verified === 1 && rowOf('092426AY-P').storeOnly === 1 &&
+    rowOf('090126IM-P').verified === 1 && rowOf('080126IY-P').verified === 0 && rowOf('080126IY-P').storeOnly === 0,
+  JSON.stringify(evRows));
+check('a day with no evidence reads as none', A.saleEvidenceOn(planIx, R1).V === 0 && A.saleEvidenceOn(planIx, R1).S === 0);
+
 check('the plan letters have names on all three routes',
   A.planName('P') === 'Promo year' && A.slotName('rst', 'M') === 'Monthly' &&
     A.slotName('lap', 'F') === 'Founder year' && A.planName(null) === 'Plan unknown');

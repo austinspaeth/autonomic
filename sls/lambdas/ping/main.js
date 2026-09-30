@@ -257,6 +257,18 @@ const SURFACES = {
  */
 const TIERS = { F: 'free', T: 'trial', P: 'pro' };
 
+/**
+ * How a `sub` was known to be a sale, from the `-E` token newer builds send on
+ * `sub`: `V` VERIFIED, a buy tap that the store then confirmed for the same
+ * plan within the hour — the one sequence nothing but a purchase produces —
+ * and `S` STORE-ONLY, the store marking a purchase as never processed with no
+ * tap behind it (a payment that cleared long after its sheet closed, an app
+ * killed mid-checkout). Counted in a map of its own on the SUB row, never in
+ * the cohort key, so every existing reader of `cohorts` is untouched and a sub
+ * with no token (every older build) is simply absent from it.
+ */
+const EVIDENCE = { V: 'verified', S: 'store' };
+
 /** Which notification was turned ON — the NOT route. Only enables are sent. */
 const NOTIFY = { M: 'morning-reminder', C: 'crash-warning', P: 'pacing-alerts' };
 
@@ -394,14 +406,17 @@ const decodeCohort = (raw) => {
 
   let tier = null;
   let version = null;
+  let evidence = null;
   parts.slice(1).forEach((tok) => {
     if (/^T[A-Z]$/.test(tok)) tier = TIERS[tok[1]] ? tok[1] : null;
     // A version is a map key, so it is accepted only in the one shape a human
     // can read back. Anything else is dropped, never stored as written.
     if (/^V\d+(\.\d+){0,2}$/.test(tok)) version = tok.slice(1);
+    // How a sale was known — see EVIDENCE. Anything else is dropped.
+    if (/^E[A-Z]$/.test(tok)) evidence = EVIDENCE[tok[1]] ? tok[1] : null;
   });
 
-  return { iso, platform: PLATFORMS[p] ? p : 'U', slot: slot || null, tier, version };
+  return { iso, platform: PLATFORMS[p] ? p : 'U', slot: slot || null, tier, version, evidence };
 };
 
 /**
@@ -507,15 +522,21 @@ const isIsoDate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
  * item ceiling — which is a live constraint here and not a theoretical one,
  * since an item that hits it stops counting the day rather than failing loudly.
  */
-const bump = async (kind, day, cohortIso, platform, slot, tier, version) => {
+/** The key a sale's evidence is counted under: the cohort key it was counted
+ *  under, `~`, the letter — `092426AY-P~V` — so a reader can join the two. */
+const evidenceKey = (cKey, evidence) => `${cKey}~${evidence}`;
+
+const bump = async (kind, day, cohortIso, platform, slot, tier, version, evidence) => {
   const cKey = cohortKey(cohortIso, platform, slot, tier);
   const bKey = buildKey(platform, tier, version);
+  const withEvidence = kind === 'SUB' && !!EVIDENCE[evidence];
   const add = new UpdateCommand({
     TableName: TABLE,
     Key: { PK: `PING#${kind}`, SK: day },
     UpdateExpression: [
       'SET #cohorts.#c = if_not_exists(#cohorts.#c, :zero) + :one',
       '#builds.#b = if_not_exists(#builds.#b, :zero) + :one',
+      ...(withEvidence ? ['#evidence.#e = if_not_exists(#evidence.#e, :zero) + :one'] : []),
       '#total = if_not_exists(#total, :zero) + :one',
       '#day = :day',
       'entityType = :t',
@@ -523,6 +544,7 @@ const bump = async (kind, day, cohortIso, platform, slot, tier, version) => {
     ExpressionAttributeNames: {
       '#cohorts': 'cohorts', '#c': cKey, '#builds': 'builds', '#b': bKey,
       '#total': 'total', '#day': 'day',
+      ...(withEvidence ? { '#evidence': 'evidence', '#e': evidenceKey(cKey, evidence) } : {}),
     },
     ExpressionAttributeValues: { ':zero': 0, ':one': 1, ':day': day, ':t': 'PING_DAY' },
   });
@@ -539,8 +561,11 @@ const bump = async (kind, day, cohortIso, platform, slot, tier, version) => {
     await ddb.send(new UpdateCommand({
       TableName: TABLE,
       Key: { PK: `PING#${kind}`, SK: day },
-      UpdateExpression: 'SET #cohorts = if_not_exists(#cohorts, :empty), #builds = if_not_exists(#builds, :empty)',
-      ExpressionAttributeNames: { '#cohorts': 'cohorts', '#builds': 'builds' },
+      UpdateExpression: 'SET #cohorts = if_not_exists(#cohorts, :empty), #builds = if_not_exists(#builds, :empty)'
+        + (withEvidence ? ', #evidence = if_not_exists(#evidence, :empty)' : ''),
+      ExpressionAttributeNames: {
+        '#cohorts': 'cohorts', '#builds': 'builds', ...(withEvidence ? { '#evidence': 'evidence' } : {}),
+      },
       ExpressionAttributeValues: { ':empty': {} },
     }));
     await ddb.send(add);
@@ -574,6 +599,7 @@ const readDays = async (kind, since) => {
     (res.Items || []).forEach((item) => {
       const cohorts = item.cohorts || {};
       const builds = item.builds || {};
+      const evidence = item.evidence || {};
       rows.push({
         day: item.SK,
         total: Number(item.total) || 0,
@@ -630,6 +656,18 @@ const readDays = async (kind, since) => {
           .sort((a, b) => a.platform.localeCompare(b.platform)
             || String(a.tier).localeCompare(String(b.tier))
             || String(a.version).localeCompare(String(b.version))),
+        // How each sale was known (SUB rows only; see EVIDENCE). `key` is the
+        // cohort key the same ping was counted under, to join on. Absent on
+        // every other route and on days before builds sent it.
+        ...(kind === 'SUB' ? {
+          evidence: Object.keys(evidence)
+            .map((k) => {
+              const [key, letter] = String(k).split('~');
+              return EVIDENCE[letter] ? { key, evidence: letter, count: Number(evidence[k]) || 0 } : null;
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.key.localeCompare(b.key) || a.evidence.localeCompare(b.evidence)),
+        } : {}),
       });
     });
     ExclusiveStartKey = res.LastEvaluatedKey;
@@ -1297,7 +1335,7 @@ const handler = async (event) => {
 
   const decoded = decodeCohort(event?.pathParameters?.cohort);
   if (!decoded) return noContent;
-  const { iso: cohort, platform, slot, tier, version } = decoded;
+  const { iso: cohort, platform, slot, tier, version, evidence } = decoded;
 
   const now = Date.now();
   if (cohort < EPOCH) return noContent;
@@ -1312,7 +1350,7 @@ const handler = async (event) => {
   const slotFor = alphabet && alphabet[slot] ? slot : null;
 
   try {
-    await bump(kind, easternDay(now), cohort, platform, slotFor, tier, version);
+    await bump(kind, easternDay(now), cohort, platform, slotFor, tier, version, evidence);
   } catch (err) {
     // Nothing downstream cares and the client is already gone, but log the
     // failure so a flatlined chart has an explanation other than "nobody

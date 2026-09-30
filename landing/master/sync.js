@@ -24,6 +24,45 @@ window.Sync = (function () {
   var baseline = null;   // { entries: Map<key,string>, settings: string, ui: string }
   var pending = false;   // a change arrived while a push was in flight
   var inFlight = false;
+  var flight = null;     // the promise of the push in flight, so a caller can wait on it
+
+  /* The baseline is PERSISTED, beside the cache it describes, and that is what
+     makes an edit survive the page going away before its push did. The cache
+     alone could never say what was unsent: it holds the server's rows and yours
+     alike, and the pull that follows every open replaced it wholesale — so a
+     purchase added and then left (a phone suspending the PWA inside the 900ms
+     debounce, a reload while a push was failing) was simply gone, from the
+     server and from this browser, with nothing on screen to say so. With the
+     baseline kept, "what have I changed that the server has not confirmed" is
+     the same diff on the next open as it was on this one: `outstanding()`
+     computes it, and `rebase()` lays it back over whatever the pull brought. */
+  var BASELINE_KEY = 'autonomic.master.syncBaseline.v1';
+  var COLLECTIONS = ['entries', 'events', 'ads', 'costs', 'sales', 'churn', 'links'];
+
+  function persistBaseline() {
+    if (!baseline) return;
+    try {
+      var out = { settings: baseline.settings, ui: baseline.ui };
+      COLLECTIONS.forEach(function (name) { out[name] = Array.from(baseline[name].entries()); });
+      localStorage.setItem(BASELINE_KEY, JSON.stringify(out));
+    } catch (e) { /* storage full or blocked: the in-memory baseline still works */ }
+  }
+
+  function restoreBaseline() {
+    try {
+      var raw = localStorage.getItem(BASELINE_KEY);
+      if (!raw) return null;
+      var p = JSON.parse(raw);
+      if (!p || typeof p !== 'object') return null;
+      var out = { settings: p.settings, ui: p.ui };
+      for (var i = 0; i < COLLECTIONS.length; i++) {
+        if (!Array.isArray(p[COLLECTIONS[i]])) return null;
+        out[COLLECTIONS[i]] = new Map(p[COLLECTIONS[i]]);
+      }
+      return out;
+    } catch (e) { return null; }
+  }
+
   var timer = null;
   var retryDelay = RETRY_BASE_MS;
   var listeners = [];
@@ -378,23 +417,105 @@ window.Sync = (function () {
 
     inFlight = true;
     setStatus('saving');
-    return window.Api.call('SYNC', d.payload).then(function () {
+    flight = window.Api.call('SYNC', d.payload).then(function () {
       inFlight = false;
+      flight = null;
       // Commit the snapshot only on success, so a failed push retries the same
       // work instead of quietly losing it.
       baseline = d.snapshot;
+      persistBaseline();
       retryDelay = RETRY_BASE_MS;
       if (pending) { pending = false; return flush(); }
       setStatus('synced');
       return null;
     }).catch(function (err) {
       inFlight = false;
+      flight = null;
       pending = false;
       setStatus('error', err);
       clearTimeout(timer);
       timer = setTimeout(flush, retryDelay);
       retryDelay = Math.min(retryDelay * 2, RETRY_MAX_MS);
     });
+    return flight;
+  }
+
+  /* `flush`, but one that WAITS for a push already in flight rather than
+     resolving past it, and then pushes whatever arrived meanwhile. The refresh
+     and the boot pull call this before pulling: resolving early let the pull
+     land first, replace the store, and have the in-flight push then commit a
+     baseline older than the store it was now describing. Never rejects — a
+     failed push is still outstanding afterwards, which is what `rebase` is
+     for. */
+  function settle() {
+    if (flight) return flight.then(function () { return settle(); });
+    // No baseline is a first open (or one whose baseline was not trusted):
+    // there is nothing to measure an edit against, and a push without one
+    // would send the whole cache, stale rows and default settings included,
+    // over the server's copy.
+    if (!baseline) return Promise.resolve();
+    clearTimeout(timer);
+    return flush();
+  }
+
+  /**
+   * What this browser holds that the server has not confirmed, as the push
+   * payload it would send — or null when there is nothing (or no baseline to
+   * measure against, which is a first open and has nothing unsent by
+   * definition). Taken just before a pull, then handed to `rebase` after it.
+   */
+  function outstanding() {
+    if (!baseline || !getStore) return null;
+    var store = getStore();
+    var d = diff(store.db, store.state);
+    var p = d.payload;
+    delete p.ui;   // the view you were on is not an edit worth replaying
+    return Object.keys(p).length ? p : null;
+  }
+
+  /* One bulk delete is not something this dashboard does through the diff —
+     Delete all data and a backup restore go through `replaceAll` — so more
+     than this many from one collection is a cache that lost rows, not a person
+     who removed them. See `trustworthy`. */
+  var REPLAY_MAX_DELETES = 5;
+
+  /**
+   * Lay unsent edits back over the store a pull just replaced, then push them.
+   * Must run AFTER `adopt`, so the replayed rows are a difference from the new
+   * baseline and actually leave. Returns whether anything changed, so the
+   * caller can rewrite the cache and repaint.
+   */
+  function rebase(p) {
+    if (!p || !getStore) return false;
+    var db = getStore().db;
+    var changed = false;
+    function apply(name, ups, dels, keyFn) {
+      var list = db[name] || (db[name] = []);
+      if (dels && dels.length) {
+        var gone = {};
+        dels.forEach(function (k) { gone[typeof k === 'string' ? k : keyFn(k)] = true; });
+        var kept = list.filter(function (r) { return !gone[keyFn(r)]; });
+        if (kept.length !== list.length) { list = db[name] = kept; changed = true; }
+      }
+      (ups || []).forEach(function (row) {
+        var k = keyFn(row);
+        var at = -1;
+        for (var i = 0; i < list.length; i++) if (keyFn(list[i]) === k) { at = i; break; }
+        if (at >= 0) list[at] = Object.assign({}, list[at], row); else list.push(row);
+        changed = true;
+      });
+    }
+    var byId = function (r) { return r && r.id; };
+    apply('entries', p.upserts, p.deletes, function (r) { return r.date + '#' + (r.platform === 'android' ? 'android' : 'ios'); });
+    apply('events', p.eventUpserts, p.eventDeletes, byId);
+    apply('ads', p.adUpserts, p.adDeletes, byId);
+    apply('costs', p.costUpserts, p.costDeletes, byId);
+    apply('sales', p.saleUpserts, p.saleDeletes, byId);
+    apply('churn', p.churnUpserts, p.churnDeletes, byId);
+    apply('links', p.linkUpserts, p.linkDeletes, function (r) { return r && r.slug; });
+    if (p.settings) { db.settings = Object.assign(db.settings || {}, p.settings); changed = true; }
+    if (changed) schedule();
+    return changed;
   }
 
   /** Called from app.js's save(). Coalesces a burst of mutations into one push. */
@@ -428,6 +549,7 @@ window.Sync = (function () {
     }).then(function () {
       inFlight = false;
       baseline = snapshot;
+      persistBaseline();
       setStatus('synced');
     }).catch(function (err) {
       inFlight = false;
@@ -440,12 +562,42 @@ window.Sync = (function () {
      pull. `state` is the UI object the pull returned (may be null). */
   function adopt(db, state) {
     baseline = snapshotOf(db, state);
+    persistBaseline();
     setStatus('synced');
   }
 
   function onStatus(fn) { listeners.push(fn); fn(status); }
 
-  function bind(fn) { getStore = fn; }
+  /* Binding is also where a baseline left by the last visit is picked back
+     up, so an edit that never got pushed is measurable before the first pull
+     replaces the store it lives in. */
+  function bind(fn) {
+    getStore = fn;
+    if (baseline) return;
+    baseline = restoreBaseline();
+    if (baseline && !trustworthy()) baseline = null;
+  }
+
+  /* A restored baseline is only as good as the cache beside it. Against a
+     cache that has lost rows — cleared storage, a collection an older build
+     never cached — the diff reads as those rows deleted, and a push sends the
+     deletes. So a baseline whose diff would delete in bulk, or empty a whole
+     collection, is thrown away: this open then behaves exactly as every open
+     did before the baseline was kept (pull over the cache, nothing replayed),
+     which loses at most an unsent edit and never the server's rows. */
+  function trustworthy() {
+    var store = getStore();
+    var p = diff(store.db, store.state).payload;
+    var pairs = [['deletes', 'entries'], ['eventDeletes', 'events'], ['adDeletes', 'ads'],
+      ['costDeletes', 'costs'], ['saleDeletes', 'sales'], ['churnDeletes', 'churn'],
+      ['linkDeletes', 'links']];
+    for (var i = 0; i < pairs.length; i++) {
+      var dels = p[pairs[i][0]];
+      if (!dels) continue;
+      if (dels.length > REPLAY_MAX_DELETES || !(store.db[pairs[i][1]] || []).length) return false;
+    }
+    return true;
+  }
 
   /* A push in flight when the tab closes would be lost; ask the browser to
      wait. Modern browsers ignore the prompt text but still hold the unload. */
@@ -466,6 +618,9 @@ window.Sync = (function () {
   return {
     pull: pull,
     flush: flush,
+    settle: settle,
+    outstanding: outstanding,
+    rebase: rebase,
     bind: bind,
     adopt: adopt,
     schedule: schedule,

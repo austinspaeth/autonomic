@@ -92,7 +92,10 @@ import {
 import {
   afterSend, notePurchase, RESTORE_SETTLE_MS, subscriberStep, type SubscriberMemory,
 } from '../lib/subscriberPing';
-import { getIapState, onNewPurchase, onPurchaseOutcome, paywallBypassed, subscribeIap } from './iap';
+import {
+  getIapState, hasRecentTap, onNewPurchase, onPurchaseOutcome, paywallBypassed, subscribeIap,
+  type NewPurchaseEvent,
+} from './iap';
 import { getTier } from './tier';
 
 const FLAGS_ID = 'autonomic.flags';
@@ -100,8 +103,8 @@ const KEY_COHORT = 'pingCohort';        // ISO date — this install's cohort, f
 const KEY_LAST_OPEN = 'pingLastOpen';   // ISO date (Eastern) of the last open ping sent
 const KEY_SUB_SENT = 'pingSubSent';     // '1' once a sub landed for the current entitlement
 const KEY_RST_SENT = 'pingRstSent';     // '1' once an rst landed for the current entitlement
-const KEY_SUB_PENDING = 'pingSubPending'; // JSON { plan, acked, tx } — a purchase not yet reported
-const KEY_SUB_TX = 'pingSubTx';         // the store transaction the last sub reported
+const KEY_SUB_PENDING = 'pingSubPending'; // JSON { plan, acked, evidence, txn } — a purchase not yet reported
+const KEY_SUB_REPORTED = 'pingSubReported'; // JSON string[] — purchase ids already reported (local only)
 const KEY_LAPSE_SEEN = 'pingLapseSeen'; // ISO date (Eastern) the store first said "not subscribed"
 const KEY_LAST_PLAN = 'pingLastPlan';   // the plan letter this install was last seen holding
 const KEY_EXCLUDED = 'pingExcluded';    // '1' — this device sends nothing (owner / tester phones)
@@ -204,14 +207,14 @@ function appVersion(): string | undefined {
  * when the event happened — a purchase mid-session moves the NEXT ping, which
  * is what makes a cohort's drift from F to P a conversion curve.
  */
-async function send(kind: PingKind, cohort: string, slot?: SlotCode): Promise<boolean> {
+async function send(kind: PingKind, cohort: string, slot?: SlotCode, evidence?: 'V' | 'S'): Promise<boolean> {
   // Reported as delivered so no caller retries it forever: the event did
   // happen, this phone just does not count.
   if (isPingExcluded()) return true;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   const url = pingUrl(
-    kind, cohort, platformCode(Platform.OS), slot, tierCode(getTier()), appVersion(),
+    kind, cohort, platformCode(Platform.OS), slot, tierCode(getTier()), appVersion(), evidence,
   );
   try {
     const res = await fetch(url, { method: 'GET', signal: controller.signal });
@@ -329,17 +332,24 @@ function readSubscriberMemory(): SubscriberMemory {
       pending = {
         plan: PLANS.has(v.plan) ? v.plan : undefined,
         acked: !!v.acked,
-        tx: typeof v.tx === 'string' && v.tx ? v.tx : undefined,
+        evidence: v.evidence === 'V' || v.evidence === 'S' ? v.evidence : undefined,
+        txn: typeof v.txn === 'string' && v.txn ? v.txn : undefined,
       };
     }
   } catch { pending = undefined; }
+  let reported: string[] | undefined;
+  try {
+    const raw = read(KEY_SUB_REPORTED);
+    const v = raw ? JSON.parse(raw) : undefined;
+    if (Array.isArray(v)) reported = v.filter((t) => typeof t === 'string');
+  } catch { reported = undefined; }
   return {
     pending,
+    reported,
     subSent: read(KEY_SUB_SENT) === '1',
     rstSent: read(KEY_RST_SENT) === '1',
     lapseSeen: read(KEY_LAPSE_SEEN) || undefined,
     lastPlan: PLANS.has(read(KEY_LAST_PLAN) || '') ? read(KEY_LAST_PLAN) as PlanCode : undefined,
-    reportedTx: read(KEY_SUB_TX) || undefined,
   };
 }
 
@@ -350,15 +360,15 @@ function writeSubscriberMemory(m: SubscriberMemory) {
   if (m.rstSent) write(KEY_RST_SENT, '1'); else remove(KEY_RST_SENT);
   if (m.lapseSeen) write(KEY_LAPSE_SEEN, m.lapseSeen); else remove(KEY_LAPSE_SEEN);
   if (m.lastPlan) write(KEY_LAST_PLAN, m.lastPlan);
-  if (m.reportedTx) write(KEY_SUB_TX, m.reportedTx);
+  if (m.reported && m.reported.length) write(KEY_SUB_REPORTED, JSON.stringify(m.reported));
 }
 
 /** A purchase this install made, from ./iap. Remembered on disk before
  *  anything is sent, so a phone killed between the store sheet and the ping
  *  still reports it on its next launch. */
-function onPurchased(e: { sku: string; acknowledged: boolean; tx?: string }) {
+function onPurchased(e: NewPurchaseEvent) {
   if (paywallBypassed()) return;
-  writeSubscriberMemory(notePurchase(readSubscriberMemory(), planCode(e.sku), e.acknowledged, e.tx));
+  writeSubscriberMemory(notePurchase(readSubscriberMemory(), planCode(e.sku), e.acknowledged, e.evidence, e.txn));
   void pingSubscriber();
 }
 
@@ -395,6 +405,8 @@ async function pingSubscriber(): Promise<void> {
     plan,
     settled: answeredSeen !== undefined && now - answeredSeen >= RESTORE_SETTLE_MS,
     today: easternDay(now),
+    activeAcked: !!iap.activeAcked,
+    tapRecent: hasRecentTap(),
   });
   if (!step) return;
   if (step.kind === 'lapse-seen') { writeSubscriberMemory({ ...memory, lapseSeen: step.day }); return; }
@@ -402,7 +414,7 @@ async function pingSubscriber(): Promise<void> {
   if (step.kind === 'drop-pending') { writeSubscriberMemory({ ...memory, pending: undefined }); return; }
   inFlight.subscriber = true;
   try {
-    if (await send(step.kind, cohortDate(now), step.plan)) {
+    if (await send(step.kind, cohortDate(now), step.plan, step.kind === 'sub' ? step.evidence : undefined)) {
       writeSubscriberMemory(afterSend(readSubscriberMemory(), step.kind, step.plan));
     }
   } finally {

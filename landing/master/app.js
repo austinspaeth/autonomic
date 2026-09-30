@@ -43,7 +43,7 @@
 
   function load() {
     var d = {
-      entries: [], events: [], ads: [], costs: [], sales: [], links: [],
+      entries: [], events: [], ads: [], costs: [], sales: [], churn: [], links: [],
       settings: { trialDays: 14, currency: '$', storeCutPct: 15 }
     };
     try {
@@ -55,6 +55,12 @@
         if (p && Array.isArray(p.ads)) d.ads = p.ads;
         if (p && Array.isArray(p.costs)) d.costs = p.costs;
         if (p && Array.isArray(p.sales)) d.sales = p.sales;
+        /* Churn has to come back from the cache like every other collection.
+           It used to be left for the pull to refill, which was harmless only
+           while nothing diffed the cache: sync.js now replays unsent edits on
+           boot, and a collection missing from the cache reads as every one of
+           its rows deleted. */
+        if (p && Array.isArray(p.churn)) d.churn = p.churn;
         if (p && Array.isArray(p.links)) d.links = p.links;
         // conversion rate used to be an entered field; it is derived now, so drop
         // any stale values rather than carrying them into exports and backups
@@ -2343,6 +2349,8 @@
       rstRange += A.eventsOn(ix, 'rst', d);
       lapRange += A.eventsOn(ix, 'lap', d);
     });
+    var evRange = { V: 0, S: 0 };
+    days.forEach(function (d) { var e = A.saleEvidenceOn(ix, d); evRange.V += e.V; evRange.S += e.S; });
     var conv7 = A.conversion(ix, ix.cohorts, 7);
     var conv30 = A.conversion(ix, ix.cohorts, 30);
     /* Activation on the install day is the onboarding's own number: everything
@@ -2575,7 +2583,7 @@
         delta: rangeDelta(ix, days, function (d) { return A.purchasesOn(ix, d); }),
         meta: 'reported by the app, unverified: the sales ledger is the source of truth for revenue. ' +
           'Restores are counted apart from the plan-letter release on; older builds may include them' +
-          storeSplitNote(ix, rangeBuys) + subscriberNote(ix, days, rstRange, lapRange),
+          storeSplitNote(ix, rangeBuys) + evidenceNote(subsRange, evRange) + subscriberNote(ix, days, rstRange, lapRange),
         split: storeSplit(rangeBuys)
       }),
       tile({
@@ -2784,6 +2792,16 @@
     var known = (days || []).some(function (d) { return A.kindKnown(ix, 'rst', d) || A.kindKnown(ix, 'lap', d); });
     if (!known && !rst && !lap) return '';
     return ' · ' + fmtInt(rst) + ' restored onto a new install · ' + fmtInt(lap) + ' lapsed (neither counted here)';
+  }
+
+  /* How the range's sales were known. Only once a build sending the evidence
+     token has reported one: before that every sale is "not known", and saying
+     so on every range would be noise. */
+  function evidenceNote(total, ev) {
+    if (!ev.V && !ev.S) return '';
+    var rest = Math.max(0, total - ev.V - ev.S);
+    return ' · ' + fmtInt(ev.V) + ' verified (buy tap, then the store) · ' + fmtInt(ev.S) + ' store-only' +
+      (rest ? ' · ' + fmtInt(rest) + ' from older builds' : '');
   }
 
   function storeSplitNote(ix, split) {
@@ -3476,6 +3494,17 @@
    *   number: nothing here is authorised to decide that a purchase did not
    *   happen.
    */
+  /* A purchase row's evidence: `Verified` a buy tap the store confirmed,
+     `Store only` the store's word with no tap, a dash for a build too old to
+     say. A row holding several sales can hold both. */
+  function evidenceCell(x) {
+    var bits = [];
+    if (x.verified) bits.push((x.count > 1 ? fmtInt(x.verified) + ' ' : '') + 'Verified');
+    if (x.storeOnly) bits.push((x.count > 1 ? fmtInt(x.storeOnly) + ' ' : '') + 'Store only');
+    if (!bits.length) return '<span class="na" title="A build too old to say how the sale was known">–</span>';
+    return esc(bits.join(' · '));
+  }
+
   function renderPurchaseRows(ix) {
     var host = document.getElementById('pgPurchaseRows');
     if (!host) return;
@@ -3496,6 +3525,7 @@
         '<td>' + esc(STORE_LABEL[x.platform] || STORE_LABEL.U) + '</td>' +
         '<td>' + (x.plan ? esc(A.planName(x.plan)) : '<span class="na" title="A build older than the plan letter, whose ping meant any subscription found">older build</span>') + '</td>' +
         '<td>' + fmtInt(x.count) + '</td>' +
+        '<td>' + evidenceCell(x) + '</td>' +
         '<td>' + (suspect ? '<span class="warn-small">seen twice?</span>' : '') + '</td>' +
         '</tr>';
     }).join('');
@@ -3507,7 +3537,7 @@
       '</div>' +
       '<div id="pgPurchaseRowsTable" class="' + (open ? '' : 'hidden') + '" style="margin-top:10px">' +
         '<div class="table-scroll"><table><thead><tr>' +
-          '<th>Paid</th><th>Installed</th><th>Age</th><th>Store</th><th>Plan</th><th>Count</th><th></th>' +
+          '<th>Paid</th><th>Installed</th><th>Age</th><th>Store</th><th>Plan</th><th>Count</th><th>Known by</th><th></th>' +
         '</tr></thead><tbody>' + body + '</tbody></table></div>' +
         (Object.keys(flagged).length
           ? '<p class="note" style="margin-top:8px">A row marked <b>seen twice?</b> shares its install day with a purchase one day either side of it. ' +
@@ -3518,7 +3548,10 @@
           '<b>Plan</b> matches a row to a store order; <b>older build</b> is a ping from before the plan letter, when this ' +
           'counter also caught reinstalls and restores (counted separately now, as restore pings). <b>Store</b> comes off the ping\'s own cohort key, so ' +
           '"no store" means a build that shipped before the platform marker rather than a third platform. This list is never filtered by ' +
-          'the platform selector — the store is one of its columns.</p>' +
+          'the platform selector — the store is one of its columns. <b>Known by</b>: <b>Verified</b> is a buy tap that the store ' +
+          'confirmed for the same plan within the hour, the one sequence nothing but a purchase produces; <b>Store only</b> is a purchase ' +
+          'the store marked as never processed with no tap behind it, such as a payment that cleared after its sheet closed. ' +
+          'A dash is a build too old to say.</p>' +
       '</div>';
 
     var btn = document.getElementById('pgPurchaseRowsToggle');
@@ -9686,13 +9719,24 @@
     refreshing = true;
     lastAutoAt = Date.now();
 
-    var work = Promise.resolve(window.Sync ? window.Sync.flush() : null)
-      .then(function () { return window.Sync ? window.Sync.pull() : null; })
+    /* `settle`, not `flush`: it waits out a push already in flight. And
+       whatever is STILL unsent after it (a push that failed) is taken before
+       the pull and laid back over its result, because the pull replaces the
+       store wholesale and adopting it made the loss permanent — an entry added
+       while a push was failing vanished from the server and from this browser
+       at the next five-minute tick. */
+    var local = null;
+    var work = Promise.resolve(window.Sync ? window.Sync.settle() : null)
+      .then(function () {
+        local = window.Sync ? window.Sync.outstanding() : null;
+        return window.Sync ? window.Sync.pull() : null;
+      })
       .then(function (remote) {
         hydrate(remote, true);
         var store = { db: db, state: state };
         if (window.Sync) window.Sync.adopt(store.db, store.state);
         // After the adopt, never before — see the note in hydrate().
+        reapply(local);
         migrateSales();
         migrateAdSpots();
       });
@@ -11911,10 +11955,22 @@
    * reason spelled out in hydrate(), the render because it is what puts the
    * server's copy on screen over the top of the cached one.
    */
-  function adopted() {
+  function adopted(local) {
+    reapply(local);
     migrateSales();
     migrateAdSpots();
     renderAll();
+  }
+
+  /* Unsent edits laid back over a store the pull just replaced (sync.js
+     `rebase`, which also schedules their push), then written to the cache —
+     hydrate() wrote the server's copy there, and a reload before the push
+     landed would otherwise find the edit missing from both. */
+  function reapply(local) {
+    if (!window.Sync || !window.Sync.rebase(local)) return;
+    sortSales();
+    try { localStorage.setItem(KEY, JSON.stringify(db)); } catch (e) { /* the push still carries it */ }
+    invalidate();
   }
 
   /** boot.js's half of the cache-first open: no cache, so draw the shape. */

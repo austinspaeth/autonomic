@@ -17,16 +17,16 @@ const { decodeCohort, cohortKey, buildKey, ALPHABET, KINDS } = require('../lambd
 test('decodes the shapes every build that ever shipped can send', () => {
   // The original: cohort only.
   assert.deepEqual(decodeCohort('D082126'),
-    { iso: '2026-08-21', platform: 'U', slot: null, tier: null, version: null });
+    { iso: '2026-08-21', platform: 'U', slot: null, tier: null, version: null, evidence: null });
   // With the platform letter.
   assert.deepEqual(decodeCohort('D082126I'),
-    { iso: '2026-08-21', platform: 'I', slot: null, tier: null, version: null });
+    { iso: '2026-08-21', platform: 'I', slot: null, tier: null, version: null, evidence: null });
   // With the sensor letter.
   assert.deepEqual(decodeCohort('D082126IG'),
-    { iso: '2026-08-21', platform: 'I', slot: 'G', tier: null, version: null });
+    { iso: '2026-08-21', platform: 'I', slot: 'G', tier: null, version: null, evidence: null });
   // And today's, with the tagged tail.
   assert.deepEqual(decodeCohort('D082126IG-TP-V1.26.0'),
-    { iso: '2026-08-21', platform: 'I', slot: 'G', tier: 'P', version: '1.26.0' });
+    { iso: '2026-08-21', platform: 'I', slot: 'G', tier: 'P', version: '1.26.0', evidence: null });
 });
 
 test('a tagged token is independent of every other one', () => {

@@ -115,6 +115,14 @@ const shape = (map) => Object.keys(map).sort().map((day) => ({
   ), []),
 }));
 
+/* Today's sale arrives from a build that says how it was known (verified); the
+   older ones carry nothing, as every build before 1.31.2 does. */
+const withEvidence = (rows) => rows.map((r) => {
+  const cohorts = r.cohorts.map((c) => Object.assign({ key: c.cohortDate + c.platform }, c));
+  return Object.assign({}, r, { cohorts },
+    r.day === T(0) ? { evidence: cohorts.map((c) => ({ key: c.key, evidence: 'V', count: c.count })) } : {});
+});
+
 const b64u = (o) => Buffer.from(JSON.stringify(o)).toString('base64url');
 const idToken = [b64u({ alg: 'RS256' }), b64u({ email: 'austinspaeth@msn.com', exp: Math.floor(Date.now() / 1000) + 3600 }), 'sig'].join('.');
 
@@ -147,7 +155,7 @@ window.fetch = (url, opts) => {
       ui: { view: 'timeline' },
     });
   }
-  if (body.action === 'PINGS') return reply({ since: body.payload.since, open: shape(OPEN), sub: shape(SUB), act: shapeAct(ACT), hrv: shapeAct(HRV) });
+  if (body.action === 'PINGS') return reply({ since: body.payload.since, open: shape(OPEN), sub: withEvidence(shape(SUB)), act: shapeAct(ACT), hrv: shapeAct(HRV) });
   return reply({ ok: true });
 };
 
@@ -302,6 +310,12 @@ const activeTile = tiles[Object.keys(tiles).find((k) => k.startsWith('Active on'
 check('active today is 4', activeTile.value.startsWith('4'));
 
 check('purchases counted', tiles['Subscriptions reported in range'].value === '3', tiles['Subscriptions reported in range'].value);
+check('and split by how they were known, the rest named as older builds',
+  /1 verified \(buy tap, then the store\) · 0 store-only · 2 from older builds/.test(tiles['Subscriptions reported in range'].meta),
+  tiles['Subscriptions reported in range'].meta);
+check('the purchase list says how each sale was known',
+  /Known by/.test($('pgPurchaseRows').textContent) && /Verified/.test($('pgPurchaseRows').textContent),
+  $('pgPurchaseRows').textContent.slice(0, 300));
 
 /* ------------------------------------------------------- installs + deltas */
 

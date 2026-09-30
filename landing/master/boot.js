@@ -74,14 +74,26 @@
     /* The refresh button spins for the whole of this — the pull, the hydrate
        and the repaint — and `start` adds the ping counter to the same wheel,
        so it turns into a checkmark only once every one of them has landed. */
-    var loaded = window.Sync.pull().then(function (remote) {
+    /* Anything the last visit changed and never got pushed is measured
+       against the baseline that visit left behind, BEFORE the pull replaces
+       the store it lives in, and laid back over the result afterwards. This
+       open used to pull straight over the cache, so a purchase added on a
+       phone that suspended the page inside the push's debounce was gone on
+       the next open with no trace anywhere. The push is tried first, so the
+       server usually has it already and the replay changes nothing. */
+    var local = null;
+    var loaded = (painted ? window.Sync.settle() : Promise.resolve()).then(function () {
+      // No cache, nothing of this browser's to replay.
+      local = painted ? window.Sync.outstanding() : null;
+      return window.Sync.pull();
+    }).then(function (remote) {
       window.Dashboard.hydrate(remote, painted);
       var store = window.Dashboard.store();
       // Baseline == what we just received, so booting doesn't push anything back.
       window.Sync.adopt(store.db, store.state);
       if (painted) {
-        // Migrations + repaint, both of which must follow the adopt.
-        window.Dashboard.adopted();
+        // Replay + migrations + repaint, all of which must follow the adopt.
+        window.Dashboard.adopted(local);
       } else {
         window.Dashboard.skeleton(false);
         window.Dashboard.start();

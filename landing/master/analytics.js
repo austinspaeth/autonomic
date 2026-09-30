@@ -384,6 +384,30 @@ window.Analytics = (function () {
     return by;
   }
 
+  /**
+   * How each day's sales were known, `{ day: { V: n, S: n } }`, inside the
+   * platform filter. `V` VERIFIED is a buy tap the store then confirmed for the
+   * same plan within the hour; `S` STORE-ONLY is the store marking a purchase
+   * never processed with no tap behind it (a payment that cleared long after
+   * its sheet closed). A sale from a build before the token carries neither,
+   * so a day's `total` minus both is "not known", never "store-only".
+   * The platform is the 7th character of the cohort key the row joins on.
+   */
+  function evidenceByDay(rows, letter) {
+    var by = {};
+    (rows || []).forEach(function (r) {
+      if (!r || !r.day) return;
+      (r.evidence || []).forEach(function (e) {
+        if (!e || (e.evidence !== 'V' && e.evidence !== 'S')) return;
+        var plat = String(e.key || '').charAt(6) || 'U';
+        if (letter && plat !== letter) return;
+        var d = by[r.day] || (by[r.day] = { V: 0, S: 0 });
+        d[e.evidence] += Number(e.count) || 0;
+      });
+    });
+    return by;
+  }
+
   /** Totals per platform over a whole map, as `{ I: n, A: n, U: n }`. */
   function splitOf(map) {
     var out = {};
@@ -549,6 +573,7 @@ window.Analytics = (function () {
          unfiltered by construction, which is the rule every platform-split
          thing here already follows. */
       rawSub: (report && report.sub) || [],
+      subEvidence: evidenceByDay(report && report.sub, letter),
       versions: (report && report.versions) || null
     };
     /* The three original kinds are ALSO reachable generically, so a caller can
@@ -568,6 +593,11 @@ window.Analytics = (function () {
   function countOn(ix, day, cohort) { return openOn(ix, day).cohorts[cohort] || 0; }
   function subCountOn(ix, day, cohort) { return subOn(ix, day).cohorts[cohort] || 0; }
   function purchasesOn(ix, day) { return subOn(ix, day).total; }
+  /** `{ V, S }` sales on `day` by how they were known (see `evidenceByDay`). */
+  function saleEvidenceOn(ix, day) {
+    var e = ix && ix.subEvidence && ix.subEvidence[day];
+    return { V: e ? e.V : 0, S: e ? e.S : 0 };
+  }
   /** First readings saved on `day`, by installs of any cohort. */
   function activationsOn(ix, day) { return actOn(ix, day).total; }
   function actCountOn(ix, day, cohort) { return actOn(ix, day).cohorts[cohort] || 0; }
@@ -1786,11 +1816,22 @@ window.Analytics = (function () {
       if (!row || !row.day) return;
       if (from && row.day < from) return;
       if (to && row.day > to) return;
+      var ev = {};
+      (row.evidence || []).forEach(function (e) {
+        if (!e || !e.key || (e.evidence !== 'V' && e.evidence !== 'S')) return;
+        var slot = ev[e.key] || (ev[e.key] = { V: 0, S: 0 });
+        slot[e.evidence] += Number(e.count) || 0;
+      });
       (row.cohorts || []).forEach(function (c) {
         var n = Number(c && c.count) || 0;
         if (!(n > 0)) return;
         var age = c.cohort ? ageDays(c.cohort, row.day) : null;
+        var known = (c.key && ev[c.key]) || { V: 0, S: 0 };
         out.push({
+          /* How many of `count` were verified / store-only. Whatever is left
+             came from a build that predates the evidence token. */
+          verified: known.V,
+          storeOnly: known.S,
           day: row.day,
           cohort: c.cohort || null,
           key: c.key || null,
@@ -2641,7 +2682,7 @@ window.Analytics = (function () {
     platformsOn: platformsOn, newPlatformsOn: newPlatformsOn, newPlatformsOver: newPlatformsOver,
     subPlatformsOn: subPlatformsOn, purchasePlatformsOver: purchasePlatformsOver,
     unattributedOn: unattributedOn,
-    countOn: countOn, purchasesOn: purchasesOn, cohortSize: cohortSize,
+    countOn: countOn, purchasesOn: purchasesOn, saleEvidenceOn: saleEvidenceOn, cohortSize: cohortSize,
     activationsOn: activationsOn, actCountOn: actCountOn, actPlatformsOn: actPlatformsOn,
     readingsOn: readingsOn, hrvCountOn: hrvCountOn, hrvPlatformsOn: hrvPlatformsOn,
     hrvMethodsOn: hrvMethodsOn, hrvMethodsOver: hrvMethodsOver, hrvMethodKnown: hrvMethodKnown,

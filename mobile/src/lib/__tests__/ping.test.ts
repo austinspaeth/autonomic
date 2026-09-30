@@ -62,6 +62,10 @@ describe('cohort ping wire format', () => {
 
   it('appends the capture method only when there is one', () => {
     expect(cohortCode('2026-08-21', 'I', 'W')).toBe('D082126IW');
+    // How a sale was known rides last, tagged, and only when there is one.
+    expect(cohortCode('2026-08-21', 'A', 'Y', 'P', '1.31.2', 'V')).toBe('D082126AY-TP-V1.31.2-EV');
+    expect(cohortCode('2026-08-21', 'A', 'Y', 'P', '1.31.2', 'S')).toBe('D082126AY-TP-V1.31.2-ES');
+    expect(cohortCode('2026-08-21', 'A', 'Y', 'P', '1.31.2')).toBe('D082126AY-TP-V1.31.2');
     expect(cohortCode('2026-08-21', 'I')).toBe('D082126I');
     expect(pingUrl('act', '2026-08-21', 'A')).toBe('https://api.autonomic.care/ping/act/D082126A');
   });

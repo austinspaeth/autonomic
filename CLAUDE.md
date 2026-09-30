@@ -1624,18 +1624,30 @@ old web app so old `export.json` files import directly.
   no longer swallows a failed `finishTransaction` (`iap.ack`), every
   entitlement check re-acknowledges an unacknowledged Play purchase
   (`iap.ackRetry`) because Play refunds one after three days, and a pending
-  purchase the store stops reporting is dropped unreported. All three routes
+  purchase the store stops reporting is dropped unreported. **Every `sub` also
+  says how it was known**, as a `-E` tail token (`purchaseEvidence`): `V`
+  VERIFIED, a buy tap the store then confirmed for the same SKU inside
+  `TAP_WINDOW_MS` (an hour), and `S` STORE-ONLY, an unacknowledged Play
+  purchase or a first StoreKit transaction with no tap (a payment that cleared
+  after its sheet closed). The lambda counts it in a separate `evidence` map on
+  the SUB row (`<cohort key>~V`), never in the cohort key, and the dashboard
+  shows verified beside store-only. **A purchase is reported once per
+  transaction**: the store's id (Play token, StoreKit transaction id) is kept
+  on the phone in `pingSubReported` and never sent, which is what stops a
+  replayed transaction counting on every launch. **The purchase must be on
+  record BEFORE `isPro` flips**: `set()` notifies synchronously, and a
+  subscriber check that saw Pro with nothing pending sent `rst` for every
+  purchase made past the restore settle window, then `sub` a foreground later.
+  `rst` also waits while a buy tap is fresh. All three routes
   carry the PLAN letter (`planCode`: `Y` yearly, `M` monthly, `P` promo year,
   `F` founder year), which is also the generation marker — new builds always
   send one and older builds never did, so a letterless `sub` row is the old
-  ambiguous count and the dashboard reads it exactly as before. **One transaction is one `sub`**: StoreKit replays a first-year
+  ambiguous count and the dashboard reads it exactly as before. **One transaction is one `sub`** matters most on iOS: StoreKit replays a first-year
   transaction to the listener (on launch when it was never finished, on a
-  reconnect), and that transaction is its own original for its whole first
-  period, so `isNewPurchase` calls every delivery new — one founder purchase
-  once landed as eight `sub`s in a day. `notePurchase` therefore drops a
-  delivery whose transaction (`reportedTx`, flag `pingSubTx`: StoreKit's
-  transaction id, Play's purchase token) already had its `sub`; a renewal or
-  resubscription is a new transaction and still counts. None of it is
+  reconnect), that transaction is its own original for its whole first period,
+  and one founder purchase once landed as eight `sub`s in a day. An install
+  whose `sub` predates `pingSubReported` adopts the first transaction delivered
+  while its entitlement stands, rather than counting it again. None of it is
   revenue; the imported sales ledger is. Renewals are not pinged: Play never
   tells the app, and iOS only while it is open. Failures are silent and NOT sent to `logError` —
   being offline is a phone's normal state, and it would flush the 40-entry

@@ -176,6 +176,20 @@ places without saying what changed, so diffing is both cheaper to maintain than
 instrumenting each call site and impossible to leave stale. A push that fails
 does not advance the baseline, so the retry re-sends the same work.
 
+**The baseline is persisted** (`autonomic.master.syncBaseline.v1`, beside the
+cache), because every open and every five-minute refresh pulls the server's
+copy OVER the store. Before it was kept, an edit whose push had not landed —
+the PWA suspended inside the 900ms debounce, a reload while a push was
+failing — was erased by that pull from the server and from this browser alike.
+Now the boot and the refresh `settle()` (wait out a push in flight, then push),
+take `outstanding()` (the diff against the persisted baseline) BEFORE the pull,
+and `rebase()` it over the result AFTER the adopt, which pushes it. A restored
+baseline is thrown away when its diff would delete in bulk or empty a whole
+collection (`trustworthy`): that is a cache that lost rows, not a person who
+removed them, and a push of it would delete the server's. Every collection the
+diff covers must be in the cache for the same reason — `churn` was not, and is
+now. Pinned by `landing/tests/master-sync.test.mjs`.
+
 Boot order lives in `boot.js`: sign in → paint the cache → `LOAD` → hydrate →
 repaint. A browser with **nothing** cached — a first sign-in, or the one after
 "Delete all data" — gets the view's **skeleton** instead.

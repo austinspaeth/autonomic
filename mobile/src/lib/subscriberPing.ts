@@ -18,29 +18,36 @@
 import type { PlanCode } from './ping';
 
 /**
- * Is a purchase the store just delivered NEW — bought, not found?
+ * What says a purchase the store just delivered is NEW — bought, not found —
+ * and how strongly: `'V'` verified, `'S'` the store's word alone, or null for
+ * not new at all.
  *
- * The store's own evidence decides wherever it has any, and the session's buy
- * tap is only the fallback, because the tap is the weaker signal in both
- * directions: a purchase whose attempt timed out or was left pending for hours
- * arrives with no tap in memory, and a renewal can land while somebody happens
- * to have the paywall open.
+ * **Verified** is the buy tap: this session tapped buy on this very SKU within
+ * the tap window, and the store then handed back a purchase of it. That is the
+ * one sequence nothing but a sale produces, and it is the number to trust.
  *
- * - **Android:** a purchase Play has not seen acknowledged has never been
- *   processed by any install, so it is new however it got here — including a
- *   cash payment that cleared overnight, or one whose listener never ran
- *   because the app was killed first. An acknowledged one is a replay.
- * - **iOS:** a transaction that is its own original is a first purchase. One
- *   that is not is a renewal, EXCEPT when this session tapped buy: a
- *   resubscription after a lapse keeps the group's original transaction id, and
- *   that is a real sale. The tap only counts for a transaction dated AFTER it:
+ * **Store-only** is a purchase the store itself marks as never processed with
+ * no tap behind it, which is still a sale and is the ONLY way to see some of
+ * them: a payment that cleared hours after its sheet closed, or an app killed
+ * the moment the sheet did. It is counted beside verified, never folded into
+ * it, because it is also where anything we misread would land.
+ *
+ * - **Android:** an acknowledged purchase has been processed by some install
+ *   already, so it is a replay whatever was tapped. An UNACKNOWLEDGED one is
+ *   new: verified with the tap, store-only without it. With no flag at all the
+ *   tap is the only evidence left.
+ * - **iOS:** the tap decides first, EXCEPT for a transaction dated before it:
  *   a subscriber who taps Subscribe instead of Restore on a new install is
- *   told they are already subscribed and handed their EXISTING transaction,
- *   which the tap alone would have reported as a sale right after its `rst`.
+ *   handed their EXISTING transaction, which the tap alone would call a sale.
+ *   A resubscription after a lapse keeps the group's original transaction id,
+ *   so only the tap can see it. Without a tap, a transaction that is its own
+ *   original is a first purchase (store-only); one that is not is a renewal.
  */
-export function isNewPurchase(p: {
+export type PurchaseEvidence = 'V' | 'S';
+
+export function purchaseEvidence(p: {
   platform: 'ios' | 'android' | string;
-  /** The SKU this session last tapped buy on, if the tap is recent. */
+  /** The SKU this session last tapped buy on, if the tap is inside the window. */
   tappedSku?: string;
   /** When that tap happened (epoch ms). */
   tappedAt?: number;
@@ -50,23 +57,28 @@ export function isNewPurchase(p: {
   originalTransactionId?: string | null;
   /** The store's purchase date for this transaction (epoch ms). */
   transactionDate?: number | null;
-}): boolean {
+}): PurchaseEvidence | null {
   const tapped = !!p.tappedSku && p.tappedSku === p.productId;
   if (p.platform === 'android') {
-    if (p.isAcknowledgedAndroid === false) return true;
-    if (p.isAcknowledgedAndroid === true) return false;
-    return tapped;
+    if (p.isAcknowledgedAndroid === true) return null;
+    if (p.isAcknowledgedAndroid === false) return tapped ? 'V' : 'S';
+    return tapped ? 'V' : null;
   }
   if (tapped) {
     const predates = !!p.transactionDate && p.tappedAt !== undefined
       && p.transactionDate < p.tappedAt - TAP_CLOCK_SLACK_MS;
     // Predating the tap is the store handing back what it already sold, even
     // when that is a first-period transaction that is its own original.
-    return !predates;
+    return predates ? null : 'V';
   }
-  if (p.transactionId && p.originalTransactionId) return p.transactionId === p.originalTransactionId;
-  return false;
+  if (p.transactionId && p.originalTransactionId && p.transactionId === p.originalTransactionId) return 'S';
+  return null;
 }
+
+/** How long a buy tap vouches for the purchase that follows it. The store
+ *  sheet, a card form, a bank's 3-D Secure page: an hour covers all of it,
+ *  and a purchase arriving later than that is left to the store's word. */
+export const TAP_WINDOW_MS = 60 * 60_000;
 
 /** How far before the buy tap a transaction may be dated and still be the one
  *  the tap bought: the date is Apple's clock and the tap is the phone's. An
@@ -85,15 +97,21 @@ export type SubscriberMemory = {
    *  false while Play has not accepted the acknowledgement: an unacknowledged
    *  purchase is refunded after three days, so it is not reported as a sale
    *  until the acknowledgement lands. */
-  pending?: { plan?: PlanCode; acked: boolean; tx?: string };
-  /** The store transaction the last `sub` reported (iOS transaction id, Play
-   *  purchase token). StoreKit replays a first-year transaction to the
-   *  listener — on launch when it was never finished, on a reconnect — and
-   *  that transaction is its own original for its whole first period, so
-   *  `isNewPurchase` calls every replay new. This is what makes the second
-   *  delivery of the same sale a no-op. A renewal or a resubscription is a
-   *  new transaction and is untouched. */
-  reportedTx?: string;
+  pending?: {
+    plan?: PlanCode;
+    acked: boolean;
+    evidence?: PurchaseEvidence;
+    /** The store's id for THIS purchase (a Play purchase token, a StoreKit
+     *  transaction id). Kept on the phone only, never sent: it is what stops
+     *  one purchase being reported twice. */
+    txn?: string;
+  };
+  /** Purchases already reported as `sub`, newest last, by the same id. A
+   *  purchase delivered again — StoreKit replaying an unfinished transaction on
+   *  every launch, the listener and an entitlement check both seeing one — is
+   *  recognised here and never counted a second time. A real resubscription is
+   *  a new transaction and so a new id. */
+  reported?: string[];
   /** A `sub` landed for the current entitlement (older builds set this too,
    *  for their "found a subscription" ping). */
   subSent: boolean;
@@ -117,10 +135,19 @@ export type SubscriberInput = {
   settled: boolean;
   /** Today's Eastern day. */
   today: string;
+  /** The store says the entitlement it just answered with is acknowledged. A
+   *  purchase whose own acknowledgement call failed can still have landed (the
+   *  call errored after Play took it), and without this it would wait for an
+   *  acknowledgement that has already happened, for ever. */
+  activeAcked?: boolean;
+  /** This session tapped buy inside the tap window. An entitlement turning up
+   *  then is the purchase arriving, never a restore. */
+  tapRecent?: boolean;
 };
 
 export type SubscriberStep =
-  | { kind: 'sub' | 'rst' | 'lap'; plan?: PlanCode }
+  | { kind: 'sub'; plan?: PlanCode; evidence?: PurchaseEvidence }
+  | { kind: 'rst' | 'lap'; plan?: PlanCode }
   | { kind: 'lapse-seen'; day: string }
   | { kind: 'lapse-clear' }
   | { kind: 'drop-pending' }
@@ -136,7 +163,9 @@ export function subscriberStep(m: SubscriberMemory, s: SubscriberInput): Subscri
   // Before the entitlement check on purpose: a purchase is news whether or not
   // the store has been re-queried since.
   if (m.pending) {
-    if (m.pending.acked && s.isPro) return { kind: 'sub', plan: m.pending.plan ?? s.plan };
+    if ((m.pending.acked || s.activeAcked) && s.isPro) {
+      return { kind: 'sub', plan: m.pending.plan ?? s.plan, evidence: m.pending.evidence };
+    }
     // The store now says there is no subscription behind it: the purchase was
     // refunded (Play does that to one left unacknowledged for three days) or
     // revoked before it was ever reported. It was never a sale.
@@ -150,7 +179,10 @@ export function subscriberStep(m: SubscriberMemory, s: SubscriberInput): Subscri
     // Entitled with nothing reported for it: a subscription that already
     // existed has arrived on this install. Once per entitlement, and only
     // after the replay window, so a new purchase is never called a restore.
-    if (!m.subSent && !m.rstSent && s.settled) return { kind: 'rst', plan: s.plan };
+    // Never while a buy tap is fresh: that entitlement is the purchase itself,
+    // arriving a beat before its own report (or refused as already owned, in
+    // which case the restore is still sent once the tap has aged out).
+    if (!m.subSent && !m.rstSent && s.settled && !s.tapRecent) return { kind: 'rst', plan: s.plan };
     return null;
   }
 
@@ -169,33 +201,46 @@ export function subscriberStep(m: SubscriberMemory, s: SubscriberInput): Subscri
  *  news again. */
 export function afterSend(m: SubscriberMemory, kind: 'sub' | 'rst' | 'lap', plan?: PlanCode): SubscriberMemory {
   if (kind === 'sub') {
-    return {
-      ...m, pending: undefined, subSent: true, lastPlan: plan ?? m.lastPlan,
-      reportedTx: m.pending?.tx ?? m.reportedTx,
-    };
+    const txn = m.pending?.txn;
+    const reported = txn ? [...(m.reported || []).filter((t) => t !== txn), txn].slice(-REPORTED_MAX) : m.reported;
+    return { ...m, pending: undefined, subSent: true, lastPlan: plan ?? m.lastPlan, reported };
   }
   if (kind === 'rst') return { ...m, rstSent: true, lastPlan: plan ?? m.lastPlan };
   return { ...m, subSent: false, rstSent: false, lapseSeen: undefined };
 }
 
-/** Record a new purchase. A second report for the same purchase (the listener
- *  and the entitlement query both seeing an unacknowledged one) only ever
- *  moves `acked` forward, and a report of the transaction a `sub` already
- *  went out for changes nothing.
+/** How many reported purchase ids are remembered. One install makes a
+ *  handful of purchases in its life; this is a bound, not a budget. */
+export const REPORTED_MAX = 20;
+
+/** Record a new purchase. One already reported is ignored outright. A second
+ *  report of the one pending (the listener and the entitlement query both
+ *  seeing an unacknowledged purchase) only ever moves `acked` forward and
+ *  `evidence` up to verified.
  *
- *  An install whose `sub` predates `reportedTx` holds the flag without the
- *  transaction behind it. A purchase delivered to it while that entitlement
- *  still stands is the same sale replayed (nothing else can be bought on top
- *  of a live subscription but a plan change), so it is adopted as the reported
- *  one rather than counted a second time. A lapse clears `subSent`, which is
- *  what lets a resubscription through. */
+ *  An install whose `sub` predates `reported` holds the flag without the
+ *  purchase behind it. A purchase delivered to it while that entitlement still
+ *  stands is the same sale replayed (nothing else can be bought on top of a
+ *  live subscription but a plan change), so it is adopted as the reported one
+ *  rather than counted a second time. A lapse clears `subSent`, which is what
+ *  lets a resubscription through. */
 export function notePurchase(
-  m: SubscriberMemory, plan: PlanCode | undefined, acked: boolean, tx?: string,
+  m: SubscriberMemory,
+  plan: PlanCode | undefined,
+  acked: boolean,
+  evidence?: PurchaseEvidence,
+  txn?: string,
 ): SubscriberMemory {
-  if (tx && tx === m.reportedTx) return m;
-  if (tx && m.subSent && !m.reportedTx && !m.pending) return { ...m, reportedTx: tx };
+  if (txn && (m.reported || []).includes(txn)) return m;
+  if (txn && m.subSent && !m.reported?.length && !m.pending) return { ...m, reported: [txn] };
+  const prev = m.pending;
   return {
     ...m,
-    pending: { plan: plan ?? m.pending?.plan, acked: acked || !!m.pending?.acked, tx: tx ?? m.pending?.tx },
+    pending: {
+      plan: plan ?? prev?.plan,
+      acked: acked || !!prev?.acked,
+      evidence: evidence === 'V' || prev?.evidence === 'V' ? 'V' : (evidence ?? prev?.evidence),
+      txn: txn ?? prev?.txn,
+    },
   };
 }
