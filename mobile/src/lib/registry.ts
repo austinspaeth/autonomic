@@ -236,6 +236,13 @@ export const ACTIVITY_TYPES: Record<string, TypeDef> = {
       { key: 'lowHr', label: 'Low HR' },
     ],
   },
+  nap: {
+    label: 'Nap', icon: 'moon',
+    fields: [
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'lowHr', label: 'Low HR' },
+    ],
+  },
   cycle: {
     label: 'Outdoor bike', icon: 'bike',
     fields: [
@@ -259,6 +266,13 @@ export const ACTIVITY_TYPES: Record<string, TypeDef> = {
       { key: 'duration', label: 'Duration', unit: 'min' },
       { key: 'avgHr', label: 'Avg HR' },
       { key: 'maxHr', label: 'Max HR' },
+    ],
+  },
+  rest: {
+    label: 'Rest / lying down', icon: 'legsUp',
+    fields: [
+      { key: 'duration', label: 'Duration', unit: 'min' },
+      { key: 'lowHr', label: 'Low HR' },
     ],
   },
   run: {

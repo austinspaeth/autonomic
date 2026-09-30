@@ -65,9 +65,11 @@ function EditTypeSheet({ kind, typeKey }: { kind: TypeKind; typeKey: string }) {
 /**
  * How much a minute of a user-created activity costs the pacing budget.
  *
- * Three words rather than a number, asked once. Nobody can pick 1.4 for
- * gardening, and the weight table only ever needed three buckets — see
- * src/lib/budget/load.ts, which is where the built-in types get theirs.
+ * Four words rather than a number, asked once. Nobody can pick 1.4 for
+ * gardening, and the weight table only ever needed these buckets — see
+ * src/lib/budget/load.ts, which is where the built-in types get theirs. Rest
+ * is the one that REFUNDS: a nap or lying down buys minutes back, and every
+ * analysis reads it as rest rather than as exercise (`isRestType`).
  */
 export function EffortField({ value, onChange }: { value: LoadWeight; onChange: (v: LoadWeight) => void }) {
   const p = usePalette();
@@ -76,6 +78,7 @@ export function EffortField({ value, onChange }: { value: LoadWeight; onChange: 
       <Text style={{ fontSize: 12.5, fontWeight: '600', color: p.textDim, marginBottom: 6 }}>Effort</Text>
       <LinkToggle
         options={[
+          { val: 'rest', label: 'Rest' },
           { val: 'light', label: 'Light' },
           { val: 'moderate', label: 'Moderate' },
           { val: 'heavy', label: 'Heavy' },
@@ -84,7 +87,9 @@ export function EffortField({ value, onChange }: { value: LoadWeight; onChange: 
         onChange={(v) => onChange(v as LoadWeight)}
       />
       <Text style={{ fontSize: 11.5, color: p.textDim, marginTop: 6 }}>
-        Used by your pacing budget to work out what a session of this costs.
+        {value === 'rest'
+          ? 'Counted as rest, not exercise. Time spent on it gives minutes back to your pacing budget.'
+          : 'Used by your pacing budget to work out what a session of this costs.'}
       </Text>
     </View>
   );

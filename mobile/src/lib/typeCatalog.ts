@@ -30,9 +30,9 @@ export function addCustomType(kind: TypeKind, name: string, opts?: { dosage?: st
   while (existing[key] || BUILTIN[kind][key]) key += '-2';
   const def: TypeDef = { label, icon: CUSTOM_ICON[kind], fields: CUSTOM_FIELDS[kind].slice(), userDefined: true };
   if (kind === 'meds' && opts?.dosage?.trim()) def.dosage = opts.dosage.trim();
-  // What a minute of it costs the pacing budget. Asked once, as three plain
-  // words rather than a number: nobody can pick 1.4 for gardening, and the
-  // table in lib/budget/load.ts only ever needed the three buckets anyway.
+  // What a minute of it costs the pacing budget. Asked once, as plain words
+  // rather than a number: nobody can pick 1.4 for gardening. Rest refunds
+  // minutes instead of costing them (lib/budget/load.ts).
   if (kind === 'activities') def.load = opts?.load || 'moderate';
   // Fresh top-level object (not an in-place write) so useMemos keyed on
   // state.customTypes see the change — save() only re-wraps state and days.

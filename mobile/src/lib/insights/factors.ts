@@ -32,6 +32,7 @@ import type { ScoreContext } from '../scoring';
 import type { AppState, DayRecord, TypeDef } from '../types';
 import { lowPressureValue, type PressureMap } from '../pressure';
 import { gutDay } from '../digestion';
+import { isRestType } from '../budget/load';
 
 export type FactorKind = 'binary' | 'continuous';
 
@@ -401,7 +402,7 @@ export function buildFactors(state: AppState, keys: string[], opts: {
       });
     });
 
-  out.push(...derivedFactors());
+  out.push(...derivedFactors(state));
   const pressure = pressureFactor(state.pressure, keys, floor);
   if (pressure) out.push(pressure);
   return out;
@@ -447,7 +448,10 @@ function pressureFactor(map: PressureMap | undefined, keys: string[], floor: num
  * returns null when its own field is missing, which is the correct and stricter
  * test.
  */
-function derivedFactors(): FactorDef[] {
+function derivedFactors(state: AppState): FactorDef[] {
+  // A rest type (nap, legs up, a custom one given Rest effort) is not activity:
+  // an afternoon lying down must not read as an afternoon of exertion.
+  const custom = state.customTypes?.activities;
   return [
     {
       id: 'sleep:hours',
@@ -569,7 +573,7 @@ function derivedFactors(): FactorDef[] {
       presence: SPAN_ACTIVITIES,
       value: (d) => {
         if (!d) return null;
-        const mins = (d.activities || []).reduce((s, a) => s + (num(a.duration) || 0), 0);
+        const mins = (d.activities || []).filter((a) => !isRestType(custom?.[a.type], a.type)).reduce((s, a) => s + (num(a.duration) || 0), 0);
         return mins;
       },
     },

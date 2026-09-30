@@ -68,6 +68,8 @@ export const LOAD_TABLE: Record<string, LoadWeight> = {
   legsUp: 'rest',
   breathwork: 'rest',
   cooldown: 'rest',
+  nap: 'rest',
+  rest: 'rest',
 
   // Upright and gentle. Non-zero because upright is the axis that matters:
   // a shower is thermal load plus standing, and it flattens people.
@@ -145,6 +147,17 @@ const num = (v: unknown): number | null => {
 export function loadOf(def: TypeDef | undefined, key: string): LoadWeight {
   if (def?.load) return def.load;
   return LOAD_TABLE[key] || DEFAULT_WEIGHT;
+}
+
+/**
+ * Is this activity type REST rather than exertion? The one question every
+ * analysis asks before treating a logged activity as exercise: a nap is an
+ * activity entry, but its minutes are recovery, and counting them as exercise
+ * minutes would call a day spent lying down an active one. Built-ins answer
+ * from LOAD_TABLE; a user-created type from the Effort it was given.
+ */
+export function isRestType(def: TypeDef | undefined, key: string): boolean {
+  return loadOf(def, key) === 'rest';
 }
 
 export interface EntryCost {

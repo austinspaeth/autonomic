@@ -1,5 +1,5 @@
 import { ACTIVITY_TYPES } from '../../registry';
-import { ASSUMED_MIN, CREDIT_CAP, LOAD_PER_MIN, LOAD_TABLE, entryCost, loadOf } from '../load';
+import { ASSUMED_MIN, CREDIT_CAP, LOAD_PER_MIN, LOAD_TABLE, entryCost, isRestType, loadOf } from '../load';
 import type { Entry, TypeDef } from '../../types';
 
 const act = (over: Partial<Entry>): Entry => ({ id: 'x', type: 'walk', ...over } as Entry);
@@ -104,5 +104,28 @@ describe('the credit cap is a real bound', () => {
     // Pinned so a future tweak to CREDIT_PER_MIN cannot quietly turn rest into
     // a way to manufacture a second day.
     expect(CREDIT_CAP).toBeLessThanOrEqual(0.25);
+  });
+});
+
+describe('rest types', () => {
+  it('treats the built-in nap and rest as rest, and exercise as not', () => {
+    expect(isRestType(ACTIVITY_TYPES.nap, 'nap')).toBe(true);
+    expect(isRestType(ACTIVITY_TYPES.rest, 'rest')).toBe(true);
+    expect(isRestType(ACTIVITY_TYPES.legsUp, 'legsUp')).toBe(true);
+    expect(isRestType(ACTIVITY_TYPES.walk, 'walk')).toBe(false);
+  });
+
+  it('lets a custom type given Rest effort buy minutes back', () => {
+    const def = { label: 'Lie on couch', icon: 'activity', fields: [], userDefined: true, load: 'rest' } as TypeDef;
+    expect(isRestType(def, 'custom-lie-on-couch')).toBe(true);
+    const c = entryCost(act({ type: 'custom-lie-on-couch', duration: '10' }), def, null);
+    expect(c.credit).toBe(true);
+    expect(c.effortMin).toBeLessThan(0);
+  });
+
+  it('refunds a 10 minute nap', () => {
+    const c = entryCost(act({ type: 'nap', duration: '10' }), ACTIVITY_TYPES.nap, 80);
+    expect(c.credit).toBe(true);
+    expect(c.effortMin).toBeCloseTo(10 * LOAD_PER_MIN.rest);
   });
 });

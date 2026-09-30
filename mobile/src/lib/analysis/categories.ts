@@ -8,6 +8,7 @@ import type { HelpContent } from '../help';
 import { addDays, todayKey } from '../dates';
 import { hrRecovery } from '../hrRecovery';
 import { budgetSeries } from '../budget/series';
+import { isRestType } from '../budget/load';
 import { SCORE_COLORS, orthoMaxDelta, restingHrBands, sBP } from '../scoring';
 import { scoreCat, sleepHours, streakInfo, type DaysMap } from '../scoring/day';
 import { ACTIVITY_TYPES, MED_TYPES, TRIGGER_TYPES } from '../registry';
@@ -456,23 +457,33 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext, cu
   };
 
   const activity = (): AnalysisCard[] => {
-    const mins = acAggSum(buckets, (d) => (d.activities || []).reduce((s, a) => s + (parseFloat(a.duration as string) || 0), 0) || null);
+    // Rest types (naps, legs-up, breathwork, a custom type given Rest effort)
+    // are activity ENTRIES but not exercise: their minutes are charted as rest
+    // beside the exercise line rather than inflating it.
+    const rest = (a: Entry) => isRestType(ctx.customTypes?.activities?.[a.type], a.type);
+    const minsOf = (d: { activities?: Entry[] }, want: boolean) => (d.activities || []).filter((a) => rest(a) === want).reduce((s, a) => s + (parseFloat(a.duration as string) || 0), 0) || null;
+    const mins = acAggSum(buckets, (d) => minsOf(d, false));
+    const restMins = acAggSum(buckets, (d) => minsOf(d, true));
     const typeCounts: Record<string, number> = {};
-    let sessions = 0, totalMins = 0;
-    buckets.forEach((b) => b.days.forEach((dk) => { const acts = days[dk].activities || []; acts.forEach((a) => { sessions++; totalMins += parseFloat(a.duration as string) || 0; typeCounts[a.type] = (typeCounts[a.type] || 0) + 1; }); }));
+    let sessions = 0, totalMins = 0, totalRest = 0;
+    buckets.forEach((b) => b.days.forEach((dk) => { const acts = days[dk].activities || []; acts.forEach((a) => { const m = parseFloat(a.duration as string) || 0; if (rest(a)) totalRest += m; else { sessions++; totalMins += m; } typeCounts[a.type] = (typeCounts[a.type] || 0) + 1; }); }));
     const rows = Object.entries(typeCounts).map(([t, c]) => ({ name: ctx.customTypes?.activities?.[t]?.label || ACTIVITY_TYPES[t]?.label || t, count: c })).sort((a, b) => b.count - a.count);
     const cards: AnalysisCard[] = [];
     if (rows.length) cards.push({
       title: 'Activity', sub: range,
-      desc: 'Exercise sessions and minutes over the range, and what kinds they were.',
+      desc: 'Exercise and rest minutes over the range, and what kinds of activity they were.',
       help: {
-        what: 'Sessions you logged and their total exercise minutes per day, week or month, with a breakdown of which kinds of session made up the total.',
+        what: 'Sessions you logged and their total exercise minutes per day, week or month, with a breakdown of which kinds of session made up the total. Rest (naps, legs up, breathwork, and any activity you set to Rest effort) is charted as its own line and never counted as exercise.',
         why: 'In autonomic recovery, consistency at a tolerable dose beats intensity, and recumbent work is often tolerated long before upright work is. Watch how your score and symptoms respond in the day or two after a harder session; that lag is what tells you the dose was too much.',
         learnMore: '/insights/pots/exercise-for-pots-levine-protocol/',
       },
-      charts: [{ label: 'Total exercise minutes', series: [series(mins, SCORE_COLORS.bad)], integer: true }],
+      charts: [{ label: 'Exercise and rest minutes', series: [series(mins, SCORE_COLORS.bad, 'Exercise'), series(restMins, SCORE_COLORS.good, 'Rest')], integer: true }],
       bars: [{ label: 'Activity types', rows }],
-      stats: [{ label: 'Sessions', value: sessions || null, sub: 'times' }, { label: 'Total', value: totalMins ? Math.round(totalMins) : null, sub: 'mins' }],
+      stats: [
+        { label: 'Sessions', value: sessions || null, sub: 'times' },
+        { label: 'Exercise', value: totalMins ? Math.round(totalMins) : null, sub: 'mins' },
+        { label: 'Rest', value: totalRest ? Math.round(totalRest) : null, sub: 'mins' },
+      ],
     });
     // Heart-rate recovery after a workout, the same figure the workout report
     // grades: the SIGNED fall from the rate you stopped at to the hand-entered
