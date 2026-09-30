@@ -8,8 +8,8 @@ keywords: "head-up tilt sleeping, elevating head of bed POTS, raising head of be
 date: 2026-09-30
 updated: 2026-09-30
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1519643381401-22c77e60520e?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Kinga Howard / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1688384452844-8364c3e2fc28?q=80&w=1171&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+photoAttribution: "Unsplash"
 tldr: "Raising the head of your whole bed a few inches keeps a gentle gravitational gradient overnight, which reduces the fluid you lose to nighttime urine production and nudges the hormones that hold on to salt and water. The result, for many people, is a bit more blood volume in the tank by morning and softer stand-up symptoms. The evidence is strongest for orthostatic hypotension and autonomic failure, and reasonable but less proven for POTS. Raise the head of the bed itself with risers, a full-length wedge, or an adjustable base, starting around 4 to 6 inches; do not just stack pillows. Give it a few weeks and track your morning stand test to see if it helps you."
 categories:
   - pots
