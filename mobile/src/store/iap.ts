@@ -806,8 +806,9 @@ function evidenceOf(p: Purchase): PurchaseEvidence | null {
  * Android is the platform where this MATTERS: Play refunds an unacknowledged
  * purchase after three days, so a failure here is a sale that will undo itself
  * and is logged. An already-acknowledged purchase is not asked again. On iOS a
- * failure only means StoreKit replays the transaction next launch, and
- * finishing one twice throws routinely, so it stays silent and counts as done.
+ * failure still counts as done (nothing refunds it), but StoreKit replays the
+ * transaction on every launch until it is finished, so it is logged as
+ * `<tag>.ios`, once per transaction per session.
  */
 const ackedThisSession = new Set<string>();
 async function acknowledge(purchase: Purchase, tag: string): Promise<boolean> {
@@ -822,11 +823,26 @@ async function acknowledge(purchase: Purchase, tag: string): Promise<boolean> {
     if (token) ackedThisSession.add(token);
     return true;
   } catch (e) {
-    if (!android) return true;
+    if (!android) {
+      // Still counted as done: nothing on iOS refunds an unfinished
+      // transaction. But it is REPLAYED to the listener on every launch,
+      // background launches included, and one subscriber's first-year
+      // transaction arrived a dozen times a day while this catch said nothing.
+      // OpenIAP treats finishing an already-finished transaction as success,
+      // so what lands here is a real refusal (a payload it could not decode,
+      // an id it could not parse). Logged once per transaction per session.
+      const id = purchase.transactionId ?? purchase.id;
+      if (id && !finishFailedThisSession.has(id)) {
+        finishFailedThisSession.add(id);
+        logError(`${tag}.ios`, iapDetail(e));
+      }
+      return true;
+    }
     logError(tag, iapDetail(e));
     return false;
   }
 }
+const finishFailedThisSession = new Set<string>();
 const outcomeListeners = new Set<(o: PurchaseOutcomeEvent) => void>();
 
 export function onPurchaseOutcome(cb: (o: PurchaseOutcomeEvent) => void): () => void {
