@@ -100,7 +100,8 @@ const KEY_COHORT = 'pingCohort';        // ISO date — this install's cohort, f
 const KEY_LAST_OPEN = 'pingLastOpen';   // ISO date (Eastern) of the last open ping sent
 const KEY_SUB_SENT = 'pingSubSent';     // '1' once a sub landed for the current entitlement
 const KEY_RST_SENT = 'pingRstSent';     // '1' once an rst landed for the current entitlement
-const KEY_SUB_PENDING = 'pingSubPending'; // JSON { plan, acked } — a purchase not yet reported
+const KEY_SUB_PENDING = 'pingSubPending'; // JSON { plan, acked, tx } — a purchase not yet reported
+const KEY_SUB_TX = 'pingSubTx';         // the store transaction the last sub reported
 const KEY_LAPSE_SEEN = 'pingLapseSeen'; // ISO date (Eastern) the store first said "not subscribed"
 const KEY_LAST_PLAN = 'pingLastPlan';   // the plan letter this install was last seen holding
 const KEY_EXCLUDED = 'pingExcluded';    // '1' — this device sends nothing (owner / tester phones)
@@ -324,7 +325,13 @@ function readSubscriberMemory(): SubscriberMemory {
   try {
     const raw = read(KEY_SUB_PENDING);
     const v = raw ? JSON.parse(raw) : undefined;
-    if (v && typeof v === 'object') pending = { plan: PLANS.has(v.plan) ? v.plan : undefined, acked: !!v.acked };
+    if (v && typeof v === 'object') {
+      pending = {
+        plan: PLANS.has(v.plan) ? v.plan : undefined,
+        acked: !!v.acked,
+        tx: typeof v.tx === 'string' && v.tx ? v.tx : undefined,
+      };
+    }
   } catch { pending = undefined; }
   return {
     pending,
@@ -332,6 +339,7 @@ function readSubscriberMemory(): SubscriberMemory {
     rstSent: read(KEY_RST_SENT) === '1',
     lapseSeen: read(KEY_LAPSE_SEEN) || undefined,
     lastPlan: PLANS.has(read(KEY_LAST_PLAN) || '') ? read(KEY_LAST_PLAN) as PlanCode : undefined,
+    reportedTx: read(KEY_SUB_TX) || undefined,
   };
 }
 
@@ -342,14 +350,15 @@ function writeSubscriberMemory(m: SubscriberMemory) {
   if (m.rstSent) write(KEY_RST_SENT, '1'); else remove(KEY_RST_SENT);
   if (m.lapseSeen) write(KEY_LAPSE_SEEN, m.lapseSeen); else remove(KEY_LAPSE_SEEN);
   if (m.lastPlan) write(KEY_LAST_PLAN, m.lastPlan);
+  if (m.reportedTx) write(KEY_SUB_TX, m.reportedTx);
 }
 
 /** A purchase this install made, from ./iap. Remembered on disk before
  *  anything is sent, so a phone killed between the store sheet and the ping
  *  still reports it on its next launch. */
-function onPurchased(e: { sku: string; acknowledged: boolean }) {
+function onPurchased(e: { sku: string; acknowledged: boolean; tx?: string }) {
   if (paywallBypassed()) return;
-  writeSubscriberMemory(notePurchase(readSubscriberMemory(), planCode(e.sku), e.acknowledged));
+  writeSubscriberMemory(notePurchase(readSubscriberMemory(), planCode(e.sku), e.acknowledged, e.tx));
   void pingSubscriber();
 }
 

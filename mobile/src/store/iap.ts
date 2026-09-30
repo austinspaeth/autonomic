@@ -533,7 +533,7 @@ async function connect() {
       const acked = await acknowledge(purchase, 'iap.ack');
       set({ isPro: true, activeSku: purchase.productId, purchasing: false, error: undefined });
       settleAttempt('purchased');
-      if (fresh) noteNewPurchase(purchase.productId, acked);
+      if (fresh) noteNewPurchase(purchase.productId, acked, txKey(purchase));
     });
   }
   if (!errorSub) {
@@ -637,7 +637,7 @@ export async function refreshEntitlement(): Promise<boolean> {
     // so it is also reported as the new purchase it is.
     if (Platform.OS === 'android' && hit
       && (hit as { isAcknowledgedAndroid?: boolean | null }).isAcknowledgedAndroid === false) {
-      noteNewPurchase(hit.productId, await acknowledge(hit, 'iap.ackRetry'));
+      noteNewPurchase(hit.productId, await acknowledge(hit, 'iap.ackRetry'), txKey(hit));
     }
   } catch (e) {
     // Keep the last known entitlement.
@@ -748,15 +748,27 @@ const recentTap = () => (lastTap && Date.now() - lastTap.at < TAP_WINDOW_MS ? la
  * A purchase THIS install made, told to whoever asked. The cohort ping is the
  * one listener: it reports `sub` for these and `rst` for an entitlement with no
  * purchase behind it, which is how a reinstall stopped counting as a sale. */
-export type NewPurchaseEvent = { sku: string; acknowledged: boolean };
+export type NewPurchaseEvent = {
+  sku: string; acknowledged: boolean;
+  /** Which store transaction this is, so the SAME one delivered again (StoreKit
+   *  replays an unfinished transaction on every launch) is reported once. */
+  tx?: string;
+};
 const newPurchaseListeners = new Set<(e: NewPurchaseEvent) => void>();
 export function onNewPurchase(cb: (e: NewPurchaseEvent) => void): () => void {
   newPurchaseListeners.add(cb);
   return () => newPurchaseListeners.delete(cb);
 }
-function noteNewPurchase(sku: string, acknowledged: boolean) {
+/** The transaction's identity: Play's purchase token (one per purchase, kept
+ *  across renewals, which Play never delivers anyway), StoreKit's transaction
+ *  id (new for each renewal and resubscription, the same on a replay). */
+function txKey(p: Purchase): string | undefined {
+  const k = Platform.OS === 'android' ? p.purchaseToken : (p.transactionId ?? p.id);
+  return k ? String(k) : undefined;
+}
+function noteNewPurchase(sku: string, acknowledged: boolean, tx?: string) {
   newPurchaseListeners.forEach((l) => {
-    try { l({ sku, acknowledged }); } catch { /* a reporter must never break a purchase */ }
+    try { l({ sku, acknowledged, tx }); } catch { /* a reporter must never break a purchase */ }
   });
 }
 

@@ -85,7 +85,15 @@ export type SubscriberMemory = {
    *  false while Play has not accepted the acknowledgement: an unacknowledged
    *  purchase is refunded after three days, so it is not reported as a sale
    *  until the acknowledgement lands. */
-  pending?: { plan?: PlanCode; acked: boolean };
+  pending?: { plan?: PlanCode; acked: boolean; tx?: string };
+  /** The store transaction the last `sub` reported (iOS transaction id, Play
+   *  purchase token). StoreKit replays a first-year transaction to the
+   *  listener — on launch when it was never finished, on a reconnect — and
+   *  that transaction is its own original for its whole first period, so
+   *  `isNewPurchase` calls every replay new. This is what makes the second
+   *  delivery of the same sale a no-op. A renewal or a resubscription is a
+   *  new transaction and is untouched. */
+  reportedTx?: string;
   /** A `sub` landed for the current entitlement (older builds set this too,
    *  for their "found a subscription" ping). */
   subSent: boolean;
@@ -160,14 +168,34 @@ export function subscriberStep(m: SubscriberMemory, s: SubscriberInput): Subscri
  *  "reported" flags reset and the next purchase or restore on this install is
  *  news again. */
 export function afterSend(m: SubscriberMemory, kind: 'sub' | 'rst' | 'lap', plan?: PlanCode): SubscriberMemory {
-  if (kind === 'sub') return { ...m, pending: undefined, subSent: true, lastPlan: plan ?? m.lastPlan };
+  if (kind === 'sub') {
+    return {
+      ...m, pending: undefined, subSent: true, lastPlan: plan ?? m.lastPlan,
+      reportedTx: m.pending?.tx ?? m.reportedTx,
+    };
+  }
   if (kind === 'rst') return { ...m, rstSent: true, lastPlan: plan ?? m.lastPlan };
   return { ...m, subSent: false, rstSent: false, lapseSeen: undefined };
 }
 
 /** Record a new purchase. A second report for the same purchase (the listener
  *  and the entitlement query both seeing an unacknowledged one) only ever
- *  moves `acked` forward. */
-export function notePurchase(m: SubscriberMemory, plan: PlanCode | undefined, acked: boolean): SubscriberMemory {
-  return { ...m, pending: { plan: plan ?? m.pending?.plan, acked: acked || !!m.pending?.acked } };
+ *  moves `acked` forward, and a report of the transaction a `sub` already
+ *  went out for changes nothing.
+ *
+ *  An install whose `sub` predates `reportedTx` holds the flag without the
+ *  transaction behind it. A purchase delivered to it while that entitlement
+ *  still stands is the same sale replayed (nothing else can be bought on top
+ *  of a live subscription but a plan change), so it is adopted as the reported
+ *  one rather than counted a second time. A lapse clears `subSent`, which is
+ *  what lets a resubscription through. */
+export function notePurchase(
+  m: SubscriberMemory, plan: PlanCode | undefined, acked: boolean, tx?: string,
+): SubscriberMemory {
+  if (tx && tx === m.reportedTx) return m;
+  if (tx && m.subSent && !m.reportedTx && !m.pending) return { ...m, reportedTx: tx };
+  return {
+    ...m,
+    pending: { plan: plan ?? m.pending?.plan, acked: acked || !!m.pending?.acked, tx: tx ?? m.pending?.tx },
+  };
 }

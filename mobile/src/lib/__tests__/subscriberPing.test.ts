@@ -136,6 +136,37 @@ describe('which subscriber ping is owed', () => {
     expect(subscriberStep(notePurchase(lapsed, 'Y', true), live())).toEqual({ kind: 'sub', plan: 'Y' });
   });
 
+  it('the same transaction delivered again after its sub is not a second sale', () => {
+    // StoreKit replays a first-year transaction (its own original, so
+    // isNewPurchase calls it new) on launch and on reconnect: one founder
+    // purchase used to land as eight subs in a day.
+    const sent = afterSend(notePurchase(blank, 'F', true, 'tx-1'), 'sub', 'F');
+    expect(sent.reportedTx).toBe('tx-1');
+    const replayed = notePurchase(sent, 'F', true, 'tx-1');
+    expect(replayed).toBe(sent);
+    expect(subscriberStep(replayed, live({ plan: 'F' }))).toBeNull();
+  });
+
+  it('a replay while the sub is still pending folds into the one report', () => {
+    const m = notePurchase(notePurchase(blank, 'F', true, 'tx-1'), 'F', true, 'tx-1');
+    expect(m.pending).toEqual({ plan: 'F', acked: true, tx: 'tx-1' });
+    expect(afterSend(m, 'sub', 'F').reportedTx).toBe('tx-1');
+  });
+
+  it('a different transaction is still news: a resubscription after a lapse', () => {
+    const sent = afterSend(notePurchase(blank, 'Y', true, 'tx-1'), 'sub', 'Y');
+    const lapsed = afterSend({ ...sent, lapseSeen: '2026-09-25' }, 'lap');
+    expect(subscriberStep(notePurchase(lapsed, 'Y', true, 'tx-2'), live())).toEqual({ kind: 'sub', plan: 'Y' });
+  });
+
+  it('an install that reported its sub before transactions were kept adopts the replay', () => {
+    const legacy: SubscriberMemory = { ...blank, subSent: true, lastPlan: 'F' };
+    const m = notePurchase(legacy, 'F', true, 'tx-1');
+    expect(m.pending).toBeUndefined();
+    expect(m.reportedTx).toBe('tx-1');
+    expect(subscriberStep(m, live())).toBeNull();
+  });
+
   it('an install that never reported a subscription has nothing to lapse', () => {
     expect(subscriberStep(blank, live({ isPro: false }))).toBeNull();
   });
