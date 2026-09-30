@@ -1397,15 +1397,13 @@ old web app so old `export.json` files import directly.
   the yearly row, and the rounded one in the sentence, which is why that one
   says "about".
 - **The founding-member offer is the other one, and it lives for a single day.
-  IT IS CURRENTLY SWITCHED OFF** — `FOUNDER_ENABLED = false` in
-  `src/lib/upsell/founder.ts`, checked first in `founderVerdict` so even a phone
-  that had already claimed its day goes quiet. The rules are untouched and stay
-  under test through `founderRules` (nothing in the app may call that directly),
-  so turning it back on is that one constant. Being off SPENDS nothing: no
+  It is ON** (`FOUNDER_ENABLED = true` in `src/lib/upsell/founder.ts`, back on
+  since 1.29.0, selling its own `FOUNDER_YEARLY_SKU` at $36). `founderVerdict`
+  checks that constant first, so switching it off silences even a phone that
+  already claimed its day; the rules stay under test through `founderRules`
+  (nothing in the app may call that directly). Being off SPENDS nothing: no
   memory is stamped, no day claimed, and the shared 7-day offer cool-down is
-  never taken, so the half-off annual card below is unaffected and in fact freer
-  to appear. The rest of this bullet describes it as it will behave when it
-  returns.
+  never taken.
   `src/lib/upsell/founder.ts` (pure + tested) + `founderMemory.ts` (flags MMKV),
   rendered by `<FounderOfferCard/>` under the Journal's Outlook. It fires on the
   first launch AFTER five days carrying the user's OWN entries (`engagedBefore`
@@ -1424,16 +1422,13 @@ old web app so old `export.json` files import directly.
   quietly expires reads as a bug the next morning, but it is said INSIDE the
   price sentence ("...your first year is 30% off. Offer is only available
   today.") rather than as its own red line under the button, which turned the
-  card into a countdown ad. On iOS it sells `YEARLY_SKU`, discounted by the
-  `annual_founder_first_year` **introductory** offer, which Apple applies on its
-  own — so an eligible user meets the same price on the ordinary paywall, and
-  the yearly plan can no longer carry a store-side free trial (one intro offer
-  per SKU). Android has no such offer id and reuses `PROMO_YEARLY_SKU`. **Every
-  number in the copy is derived from the two prices the store returned**
-  (`introPriceOf` + `discountPct`, which parses comma-decimal and grouped
-  currencies): the "30% off" claim and the "first year, then" clause both vanish
-  when StoreKit says this user isn't eligible, rather than being hardcoded from
-  the App Store Connect setup. `STORE_SETUP.md` Part 7.
+  card into a countdown ad. On both stores it sells its OWN product,
+  `FOUNDER_YEARLY_SKU` (`com.autonomic.journal.yearly.founder`, Play base plan
+  `yearly-founder`), which renews at its own price — deliberately not
+  `PROMO_YEARLY_SKU`, the annual card's deeper cut, so the two cards stay two
+  offers. **Every number in the copy is derived from the prices the store
+  returned** (`priceOf` + `discountPct`, which parses comma-decimal and grouped
+  currencies), never hardcoded from the store setup. `STORE_SETUP.md` Part 7.
 - **The only thing the app sends anywhere is an anonymous cohort ping.**
   `src/store/ping.ts` (shell) over `src/lib/ping.ts` (pure + tested) GETs
   `api.autonomic.care/ping/open/D{MMDDYY}{P}` on launch and on foreground,
@@ -1633,7 +1628,14 @@ old web app so old `export.json` files import directly.
   carry the PLAN letter (`planCode`: `Y` yearly, `M` monthly, `P` promo year,
   `F` founder year), which is also the generation marker — new builds always
   send one and older builds never did, so a letterless `sub` row is the old
-  ambiguous count and the dashboard reads it exactly as before. None of it is
+  ambiguous count and the dashboard reads it exactly as before. **One transaction is one `sub`**: StoreKit replays a first-year
+  transaction to the listener (on launch when it was never finished, on a
+  reconnect), and that transaction is its own original for its whole first
+  period, so `isNewPurchase` calls every delivery new — one founder purchase
+  once landed as eight `sub`s in a day. `notePurchase` therefore drops a
+  delivery whose transaction (`reportedTx`, flag `pingSubTx`: StoreKit's
+  transaction id, Play's purchase token) already had its `sub`; a renewal or
+  resubscription is a new transaction and still counts. None of it is
   revenue; the imported sales ledger is. Renewals are not pinged: Play never
   tells the app, and iOS only while it is open. Failures are silent and NOT sent to `logError` —
   being offline is a phone's normal state, and it would flush the 40-entry
