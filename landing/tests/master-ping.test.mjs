@@ -204,6 +204,8 @@ const tiles = {};
       deltas: [].slice.call(t.querySelectorAll('.deltas > div'))
         .map((d) => d.textContent.replace(/\s+/g, ' ').trim()),
       split: ((t.querySelector('.split') || {}).textContent || '').replace(/\s+/g, ' ').trim(),
+      splits: [].slice.call(t.querySelectorAll('.split'))
+        .map((x) => x.textContent.replace(/\s+/g, ' ').trim()),
     };
   });
 });
@@ -311,8 +313,12 @@ check('active today is 4', activeTile.value.startsWith('4'));
 
 check('purchases counted', tiles['Subscriptions reported in range'].value === '3', tiles['Subscriptions reported in range'].value);
 check('and split by how they were known, the rest named as older builds',
-  /1 verified \(buy tap, then the store\) · 0 store-only · 2 from older builds/.test(tiles['Subscriptions reported in range'].meta),
-  tiles['Subscriptions reported in range'].meta);
+  /Within 1h of tap 1 No tap 0 Older build 2/.test(tiles['Subscriptions reported in range'].splits.join(' | ')),
+  tiles['Subscriptions reported in range'].splits.join(' | '));
+const dayBuys = tiles[Object.keys(tiles).find((k) => k.startsWith('Subscriptions reported on'))];
+check('the newest-day tile carries the same split, always drawn',
+  !!dayBuys && dayBuys.splits.length === 2 && /Within 1h of tap \d+ No tap \d+ Older build \d+/.test(dayBuys.splits[1]),
+  dayBuys ? dayBuys.splits.join(' | ') : 'no tile');
 check('the purchase list says how each sale was known',
   /Known by/.test($('pgPurchaseRows').textContent) && /Verified/.test($('pgPurchaseRows').textContent),
   $('pgPurchaseRows').textContent.slice(0, 300));
