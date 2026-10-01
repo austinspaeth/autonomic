@@ -1631,7 +1631,11 @@ old web app so old `export.json` files import directly.
   purchase or a first StoreKit transaction with no tap (a payment that cleared
   after its sheet closed). The lambda counts it in a separate `evidence` map on
   the SUB row (`<cohort key>~V`), never in the cohort key, and the dashboard
-  shows verified beside store-only. **A purchase is reported once per
+  shows verified beside store-only as an ALWAYS-drawn second split row on
+  the "Subscriptions reported in range" tile (Verified / Store only / Older
+  build) plus the purchase list's Known by column. It was first a clause in the
+  tile's fine print that hid itself until a tagged sale arrived, and nobody
+  could find it. **A purchase is reported once per
   transaction**: the store's id (Play token, StoreKit transaction id) is kept
   on the phone in `pingSubReported` and never sent, which is what stops a
   replayed transaction counting on every launch. **The purchase must be on
