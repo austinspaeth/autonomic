@@ -1,6 +1,6 @@
 import { planCode } from '../ping';
 import {
-  afterSend, notePurchase, purchaseEvidence, REPORTED_MAX, subscriberStep, TAP_WINDOW_MS,
+  afterSend, duplicateOf, notePurchase, purchaseEvidence, REPORTED_MAX, subscriberStep, TAP_WINDOW_MS,
   type SubscriberInput, type SubscriberMemory,
 } from '../subscriberPing';
 
@@ -225,5 +225,50 @@ describe('which subscriber ping is owed', () => {
     const m = notePurchase(blank, 'Y', false, 'V', 'tok');
     expect(subscriberStep(m, live())).toBeNull();
     expect(subscriberStep(notePurchase(m, 'Y', true, 'V', 'tok'), live())).toEqual({ kind: 'sub', plan: 'Y', evidence: 'V' });
+  });
+
+  describe('one subscription is one sale, whatever its transaction ids', () => {
+    const day = '2026-09-25';
+
+    it('a new transaction inside a reported subscription is not a second sale', () => {
+      const sent = afterSend(notePurchase(blank, 'F', true, 'S', 'tx-1', 'orig-1'), 'sub', 'F', day);
+      expect(sent.reportedOriginals).toEqual(['orig-1']);
+      expect(duplicateOf(sent, 'tx-2', 'orig-1')).toBe('original');
+      const again = notePurchase(sent, 'F', true, 'S', 'tx-2', 'orig-1');
+      expect(again).toBe(sent);
+      expect(subscriberStep(again, live({ plan: 'F', today: '2026-09-27' }))).toBeNull();
+    });
+
+    it('the same transaction is caught by its own id first', () => {
+      const sent = afterSend(notePurchase(blank, 'F', true, 'S', 'tx-1', 'orig-1'), 'sub', 'F', day);
+      expect(duplicateOf(sent, 'tx-1', 'orig-1')).toBe('txn');
+    });
+
+    it('a second sale on the same day is dropped whatever its ids say', () => {
+      const sent = afterSend(notePurchase(blank, 'F', true, 'S', 'tx-1'), 'sub', 'F', day);
+      expect(sent.lastSubDay).toBe(day);
+      const other = notePurchase(sent, 'F', true, 'S', 'tx-9');
+      expect(subscriberStep(other, live({ plan: 'F', today: day }))).toEqual({ kind: 'drop-duplicate' });
+      // The next day it is judged on its ids again.
+      expect(subscriberStep(other, live({ plan: 'F', today: '2026-09-26' })))
+        .toEqual({ kind: 'sub', plan: 'F', evidence: 'S' });
+    });
+
+    it('an install that reported before original ids were kept adopts the next delivery', () => {
+      // 1.31.1: the transaction id is on record, the original is not.
+      const held: SubscriberMemory = { ...blank, subSent: true, reported: ['tx-1'], lastPlan: 'F' };
+      const m = notePurchase(held, 'F', true, 'S', 'tx-2', 'orig-1');
+      expect(m.pending).toBeUndefined();
+      expect(m.reportedOriginals).toEqual(['orig-1']);
+      expect(duplicateOf(m, 'tx-3', 'orig-1')).toBe('original');
+    });
+
+    it('coming back after a confirmed lapse is a sale again, under the same original', () => {
+      const sent = afterSend(notePurchase(blank, 'Y', true, 'V', 'tx-1', 'orig-1'), 'sub', 'Y', day);
+      const lapsed = afterSend({ ...sent, lapseSeen: day }, 'lap');
+      expect(lapsed.reportedOriginals).toBeUndefined();
+      expect(subscriberStep(notePurchase(lapsed, 'Y', true, 'V', 'tx-2', 'orig-1'), live({ today: '2026-11-01' })))
+        .toEqual({ kind: 'sub', plan: 'Y', evidence: 'V' });
+    });
   });
 });

@@ -1647,7 +1647,17 @@ old web app so old `export.json` files import directly.
   reconnect), that transaction is its own original for its whole first period,
   and one founder purchase once landed as eight `sub`s in a day. An install
   whose `sub` predates `pingSubReported` adopts the first transaction delivered
-  while its entitlement stands, rather than counting it again. None of it is
+  while its entitlement stands, rather than counting it again. **The
+  transaction id was not enough**: the same founder subscriber went on
+  reporting several sales a day on 1.31.1, so the listener was being handed
+  transactions with ids it had not seen. Two more rules sit behind it, neither
+  trusting a transaction id: a StoreKit ORIGINAL id already reported
+  (`pingSubOriginals`, cleared by a confirmed lapse, since a resubscription keeps
+  the group's original) is the same subscription, and a second `sub` on the
+  same Eastern day (`pingSubDay`) is dropped outright, since a subscription
+  group holds one plan at a time. Whatever either catches is reported as the
+  fault `ping.subDuplicate` (`original` / `day` + the evidence letter), once per
+  rule per session, which is how the Failures tab says which hole it was. None of it is
   revenue; the imported sales ledger is. Renewals are not pinged: Play never
   tells the app, and iOS only while it is open. Failures are silent and NOT sent to `logError` —
   being offline is a phone's normal state, and it would flush the 40-entry
