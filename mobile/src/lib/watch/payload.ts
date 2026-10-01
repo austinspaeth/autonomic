@@ -141,7 +141,7 @@ export function mapSymptomPayload(payload: Record<string, unknown>): { dayKey: s
  * inferred from the RR sum, because a shortfall between the two is exactly the
  * dropped-beat signal `isTrustedReading` exists to catch.
  */
-export function mapHrvPayload(payload: Record<string, unknown>): { dayKey: string; entry: Entry; waveform: WaveformData | null } | null {
+export function mapHrvPayload(payload: Record<string, unknown>): { dayKey: string; entry: Entry; waveform: WaveformData | null; refused: boolean } | null {
   if (!payload || payload.type !== 'hrv') return null;
   const id = payload.id;
   if (typeof id !== 'string' || !id) return null;
@@ -173,7 +173,12 @@ export function mapHrvPayload(payload: Record<string, unknown>): { dayKey: strin
 
   // Waveforms never enter the journal — the raw RR goes to the sidecar, and
   // rrClean is deliberately not stored (it is re-derived by correctArtifacts).
-  return { dayKey: keyOf(date), entry, waveform: { rrRaw: rr } };
+  //
+  // `refused` says the capture gate would have declined this one. It is still
+  // filed (whatever metrics it produced, as before), but it is not published to
+  // the health store, the same as a refused phone-side capture, which is never
+  // written anywhere.
+  return { dayKey: keyOf(date), entry, waveform: { rrRaw: rr }, refused: !result.ok };
 }
 
 export interface MappedWatch {
@@ -181,6 +186,8 @@ export interface MappedWatch {
   dayKey: string;
   entry: Entry;
   waveform: WaveformData | null;
+  /** HRV only: the capture gate would have refused this reading. */
+  refused?: boolean;
 }
 
 /** Dispatch a raw watch userInfo payload to its journal section. */
@@ -192,6 +199,6 @@ export function mapWatchPayload(payload: Record<string, unknown>): MappedWatch |
   const sym = mapSymptomPayload(payload);
   if (sym) return { section: 'symptoms', dayKey: sym.dayKey, entry: sym.entry, waveform: null };
   const hrv = mapHrvPayload(payload);
-  if (hrv) return { section: 'readings', dayKey: hrv.dayKey, entry: hrv.entry, waveform: hrv.waveform };
+  if (hrv) return { section: 'readings', dayKey: hrv.dayKey, entry: hrv.entry, waveform: hrv.waveform, refused: hrv.refused };
   return null;
 }

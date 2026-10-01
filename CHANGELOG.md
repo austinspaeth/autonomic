@@ -7,6 +7,44 @@ in the app's "What's new" card are a separate, deliberately plainer log in
 `mobile/src/lib/whatsNew.ts` — update it whenever `version` in `mobile/app.json`
 crosses to a new `x.x` (a unit test fails if the shipping minor has no entry).
 
+## Unreleased
+
+**A Garmin reading now reaches Apple Health / Health Connect, and the linked
+watch is remembered.** Both came from one support report: readings taken on the
+watch were missing from Apple Health, and the watch had to be re-picked as the
+sensor every morning.
+
+- **Garmin readings are published to the health store.** Only the results card
+  (`features/hrv/Results.tsx`) ever wrote one, and a Garmin reading never passes
+  through it: it lands through `receive()` in `lib/garmin/receiver.ts`. The rule
+  now lives in `lib/health/hrvWrite.ts` (pure + tested). `hrvHealthWrite` is
+  shared by both paths: Health connected, not `degraded`, not an Apple Watch
+  reading, SDNN or RMSSD present. `arrivalHealthWrite` adds the wrist's own
+  gates: the reading is FRESH (the watch re-delivers until acked, and a
+  re-delivery must never write twice), it is in readings, and it was not
+  `refused`. That flag is new on `mapHrvPayload`, because a refused Garmin
+  reading is still filed in the journal, while a refused phone capture is never
+  written anywhere. The write fires after the flush and ack, and a failure goes
+  to `garmin.healthWrite`. The health-update pill cannot offer the sample back:
+  it is `ownApp` on both platforms, and it carries no beat series.
+- **`migrate()` dropped `lastHrvSource: 'garmin'` on every load.** Its allowed
+  list predated Garmin support, so the remembered sensor was wiped on every
+  launch.
+- **iOS forgot the linked watch on every cold launch** (native, needs a build).
+  `GarminLinkModule.swift` held devices only in memory, and on iOS the only
+  source of a device is Garmin Connect's URL callback. As a result the picker
+  row vanished, the default sensor fell back, and a reading queued on the watch
+  waited for a re-link. The selection is now archived (`IQDevice` is
+  NSSecureCoding) to `UserDefaults` and restored in `initialize`. An unreadable
+  archive means no devices, never a crash. A new pick in Garmin Connect
+  REPLACES the stored set; an empty pick replaces nothing. Watches linked
+  before this build are not in the archive and need re-linking once.
+- **A restore is not a link.** `setDevices`' `gained` branch makes Garmin the
+  sensor when a watch is linked. The launch-time restore (`{ restored: true }`)
+  no longer counts as gaining one, or every cold start would override a user
+  who had since picked the camera or a strap. Android already had that bug,
+  since its SDK reports the paired devices at every launch.
+
 ## 1.29.0
 
 **The pacing pause became an event rather than an address.** Three things

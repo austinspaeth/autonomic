@@ -32,6 +32,8 @@ import { pingReadingKind, pingWristReading } from '../../store/ping';
 import { isFirstBaseline } from '../ping';
 import { todayKey } from '../dates';
 import { logError } from '../diagnostics/errorLog';
+import { health } from '../health';
+import { arrivalHealthWrite } from '../health/hrvWrite';
 import { computeScores, profileCtx } from '../scoring';
 import type { Entry } from '../types';
 import { mapWatchPayload } from '../watch/payload';
@@ -109,7 +111,7 @@ export function subscribeGarminDevices(fn: DeviceListener): () => void {
   return () => { deviceListeners.delete(fn); };
 }
 
-function setDevices(list: GarminDevice[]) {
+function setDevices(list: GarminDevice[], opts: { restored?: boolean } = {}) {
   const gained = !devices.length && list.length > 0;
   devices = list;
   // Linking a watch IS choosing it. Persisting the preference means the choice
@@ -117,7 +119,12 @@ function setDevices(list: GarminDevice[]) {
   // round-trips through Garmin Connect and the app comes back fresh. Setting
   // only React state left the user looking at "Phone camera" selected moments
   // after they added a watch.
-  if (gained) {
+  //
+  // A RESTORE is not a link. At launch the list goes from empty to the watch
+  // linked last session, which looks exactly like gaining one, and treating it
+  // that way would put Garmin back as the sensor every cold start for somebody
+  // who has since deliberately picked the camera or a strap.
+  if (gained && !opts.restored) {
     getState().settings.lastHrvSource = 'garmin';
     save();
   }
@@ -222,6 +229,17 @@ function receive(msg: GarminMessage) {
     }
     arrivalListeners.forEach((fn) => fn(mapped.dayKey, mapped.entry));
   }
+
+  // Publish to Apple Health / Health Connect on the same terms as a reading
+  // filed by the results card. Garmin beats arrive over Connect IQ and have
+  // never been in the health store, so the Apple Watch's "it came from there"
+  // exemption does not apply. `arrivalHealthWrite` refuses a re-delivery, so a
+  // lost ack can never write a second sample. After the write, flush and ack
+  // on purpose: a slow health store must never hold up the watch's outbox.
+  const write = arrivalHealthWrite({ fresh, ...mapped }, {
+    enabled: health().available && !!getState().settings.healthEnabled,
+  });
+  if (write) health().writeHrvSession(write).catch((e) => logError('garmin.healthWrite', e));
 }
 
 /**
@@ -305,9 +323,11 @@ export function initGarminReceiver() {
     .initialize(GARMIN_URL_SCHEME)
     .then(() => native.getDevices())
     .then((list) => {
-      setDevices(list);
-      // Re-attach to devices paired in a previous session, so a reading queued
-      // on the watch can drain without the user re-picking.
+      setDevices(list, { restored: true });
+      // Re-attach to devices linked in a previous session, so a reading queued
+      // on the watch can drain without the user re-picking. Android's SDK knows
+      // the paired devices itself; on iOS the native module persists the
+      // selection Garmin Connect handed back and restores it in `initialize`.
       return Promise.all(list.map((d) => native.startListening(d.id)));
     })
     .catch((e) => logError('garmin.init', e));

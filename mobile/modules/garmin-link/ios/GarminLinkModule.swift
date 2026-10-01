@@ -54,6 +54,14 @@ public class GarminLinkModule: Module {
   // without this they would be deallocated the moment initialize() returned and
   // no message would ever arrive.
   private let delegates = GarminDelegates()
+
+  /// Where the linked devices outlive the process. The SDK keeps nothing: on
+  /// iOS the ONLY source of a device is the URL Garmin Connect hands back
+  /// after the user picks, so without this every cold launch forgot the watch.
+  /// The sensor default fell back to the camera, the picker lost its Garmin
+  /// row and a reading queued on the wrist waited until the user re-linked.
+  private static let storedDevicesKey = "com.autonomic.garmin-link.devices.v1"
+
   private var devices: [UUID: IQDevice] = [:]
   private var apps: [UUID: IQApp] = [:]
   private var initialized = false
@@ -70,6 +78,11 @@ public class GarminLinkModule: Module {
       self.delegates.owner = self
       ConnectIQ.sharedInstance().initialize(withUrlScheme: urlScheme,
                                             uiOverrideDelegate: self.delegates)
+      // Restored after the SDK is up, so `getDevices` answers immediately and
+      // `startListening` can attach without a trip through Garmin Connect.
+      for device in self.loadStoredDevices() {
+        self.register(device)
+      }
       self.initialized = true
       return true
     }
@@ -88,11 +101,18 @@ public class GarminLinkModule: Module {
               as? [IQDevice] else {
         return []
       }
+      // The pick in Garmin Connect is the user's whole answer, so it REPLACES
+      // the stored set: a watch they left unticked is unlinked. An empty pick
+      // replaces nothing, matching the JS side, which ignores an empty answer.
+      guard !found.isEmpty else { return [] }
+      self.devices.removeAll()
+      self.apps.removeAll()
       var out: [[String: Any]] = []
       for device in found {
         self.register(device)
         out.append(self.describe(device))
       }
+      self.saveStoredDevices()
       return out
     }
 
@@ -168,6 +188,34 @@ public class GarminLinkModule: Module {
   private func register(_ device: IQDevice) {
     devices[device.uuid] = device
     apps[device.uuid] = IQApp(uuid: Self.watchAppUuid, store: Self.watchAppStoreUuid, device: device)
+  }
+
+  /// Archive the current set. `IQDevice` adopts NSSecureCoding; keyed by uuid
+  /// in `devices`, so linking the same watch again replaces it.
+  private func saveStoredDevices() {
+    let list = Array(devices.values)
+    do {
+      let data = try NSKeyedArchiver.archivedData(withRootObject: list, requiringSecureCoding: true)
+      UserDefaults.standard.set(data, forKey: Self.storedDevicesKey)
+    } catch {
+      // Not fatal: the link still works this session, it just will not
+      // survive a relaunch.
+    }
+  }
+
+  /// A corrupt or unreadable archive is "no devices", never a crash: the
+  /// worst case is the user links the watch again.
+  private func loadStoredDevices() -> [IQDevice] {
+    guard let data = UserDefaults.standard.data(forKey: Self.storedDevicesKey) else { return [] }
+    do {
+      let decoded = try NSKeyedUnarchiver.unarchivedObject(
+        ofClasses: [NSArray.self, IQDevice.self, NSUUID.self, NSString.self],
+        from: data)
+      return (decoded as? [IQDevice]) ?? []
+    } catch {
+      UserDefaults.standard.removeObject(forKey: Self.storedDevicesKey)
+      return []
+    }
   }
 
   private func app(for deviceId: String) -> IQApp? {

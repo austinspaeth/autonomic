@@ -52,6 +52,14 @@ describe('mapHrvPayload', () => {
     expect((m!.entry as Record<string, unknown>).rrRaw).toBeUndefined();
   });
 
+  it('says whether the capture gate would have refused the reading', () => {
+    // A refused reading is still filed, but must not be published to Health.
+    expect(mapHrvPayload(base())!.refused).toBe(false);
+    expect(mapWatchPayload(base())!.refused).toBe(false);
+    const thin = { ...base(), rrMs: rr.slice(0, 20), elapsedSec: 18 };
+    expect(mapHrvPayload(thin)!.refused).toBe(true);
+  });
+
   it("stamps durationSec from the watch's elapsed time, not the RR sum", () => {
     // A shortfall between the two IS the dropped-beat signal; inferring
     // duration from the sum would erase the evidence.

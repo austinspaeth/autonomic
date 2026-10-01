@@ -21,6 +21,7 @@ import { computeScores, profileCtx } from '../../lib/scoring';
 import { getState, storeWaveform, upsertEntry } from '../../store/store';
 import { splitWaveform } from '../../lib/waveforms';
 import { health, healthAppName } from '../../lib/health';
+import { hrvHealthWrite } from '../../lib/health/hrvWrite';
 import { confirmDelete, EntryForm } from '../EntryForm';
 import { READING_TYPES } from '../../lib/registry';
 import { keyOf, nowTime, pad, todayKey, uid } from '../../lib/dates';
@@ -217,21 +218,16 @@ export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, 
     // health store cannot, so what would land there is a bare SDNN, indexed
     // beside clean readings, readable by every other app on the phone, with
     // nothing left to say the app itself would have declined it.
-    if (!degraded && health().available && getState().settings.healthEnabled && config.source !== 'watch') {
-      const sdnn = parseFloat(reading.sdnn as string);
-      const rmssd = parseFloat(reading.rmssd as string);
-      const hr = parseFloat((reading.hr || reading.avgHr) as string);
-      // iOS stores SDNN (HealthKit's HRV type), Android RMSSD (Health
-      // Connect's) — pass both and let the platform impl pick.
-      if (!isNaN(sdnn) || !isNaN(rmssd)) {
-        health().writeHrvSession({
-          sdnnMs: isNaN(sdnn) ? undefined : sdnn,
-          rmssdMs: isNaN(rmssd) ? undefined : rmssd,
-          avgHr: isNaN(hr) ? undefined : hr,
-          startISO: new Date(startedAtMs || (Date.now() - durationSec * 1000)).toISOString(),
-          durationSec,
-        }).then(() => setWroteHealth(true)).catch(() => { /* graceful */ });
-      }
+    //
+    // The rule lives in `hrvHealthWrite`, shared with the Garmin receiver. iOS
+    // stores SDNN (HealthKit's HRV type), Android RMSSD (Health Connect's) —
+    // both are passed and the platform impl picks.
+    const write = hrvHealthWrite(entry, {
+      enabled: health().available && !!getState().settings.healthEnabled,
+      startMs: startedAtMs,
+    });
+    if (write) {
+      health().writeHrvSession(write).then(() => setWroteHealth(true)).catch(() => { /* graceful */ });
     }
   };
 

@@ -211,6 +211,15 @@ describe('migrate: top-level sections', () => {
     expect(s.healthEnabled).toBe(true);
   });
 
+  it('keeps every real HRV source, Garmin included, and drops anything else', () => {
+    // 'garmin' was missing from this list, so a linked Garmin was forgotten as
+    // the default sensor on every launch.
+    for (const src of ['polar', 'watch', 'garmin', 'camera']) {
+      expect(migrate({ settings: { lastHrvSource: src } }).settings.lastHrvSource).toBe(src);
+    }
+    expect(migrate({ settings: { lastHrvSource: 'fitbit' } }).settings.lastHrvSource).toBeUndefined();
+  });
+
   it('drops a structurally-broken protocol, keeps a valid one', () => {
     const broken = migrate({ settings: { protocol: { triggers: { enabled: true } } } }).settings.protocol;
     expect(broken).toBeUndefined();
