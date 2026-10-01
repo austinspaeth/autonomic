@@ -14,11 +14,14 @@ import { dirname, join } from 'node:path';
 import QRCode from 'qrcode';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
-const { storeUrl } = await import(pathToFileURL(join(root, 'src/lib/site.ts')).href);
+const { storeUrl, GIVEAWAY_CAMPAIGN } = await import(pathToFileURL(join(root, 'src/lib/site.ts')).href);
 
 const TARGETS = [
   { file: 'static/qr-ios.svg', url: storeUrl('ios') },
-  { file: 'static/qr-android.svg', url: storeUrl('android') }
+  { file: 'static/qr-android.svg', url: storeUrl('android') },
+  // The giveaway page's modal swaps these in (see aj-store-campaign in app.html).
+  { file: `static/qr-ios-${GIVEAWAY_CAMPAIGN}.svg`, url: storeUrl('ios', GIVEAWAY_CAMPAIGN) },
+  { file: `static/qr-android-${GIVEAWAY_CAMPAIGN}.svg`, url: storeUrl('android', GIVEAWAY_CAMPAIGN) }
 ];
 
 for (const { file, url } of TARGETS) {

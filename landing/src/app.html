@@ -315,6 +315,30 @@
               android:
                 'https://play.google.com/store/apps/details?id=com.autonomic.journal&referrer=utm_source%3Dautonomic.care%26utm_medium%3Dreferral%26utm_campaign%3Dlanding'
             };
+
+            // A page with its own campaign (the giveaway page) says so in
+            // <meta name="aj-store-campaign">. Every store link on it then
+            // carries that campaign instead of Landing: the nav button, the
+            // modal's badges and its QR codes (built by `npm run qr` as
+            // /qr-<platform>-<campaign>.svg). Same formula as storeUrl().
+            var campMeta = document.querySelector('meta[name="aj-store-campaign"]');
+            var CAMP = campMeta ? (campMeta.getAttribute('content') || '').trim() : '';
+            if (CAMP) {
+              STORE = {
+                ios: 'https://apps.apple.com/app/apple-store/id6789786971?pt=126963570&ct=' + encodeURIComponent(CAMP) + '&mt=8',
+                android:
+                  'https://play.google.com/store/apps/details?id=com.autonomic.journal&referrer=' +
+                  encodeURIComponent('utm_source=autonomic.care&utm_medium=referral&utm_campaign=' + CAMP.toLowerCase())
+              };
+              document.querySelectorAll('#dlModal [data-dl-store]').forEach(function (a) {
+                var p = a.getAttribute('data-dl-store');
+                if (STORE[p]) a.setAttribute('href', STORE[p]);
+              });
+              document.querySelectorAll('#dlModal .dlm-qr img').forEach(function (img) {
+                var src = img.getAttribute('src') || '';
+                img.setAttribute('src', src.replace(/^\/qr-(ios|android)\.svg$/, '/qr-$1-' + CAMP.toLowerCase() + '.svg'));
+              });
+            }
             var GLYPH = {
               ios: '<svg viewBox="0 0 384 512" fill="currentColor" aria-hidden="true"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5c0 26.2 4.8 53.3 14.4 81.2 12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zM262.1 104.5c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 20-27.8 44.7-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>',
               // The Play Store mark, not the Android robot: the button opens

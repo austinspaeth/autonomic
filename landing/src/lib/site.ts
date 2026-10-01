@@ -144,6 +144,15 @@ export const appStoreLink = storeUrl('ios');
 export const playStoreLink = storeUrl('android');
 
 /**
+ * The giveaway page's own campaign (App Store `ct`, Play `utm_campaign`), so a
+ * download from it reads apart from the ordinary `Landing` traffic. The page's
+ * badges use it directly; it also renders it as `<meta name="aj-store-campaign">`,
+ * which tells the site-wide script in `app.html` to retag the nav Download
+ * button and the download modal (badges AND QR codes) on that page too.
+ */
+export const GIVEAWAY_CAMPAIGN = 'awareness-giveaway';
+
+/**
  * The freemium model, as the app actually ships it: the journal is free
  * forever, Autonomic Pro is an auto-renewing subscription, and every fresh
  * install opens with `trialDays` of full Pro access (no card, no account).

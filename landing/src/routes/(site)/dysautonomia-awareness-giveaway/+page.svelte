@@ -6,7 +6,7 @@
    * The site runs `csr = false`, so everything here is static markup and CSS:
    * the floating prizes and the ribbon's glow are CSS/SMIL animations.
    */
-  import { site, storeUrl, giveawayUrl, giveawayPosts, APP_MARK_PATH } from '$lib/site';
+  import { site, storeUrl, giveawayUrl, giveawayPosts, APP_MARK_PATH, GIVEAWAY_CAMPAIGN } from '$lib/site';
   import GiveawayRibbon from '$lib/GiveawayRibbon.svelte';
   import PrizeWatchArt from '$lib/PrizeWatchArt.svelte';
   import PrizeStrapArt from '$lib/PrizeStrapArt.svelte';
@@ -20,9 +20,10 @@
   const ogAlt = 'Autonomic Dysautonomia Awareness Month giveaway: win an Apple Watch Series 12 or a Polar H10 with a daily HRV reading.';
   const email = 'austin@autonomic.care';
 
-  // Attributed so giveaway downloads show up as their own campaign.
-  const iosHref = storeUrl('ios', 'Giveaway');
-  const androidHref = storeUrl('android', 'Giveaway');
+  // Attributed so giveaway downloads show up as their own campaign. The meta
+  // tag below carries the same campaign to the nav button and download modal.
+  const iosHref = storeUrl('ios', GIVEAWAY_CAMPAIGN);
+  const androidHref = storeUrl('android', GIVEAWAY_CAMPAIGN);
 
   const socials = [
     { key: 'facebook', label: 'Facebook' },
@@ -47,6 +48,7 @@
   <title>{title}</title>
   <meta name="description" content={description} />
   <link rel="canonical" href={canonical} />
+  <meta name="aj-store-campaign" content={GIVEAWAY_CAMPAIGN} />
   <meta property="og:type" content="website" />
   <meta property="og:url" content={canonical} />
   <meta property="og:title" content={title} />
