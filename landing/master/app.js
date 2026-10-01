@@ -2482,6 +2482,7 @@
           subscriberNote(ix, [ix.last], A.eventsOn(ix, 'rst', ix.last), A.eventsOn(ix, 'lap', ix.last)),
         deltas: dayDeltas(ix.last, days, function (d) { return A.purchasesOn(ix, d); }),
         split: storeSplit(A.subPlatformsOn(ix, ix.last)),
+        splitB: evidenceSplit(A.purchasesOn(ix, ix.last), A.saleEvidenceOn(ix, ix.last)),
         record: recBuys
       }),
       tile({
@@ -2801,12 +2802,14 @@
      which made the split impossible to find while it was empty — and an empty
      split is itself the answer ("every sale here came from a build too old to
      say"). Verified is a buy tap the store confirmed within the hour; store
-     only is the store's word with no tap; older build is the rest. */
+     only is the store's word with no tap; older build is the rest. Drawn on
+     both the newest-day tile and the range tile, worded as what happened
+     ("within 1h of tap" / "no tap") rather than as a verdict. */
   function evidenceSplit(total, ev) {
     var rest = Math.max(0, total - ev.V - ev.S);
     return [
-      { name: 'Verified', color: COLOR.s3, value: fmtInt(ev.V) },
-      { name: 'Store only', color: COLOR.gold, value: fmtInt(ev.S) },
+      { name: 'Within 1h of tap', color: COLOR.s3, value: fmtInt(ev.V) },
+      { name: 'No tap', color: COLOR.gold, value: fmtInt(ev.S) },
       { name: 'Older build', color: COLOR.muted, value: fmtInt(rest) }
     ];
   }
