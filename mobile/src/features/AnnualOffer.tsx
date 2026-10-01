@@ -41,31 +41,11 @@ import { detectDownturn } from '../lib/scoring/downturn';
 import { detectStrain } from '../lib/scoring/strain';
 import { dueMilestone, liveOffer } from '../lib/upsell/annual';
 import { discountPct } from '../lib/upsell/founder';
+import { perMonth } from '../lib/upsell/price';
 import { FORCE_ANNUAL_OFFER, annualMemory, noteAnnualOfferDismissed, noteAnnualOfferStarted } from '../lib/upsell/annualMemory';
 import { noteOfferShown, offerPacingClear } from '../lib/upsell/pacingMemory';
 import { pingOfferAccepted, pingOfferDismissed, pingOfferShown } from '../store/ping';
 import { profileCtx } from '../lib/scoring';
-
-/**
- * Monthly equivalent of a localized yearly price, keeping whatever currency
- * shape the store handed us. Null when the price doesn't parse, in which case
- * the caller leaves the clause off rather than guessing at it.
- *
- * Two precisions, because the card needs both and they are not interchangeable.
- * The plan row prints the EXACT division ("$2.08/mo") beside the real yearly
- * price, where a rounded figure would not multiply back up. The sentence prints
- * the rounded one, which is why it has to say "about".
- */
-function perMonth(price: string, precise: boolean): string | null {
-  const m = price.match(/\d[\d.,]*/);
-  if (!m) return null;
-  const n = parseFloat(m[0].replace(/[^0-9.]/g, ''));
-  if (!Number.isFinite(n) || n <= 0) return null;
-  const each = n / 12;
-  const rounded = Math.round(each);
-  if (precise) return price.replace(m[0], each.toFixed(2));
-  return price.replace(m[0], rounded >= 1 ? String(rounded) : each.toFixed(2));
-}
 
 /**
  * "half off" only when the store's two prices really do come to about half.
