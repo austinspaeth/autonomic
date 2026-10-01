@@ -50,6 +50,13 @@ export function fmtReleaseDate(iso: string): string {
 
 export const RELEASES: Release[] = [
   {
+    version: '1.32',
+    date: '2026-10-01',
+    notes: [
+      'Improvements to the Garmin experience.',
+    ],
+  },
+  {
     version: '1.31',
     date: '2026-09-27',
     notes: [

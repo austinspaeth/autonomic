@@ -7,7 +7,7 @@ in the app's "What's new" card are a separate, deliberately plainer log in
 `mobile/src/lib/whatsNew.ts` — update it whenever `version` in `mobile/app.json`
 crosses to a new `x.x` (a unit test fails if the shipping minor has no entry).
 
-## Unreleased
+## 1.32.0
 
 **A Garmin reading now reaches Apple Health / Health Connect, and the linked
 watch is remembered.** Both came from one support report: readings taken on the
