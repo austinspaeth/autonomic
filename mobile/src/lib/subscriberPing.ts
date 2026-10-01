@@ -105,6 +105,9 @@ export type SubscriberMemory = {
      *  transaction id). Kept on the phone only, never sent: it is what stops
      *  one purchase being reported twice. */
     txn?: string;
+    /** StoreKit's ORIGINAL transaction id: one per subscription, the same for
+     *  every renewal, plan change and replay inside it. iOS only. */
+    original?: string;
   };
   /** Purchases already reported as `sub`, newest last, by the same id. A
    *  purchase delivered again — StoreKit replaying an unfinished transaction on
@@ -112,6 +115,16 @@ export type SubscriberMemory = {
    *  recognised here and never counted a second time. A real resubscription is
    *  a new transaction and so a new id. */
   reported?: string[];
+  /** Original transaction ids a `sub` has already gone out for, since the last
+   *  confirmed lapse. The transaction id alone was not enough: one founder
+   *  subscriber on 1.31.1 still reported a sale several times a day, so each
+   *  delivery reaching the listener carried an id `reported` had not seen. A
+   *  subscription is ONE sale however many transactions it produces. */
+  reportedOriginals?: string[];
+  /** The Eastern day the last `sub` went out. No install buys two
+   *  subscriptions in one day (a subscription group holds one at a time), so a
+   *  second on the same day is a duplicate whatever its ids say. */
+  lastSubDay?: string;
   /** A `sub` landed for the current entitlement (older builds set this too,
    *  for their "found a subscription" ping). */
   subSent: boolean;
@@ -151,6 +164,7 @@ export type SubscriberStep =
   | { kind: 'lapse-seen'; day: string }
   | { kind: 'lapse-clear' }
   | { kind: 'drop-pending' }
+  | { kind: 'drop-duplicate' }
   | null;
 
 /**
@@ -164,6 +178,7 @@ export function subscriberStep(m: SubscriberMemory, s: SubscriberInput): Subscri
   // the store has been re-queried since.
   if (m.pending) {
     if ((m.pending.acked || s.activeAcked) && s.isPro) {
+      if (m.lastSubDay === s.today) return { kind: 'drop-duplicate' };
       return { kind: 'sub', plan: m.pending.plan ?? s.plan, evidence: m.pending.evidence };
     }
     // The store now says there is no subscription behind it: the purchase was
@@ -199,14 +214,34 @@ export function subscriberStep(m: SubscriberMemory, s: SubscriberInput): Subscri
 /** The memory after a ping landed. A lapse closes the entitlement, so both
  *  "reported" flags reset and the next purchase or restore on this install is
  *  news again. */
-export function afterSend(m: SubscriberMemory, kind: 'sub' | 'rst' | 'lap', plan?: PlanCode): SubscriberMemory {
+export function afterSend(
+  m: SubscriberMemory, kind: 'sub' | 'rst' | 'lap', plan?: PlanCode, today?: string,
+): SubscriberMemory {
   if (kind === 'sub') {
     const txn = m.pending?.txn;
+    const original = m.pending?.original;
     const reported = txn ? [...(m.reported || []).filter((t) => t !== txn), txn].slice(-REPORTED_MAX) : m.reported;
-    return { ...m, pending: undefined, subSent: true, lastPlan: plan ?? m.lastPlan, reported };
+    const reportedOriginals = original
+      ? [...(m.reportedOriginals || []).filter((t) => t !== original), original].slice(-REPORTED_MAX)
+      : m.reportedOriginals;
+    return {
+      ...m, pending: undefined, subSent: true, lastPlan: plan ?? m.lastPlan, reported, reportedOriginals,
+      lastSubDay: today ?? m.lastSubDay,
+    };
   }
   if (kind === 'rst') return { ...m, rstSent: true, lastPlan: plan ?? m.lastPlan };
-  return { ...m, subSent: false, rstSent: false, lapseSeen: undefined };
+  // A confirmed lapse closes the subscription, so coming back is a sale again
+  // even though StoreKit keeps the group's original transaction id.
+  return { ...m, subSent: false, rstSent: false, lapseSeen: undefined, reportedOriginals: undefined };
+}
+
+/** Why a delivered purchase is a duplicate of one already reported, or null.
+ *  Answered separately from `notePurchase` so the shell can report WHICH rule
+ *  caught it: the transaction id, or only the subscription's original id. */
+export function duplicateOf(m: SubscriberMemory, txn?: string, original?: string): 'txn' | 'original' | null {
+  if (txn && (m.reported || []).includes(txn)) return 'txn';
+  if (original && (m.reportedOriginals || []).includes(original)) return 'original';
+  return null;
 }
 
 /** How many reported purchase ids are remembered. One install makes a
@@ -230,9 +265,24 @@ export function notePurchase(
   acked: boolean,
   evidence?: PurchaseEvidence,
   txn?: string,
+  original?: string,
 ): SubscriberMemory {
-  if (txn && (m.reported || []).includes(txn)) return m;
-  if (txn && m.subSent && !m.reported?.length && !m.pending) return { ...m, reported: [txn] };
+  if (duplicateOf(m, txn, original)) return m;
+  // An install that already reported its sale, under a build that kept less
+  // than this one does (no transaction ids before 1.31.1, no original ids
+  // before this), still holds that subscription: nothing can be bought on top
+  // of a live one but a plan change, and a lapse clears `subSent`. So what
+  // arrives now is that sale delivered again, and is adopted as the reported
+  // one rather than counted a second time.
+  const legacy = m.subSent && !m.pending
+    && ((!!txn && !m.reported?.length) || (!!original && !m.reportedOriginals?.length));
+  if (legacy) {
+    return {
+      ...m,
+      reported: txn ? [...(m.reported || []), txn].slice(-REPORTED_MAX) : m.reported,
+      reportedOriginals: original ? [original] : m.reportedOriginals,
+    };
+  }
   const prev = m.pending;
   return {
     ...m,
@@ -241,6 +291,7 @@ export function notePurchase(
       acked: acked || !!prev?.acked,
       evidence: evidence === 'V' || prev?.evidence === 'V' ? 'V' : (evidence ?? prev?.evidence),
       txn: txn ?? prev?.txn,
+      original: original ?? prev?.original,
     },
   };
 }

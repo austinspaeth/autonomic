@@ -528,9 +528,10 @@ async function connect() {
       // below would otherwise find Pro with no purchase behind it.
       const evidence = evidenceOf(purchase);
       const txn = txnOf(purchase);
-      if (evidence) noteNewPurchase({ sku: purchase.productId, acknowledged: false, evidence, txn });
+      const original = originalOf(purchase);
+      if (evidence) noteNewPurchase({ sku: purchase.productId, acknowledged: false, evidence, txn, original });
       const acked = await acknowledge(purchase, 'iap.ack');
-      if (evidence && acked) noteNewPurchase({ sku: purchase.productId, acknowledged: true, evidence, txn });
+      if (evidence && acked) noteNewPurchase({ sku: purchase.productId, acknowledged: true, evidence, txn, original });
       set({ isPro: true, activeSku: purchase.productId, activeAcked: acked, purchasing: false, error: undefined });
       settleAttempt('purchased');
     });
@@ -767,7 +768,11 @@ export const hasRecentTap = () => !!recentTap();
  * existed and sends `rst`. That is how every purchase made more than fifteen
  * seconds into a session was counted as a restore AND, one foreground later,
  * as a sale. */
-export type NewPurchaseEvent = { sku: string; acknowledged: boolean; evidence: PurchaseEvidence; txn?: string };
+export type NewPurchaseEvent = {
+  sku: string; acknowledged: boolean; evidence: PurchaseEvidence; txn?: string;
+  /** StoreKit's original transaction id (iOS only): one per subscription. */
+  original?: string;
+};
 const newPurchaseListeners = new Set<(e: NewPurchaseEvent) => void>();
 export function onNewPurchase(cb: (e: NewPurchaseEvent) => void): () => void {
   newPurchaseListeners.add(cb);
@@ -784,6 +789,14 @@ function noteNewPurchase(e: NewPurchaseEvent) {
 const txnOf = (p: Purchase): string | undefined => (Platform.OS === 'android'
   ? p.purchaseToken || undefined
   : (p.transactionId ?? p.id) || undefined);
+
+/** The subscription's original transaction id. iOS only: Play's token is
+ *  already one per subscription. */
+const originalOf = (p: Purchase): string | undefined => {
+  if (Platform.OS === 'android') return undefined;
+  const o = (p as { originalTransactionIdentifierIOS?: string | null }).originalTransactionIdentifierIOS;
+  return o ? String(o) : undefined;
+};
 
 /** How this purchase is known to be new, or null if it is not. */
 function evidenceOf(p: Purchase): PurchaseEvidence | null {

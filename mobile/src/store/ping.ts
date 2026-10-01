@@ -90,8 +90,9 @@ import {
   type SlotCode, type ViewCode,
 } from '../lib/ping';
 import {
-  afterSend, notePurchase, RESTORE_SETTLE_MS, subscriberStep, type SubscriberMemory,
+  afterSend, duplicateOf, notePurchase, RESTORE_SETTLE_MS, subscriberStep, type SubscriberMemory,
 } from '../lib/subscriberPing';
+import { reportFault } from './errorReport';
 import {
   getIapState, hasRecentTap, onNewPurchase, onPurchaseOutcome, paywallBypassed, subscribeIap,
   type NewPurchaseEvent,
@@ -105,6 +106,8 @@ const KEY_SUB_SENT = 'pingSubSent';     // '1' once a sub landed for the current
 const KEY_RST_SENT = 'pingRstSent';     // '1' once an rst landed for the current entitlement
 const KEY_SUB_PENDING = 'pingSubPending'; // JSON { plan, acked, evidence, txn } — a purchase not yet reported
 const KEY_SUB_REPORTED = 'pingSubReported'; // JSON string[] — purchase ids already reported (local only)
+const KEY_SUB_ORIGINALS = 'pingSubOriginals'; // JSON string[] — StoreKit original ids already reported (local only)
+const KEY_SUB_DAY = 'pingSubDay';       // ISO date (Eastern) the last sub went out
 const KEY_LAPSE_SEEN = 'pingLapseSeen'; // ISO date (Eastern) the store first said "not subscribed"
 const KEY_LAST_PLAN = 'pingLastPlan';   // the plan letter this install was last seen holding
 const KEY_EXCLUDED = 'pingExcluded';    // '1' — this device sends nothing (owner / tester phones)
@@ -334,6 +337,7 @@ function readSubscriberMemory(): SubscriberMemory {
         acked: !!v.acked,
         evidence: v.evidence === 'V' || v.evidence === 'S' ? v.evidence : undefined,
         txn: typeof v.txn === 'string' && v.txn ? v.txn : undefined,
+        original: typeof v.original === 'string' && v.original ? v.original : undefined,
       };
     }
   } catch { pending = undefined; }
@@ -343,9 +347,17 @@ function readSubscriberMemory(): SubscriberMemory {
     const v = raw ? JSON.parse(raw) : undefined;
     if (Array.isArray(v)) reported = v.filter((t) => typeof t === 'string');
   } catch { reported = undefined; }
+  let reportedOriginals: string[] | undefined;
+  try {
+    const raw = read(KEY_SUB_ORIGINALS);
+    const v = raw ? JSON.parse(raw) : undefined;
+    if (Array.isArray(v)) reportedOriginals = v.filter((t) => typeof t === 'string');
+  } catch { reportedOriginals = undefined; }
   return {
     pending,
     reported,
+    reportedOriginals,
+    lastSubDay: read(KEY_SUB_DAY) || undefined,
     subSent: read(KEY_SUB_SENT) === '1',
     rstSent: read(KEY_RST_SENT) === '1',
     lapseSeen: read(KEY_LAPSE_SEEN) || undefined,
@@ -361,6 +373,21 @@ function writeSubscriberMemory(m: SubscriberMemory) {
   if (m.lapseSeen) write(KEY_LAPSE_SEEN, m.lapseSeen); else remove(KEY_LAPSE_SEEN);
   if (m.lastPlan) write(KEY_LAST_PLAN, m.lastPlan);
   if (m.reported && m.reported.length) write(KEY_SUB_REPORTED, JSON.stringify(m.reported));
+  if (m.reportedOriginals && m.reportedOriginals.length) write(KEY_SUB_ORIGINALS, JSON.stringify(m.reportedOriginals));
+  else remove(KEY_SUB_ORIGINALS);
+  if (m.lastSubDay) write(KEY_SUB_DAY, m.lastSubDay);
+}
+
+/** A sale caught as a duplicate is reported as a fault, once per rule per
+ *  session: the rule that caught it is the diagnosis (`original` means the
+ *  store is minting new transactions inside one subscription, `day` that
+ *  neither id caught it), and the Failures tab is the only place it can be
+ *  read. Never through `logError`, which would spend the `err` counter. */
+const dupSeen = new Set<string>();
+function noteDuplicate(rule: 'txn' | 'original' | 'day', evidence?: string) {
+  if (rule === 'txn' || dupSeen.has(rule)) return;   // the expected replay, not news
+  dupSeen.add(rule);
+  try { reportFault('ping.subDuplicate', `${rule} ${evidence ?? '-'}`); } catch { /* never let a report break this */ }
 }
 
 /** A purchase this install made, from ./iap. Remembered on disk before
@@ -368,7 +395,10 @@ function writeSubscriberMemory(m: SubscriberMemory) {
  *  still reports it on its next launch. */
 function onPurchased(e: NewPurchaseEvent) {
   if (paywallBypassed()) return;
-  writeSubscriberMemory(notePurchase(readSubscriberMemory(), planCode(e.sku), e.acknowledged, e.evidence, e.txn));
+  const memory = readSubscriberMemory();
+  const dup = duplicateOf(memory, e.txn, e.original);
+  if (dup) { noteDuplicate(dup, e.evidence); return; }
+  writeSubscriberMemory(notePurchase(memory, planCode(e.sku), e.acknowledged, e.evidence, e.txn, e.original));
   void pingSubscriber();
 }
 
@@ -412,10 +442,15 @@ async function pingSubscriber(): Promise<void> {
   if (step.kind === 'lapse-seen') { writeSubscriberMemory({ ...memory, lapseSeen: step.day }); return; }
   if (step.kind === 'lapse-clear') { writeSubscriberMemory({ ...memory, lapseSeen: undefined }); return; }
   if (step.kind === 'drop-pending') { writeSubscriberMemory({ ...memory, pending: undefined }); return; }
+  if (step.kind === 'drop-duplicate') {
+    noteDuplicate('day', memory.pending?.evidence);
+    writeSubscriberMemory({ ...memory, pending: undefined });
+    return;
+  }
   inFlight.subscriber = true;
   try {
     if (await send(step.kind, cohortDate(now), step.plan, step.kind === 'sub' ? step.evidence : undefined)) {
-      writeSubscriberMemory(afterSend(readSubscriberMemory(), step.kind, step.plan));
+      writeSubscriberMemory(afterSend(readSubscriberMemory(), step.kind, step.plan, easternDay(now)));
     }
   } finally {
     inFlight.subscriber = false;
