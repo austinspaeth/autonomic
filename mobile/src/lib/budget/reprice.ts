@@ -54,12 +54,15 @@ export const CURVE_MAX = 400;
  * the day's own cadence: at a 20-minute sampling rate a fixed 20-minute
  * ceiling marked every ordinary interval uncovered, so a fully worn day was
  * charged for a fraction of what it watched, and past 30 minutes it was
- * charged for nothing at all. Those days are re-read from their curves.
+ * charged for nothing at all. Those days are re-read from their curves. 4 is
+ * the cadence being read by TIME rather than by interval count
+ * (./burn `cadenceByTimeMin`), so a dense burst — a workout, a strap reading —
+ * can no longer collapse the tolerance and wipe out the rest of the day.
  *
  * BUMP THIS whenever a change to ./burn or ./upright would give a stored day a
  * different answer from the same curve, and the repair runs once more.
  */
-export const PRICE_VERSION = 3;
+export const PRICE_VERSION = 4;
 
 export type RepriceAction =
   /** Already priced under the current rules, or there is nothing to work from. */
