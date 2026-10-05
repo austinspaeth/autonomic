@@ -569,6 +569,24 @@ describe('the gap tolerance is read off the day, not off one sensor', () => {
     expect(hrMinutesAbove(four, 60)!.coverageMin).toBe(0);
   });
 
+  /* One dense burst (a workout, a Breathe session, a strap reading) used to
+     outnumber a whole day of background intervals, drop the tolerance to its
+     floor and turn every ordinary gap uncovered: the minutes above the line
+     and the recovery minutes vanished on the next read, and the strip handed
+     back time the user had really spent. */
+  it('is not collapsed by one dense burst', () => {
+    const bpm = (sec: number) => (Math.floor(sec / 3600) % 3 === 0 ? 110 : 62);
+    const wrist = sampleDay(7, 2, bpm).filter((p) => p.t < 16 * 3600);
+    const burst: { t: number; bpm: number }[] = [];
+    for (let t = 16 * 3600; t < 16 * 3600 + 70 * 60; t += 5) burst.push({ t, bpm: 80 });
+    const before = hrMinutesAbove(wrist, 95)!;
+    const after = hrMinutesAbove([...wrist, ...burst], 95)!;
+    expect(before.aboveMin).toBeGreaterThan(100);
+    expect(after.aboveMin).toBe(before.aboveMin);
+    expect(after.coverageMin).toBeGreaterThanOrEqual(before.coverageMin);
+    expect(hrMinutesBelow([...wrist, ...burst], 70, [])).toBeGreaterThanOrEqual(hrMinutesBelow(wrist, 70, [])!);
+  });
+
   it('gives a background day real coverage where it used to have almost none', () => {
     // The whole point. At an eight-minute cadence every single interval used
     // to exceed a fixed five-minute threshold, so a fully worn watch reported
