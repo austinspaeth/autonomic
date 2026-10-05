@@ -2482,6 +2482,7 @@
           subscriberNote(ix, [ix.last], A.eventsOn(ix, 'rst', ix.last), A.eventsOn(ix, 'lap', ix.last)),
         deltas: dayDeltas(ix.last, days, function (d) { return A.purchasesOn(ix, d); }),
         split: storeSplit(A.subPlatformsOn(ix, ix.last)),
+        splitB: evidenceSplit(A.purchasesOn(ix, ix.last), A.saleEvidenceOn(ix, ix.last)),
         record: recBuys
       }),
       tile({
@@ -2583,8 +2584,9 @@
         delta: rangeDelta(ix, days, function (d) { return A.purchasesOn(ix, d); }),
         meta: 'reported by the app, unverified: the sales ledger is the source of truth for revenue. ' +
           'Restores are counted apart from the plan-letter release on; older builds may include them' +
-          storeSplitNote(ix, rangeBuys) + evidenceNote(subsRange, evRange) + subscriberNote(ix, days, rstRange, lapRange),
-        split: storeSplit(rangeBuys)
+          storeSplitNote(ix, rangeBuys) + subscriberNote(ix, days, rstRange, lapRange),
+        split: storeSplit(rangeBuys),
+        splitB: evidenceSplit(subsRange, evRange)
       }),
       tile({
         label: 'Active / day', color: PC.active, value: fmtInt(Math.round(avg)), delta: dActive,
@@ -2794,14 +2796,22 @@
     return ' · ' + fmtInt(rst) + ' restored onto a new install · ' + fmtInt(lap) + ' lapsed (neither counted here)';
   }
 
-  /* How the range's sales were known. Only once a build sending the evidence
-     token has reported one: before that every sale is "not known", and saying
-     so on every range would be noise. */
-  function evidenceNote(total, ev) {
-    if (!ev.V && !ev.S) return '';
+  /* How the range's sales were known, as the tile's second row, under the
+     store split. ALWAYS drawn: it used to be a clause in the fine print that
+     hid itself until a build sending the evidence token had reported a sale,
+     which made the split impossible to find while it was empty — and an empty
+     split is itself the answer ("every sale here came from a build too old to
+     say"). Verified is a buy tap the store confirmed within the hour; store
+     only is the store's word with no tap; older build is the rest. Drawn on
+     both the newest-day tile and the range tile, worded as what happened
+     ("within 1h of tap" / "no tap") rather than as a verdict. */
+  function evidenceSplit(total, ev) {
     var rest = Math.max(0, total - ev.V - ev.S);
-    return ' · ' + fmtInt(ev.V) + ' verified (buy tap, then the store) · ' + fmtInt(ev.S) + ' store-only' +
-      (rest ? ' · ' + fmtInt(rest) + ' from older builds' : '');
+    return [
+      { name: 'Within 1h of tap', color: COLOR.s3, value: fmtInt(ev.V) },
+      { name: 'No tap', color: COLOR.gold, value: fmtInt(ev.S) },
+      { name: 'Older build', color: COLOR.muted, value: fmtInt(rest) }
+    ];
   }
 
   function storeSplitNote(ix, split) {

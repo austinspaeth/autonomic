@@ -528,9 +528,10 @@ async function connect() {
       // below would otherwise find Pro with no purchase behind it.
       const evidence = evidenceOf(purchase);
       const txn = txnOf(purchase);
-      if (evidence) noteNewPurchase({ sku: purchase.productId, acknowledged: false, evidence, txn });
+      const original = originalOf(purchase);
+      if (evidence) noteNewPurchase({ sku: purchase.productId, acknowledged: false, evidence, txn, original });
       const acked = await acknowledge(purchase, 'iap.ack');
-      if (evidence && acked) noteNewPurchase({ sku: purchase.productId, acknowledged: true, evidence, txn });
+      if (evidence && acked) noteNewPurchase({ sku: purchase.productId, acknowledged: true, evidence, txn, original });
       set({ isPro: true, activeSku: purchase.productId, activeAcked: acked, purchasing: false, error: undefined });
       settleAttempt('purchased');
     });
@@ -767,7 +768,11 @@ export const hasRecentTap = () => !!recentTap();
  * existed and sends `rst`. That is how every purchase made more than fifteen
  * seconds into a session was counted as a restore AND, one foreground later,
  * as a sale. */
-export type NewPurchaseEvent = { sku: string; acknowledged: boolean; evidence: PurchaseEvidence; txn?: string };
+export type NewPurchaseEvent = {
+  sku: string; acknowledged: boolean; evidence: PurchaseEvidence; txn?: string;
+  /** StoreKit's original transaction id (iOS only): one per subscription. */
+  original?: string;
+};
 const newPurchaseListeners = new Set<(e: NewPurchaseEvent) => void>();
 export function onNewPurchase(cb: (e: NewPurchaseEvent) => void): () => void {
   newPurchaseListeners.add(cb);
@@ -784,6 +789,14 @@ function noteNewPurchase(e: NewPurchaseEvent) {
 const txnOf = (p: Purchase): string | undefined => (Platform.OS === 'android'
   ? p.purchaseToken || undefined
   : (p.transactionId ?? p.id) || undefined);
+
+/** The subscription's original transaction id. iOS only: Play's token is
+ *  already one per subscription. */
+const originalOf = (p: Purchase): string | undefined => {
+  if (Platform.OS === 'android') return undefined;
+  const o = (p as { originalTransactionIdentifierIOS?: string | null }).originalTransactionIdentifierIOS;
+  return o ? String(o) : undefined;
+};
 
 /** How this purchase is known to be new, or null if it is not. */
 function evidenceOf(p: Purchase): PurchaseEvidence | null {
@@ -806,8 +819,9 @@ function evidenceOf(p: Purchase): PurchaseEvidence | null {
  * Android is the platform where this MATTERS: Play refunds an unacknowledged
  * purchase after three days, so a failure here is a sale that will undo itself
  * and is logged. An already-acknowledged purchase is not asked again. On iOS a
- * failure only means StoreKit replays the transaction next launch, and
- * finishing one twice throws routinely, so it stays silent and counts as done.
+ * failure still counts as done (nothing refunds it), but StoreKit replays the
+ * transaction on every launch until it is finished, so it is logged as
+ * `<tag>.ios`, once per transaction per session.
  */
 const ackedThisSession = new Set<string>();
 async function acknowledge(purchase: Purchase, tag: string): Promise<boolean> {
@@ -822,11 +836,26 @@ async function acknowledge(purchase: Purchase, tag: string): Promise<boolean> {
     if (token) ackedThisSession.add(token);
     return true;
   } catch (e) {
-    if (!android) return true;
+    if (!android) {
+      // Still counted as done: nothing on iOS refunds an unfinished
+      // transaction. But it is REPLAYED to the listener on every launch,
+      // background launches included, and one subscriber's first-year
+      // transaction arrived a dozen times a day while this catch said nothing.
+      // OpenIAP treats finishing an already-finished transaction as success,
+      // so what lands here is a real refusal (a payload it could not decode,
+      // an id it could not parse). Logged once per transaction per session.
+      const id = purchase.transactionId ?? purchase.id;
+      if (id && !finishFailedThisSession.has(id)) {
+        finishFailedThisSession.add(id);
+        logError(`${tag}.ios`, iapDetail(e));
+      }
+      return true;
+    }
     logError(tag, iapDetail(e));
     return false;
   }
 }
+const finishFailedThisSession = new Set<string>();
 const outcomeListeners = new Set<(o: PurchaseOutcomeEvent) => void>();
 
 export function onPurchaseOutcome(cb: (o: PurchaseOutcomeEvent) => void): () => void {

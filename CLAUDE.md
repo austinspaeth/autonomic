@@ -1631,7 +1631,11 @@ old web app so old `export.json` files import directly.
   purchase or a first StoreKit transaction with no tap (a payment that cleared
   after its sheet closed). The lambda counts it in a separate `evidence` map on
   the SUB row (`<cohort key>~V`), never in the cohort key, and the dashboard
-  shows verified beside store-only. **A purchase is reported once per
+  shows verified beside store-only as an ALWAYS-drawn second split row on
+  both the newest-day "Subscriptions reported on <day>" tile and the range tile
+  (Within 1h of tap / No tap / Older build) plus the purchase list's Known by column. It was first a clause in the
+  tile's fine print that hid itself until a tagged sale arrived, and nobody
+  could find it. **A purchase is reported once per
   transaction**: the store's id (Play token, StoreKit transaction id) is kept
   on the phone in `pingSubReported` and never sent, which is what stops a
   replayed transaction counting on every launch. **The purchase must be on
@@ -1647,7 +1651,17 @@ old web app so old `export.json` files import directly.
   reconnect), that transaction is its own original for its whole first period,
   and one founder purchase once landed as eight `sub`s in a day. An install
   whose `sub` predates `pingSubReported` adopts the first transaction delivered
-  while its entitlement stands, rather than counting it again. None of it is
+  while its entitlement stands, rather than counting it again. **The
+  transaction id was not enough**: the same founder subscriber went on
+  reporting several sales a day on 1.31.1, so the listener was being handed
+  transactions with ids it had not seen. Two more rules sit behind it, neither
+  trusting a transaction id: a StoreKit ORIGINAL id already reported
+  (`pingSubOriginals`, cleared by a confirmed lapse, since a resubscription keeps
+  the group's original) is the same subscription, and a second `sub` on the
+  same Eastern day (`pingSubDay`) is dropped outright, since a subscription
+  group holds one plan at a time. Whatever either catches is reported as the
+  fault `ping.subDuplicate` (`original` / `day` + the evidence letter), once per
+  rule per session, which is how the Failures tab says which hole it was. None of it is
   revenue; the imported sales ledger is. Renewals are not pinged: Play never
   tells the app, and iOS only while it is open. Failures are silent and NOT sent to `logError` —
   being offline is a phone's normal state, and it would flush the 40-entry

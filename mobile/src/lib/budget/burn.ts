@@ -202,7 +202,7 @@ export const GAP_PCT = 0.75;
  * cannot disagree about what "covered" means for that day.
  */
 export function gapToleranceFor(series: { t: number; bpm: number }[] | null | undefined): number {
-  const typical = typicalGapMin(series);
+  const typical = cadenceByTimeMin(series);
   if (typical == null) return HR_GAP_MIN;
   const capped = Math.min(HR_GAP_MAX, typical * GAP_TOLERANCE_K);
   return Math.min(HR_GAP_HARD, Math.max(HR_GAP_MIN, capped, typical * GAP_KEEP));
@@ -234,6 +234,49 @@ export function typicalGapMin(series: { t: number; bpm: number }[] | null | unde
   if (gaps.length < 2) return null;
   gaps.sort((a, b) => a - b);
   return gaps[Math.min(gaps.length - 1, Math.floor((gaps.length - 1) * GAP_PCT))];
+}
+
+/**
+ * The cadence the gap TOLERANCE is read from: the same percentile, but over
+ * the day's TIME rather than over its intervals — the gap a typical minute of
+ * the day sat inside.
+ *
+ * Counting intervals let one dense burst outvote the whole day. A wrist
+ * sampling every six minutes writes ~150 intervals over a waking day; a
+ * seventy-minute workout, Breathe session or strap reading at one sample every
+ * five seconds writes ~840 in an hour. The 75th-percentile INTERVAL was then
+ * five seconds, the tolerance fell to its five-minute floor, and every ordinary
+ * background gap for the rest of the day turned uncovered at once. Measured on
+ * a synthetic day of exactly that shape: 176 minutes above the line became 0,
+ * 534 minutes of coverage became 70, and the recovery minutes went with them —
+ * so the strip handed back an hour and a half the user had really spent, the
+ * phrase under it called that a saving in green, and the Recovery row vanished
+ * from the drill-in between two openings. Weighted by time the burst is the
+ * seventy minutes it lasted and nothing more.
+ *
+ * `typicalGapMin` stays count-based on purpose: it is what is stored as
+ * `hrSampleGapMin` and compared across days in ./baseline, and moving its
+ * meaning would put the stored days on a different scale from new ones.
+ */
+export function cadenceByTimeMin(series: { t: number; bpm: number }[] | null | undefined): number | null {
+  if (!series || series.length < 3) return null;
+  const pts = series
+    .filter((p) => Number.isFinite(p.t) && Number.isFinite(p.bpm) && p.bpm > 0)
+    .sort((a, b) => a.t - b.t);
+  const gaps: number[] = [];
+  for (let i = 1; i < pts.length; i++) {
+    const g = (pts[i].t - pts[i - 1].t) / 60;
+    if (g > 0) gaps.push(g);
+  }
+  if (gaps.length < 2) return null;
+  gaps.sort((a, b) => a - b);
+  const total = gaps.reduce((a, b) => a + b, 0);
+  let acc = 0;
+  for (const g of gaps) {
+    acc += g;
+    if (acc >= total * GAP_PCT) return g;
+  }
+  return gaps[gaps.length - 1];
 }
 
 /** Minutes a run above the line must last before it is called a stretch. */

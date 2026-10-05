@@ -28,6 +28,7 @@
 import type { DaysMap } from '../scoring/day';
 import type { Tier } from '../tier';
 import { engagedDayCount } from '../review/eligibility';
+import { priceAmount } from './price';
 
 /**
  * The offer is ON.
@@ -174,21 +175,9 @@ export function founderRules(input: FounderInput): FounderVerdict {
  * price is a per-territory setting we don't control from here.
  */
 export function discountPct(introPrice: string, fullPrice: string): number | null {
-  const amount = (s: string): number | null => {
-    const m = s.match(/\d[\d.,\s]*/);
-    if (!m) return null;
-    // Strip grouping separators, keep the last separator as the decimal point:
-    // handles "1.234,56" and "1,234.56" alike.
-    const raw = m[0].replace(/\s/g, '');
-    const lastSep = Math.max(raw.lastIndexOf('.'), raw.lastIndexOf(','));
-    const norm = lastSep >= 0 && raw.length - lastSep <= 3
-      ? `${raw.slice(0, lastSep).replace(/[.,]/g, '')}.${raw.slice(lastSep + 1)}`
-      : raw.replace(/[.,]/g, '');
-    const n = parseFloat(norm);
-    return Number.isFinite(n) && n > 0 ? n : null;
-  };
-  const intro = amount(introPrice);
-  const full = amount(fullPrice);
+  // Handles "1.234,56" and "1,234.56" alike (./price).
+  const intro = priceAmount(introPrice);
+  const full = priceAmount(fullPrice);
   if (intro == null || full == null || intro >= full) return null;
   const pct = Math.round((1 - intro / full) * 100);
   return pct >= 5 ? pct : null;
