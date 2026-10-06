@@ -8,8 +8,8 @@ keywords: "HRV vs resting heart rate, HRV or resting heart rate, resting heart r
 date: 2026-10-06
 updated: 2026-10-06
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1541199249251-f713e6145474?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Kinga Howard / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1659366100463-9e29a63adcc2?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+photoAttribution: "Unsplash"
 tldr: "Resting heart rate (RHR) tells you how hard your heart is working at rest; HRV tells you how flexible your autonomic nervous system is beat to beat. They usually move in opposite directions (good recovery means lower RHR and higher HRV), so watching both at once is more reliable than trusting either alone. When they split, something specific is usually going on."
 categories:
   - hrv
