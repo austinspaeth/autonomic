@@ -8,8 +8,8 @@ keywords: "meditation and HRV, does meditation improve HRV, meditation vagal ton
 date: 2026-10-05
 updated: 2026-10-05
 author: "Austin Spaeth"
-photoLocation: https://images.unsplash.com/photo-1578497049232-3af54fc00d3e?q=80&w=1760&auto=format&fit=crop
-photoAttribution: "DrematiNap / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1602254473438-fc0ee47d9715?q=80&w=987&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+photoAttribution: "Unsplash"
 tldr: "Meditation does raise HRV, but the effect is modest and most of the within-session lift comes from the slow breathing that meditation encourages, not from stillness alone. During a session, RMSSD and HF power usually climb as your breath slows. A lasting rise in your resting baseline is possible over weeks of regular practice, but it is smaller and more variable, so judge it by your own multi-week trend measured the same way each day, not by one calm sitting."
 categories:
   - hrv

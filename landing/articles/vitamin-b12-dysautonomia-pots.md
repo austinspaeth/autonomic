@@ -8,7 +8,7 @@ keywords: "vitamin B12 and dysautonomia, B12 deficiency POTS, B12 and HRV, vitam
 date: 2026-10-02
 updated: 2026-10-02
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1498837167922-ddd27525d352?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "https://images.unsplash.com/photo-1565071783280-719b01b29912?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Unsplash"
 tldr: "Vitamin B12 keeps the insulation on your nerves intact and helps build red blood cells, so a real deficiency can damage the autonomic nerves that control heart rate and blood pressure and can cause anemia that drives a fast, pounding heartbeat. The result can look a lot like POTS or dysautonomia and can lower HRV. The catch is that the usual serum B12 test has a wide grey zone where you can be functionally low with a 'normal' result, so ask for methylmalonic acid (MMA) to confirm. B12 is water-soluble and very safe to correct compared with vitamin D, but test before you treat so you do not hide the diagnosis, and track your own HRV, resting heart rate and stand test against your baseline to see whether correcting it actually helped."
 categories:

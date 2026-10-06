@@ -8,8 +8,8 @@ keywords: "intermittent fasting POTS, intermittent fasting and HRV, fasting dysa
 date: 2026-10-03
 updated: 2026-10-03
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1498837167922-ddd27525d352?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Brooke Lark / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1659352155635-aef81d690cd4?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
+photoAttribution: "Unsplash"
 tldr: "Intermittent fasting has real metabolic appeal, but POTS and dysautonomia change the calculation. In a healthy body a fasting window often nudges vagal activity and HRV up a little. In a dysautonomic one, the same fast can push the other way, because going long without food tends to drop blood volume (you skip fluids and salt along with the meal), dip blood sugar enough to trigger an adrenaline surge, and then concentrate eating into fewer, larger meals that worsen post-meal blood pooling. The riskiest pattern is skipping breakfast and fasting straight through the morning, which is already the worst part of the POTS day. If you still want to try it, a gentle window (12:12 or 14:10), eating earlier rather than later, and keeping salt and fluids up during the fast are far safer than a long or late fast. Watch your morning HRV, resting heart rate and stand test, and discuss it with your clinician if you take medication."
 categories:
   - food
