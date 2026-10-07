@@ -20,7 +20,7 @@ import { mergeReport, useData } from './data';
 import { onPush, registerForPush } from './push';
 import { addDays, easternDay, shortDate } from './dates';
 import { diff, MAX_CATCHUP_MS, records, snapshot, type AlertEvent, type Snapshot } from './alerts';
-import { setCelebrations, type CelebrationKind } from '../components/Celebration';
+import { setCelebrations, whenCelebrationReady, type CelebrationKind } from '../components/Celebration';
 
 const BASE_KEY = 'master.alerts.baseline.v1';
 const HISTORY_KEY = 'master.alerts.history.v1';
@@ -101,14 +101,20 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
     } else {
       setPreviews((cur) => [...events, ...cur]);
     }
-    setLive((cur) => [...cur, ...events.map((e) => e.id)]);
-    Haptics.notificationAsync(
-      events.some((e) => e.kind === 'crash')
-        ? Haptics.NotificationFeedbackType.Error
-        : events.some((e) => e.kind === 'sale' || e.kind === 'record')
-          ? Haptics.NotificationFeedbackType.Success
-          : Haptics.NotificationFeedbackType.Warning,
-    ).catch(() => {});
+    /* A toast that brings confetti waits for the confetti page, so the two
+       land together instead of the toast arriving to an empty sky. */
+    const raise = () => {
+      setLive((cur) => [...cur, ...events.map((e) => e.id)]);
+      Haptics.notificationAsync(
+        events.some((e) => e.kind === 'crash')
+          ? Haptics.NotificationFeedbackType.Error
+          : events.some((e) => e.kind === 'sale' || e.kind === 'record')
+            ? Haptics.NotificationFeedbackType.Success
+            : Haptics.NotificationFeedbackType.Warning,
+      ).catch(() => {});
+    };
+    if (events.some((e) => CELEBRATION[e.kind])) whenCelebrationReady().then(raise);
+    else raise();
   }, []);
 
   const check = useCallback(async () => {
