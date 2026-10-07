@@ -5,7 +5,17 @@
  * install is the same number and none of the news. */
 import { useEffect, useMemo, useState } from 'react';
 import { PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import Animated, { Easing, FadeIn, FadeOut, LinearTransition, runOnJS, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import Animated, {
+  Easing,
+  FadeIn,
+  FadeOut,
+  LinearTransition,
+  runOnJS,
+  useAnimatedProps,
+  useAnimatedStyle,
+  useSharedValue,
+  withTiming,
+} from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -86,12 +96,20 @@ export function InstallRows({ event }: { event: AlertEvent }) {
 
 /* ---------------------------------------------------------------- toasts */
 
-/* The live toasts are a DECK, like the stacked modal cards: the newest sits
-   in front, and every card behind it is a little smaller and a little higher,
-   peeking over its top edge. Tapping, swiping or ✕ dismisses the front card
-   and the next one comes forward; the details are in the bell's history. Nothing bounces: a card is DROPPED onto the deck (it
-   fades in while settling from slightly larger to full size) and the others
-   ease into their new places. */
+/* The live toasts are a DECK, like the stacked modal cards: the most
+   important sits in front (TOAST_PRIORITY, newest first within a kind), and
+   every card behind it is a little smaller and a little higher, peeking over
+   its top edge. Tapping, swiping or ✕ dismisses the front card and the next
+   one comes forward; the details are in the bell's history. Nothing bounces:
+   a card DESCENDS onto the deck (it fades in while settling down from
+   slightly larger and higher to its place) and the others ease into theirs. */
+
+/** Front to back. A kind not listed goes behind all of these. */
+const TOAST_PRIORITY: AlertEvent['kind'][] = ['crash', 'sale', 'record', 'download', 'visitor', 'reading'];
+const rank = (k: AlertEvent['kind']) => {
+  const i = TOAST_PRIORITY.indexOf(k);
+  return i < 0 ? TOAST_PRIORITY.length : i;
+};
 
 const TOAST_H = 86;
 /** How much of each card behind shows above the one in front of it. */
@@ -101,17 +119,17 @@ const SHRINK = 0.055;
 /** Cards past this depth are hidden (the count says how many). */
 const MAX_DEPTH = 3;
 const EASE = { duration: 280, easing: Easing.out(Easing.cubic) };
+const BLUR = 95;
+/* The entrance: one 0→1 value drives the fade, the zoom (from APPEAR_SCALE
+   down to full size) and the descent (from APPEAR_LIFT above its place).
+   It is part of the card's own animated style rather than a layout
+   `entering` animation, because the two fought over `transform` (the deck
+   position lives there too) and the card stuttered on its way in. */
+const APPEAR = { duration: 420, easing: Easing.out(Easing.cubic) };
+const APPEAR_SCALE = 0.08;
+const APPEAR_LIFT = 18;
 
-function dropIn() {
-  'worklet';
-  return {
-    initialValues: { opacity: 0, transform: [{ scale: 1.1 }, { translateY: 0 }] },
-    animations: {
-      opacity: withTiming(1, { duration: 220 }),
-      transform: [{ scale: withTiming(1, { duration: 340, easing: Easing.out(Easing.cubic) }) }, { translateY: withTiming(0, { duration: 1 }) }],
-    },
-  };
-}
+const AnimatedBlur = Animated.createAnimatedComponent(BlurView);
 
 function liftOut() {
   'worklet';
@@ -143,9 +161,13 @@ function Toast({
   const [swiped, setSwiped] = useState(false);
   const d = useSharedValue(depth);
   const tx = useSharedValue(0);
+  const appear = useSharedValue(0);
   useEffect(() => {
     d.value = withTiming(depth, EASE);
   }, [depth, d]);
+  useEffect(() => {
+    appear.value = withTiming(1, APPEAR);
+  }, [appear]);
 
   const gone = (dir: number) => {
     setSwiped(true);
@@ -181,41 +203,53 @@ function Toast({
     [],
   );
 
+  /* The fade is NOT the wrapper's opacity: a blur view under a parent with
+     opacity below 1 renders broken on iOS and pops in at the end, which is
+     the jagged entrance this replaced. The wrapper's border, the content and
+     the blur's own intensity fade instead. */
   const style = useAnimatedStyle(() => ({
     opacity: (d.value > MAX_DEPTH - 0.01 ? 0 : 1) * (1 - Math.min(1, Math.abs(tx.value) / 360)),
-    transform: [{ translateY: -PEEK * d.value }, { translateX: tx.value }, { scale: 1 - SHRINK * d.value }],
+    borderColor: `rgba(255,255,255,${0.16 * appear.value})`,
+    transform: [
+      { translateY: -PEEK * d.value - APPEAR_LIFT * (1 - appear.value) },
+      { translateX: tx.value },
+      { scale: (1 - SHRINK * d.value) * (1 + APPEAR_SCALE * (1 - appear.value)) },
+    ],
   }));
+  const fade = useAnimatedStyle(() => ({ opacity: appear.value }));
+  const blur = useAnimatedProps(() => ({ intensity: BLUR * appear.value }));
   const k = KIND_STYLE[event.kind];
   const front = depth === 0;
   return (
     <Animated.View
-      entering={front ? dropIn : undefined}
       exiting={swiped ? undefined : liftOut}
       pointerEvents={front ? 'auto' : 'none'}
       onLayout={front ? (e) => onHeight?.(e.nativeEvent.layout.height) : undefined}
       style={[st.toastWrap, { zIndex: 100 - depth, transformOrigin: 'bottom' }, style]}
       {...(front ? pan.panHandlers : {})}
     >
-      <BlurView tint="systemChromeMaterialDark" intensity={95} style={StyleSheet.absoluteFill} />
-      <View style={[StyleSheet.absoluteFill, { backgroundColor: `${k.color}12` }]} />
+      <AnimatedBlur tint="systemChromeMaterialDark" animatedProps={blur} style={StyleSheet.absoluteFill} />
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: `${k.color}12` }, fade]} />
       {/* Tapping a toast closes it; the details live in the alerts history. */}
-      <Pressable onPress={() => gone(0)} style={st.toast}>
-        <View style={st.toastHead}>
-          <Icon kind={event.kind} size={40} />
-          <View style={{ flex: 1, minWidth: 0, paddingRight: 26 }}>
-            <Text style={st.title} numberOfLines={1}>
-              {event.title}
-            </Text>
-            <Text style={st.body} numberOfLines={1}>
-              {short(event.body)}
-            </Text>
+      <Animated.View style={[st.toastFill, fade]}>
+        <Pressable onPress={() => gone(0)} style={st.toast}>
+          <View style={st.toastHead}>
+            <Icon kind={event.kind} size={40} />
+            <View style={{ flex: 1, minWidth: 0, paddingRight: 26 }}>
+              <Text style={st.title} numberOfLines={1}>
+                {event.title}
+              </Text>
+              <Text style={st.body} numberOfLines={1}>
+                {short(event.body)}
+              </Text>
+            </View>
           </View>
-        </View>
-        <Pressable hitSlop={12} onPress={() => gone(0)} style={st.x}>
-          <SymbolView name="xmark" size={10} weight="bold" tintColor={C.dim} />
+          <Pressable hitSlop={12} onPress={() => gone(0)} style={st.x}>
+            <SymbolView name="xmark" size={10} weight="bold" tintColor={C.dim} />
+          </Pressable>
+          <Text style={st.timeCorner}>{ago(event.at)}</Text>
         </Pressable>
-        <Text style={st.timeCorner}>{ago(event.at)}</Text>
-      </Pressable>
+      </Animated.View>
     </Animated.View>
   );
 }
@@ -225,8 +259,13 @@ export function ToastStack({ raisedBy = 0 }: { raisedBy?: number }) {
   const insets = useSafeAreaInsets();
   const { history, live, dismiss, dismissAll } = useAlerts();
   const [frontH, setFrontH] = useState(TOAST_H);
-  // Newest first: `live` is in arrival order.
-  const shown = [...live].reverse().map((id) => history.find((e) => e.id === id)).filter((e): e is AlertEvent => !!e);
+  // Most important first, newest first within a kind (`live` is in arrival
+  // order, and the sort is stable).
+  const shown = [...live]
+    .reverse()
+    .map((id) => history.find((e) => e.id === id))
+    .filter((e): e is AlertEvent => !!e)
+    .sort((a, b) => rank(a.kind) - rank(b.kind));
   if (!shown.length) return null;
   const bottom = insets.bottom + BOTTOM_CHROME + raisedBy + 10;
   const behind = Math.min(shown.length - 1, MAX_DEPTH - 1);
@@ -353,6 +392,7 @@ const st = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.16)',
   },
+  toastFill: { flex: 1 },
   toast: { flex: 1, justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 12 },
   timeCorner: { position: 'absolute', right: 14, bottom: 10, color: C.muted, fontSize: 11 },
   toastHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },

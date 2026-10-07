@@ -2,8 +2,9 @@
  *
  * While the app is in front it asks for the last 45 days of pings every
  * POLL_MS, diffs them against the baseline it last saw, and announces what
- * rose: a toast per event (they stack until dismissed), an entry in the
- * history the bell opens, and the celebration for its kind. The baseline is
+ * rose: a toast per event (they stack until dismissed) and an entry in the
+ * history the bell opens. The celebration for a kind runs for as long as a
+ * toast of that kind is up, and stops when the last one is cleared. The baseline is
  * remembered on disk, so what arrived while the app was closed is announced
  * when it opens, up to MAX_CATCHUP_MS; a first launch seeds in silence.
  *
@@ -19,7 +20,7 @@ import { mergeReport, useData } from './data';
 import { onPush, registerForPush } from './push';
 import { addDays, easternDay, shortDate } from './dates';
 import { diff, MAX_CATCHUP_MS, records, snapshot, type AlertEvent, type Snapshot } from './alerts';
-import { celebrate, type CelebrationKind } from '../components/Celebration';
+import { setCelebrations, type CelebrationKind } from '../components/Celebration';
 
 const BASE_KEY = 'master.alerts.baseline.v1';
 const HISTORY_KEY = 'master.alerts.history.v1';
@@ -101,10 +102,6 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
       setPreviews((cur) => [...events, ...cur]);
     }
     setLive((cur) => [...cur, ...events.map((e) => e.id)]);
-    const kinds = new Set(events.map((e) => CELEBRATION[e.kind]).filter(Boolean) as CelebrationKind[]);
-    (['record', 'sale', 'download', 'return'] as CelebrationKind[]).forEach((k, i) => {
-      if (kinds.has(k)) setTimeout(() => celebrate(k), i * 350);
-    });
     Haptics.notificationAsync(
       events.some((e) => e.kind === 'crash')
         ? Haptics.NotificationFeedbackType.Error
@@ -177,6 +174,19 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
   );
 
   const all = [...previews, ...history];
+
+  /* Each live toast keeps its kind's effect running; clearing the last toast
+     of a kind stops that effect and leaves the others alone. */
+  const running = [
+    ...new Set(live.map((id) => CELEBRATION[all.find((e) => e.id === id)?.kind as AlertEvent['kind']]).filter(Boolean)),
+  ]
+    .sort()
+    .join();
+  useEffect(() => {
+    setCelebrations(running ? (running.split(',') as CelebrationKind[]) : []);
+  }, [running]);
+  useEffect(() => () => setCelebrations([]), []);
+
   const value: AlertsState = {
     history: all,
     live,
