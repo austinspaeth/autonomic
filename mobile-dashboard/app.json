@@ -33,7 +33,8 @@
         {
           "color": "#ffffff"
         }
-      ]
+      ],
+      "./plugins/withSceneLifecycle"
     ],
     "experiments": {
       "typedRoutes": false
