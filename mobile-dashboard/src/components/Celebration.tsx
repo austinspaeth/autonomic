@@ -22,9 +22,16 @@
  *   - The OS kills a web view's content process while the app sits in the
  *     background. The view goes blank, so termination remounts it, and the
  *     fresh page is told the current set the moment it reports ready.
+ *   - Termination is not always REPORTED. So every return to the foreground
+ *     asks the page to answer; no answer within ALIVE_MS remounts it.
+ *
+ * Toasts wait for the page (`whenCelebrationReady`): a toast whose confetti
+ * cannot run yet is held until the page says ready, or READY_WAIT_MS at the
+ * outside, so the two arrive together. The page only says ready once the
+ * confetti library is actually defined; if it is not, the view is remounted.
  */
 import { useEffect, useRef, useState } from 'react';
-import { StyleSheet, View } from 'react-native';
+import { AppState, StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
 import { CONFETTI_JS } from './confettiBundle';
 
@@ -32,6 +39,35 @@ export type CelebrationKind = 'return' | 'download' | 'sale' | 'record';
 
 let wanted: CelebrationKind[] = [];
 const listeners = new Set<() => void>();
+
+/* Whether the page is up with the library loaded, and who is waiting on it. */
+let ready = false;
+const waiting = new Set<() => void>();
+const READY_WAIT_MS = 4000;
+const ALIVE_MS = 1500;
+
+function setReady(on: boolean) {
+  ready = on;
+  if (!on) return;
+  const fns = [...waiting];
+  waiting.clear();
+  fns.forEach((fn) => fn());
+}
+
+/** Resolves once the confetti page is ready, or after READY_WAIT_MS regardless:
+    a toast is never lost to a web view that will not come up. */
+export function whenCelebrationReady(): Promise<void> {
+  if (ready) return Promise.resolve();
+  return new Promise((resolve) => {
+    const done = () => {
+      clearTimeout(timer);
+      waiting.delete(done);
+      resolve();
+    };
+    const timer = setTimeout(done, READY_WAIT_MS);
+    waiting.add(done);
+  });
+}
 
 /** Run exactly these effects (and stop any others) until told otherwise. */
 export function setCelebrations(kinds: CelebrationKind[]) {
@@ -159,28 +195,44 @@ function tick(){
   requestAnimationFrame(tick);
 }
 
-window.ReactNativeWebView&&window.ReactNativeWebView.postMessage('ready');
+function say(m){window.ReactNativeWebView&&window.ReactNativeWebView.postMessage(m)}
+window.alive=function(){say(typeof confetti==='function'?'ready':'nolib')};
+window.alive();
 </script></body></html>`;
 
 export function CelebrationLayer() {
   const web = useRef<WebView>(null);
-  const ready = useRef(false);
   const [generation, setGeneration] = useState(0);
+  const check = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const retries = useRef(0);
 
   const push = () => {
-    if (ready.current) web.current?.injectJavaScript(`window.sync && window.sync(${JSON.stringify(wanted)}); true;`);
+    if (ready) web.current?.injectJavaScript(`window.sync && window.sync(${JSON.stringify(wanted)}); true;`);
   };
 
   /* The page is gone: wait for a fresh one to say ready, then tell it. */
   const restart = () => {
-    ready.current = false;
+    if (check.current) clearTimeout(check.current);
+    check.current = null;
+    setReady(false);
     setGeneration((g) => g + 1);
   };
 
   useEffect(() => {
     listeners.add(push);
+    /* Back in front: hold toasts until the page proves it is still alive. */
+    const sub = AppState.addEventListener('change', (st) => {
+      if (st !== 'active') return;
+      setReady(false);
+      if (check.current) clearTimeout(check.current);
+      check.current = setTimeout(restart, ALIVE_MS);
+      web.current?.injectJavaScript('window.alive ? window.alive() : 0; true;');
+    });
     return () => {
       listeners.delete(push);
+      sub.remove();
+      if (check.current) clearTimeout(check.current);
+      setReady(false);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -200,8 +252,18 @@ export function CelebrationLayer() {
         onContentProcessDidTerminate={restart}
         onRenderProcessGone={restart}
         onMessage={(e) => {
-          if (e.nativeEvent.data !== 'ready') return;
-          ready.current = true;
+          const msg = e.nativeEvent.data;
+          if (check.current) clearTimeout(check.current);
+          check.current = null;
+          if (msg === 'nolib') {
+            // The inlined library did not define confetti(): try a fresh page
+            // a few times rather than run a layer that can never draw.
+            if (retries.current++ < 3) restart();
+            return;
+          }
+          if (msg !== 'ready') return;
+          retries.current = 0;
+          setReady(true);
           push();
         }}
       />

@@ -6,8 +6,8 @@ import { useSyncExternalStore } from 'react';
 export type ViewKey = 'glance' | 'usage' | 'sales' | 'forecast' | 'errors' | 'pings' | 'links' | 'account';
 
 export const VIEWS: { key: ViewKey; label: string }[] = [
-  { key: 'glance', label: 'Overview' },
   { key: 'usage', label: 'App usage' },
+  { key: 'glance', label: 'App Performance' },
   { key: 'sales', label: 'Sales' },
   { key: 'forecast', label: 'Forecast' },
   { key: 'errors', label: 'Crashes & Errors' },
@@ -16,7 +16,8 @@ export const VIEWS: { key: ViewKey; label: string }[] = [
   { key: 'account', label: 'Account' },
 ];
 
-let current: ViewKey = 'glance';
+/* App usage is the home view: it is what gets opened to most often. */
+let current: ViewKey = 'usage';
 const listeners = new Set<() => void>();
 
 export function setView(key: ViewKey) {
