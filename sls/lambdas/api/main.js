@@ -18,11 +18,15 @@
  *   PUSH_SUBSCRIBE { subscription, ua } -> registers this device
  *   PUSH_UNSUBSCRIBE { endpoint } -> forgets it
  *   PUSH_TEST      -> sends one now, through the real encrypted path
+ *   PUSH_EXPO_REGISTER { token, device } -> the phone dashboard's Expo push token
+ *   PUSH_EXPO_UNREGISTER { token } -> forgets it
+ *   PUSH_EXPO_TEST -> sends one to every registered phone now
  *
  * One action here has a side effect outside DynamoDB: SYNC publishes campaign
  * download pages into the site bucket. See lambdas/api/links.js for why the
  * page is a written object rather than a runtime lookup.
  */
+const zlib = require('node:zlib');
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const {
   DynamoDBDocumentClient,
@@ -49,6 +53,7 @@ const {
 /* Reading the two stores. Its own file because the Play half is a scrape and
    wants explaining at length. */
 const { storeVersions } = require('./storeVersions');
+const expoPush = require('../push/expo');
 /* Campaign download links — `/download/<slug>`. Its own file because the S3
    publish, and the reasons for it, want explaining at length. */
 const {
@@ -85,6 +90,22 @@ const json = (statusCode, body) => ({
   headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(body),
 });
+
+/* Responses past this size are gzipped when the caller accepts it. The usage
+   report is extremely repetitive JSON (the same keys and letters on every
+   row), so it compresses by an order of magnitude; small responses are not
+   worth the CPU. HTTP API passes a base64 body through as binary. */
+const GZIP_MIN = 8 * 1024;
+const maybeGzip = (event, res) => {
+  const accept = String(event?.headers?.['accept-encoding'] || event?.headers?.['Accept-Encoding'] || '');
+  if (!/\bgzip\b/i.test(accept) || !res.body || res.body.length < GZIP_MIN) return res;
+  return {
+    ...res,
+    headers: { ...res.headers, 'Content-Encoding': 'gzip', Vary: 'Accept-Encoding' },
+    body: zlib.gzipSync(res.body).toString('base64'),
+    isBase64Encoded: true,
+  };
+};
 
 const chunk = (arr, size) => {
   const out = [];
@@ -782,7 +803,7 @@ const handler = async (event) => {
   try {
     switch (action) {
       case 'LOAD':
-        return json(200, await load(pk));
+        return maybeGzip(event, json(200, await load(pk)));
       case 'SYNC':
         return json(200, await sync(pk, payload));
       case 'REPLACE_ALL':
@@ -794,7 +815,9 @@ const handler = async (event) => {
       // dashboard already holds a token, and shouldn't also hold the ping
       // lambda's shared key.
       case 'PINGS':
-        return json(200, await pingReport(payload.since));
+        // `compact`: the stored maps as they are, decoded by the caller (the
+        // phone dashboard). Without it, the expanded rows the web reads.
+        return maybeGzip(event, json(200, await pingReport(payload.since, { compact: !!payload.compact })));
       /* The giveaway sign-ups. Email addresses, so they are read ONLY here,
          behind the token and the allowlist — never on the shared-key report. */
       case 'GIVEAWAY':
@@ -815,6 +838,15 @@ const handler = async (event) => {
         return json(200, await pushSubscribe(email, payload));
       case 'PUSH_UNSUBSCRIBE':
         return json(200, await pushUnsubscribe(email, payload));
+      /* The phone dashboard's own pushes (new install, sale, hard crash),
+         sent by the ping handler the moment they arrive. See push/expo.js. */
+      case 'PUSH_EXPO_REGISTER':
+        return json(200, await expoPush.register(email, payload.token, payload.device));
+      case 'PUSH_EXPO_UNREGISTER':
+        return json(200, await expoPush.unregister(payload.token));
+      case 'PUSH_EXPO_TEST':
+        await expoPush.send('\u{1F44B} Autonomic', 'Instant alerts are working.', { kind: 'test' });
+        return json(200, { ok: true });
       case 'PUSH_TEST':
         return json(200, await pushTest(email, payload));
       /* Campaign links publish themselves on save. This is the button for the

@@ -188,6 +188,9 @@ const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, UpdateCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
 const { readGiveaway, writeGiveaway } = require('./giveaway');
 
+/* Instant pushes to the owner's phone for new installs, sales and crashes. */
+const expoPush = require('../push/expo');
+
 const TABLE = process.env.DYNAMO_TABLE_NAME;
 
 /** Shared secret for the read route. Unset ⇒ the route refuses everyone, which
@@ -584,7 +587,24 @@ const bump = async (kind, day, cohortIso, platform, slot, tier, version, evidenc
  * `'F'` are different claims, and the dashboard is built to show the
  * difference.
  */
-const readDays = async (kind, since) => {
+/* COMPACT rows (`report(since, { compact: true })`): the stored maps as they
+   are, `{ day, total, c: { cohortKey: n }, b?: { buildKey: n }, e?: { "key~V": n } }`.
+   Every field the expanded row spells out is decoded from the keys, so the
+   expanded form repeats each one per entry; for the phone dashboard, which
+   decodes the keys itself, that was most of a multi-megabyte report. The
+   expanded form stays the default, so the web dashboard reads it unchanged. */
+const compactRow = (item) => {
+  const num = (m) => Object.keys(m || {}).reduce((a, k) => {
+    a[k] = Number(m[k]) || 0;
+    return a;
+  }, {});
+  const row = { day: item.SK, total: Number(item.total) || 0, c: num(item.cohorts) };
+  if (item.builds && Object.keys(item.builds).length) row.b = num(item.builds);
+  if (item.evidence && Object.keys(item.evidence).length) row.e = num(item.evidence);
+  return row;
+};
+
+const readDays = async (kind, since, compact = false) => {
   const reading = !!READING_KINDS[kind];
   const rows = [];
   let ExclusiveStartKey;
@@ -597,6 +617,10 @@ const readDays = async (kind, since) => {
       ExclusiveStartKey,
     }));
     (res.Items || []).forEach((item) => {
+      if (compact) {
+        rows.push(compactRow(item));
+        return;
+      }
       const cohorts = item.cohorts || {};
       const builds = item.builds || {};
       const evidence = item.evidence || {};
@@ -940,10 +964,10 @@ const readFaults = async (since) => {
  */
 const REPORT_KINDS = Object.keys(KINDS);
 
-const report = async (since) => {
+const report = async (since, opts = {}) => {
   const from = isIsoDate(since) ? since : EPOCH;
   const [rows, faults, offerFailures] = await Promise.all([
-    Promise.all(REPORT_KINDS.map((k) => readDays(KINDS[k], from))),
+    Promise.all(REPORT_KINDS.map((k) => readDays(KINDS[k], from, !!opts.compact))),
     // Read alongside the counters rather than behind a second call: the
     // dashboard shows failures against opens ("of the phones in the app today,
     // how many hit this"), and a view that fetched them separately would draw
@@ -962,7 +986,7 @@ const report = async (since) => {
       return [];
     }),
   ]);
-  const out = { since: from, faults, offerFailures };
+  const out = { since: from, faults, offerFailures, ...(opts.compact ? { compact: true } : {}) };
   REPORT_KINDS.forEach((k, i) => { out[k] = rows[i]; });
   return out;
 };
@@ -1045,6 +1069,11 @@ const handleFault = async (event) => {
     easternDay(now), safeTag(q.t), msg, q.f === '1',
     platform, tier, version, n, installDay, now,
   );
+  /* A HARD crash reaches the owner's phone at once: a fatal report, on the
+     first report of the day from this install (`d`), so a crash loop is one
+     push per phone per day rather than one per retry. Handled errors never
+     push. After the count, and unable to fail it (see push/expo.js). */
+  if (q.f === '1' && installDay) await expoPush.crash({ tag: safeTag(q.t), msg, platform, version });
   return noContent;
 };
 
@@ -1362,6 +1391,12 @@ const handler = async (event) => {
     // into "collects data". The error and the kind are enough to debug with.
     console.error('ping write failed', kind, err);
   }
+
+  /* The two arrivals worth an instant push to the owner's phone: a FIRST RUN
+     (an open whose install day is today, i.e. a new install) and a SALE.
+     After the count, and unable to fail or delay it (see push/expo.js). */
+  if (kind === 'OPEN' && cohort === easternDay(now)) await expoPush.newInstall({ platform, tier, version });
+  else if (kind === 'SUB') await expoPush.sale({ platform, slot: slotFor, tier });
   return noContent;
 };
 

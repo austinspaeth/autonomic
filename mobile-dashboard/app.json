@@ -1,0 +1,49 @@
+{
+  "expo": {
+    "name": "Autonomic Master",
+    "slug": "autonomic-master",
+    "scheme": "autonomic-master",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "dark",
+    "backgroundColor": "#000000",
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.autonomic.master",
+      "appleTeamId": "L3YCKS64HC",
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.autonomic.master",
+      "adaptiveIcon": {
+        "backgroundColor": "#0b0b0c",
+        "foregroundImage": "./assets/icon.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "plugins": [
+      "expo-router",
+      "expo-secure-store",
+      "expo-font",
+      [
+        "expo-notifications",
+        {
+          "color": "#ffffff"
+        }
+      ]
+    ],
+    "experiments": {
+      "typedRoutes": false
+    },
+    "owner": "austinspaeth",
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "138b7948-3fdb-449e-9b27-02720457e876"
+      }
+    }
+  }
+}
