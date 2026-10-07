@@ -81,6 +81,22 @@ const PAD = 16;
 const RIB_GAP = 14;
 /** The ribbon's own viewBox is 100 x 140. */
 const RIB_ASPECT = 100 / 140;
+/**
+ * The tallest the ribbon may grow: the two titles at the default text size
+ * (label line + its margin + two 25pt prize lines), with a little slack.
+ *
+ * Load-bearing, not cosmetic. The ribbon's WIDTH comes from the title block's
+ * measured height, and that width is taken out of the same row, so a wider
+ * ribbon narrows the titles, the prize wraps again, the block grows and the
+ * ribbon widens once more. At the default size it settles in a step or two; at
+ * a large Android font or display size it never does, the card re-lays itself
+ * out until React gives up with "Maximum update depth exceeded" and the app is
+ * killed. Capped, the ribbon's width stops depending on the measurement once
+ * the titles pass two lines, so the loop is bounded: every step can only add a
+ * line, and at most two steps change anything. Past the cap the ribbon keeps
+ * its proportions and sits centred beside the taller titles.
+ */
+const RIB_MAX_H = 74;
 const GLOW = 190;
 
 export function GiveawayCard({ dk }: { dk: string }) {
@@ -91,7 +107,8 @@ export function GiveawayCard({ dk }: { dk: string }) {
   const [entered, setEntered] = useState(isGiveawaySignedUp);
   // The open layout's title block, which the ribbon beside it matches.
   const [headH, setHeadH] = useState(0);
-  const ribW = headH * RIB_ASPECT;
+  const ribH = Math.min(headH, RIB_MAX_H);
+  const ribW = ribH * RIB_ASPECT;
 
   // 0 = open, 1 = collapsed. Measured sizes live in shared values so the
   // animated styles never wait on a React render.
@@ -159,9 +176,10 @@ export function GiveawayCard({ dk }: { dk: string }) {
 
         <Pressable onPress={() => toggle(true)} accessibilityLabel="Collapse giveaway card" style={{ paddingHorizontal: PAD, paddingTop: PAD, paddingBottom: 14 }}>
           {/* The ribbon stands beside the two titles, exactly as tall as they
-              are: measured, since the prize wraps to one line or two. */}
+              are: measured, since the prize wraps to one line or two. Up to
+              RIB_MAX_H, or the measurement feeds itself (see there). */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: RIB_GAP, marginBottom: 12 }}>
-            <View pointerEvents="none" style={{ width: ribW, height: headH, opacity: headH > 0 ? 1 : 0 }}>
+            <View pointerEvents="none" style={{ width: ribW, height: ribH, opacity: headH > 0 ? 1 : 0 }}>
               <Ribbon bloom />
             </View>
             <View style={{ flex: 1, paddingRight: 28 }} onLayout={(e) => setHeadH(Math.round(e.nativeEvent.layout.height))}>
