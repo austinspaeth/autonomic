@@ -11,10 +11,19 @@
  *
  * Fire it from anywhere with `celebrate(kind)`; calls made before the page
  * has loaded are queued, never dropped.
+ *
+ * Two things that only bite on a real phone:
+ *   - The confetti library is INLINED (confettiBundle.ts), never fetched. A
+ *     CDN script that failed to load still let the page report ready, and
+ *     every confetti() call then threw into the silent catch below.
+ *   - The OS kills a web view's content process while the app sits in the
+ *     background. The view goes blank but `ready` stayed true, so every later
+ *     celebration was injected into a dead page. Termination now remounts it.
  */
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 import { WebView } from 'react-native-webview';
+import { CONFETTI_JS } from './confettiBundle';
 
 export type CelebrationKind = 'return' | 'download' | 'sale' | 'record';
 
@@ -27,7 +36,7 @@ const HTML = `<!doctype html><html><head>
 <meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no">
 <style>html,body{margin:0;padding:0;background:transparent;overflow:hidden;width:100%;height:100%}
 #ribbons{position:fixed;inset:0;width:100%;height:100%;pointer-events:none}</style>
-<script src="https://cdn.jsdelivr.net/npm/@tsparticles/confetti@4.4.0/tsparticles.confetti.bundle.min.js"></script>
+<script>${CONFETTI_JS}</script>
 </head><body><canvas id="ribbons"></canvas><script>
 var GOLD=['#FFD700','#FFC93C','#F5B700','#FFE680','#E6A800','#FFF4C2','#D4AF37'];
 var SILVER=['#ffffff','#f4f5f7','#e3e5e8','#c0c0c0','#a8adb4','#d9dde3'];
@@ -131,6 +140,13 @@ export function CelebrationLayer() {
   const web = useRef<WebView>(null);
   const ready = useRef(false);
   const queue = useRef<CelebrationKind[]>([]);
+  const [generation, setGeneration] = useState(0);
+
+  /* The page is gone: queue until a fresh one says ready. */
+  const restart = () => {
+    ready.current = false;
+    setGeneration((g) => g + 1);
+  };
 
   useEffect(() => {
     const fn = (k: CelebrationKind) => {
@@ -149,6 +165,7 @@ export function CelebrationLayer() {
   return (
     <View pointerEvents="none" style={StyleSheet.absoluteFill}>
       <WebView
+        key={generation}
         ref={web}
         source={{ html: HTML, baseUrl: 'https://autonomic.care/' }}
         originWhitelist={['*']}
@@ -157,6 +174,8 @@ export function CelebrationLayer() {
         scrollEnabled={false}
         bounces={false}
         javaScriptEnabled
+        onContentProcessDidTerminate={restart}
+        onRenderProcessGone={restart}
         onMessage={(e) => {
           if (e.nativeEvent.data !== 'ready') return;
           ready.current = true;
