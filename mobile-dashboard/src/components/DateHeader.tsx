@@ -17,7 +17,11 @@ export function DateHeader({
   earliest,
   intensity,
   onChange,
+  bare,
 }: {
+  /** Inside another control (the wide filter bar): no box of its own, a fixed
+   *  width so the bar does not shift as the date changes, tighter arrows. */
+  bare?: boolean;
   dk: string;
   today: string;
   earliest?: string | null;
@@ -38,17 +42,19 @@ export function DateHeader({
   };
 
   return (
-    <View style={s.row}>
-      <Pressable disabled={atStart} onPress={() => go(addDays(dk, -1))} hitSlop={8} style={[s.arrow, atStart && { opacity: 0.3 }]}>
-        <SymbolView name="chevron.left" size={18} weight="semibold" tintColor={C.text} />
+    <View style={[s.row, bare && s.rowBare]}>
+      <Pressable disabled={atStart} onPress={() => go(addDays(dk, -1))} hitSlop={8} style={[s.arrow, bare && s.arrowBare, atStart && { opacity: 0.3 }]}>
+        <SymbolView name="chevron.left" size={bare ? 15 : 18} weight="semibold" tintColor={C.text} />
       </Pressable>
-      <Pressable onPress={() => setOpen(true)} style={({ pressed }) => [s.squircle, pressed && { opacity: 0.75 }]}>
+      <Pressable onPress={() => setOpen(true)} hitSlop={bare ? 6 : 0} style={({ pressed }) => [bare ? s.plain : s.squircle, pressed && { opacity: bare ? 0.6 : 0.75 }]}>
         <Animated.View key={dk} entering={(dir > 0 ? FadeInRight : FadeInLeft).duration(220)}>
-          <Text style={s.label}>{atToday ? 'Today' : longDate(dk)}</Text>
+          <Text style={[s.label, bare && s.labelBare]} numberOfLines={1}>
+            {atToday ? 'Today' : longDate(dk)}
+          </Text>
         </Animated.View>
       </Pressable>
-      <Pressable disabled={atToday} onPress={() => go(addDays(dk, 1))} hitSlop={8} style={[s.arrow, atToday && { opacity: 0.3 }]}>
-        <SymbolView name="chevron.right" size={18} weight="semibold" tintColor={C.text} />
+      <Pressable disabled={atToday} onPress={() => go(addDays(dk, 1))} hitSlop={8} style={[s.arrow, bare && s.arrowBare, atToday && { opacity: 0.3 }]}>
+        <SymbolView name="chevron.right" size={bare ? 15 : 18} weight="semibold" tintColor={C.text} />
       </Pressable>
 
       <Sheet visible={open} onClose={() => setOpen(false)} title="Select date">
@@ -85,4 +91,9 @@ const s = StyleSheet.create({
     alignItems: 'center',
   },
   label: { color: C.text, fontSize: 17, fontWeight: '600', textAlign: 'center' },
+  rowBare: { gap: 0 },
+  arrowBare: { width: 34, height: 40 },
+  /* Wide enough for the longest date ("Wed, Sep 30"), so the arrows hold still. */
+  plain: { width: 104, height: 40, alignItems: 'center', justifyContent: 'center', overflow: 'hidden' },
+  labelBare: { fontSize: 14 },
 });

@@ -1,0 +1,480 @@
+{
+  "name": "Dysautonomia Awareness Month launch",
+  "created": "2026-10-06",
+  "notes": "First five slideshows: relatability, proof, a save-worthy listicle, awareness month, and the giveaway.",
+  "account": {
+    "handle": "POTSDad",
+    "sound": "original sound - POTSDad"
+  },
+  "style": {
+    "type": "bold",
+    "signature": "POTSDad"
+  },
+  "creatives": [
+    {
+      "id": "c1",
+      "name": "POV: you stood up",
+      "title": "My heart hit 140 making coffee ☕",
+      "goal": "Widest-net relatability. No selling until the last slide.",
+      "caption": "POV: your heart rate when you stand up. If this is you, you're not imagining it 🩵 #pots #dysautonomia #longcovid #chronicillness #spoonie",
+      "stats": {
+        "likes": "48.2K",
+        "comments": "1,204",
+        "saves": "9,876",
+        "shares": "2,310"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "text": [
+            "POV: you got up to make coffee & your HR hit *140.*"
+          ],
+          "img": {
+            "src": "img/c1s1.jpg",
+            "pos": "center bottom",
+            "source": "unsplash",
+            "search": "dizzy kitchen counter",
+            "shows": "A white drip coffee maker against a dark wall.",
+            "frame": "Machine in the lower half; the hook sits in the dark space above it under a light wash.",
+            "credit": "Photo by Ronan Furuta on Unsplash (unsplash.com/photos/white-and-black-coffeemaker-AjcABUQ7WuA)"
+          },
+          "copyAt": "top",
+          "scrim": "light"
+        },
+        {
+          "layout": "photo",
+          "text": [
+            "Everyone said it was anxiety.",
+            "Your smartwatch said *otherwise.*"
+          ],
+          "img": {
+            "src": "img/c1s2.jpg",
+            "pos": "50% 33%",
+            "source": "app",
+            "shows": "The Autonomic watch app's live heart-rate monitor at 143 BPM, Δ +36, composited onto a wrist.",
+            "frame": "Watch in the top third, clear of the copy.",
+            "credit": "Wrist photo by Anastasiya Badun on Unsplash (unsplash.com/photos/a-person-holding-an-apple-watch-in-their-hand-EK6J3PLsndY); screen is the Autonomic watch app"
+          },
+          "textY": 215,
+          "textSize": 1.09,
+          "overlay": 46
+        },
+        {
+          "layout": "photo",
+          "text": [
+            "If your body does this, you're not imagining it.",
+            "And you're *not alone.*"
+          ],
+          "img": {
+            "src": "img/c1s3.jpg",
+            "pos": "52% 79%",
+            "source": "unsplash",
+            "shows": "A woman at a kitchen table at night, head resting on her hand, eyes half closed, a mug in front of her.",
+            "frame": "Wide photo cropped to her and the mug; face in the upper third, the copy over the darkened lower half.",
+            "zoom": 1.23
+          },
+          "tint": "#0b0e0e",
+          "textY": 192,
+          "overlay": 38
+        },
+        {
+          "layout": "phone",
+          "cta": true,
+          "text": [
+            "I know it's real because I can *see it.*",
+            "Free app in bio if you want to *track yours.* 🩵"
+          ],
+          "img": {
+            "src": "img/c1s4.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "Progress, POTS section: stand tests over 12 weeks. Latest sustained rise 51 bpm (red), standing peak +74 on a 69 baseline (about 143 bpm), 12 of 12 over the POTS threshold, both lines climbing.",
+            "frame": "Raw full-height screenshot; the falling chart sits in the top two thirds."
+          },
+          "textSize": 1.07,
+          "phoneY": 22,
+          "textY": -8,
+          "phoneX": -83,
+          "phoneSize": 0.87
+        }
+      ],
+      "music": {
+        "mood": "Soft lo-fi with a wry edge",
+        "notes": "Relatable, not sad. A mellow lo-fi beat or a deadpan trending POV sound carries the hook; it should feel like a shrug at slide 1 and turn tender by slide 3. Keep it low under the text so the words land.",
+        "bpm": "75-85",
+        "search": [
+          "lofi chill",
+          "soft lofi piano",
+          "pov sound"
+        ],
+        "file": "audio/c1.mp3",
+        "fileName": "alex-morgan-lofi-sunny-cafe-568156.mp3"
+      }
+    },
+    {
+      "id": "c2",
+      "name": "My data saw it coming",
+      "title": "My watch saw my crash coming 3 days early",
+      "goal": "Proof + intrigue.",
+      "caption": "My HRV saw the crash coming 3 days before I did. Pacing changed everything. #mecfs #longcovid #pacing #hrv #chronicfatigue",
+      "stats": {
+        "likes": "31.7K",
+        "comments": "892",
+        "saves": "12.1K",
+        "shares": "1,544"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "text": [
+            "My watch knew I was going to crash *3 days* before I did."
+          ],
+          "img": {
+            "src": "img/c2s1.png",
+            "pos": "68% 100%",
+            "source": "mine",
+            "shows": "You looking wiped out in a dim bedroom.",
+            "frame": "Face in the upper third; the hook sits across the middle under a dark wash. Low light is fine, it is the mood."
+          },
+          "textSize": 0.89,
+          "textY": 327
+        },
+        {
+          "layout": "phone",
+          "text": [
+            "My HRV dropped 3 days straight.",
+            "I felt fine. *The data didn't agree.*"
+          ],
+          "img": {
+            "src": "img/c2s2.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "Your real HRV trend dropping over several days.",
+            "frame": "Raw full-height screenshot. Put the falling chart in the top two thirds of the screen."
+          },
+          "phoneY": -119,
+          "phoneX": -67
+        },
+        {
+          "layout": "phone",
+          "text": [
+            "By the time I felt it, *I'd already been warned.*"
+          ],
+          "img": {
+            "src": "img/c2s3.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "Progress or Insights showing the crash day.",
+            "frame": "Raw full-height screenshot, crash day visible in the top two thirds."
+          },
+          "phoneY": -244,
+          "textSize": 1.13,
+          "phoneX": -74,
+          "phoneSize": 0.89
+        },
+        {
+          "layout": "phone",
+          "cta": true,
+          "text": [
+            "Now I pace *before* the crash, not after.",
+            "Free app I built, link in bio."
+          ],
+          "img": {
+            "src": "img/c2s4.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "The Journal home: Today row, the Outlook card with the score (96), pacing strip and key figures, giveaway card collapsed.",
+            "frame": "Full-height screenshot from the top; move or shrink the phone to show more of it."
+          },
+          "phoneX": -135,
+          "phoneSize": 0.72,
+          "phoneY": -34
+        }
+      ],
+      "music": {
+        "mood": "Quiet suspense that resolves warm",
+        "notes": "A slow-building ambient pulse, almost a heartbeat, so the three days of falling HRV feel like a countdown. No big drop. Let it open up into something warmer on the last slide, where you pace before the crash.",
+        "bpm": "70-90",
+        "search": [
+          "suspense ambient",
+          "heartbeat ambient",
+          "slow build cinematic"
+        ],
+        "file": "audio/c2.mp3",
+        "fileName": "leberch-quiet-piano-313742.mp3"
+      }
+    },
+    {
+      "id": "c3",
+      "name": "5 signs you might have POTS",
+      "title": "5 POTS signs my doctors missed for years",
+      "goal": "Save-worthy, searchable listicle.",
+      "caption": "Save this for your next appointment 🩵 5 signs of POTS that took years to get taken seriously. #pots #potsawareness #dysautonomia #chronicillness",
+      "stats": {
+        "likes": "86.4K",
+        "comments": "3,402",
+        "saves": "41.9K",
+        "shares": "7,118"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "text": [
+            "5 signs you might have *POTS*",
+            "(that doctors kept missing for me)"
+          ],
+          "img": {
+            "src": "img/c3s1.jpg",
+            "pos": "center",
+            "source": "unsplash",
+            "search": "minimal calm background",
+            "shows": "A minimal, clean background with lots of negative space.",
+            "frame": "Soft texture or gradient with no focal subject. It is fully darkened under the headline.",
+            "credit": "Photo by Luke Chesser on Unsplash (unsplash.com/photos/light-blue-to-dark-blue-gradient-3rWagdKBF7U)"
+          }
+        },
+        {
+          "layout": "list",
+          "kicker": "5 signs of POTS",
+          "text": [
+            "1. Heart races when you stand",
+            "2. Dizzy or lightheaded upright",
+            "3. Wiped out after small tasks",
+            "4. Brain fog",
+            "5. Everything's worse in heat"
+          ],
+          "img": {
+            "src": "img/c3s2.jpg",
+            "pos": "center",
+            "source": "unsplash",
+            "search": "soft linen texture",
+            "shows": "A calm, simple background: linen, paper, soft sky.",
+            "frame": "Darkened ~85% under the list, so texture matters more than subject.",
+            "credit": "Photo by Heather Green on Unsplash (unsplash.com/photos/a-light-blue-fabric-textured-with-a-diagonal-pattern-VYeNQq9SnnE)"
+          },
+          "fine": "Not medical advice. Ask your doctor about a stand test.",
+          "textY": 69,
+          "textSize": 1.02
+        },
+        {
+          "layout": "phone",
+          "cta": true,
+          "text": [
+            "I tracked all of it to *show my doctor.*",
+            "Free app in bio to track yours. 🩵"
+          ],
+          "img": {
+            "src": "img/c3s3.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "The symptom-tracking screen.",
+            "frame": "Raw full-height screenshot with logged symptoms near the top."
+          },
+          "phoneX": -98,
+          "phoneSize": 0.82
+        }
+      ],
+      "music": {
+        "mood": "Bright, easy groove",
+        "notes": "Light acoustic or a clean upbeat lo-fi that keeps people swiping through the list without competing with it. Steady from start to finish, no drops or vocals over the list slides. Saves come from re-reading, so it should loop well.",
+        "bpm": "95-110",
+        "search": [
+          "soft acoustic upbeat",
+          "aesthetic chill",
+          "ukulele happy"
+        ],
+        "file": "audio/c3.mp3",
+        "fileName": "penguinmusic-gardens-stylish-chill-303261.mp3"
+      }
+    },
+    {
+      "id": "c4",
+      "name": "They said it was in my head",
+      "title": "They said it was all in my head",
+      "goal": "Emotional, shareable, awareness month.",
+      "caption": "Not just a feeling. It's data I can track and share. October is Dysautonomia Awareness Month 🩵 #dysautonomiaawareness #longcovid #pots #invisibleillness",
+      "stats": {
+        "likes": "122K",
+        "comments": "5,671",
+        "saves": "18.3K",
+        "shares": "14.2K"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "text": [
+            "People told me my long COVID was *‘in my head.’*"
+          ],
+          "img": {
+            "src": "img/c4s1.jpg",
+            "pos": "26% 4%",
+            "source": "mine",
+            "shows": "An honest window-light portrait of you.",
+            "frame": "Face in the upper third, looking at the camera or out the window. The hook covers the middle under a dark wash."
+          },
+          "textSize": 1.04,
+          "overlay": 59,
+          "textY": 505
+        },
+        {
+          "layout": "phone",
+          "text": [
+            "So I recorded what my heart *actually does* when I stand up."
+          ],
+          "img": {
+            "src": "img/c4s2.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "HRV / heart rate during a standing test.",
+            "frame": "Raw full-height screenshot; the standing jump in heart rate should be in the top two thirds."
+          },
+          "phoneX": -109,
+          "phoneY": -221,
+          "phoneSize": 0.92
+        },
+        {
+          "layout": "photo",
+          "text": [
+            "Now it's not just a feeling. *It's data I can track and share.*"
+          ],
+          "img": {
+            "src": "img/c4s3.jpg",
+            "pos": "40% 0%",
+            "source": "unsplash",
+            "shows": "Two hands passing a small black paper heart, plain light background.",
+            "frame": "Backdrop extended below the photo so the heart sits in the upper half, above the line.",
+            "zoom": 1.41
+          },
+          "textSize": 1.02,
+          "overlay": 63
+        },
+        {
+          "layout": "phone",
+          "cta": true,
+          "text": [
+            "Track yours. *See what helps or hurts your numbers.*",
+            "Watch your autonomic system recover!",
+            "Free app for iOS and Android, link in my bio."
+          ],
+          "img": {
+            "src": "img/c4s4.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "The Journal home, not scrolled: Today row, the Outlook card with the Autonomic score, pacing strip and key figures.",
+            "frame": "Full-height screenshot from the top."
+          },
+          "phoneSize": 0.82,
+          "phoneX": -86
+        }
+      ],
+      "music": {
+        "mood": "Emotional piano swelling to hope",
+        "notes": "Sparse piano under the first slide, building with strings through the standing test, peaking on \"You can't fake a heart rate\", then resolving hopeful for the awareness-month close. Instrumental only, so your words stay the voice.",
+        "bpm": "60-75",
+        "search": [
+          "emotional piano",
+          "hopeful cinematic strings",
+          "inspirational piano"
+        ],
+        "file": "audio/c4.mp3",
+        "fileName": "the_mountain-emotional-cello-155579.mp3"
+      }
+    },
+    {
+      "id": "c5",
+      "name": "The giveaway",
+      "title": "I'm giving away an Apple Watch 🩵",
+      "goal": "Convert. Warm and rest-first.",
+      "caption": "Giving away an Apple Watch to the POTS & long COVID community this Dysautonomia Awareness Month 🩵 How to enter: download Autonomic (free on iOS & Android, link in bio), sign up on the giveaway card in the Journal, and take an HRV reading each morning (your phone's camera works, no special equipment needed). One entry per day, up to 10 entries, Oct 1 to Oct 31. US residents 18+, no purchase necessary. Your health data stays on your phone. Not affiliated with TikTok or Apple. #giveaway #pots #longcovid #dysautonomia",
+      "stats": {
+        "likes": "22.9K",
+        "comments": "4,388",
+        "saves": "6,042",
+        "shares": "3,117"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "text": [
+            "I'm giving away an *Apple Watch* to the POTS and Long COVID community:ribbon:"
+          ],
+          "img": {
+            "src": "img/c5s1.jpg",
+            "pos": "35% 64%",
+            "source": "unsplash",
+            "shows": "Apple Watch on a plain light grey surface, shot straight down (the prize).",
+            "frame": "Backdrop extended upward so the watch sits under the hook. Nudge with X / Y / Zoom.",
+            "zoom": 1.8
+          },
+          "copyAt": "top",
+          "scrim": "light",
+          "overlay": 56,
+          "textSize": 0.86
+        },
+        {
+          "layout": "phone",
+          "text": [
+            "I have POTS too.",
+            "I built a free app to track *HRV, heart rate & symptoms*, and to *pace my energy.*"
+          ],
+          "img": {
+            "src": "img/c5s2.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "The app looking clean: Journal or Outlook.",
+            "frame": "Raw full-height screenshot, the busiest content near the top."
+          },
+          "phoneX": -82,
+          "phoneSize": 0.81,
+          "phoneY": -140
+        },
+        {
+          "layout": "photo",
+          "text": [
+            "To enter: download the app and take an *HRV reading* each morning. One entry per day, up to 10 days.",
+            "No purchase, and your health data isn't shared with us. No special equipment required."
+          ],
+          "img": {
+            "src": "",
+            "pos": "center 35%",
+            "source": "mine",
+            "shows": "You resting: lying back under a blanket, or a cup of tea in your hands, eyes closed. Calm, not posed.",
+            "frame": "Portrait. You in the top half; the copy covers the bottom. Warm window light if you can."
+          },
+          "textY": 138,
+          "textSize": 0.95
+        },
+        {
+          "layout": "photo",
+          "cta": true,
+          "text": [
+            "Free app + giveaway details *in the caption!*"
+          ],
+          "fine": "US residents 18+. No purchase necessary. Not affiliated with TikTok or Apple.",
+          "img": {
+            "src": "img/c5s4.png",
+            "pos": "63% 14%",
+            "source": "graphic",
+            "shows": "Prize graphic: Apple Watch and Polar H10 from the site, three LMNT boxes (Pink Lemonade, Citrus Salt, Watermelon), ribbon behind.",
+            "frame": "Prizes sit in the band between the logo row and the headline.",
+            "zoom": 1.43
+          },
+          "overlay": 8,
+          "textY": 298
+        }
+      ],
+      "music": {
+        "mood": "Cozy, warm acoustic",
+        "notes": "Gentle acoustic guitar or soft indie, like a quiet morning. This is a giveaway for people who are often exhausted, so nothing hype, no countdown energy. Warm the whole way through; rest comes first.",
+        "bpm": "80-95",
+        "search": [
+          "cozy acoustic",
+          "warm indie folk",
+          "soft morning guitar"
+        ],
+        "file": "audio/c5.mp3",
+        "fileName": "lnplusmusic-exciting-exciting-music-607838.mp3"
+      }
+    }
+  ]
+}

@@ -13,17 +13,23 @@
  * split (they would have nothing left to compare).
  */
 import { useMemo, useState, type ReactNode } from 'react';
-import { StyleSheet, Text, View, ScrollView } from 'react-native';
+import { Pressable, StyleSheet, Text, View, ScrollView } from 'react-native';
+import { SymbolView } from 'expo-symbols';
+import * as Haptics from 'expo-haptics';
+import { pingPlanName, SaleFromPingSheet, subscribePings, type SubPing } from './AddSheet';
 import { Chips, WeekdayChart, BarChart } from '../components/charts';
 import { Lines, OverlayBars, StackedBars, type Key } from '../components/series';
 import { MetricTiles, type Change, type Comparison, type MetricSpec } from '../components/MetricTiles';
 import { Card, Divider, Segmented } from '../components/ui';
-import { PaceGauge } from '../components/PaceGauge';
+import { DeepDive, DeepDiveGrid } from '../components/DeepDive';
 import { useData } from '../lib/data';
-import { addDays, easternDayFraction, shortDate } from '../lib/dates';
-import { int, one } from '../lib/format';
+import { addDays, easternClock, easternDay, shortDate } from '../lib/dates';
+import { buildPace } from '../lib/pace';
+import { int } from '../lib/format';
 import type { PingKind } from '../lib/types';
 import {
+  ageNorm,
+  cohortNorm,
   activation,
   activeByCohort,
   activeOn,
@@ -48,6 +54,7 @@ import {
   SMALL_COHORT,
   newOn,
   offerFunnel,
+  paceDay,
   pctChange,
   platformsOver,
   presenceAt,
@@ -99,6 +106,28 @@ const STORES: Key[] = [
   { key: 'A', label: 'Android', color: C.android },
   { key: 'U', label: 'No store', color: C.unknown },
 ];
+/* The plan letter a subscribe ping carries. A ping from a build older than
+   the letter has none, and is its own grey band rather than a guess. */
+const SUB_PLANS: Key[] = [
+  { key: 'Y', label: 'Annual', color: '#199e70' },
+  { key: 'F', label: 'Founder annual', color: '#c98500' },
+  { key: 'P', label: 'Promo annual', color: '#d95926' },
+  { key: 'M', label: 'Monthly', color: C.series },
+  { key: '?', label: 'Older build', color: C.unknown },
+];
+const subPlans = (e: { total: number; slots: Record<string, number> } | undefined) => {
+  const out: Record<string, number> = { Y: 0, F: 0, P: 0, M: 0, '?': 0 };
+  let named = 0;
+  Object.entries(e?.slots ?? {}).forEach(([k, n]) => {
+    if (k in out && k !== '?') {
+      out[k] += n;
+      named += n;
+    }
+  });
+  // Whatever carried no readable letter, so the bar still sums to the day.
+  out['?'] = Math.max(0, (e?.total ?? 0) - named);
+  return out;
+};
 const WHO: Key[] = [
   { key: 'back', label: 'Returning', color: C.series },
   { key: 'fresh', label: 'First run', color: '#199e70' },
@@ -159,15 +188,6 @@ const lettersOf = (keys: Key[], counts: Record<string, number>) => keys.filter((
 
 /* ---------------------------------------------------------- scaffolding */
 
-function Section({ title, note }: { title: string; note?: string }) {
-  return (
-    <View style={s.section}>
-      <Text style={s.sectionTitle}>{title}</Text>
-      {note ? <Text style={s.sectionNote}>{note}</Text> : null}
-    </View>
-  );
-}
-
 function Note({ children }: { children: ReactNode }) {
   return <Text style={s.note}>{children}</Text>;
 }
@@ -217,6 +237,9 @@ export function UsageView({ dk, isToday, range, platform }: { dk: string; isToda
     return { last, from, days, prevDays, cohorts };
   }, [ix, dk, range]);
 
+  const rangeSub = `${shortDate(ctx.from)} – ${shortDate(ctx.last)} · ${ctx.days.length} days`;
+  const releases = (snap?.load?.events || []).filter((e) => e.category === 'RELEASE').map((e) => ({ date: e.date, label: e.title }));
+
   if (!ix.last) {
     return (
       <Card>
@@ -227,38 +250,67 @@ export function UsageView({ dk, isToday, range, platform }: { dk: string; isToda
 
   return (
     <>
-      <TodaySection ix={ix} ctx={ctx} isToday={isToday && ctx.last === dk} />
-      <RangeSection ix={ix} ctx={ctx} growthMode={growthMode} setGrowthMode={setGrowthMode} buildMode={buildMode} setBuildMode={setBuildMode} weekdayMetric={weekdayMetric} setWeekdayMetric={setWeekdayMetric} />
-      <LifeSection
-        ix={ix}
-        ctx={ctx}
-        curveMode={curveMode}
-        setCurveMode={setCurveMode}
-        trendAge={trendAge}
-        setTrendAge={setTrendAge}
-        releases={(snap?.load?.events || []).filter((e) => e.category === 'RELEASE').map((e) => ({ date: e.date, label: e.title }))}
-      />
+      <TodaySection ix={ix} ctx={ctx} isToday={isToday && ctx.last === dk} at={snap?.at ?? null} />
+      <GrowthCard ix={ix} days={ctx.days} mode={growthMode} setMode={setGrowthMode} />
+      {/* The range's own numbers live on their own cards, so this screen stays
+          about the day. Each is built only while it is open. */}
+      <DeepDiveGrid>
+        <DeepDive icon="chart.bar.xaxis" title="Usage over range" sub={rangeSub}>
+          <RangeSection ix={ix} ctx={ctx} buildMode={buildMode} setBuildMode={setBuildMode} weekdayMetric={weekdayMetric} setWeekdayMetric={setWeekdayMetric} part="usage" />
+        </DeepDive>
+        <DeepDive icon="arrow.triangle.2.circlepath" title="Retention over range" sub={rangeSub}>
+          <LifeSection part="retention" ix={ix} ctx={ctx} curveMode={curveMode} setCurveMode={setCurveMode} trendAge={trendAge} setTrendAge={setTrendAge} releases={releases} />
+        </DeepDive>
+        <DeepDive icon="waveform.path.ecg" title="Measures over range" sub={rangeSub}>
+          <RangeSection ix={ix} ctx={ctx} buildMode={buildMode} setBuildMode={setBuildMode} weekdayMetric={weekdayMetric} setWeekdayMetric={setWeekdayMetric} part="measures" />
+          <LifeSection part="measures" ix={ix} ctx={ctx} curveMode={curveMode} setCurveMode={setCurveMode} trendAge={trendAge} setTrendAge={setTrendAge} releases={releases} />
+        </DeepDive>
+        <DeepDive icon="exclamationmark.triangle" title="Crashes and errors" sub={rangeSub}>
+          <RangeSection ix={ix} ctx={ctx} buildMode={buildMode} setBuildMode={setBuildMode} weekdayMetric={weekdayMetric} setWeekdayMetric={setWeekdayMetric} part="errors" />
+        </DeepDive>
+      </DeepDiveGrid>
     </>
   );
 }
 
 type Ctx = { last: string; from: string; days: string[]; prevDays: string[] | null; cohorts: string[] };
 
-/** The web's three baselines for one day; an unknown baseline drops its row. */
-function dayDeltas(ix: UsageIndex, day: string, days: string[], f: (d: string) => number | null, neutral: boolean): Comparison[] {
+/**
+ * One day against everything it can fairly be held up to: the day before, the
+ * same weekday last week, its trailing week and the range, each printing the
+ * number it is measured against, then where the day sits in the range (its
+ * high and low, with their dates). An unknown baseline drops its row.
+ */
+function dayDeltas(
+  ix: UsageIndex,
+  day: string,
+  days: string[],
+  f: (d: string) => number | null,
+  neutral: boolean,
+  fmt: (n: number) => string = (n) => (Number.isInteger(n) ? int(n) : n.toFixed(1)),
+): Comparison[] {
   const now = f(day);
   if (now === null) return [];
-  const vals = days.map(f).filter((v): v is number => v !== null);
-  const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  const mean = (ds: string[]) => {
+    const vals = ds.map(f).filter((v): v is number => v !== null);
+    return vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+  };
   const wk = addDays(day, -7);
+  const week = Array.from({ length: 7 }, (_, i) => addDays(day, -1 - i));
   const row = (label: string, base: number | null): Comparison | null => {
     const p = pctChange(now, base);
-    return p === null ? null : { label, change: { value: now, base, neutral } };
+    return p === null ? null : { label, change: { value: now, base, neutral }, format: fmt };
   };
+  const seen = days.map((d) => ({ d, v: f(d) })).filter((x): x is { d: string; v: number } => x.v !== null);
+  const high = seen.reduce<{ d: string; v: number } | null>((m, x) => (!m || x.v > m.v ? x : m), null);
+  const low = seen.reduce<{ d: string; v: number } | null>((m, x) => (!m || x.v < m.v ? x : m), null);
   return [
     row('vs the day before', f(addDays(day, -1))),
     row(`vs ${WD[new Date(`${wk}T12:00:00Z`).getUTCDay()]} last week`, f(wk)),
-    row('vs the range average', avg),
+    row('vs the 7 days before', mean(week)),
+    row('vs the range average', mean(days)),
+    seen.length > 1 && high ? { label: 'Range high', value: `${fmt(high.v)} · ${shortDate(high.d)}` } : null,
+    seen.length > 1 && low ? { label: 'Range low', value: `${fmt(low.v)} · ${shortDate(low.d)}` } : null,
   ].filter((x): x is Comparison => !!x);
 }
 
@@ -287,23 +339,19 @@ function rangeChange(ctx: Ctx, f: (d: string) => number | null): Change {
 }
 
 const series = (days: string[], f: (d: string) => number | null) => days.map((d) => ({ day: d, value: f(d) ?? 0 }));
-/* Lists read most to least; a bucket that names nothing (unknown, no store,
-   not stated) stays last whatever its size. */
-const UNNAMED = new Set(['?', 'U']);
-const byTotal = (a: { total: number }, b: { total: number }) => b.total - a.total;
 const parts = (keys: Key[], counts: Record<string, number>) =>
-  keys
-    .filter((k) => counts[k.key])
-    .map((k) => ({ key: k.key, label: k.label, value: counts[k.key], color: k.color }))
-    .sort((a, b) => Number(UNNAMED.has(a.key)) - Number(UNNAMED.has(b.key)) || b.value - a.value);
+  keys.filter((k) => counts[k.key]).map((k) => ({ key: k.key, label: k.label, value: counts[k.key], color: k.color }));
 
 /* ============================================================ ON <DAY> */
 
-function TodaySection({ ix, ctx, isToday }: { ix: UsageIndex; ctx: Ctx; isToday: boolean }) {
+function TodaySection({ ix, ctx, isToday, at }: { ix: UsageIndex; ctx: Ctx; isToday: boolean; /** When the counts were read. */ at: number | null }) {
   const day = ctx.last;
   const specs = useMemo<MetricSpec[]>(() => {
     // Coloured even on today, as asked; the note below says why today reads low.
-    const d7 = (f: (d: string) => number | null) => dayDeltas(ix, day, ctx.days, f, false);
+    const d7 = (f: (d: string) => number | null, fmt?: (n: number) => string) => dayDeltas(ix, day, ctx.days, f, false, fmt);
+    /** The same rows for a second figure on a card, each label led by its name. */
+    const named = (name: string, f: (d: string) => number | null, fmt?: (n: number) => string) =>
+      d7(f, fmt).map((c) => ({ ...c, label: `${name} ${c.label.charAt(0).toLowerCase()}${c.label.slice(1)}` }));
     const headline = (f: (d: string) => number | null) => vsDayBefore(f, day, false);
     const active = activeOn(ix, day);
     const fresh = newOn(ix, day);
@@ -320,14 +368,24 @@ function TodaySection({ ix, ctx, isToday }: { ix: UsageIndex; ctx: Ctx; isToday:
       format: int,
       color,
     });
-    /* Today only: is the day so far keeping up with the range's average day?
-       The average leaves today out, since it is the thing being judged. */
-    const fraction = easternDayFraction();
-    const pace = (fn: (d: string) => number | null) => {
-      if (!isToday) return undefined;
-      const vals = ctx.days.filter((d) => d !== day).map(fn).filter((v): v is number => v !== null);
-      const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
-      return <PaceGauge now={fn(day) ?? 0} avg={avg} fraction={fraction} format={(n) => (Number.isInteger(n) ? int(n) : one(n))} />;
+    /* Pace, for today only: a finished day has nothing left to be on track
+       for. The clock is when the counts were READ, not when they are looked
+       at, so a stale snapshot is not held to a later hour. */
+    const pace = (who: 'all' | 'fresh', color?: string) => {
+      if (!isToday || at === null || easternDay(at) !== day) return null;
+      const before = ctx.days.filter((d) => d < day);
+      const yd = addDays(day, -1);
+      const model = buildPace({
+        now: who === 'fresh' ? fresh : active,
+        clock: easternClock(at),
+        today: paceDay(ix, day, who).hours,
+        yesterday: ix.first && yd >= ix.first ? paceDay(ix, yd, who) : null,
+        range: before.map((d) => paceDay(ix, d, who)),
+        history: Array.from({ length: 28 }, (_, i) => addDays(day, -1 - i))
+          .filter((d) => !!ix.first && d >= ix.first)
+          .map((d) => paceDay(ix, d, who)),
+      });
+      return model ? { model, color } : null;
     };
     const V = sub?.evidence.V ?? 0;
     const S = sub?.evidence.S ?? 0;
@@ -337,12 +395,19 @@ function TodaySection({ ix, ctx, isToday }: { ix: UsageIndex; ctx: Ctx; isToday:
         label: 'In the app',
         value: int(active),
         change: headline((d) => activeOn(ix, d)),
-        wide: true,
+        pace: pace('all'),
         comparisons: d7((d) => activeOn(ix, d)),
-        extra: pace((d) => activeOn(ix, d)),
         splits: [
           { title: 'Who', parts: parts(WHO, { back: Math.max(0, active - fresh), fresh }), format: int },
           { title: 'Store', parts: parts(STORES, entry(ix, 'open', day)?.platforms ?? {}), format: int },
+          {
+            title: 'Trial',
+            parts: [
+              { key: 'trial', label: 'In trial (D0–14)', value: lifecycleActive(ix, day, true), color: '#199e70' },
+              { key: 'past', label: 'Past trial (D15+)', value: lifecycleActive(ix, day, false), color: '#c98500' },
+            ].filter((x) => x.value),
+            format: int,
+          },
         ],
         chart: chart('Over the range', (d) => activeOn(ix, d)),
       },
@@ -352,8 +417,8 @@ function TodaySection({ ix, ctx, isToday }: { ix: UsageIndex; ctx: Ctx; isToday:
         value: int(fresh),
         change: headline((d) => newOn(ix, d)),
         note: 'First runs: installs the counter had never seen before.',
+        pace: pace('fresh', '#199e70'),
         comparisons: d7((d) => newOn(ix, d)),
-        extra: pace((d) => newOn(ix, d)),
         splits: [{ title: 'Store', parts: parts(STORES, entry(ix, 'open', day)?.fresh ?? {}), format: int }],
         chart: chart('Over the range', (d) => newOn(ix, d), '#199e70'),
       },
@@ -381,7 +446,20 @@ function TodaySection({ ix, ctx, isToday }: { ix: UsageIndex; ctx: Ctx; isToday:
             format: int,
           },
         ],
-        chart: chart('Over the range', (d) => totalOn(ix, 'sub', d), '#199e70'),
+        body: (
+          <>
+            <SubsList day={day} platform={ix.platform} />
+            {/* In place of the plain bar chart: the same days, split by plan. */}
+            <StackedBars
+              title="Over the range"
+              keys={SUB_PLANS}
+              rows={ctx.days.map((d) => ({ x: d, values: known(ix, 'sub', d) ? subPlans(entry(ix, 'sub', d)) : null }))}
+              xLabel={shortDate}
+              height={96}
+              summary={`${int(ctx.days.reduce((t, d) => t + totalOn(ix, 'sub', d), 0))} reported`}
+            />
+          </>
+        ),
       },
       {
         key: 'act',
@@ -396,9 +474,17 @@ function TodaySection({ ix, ctx, isToday }: { ix: UsageIndex; ctx: Ctx; isToday:
         key: 'hrv',
         label: 'Measured',
         value: hrvKnown ? int(readings) : '–',
+        // The same people as a share of everyone in the app that day.
+        aside: share(day) === null ? undefined : `/ ${pct(share(day))}`,
         change: headline((d) => knownTotal(ix, 'hrv', d)),
-        note: 'Installs that completed an HRV reading that day.',
-        comparisons: d7((d) => knownTotal(ix, 'hrv', d)),
+        note: 'Installs that completed an HRV reading that day, and their share of everyone in the app. A share of people, not of opens.',
+        comparisons: [
+          ...d7((d) => knownTotal(ix, 'hrv', d)),
+          { label: 'Share of active', value: pct(share(day)) },
+          ...named('Share', share, (v) => pct(v)),
+          ...(fresh ? [{ label: 'Of first runs', value: pct((firstRunReadings / fresh) * 100) }] : []),
+          ...(returningOn(ix, day) ? [{ label: 'Of returning', value: pct((Math.max(0, readings - firstRunReadings) / returningOn(ix, day)) * 100) }] : []),
+        ],
         splits: [
           { title: 'Store', parts: parts(STORES, hrvE?.platforms ?? {}), format: int },
           ...(ix.hrvMethodFirst && day >= ix.hrvMethodFirst ? [{ title: 'Sensor', parts: parts(SENSORS, hrvE?.slots ?? {}), format: int }] : []),
@@ -406,60 +492,27 @@ function TodaySection({ ix, ctx, isToday }: { ix: UsageIndex; ctx: Ctx; isToday:
         chart: { ...chart('Over the range', (d) => knownTotal(ix, 'hrv', d)), unknownBefore: ix.firstDay.hrv },
       },
       {
-        key: 'share',
-        label: 'Measured of active',
-        value: pct(share(day)),
-        change: headline(share),
-        note: 'A share of people, not of opens: both counters fire once per install per day.',
-        comparisons: [
-          ...d7(share),
-          ...(fresh ? [{ label: 'Of first runs', value: pct((firstRunReadings / fresh) * 100) }] : []),
-          ...(returningOn(ix, day) ? [{ label: 'Of returning', value: pct((Math.max(0, readings - firstRunReadings) / returningOn(ix, day)) * 100) }] : []),
-        ],
-        chart: { title: 'Over the range', series: series(ctx.days, share), format: (v: number) => pct(v) },
-      },
-      {
-        key: 'trial',
-        label: 'Active in trial',
-        value: int(lifecycleActive(ix, day, true)),
-        change: headline((d) => lifecycleActive(ix, d, true)),
-        note: 'Installs 14 days old or younger that opened the app.',
-        comparisons: d7((d) => lifecycleActive(ix, d, true)),
-        chart: chart('Over the range', (d) => lifecycleActive(ix, d, true), '#199e70'),
-      },
-      {
-        key: 'past',
-        label: 'Active past the trial',
-        value: int(lifecycleActive(ix, day, false)),
-        change: headline((d) => lifecycleActive(ix, d, false)),
-        note: 'Installs 15 days old or older: the free tier unless they paid.',
-        comparisons: d7((d) => lifecycleActive(ix, d, false)),
-        chart: chart('Over the range', (d) => lifecycleActive(ix, d, false), '#c98500'),
-      },
-      {
         key: 'crash',
-        label: 'Crashes',
-        value: int(f.crashInstalls),
-        change: headline((d) => faultDay(ix, d).crashInstalls),
-        note: `${int(f.crashOccurrences)} occurrences${active ? ` · ${pct((f.crashInstalls / active) * 100, 1)} of actives` : ''}. Install-days, not phones.`,
-        comparisons: d7((d) => faultDay(ix, d).crashInstalls),
-        splits: [{ title: 'Store', parts: parts(STORES, f.crashPlatforms), format: int }],
-        chart: chart('Over the range', (d) => faultDay(ix, d).crashInstalls, '#e66767'),
-      },
-      {
-        key: 'fail',
-        label: 'Failures',
-        value: int(f.installs),
+        label: 'Crashes / errors',
+        value: `${int(f.crashInstalls)} / ${int(f.installs)}`,
         change: headline((d) => faultDay(ix, d).installs),
-        note: `${int(f.occurrences)} occurrences across ${f.signatures} distinct failures. Crashes included.`,
-        comparisons: d7((d) => faultDay(ix, d).installs),
-        splits: [{ title: 'Store', parts: parts(STORES, f.platforms), format: int }],
-        chart: chart('Over the range', (d) => faultDay(ix, d).installs, '#e66767'),
+        note: `Install-days, not phones. Errors count crashes too: ${int(f.occurrences)} occurrences across ${f.signatures} distinct failures, ${int(f.crashOccurrences)} of them crashes${active ? ` (${pct((f.crashInstalls / active) * 100, 1)} of actives)` : ''}.`,
+        comparisons: [
+          ...named('Crashes', (d) => faultDay(ix, d).crashInstalls),
+          ...named('Errors', (d) => faultDay(ix, d).installs),
+        ],
+        splits: [
+          { title: 'Crashes by store', parts: parts(STORES, f.crashPlatforms), format: int },
+          { title: 'Errors by store', parts: parts(STORES, f.platforms), format: int },
+        ],
+        chart: chart('Errors over the range', (d) => faultDay(ix, d).installs, '#e66767'),
       },
     ];
-  }, [ix, ctx, day, isToday]);
+  }, [ix, ctx, day, isToday, at]);
 
   const ages = useMemo(() => activeByCohort(ix, day), [ix, day]);
+  const [whoMode, setWhoMode] = useState<'basic' | 'expanded'>('basic');
+  const activeTotal = ages.reduce((t, a) => t + a.count, 0);
 
   return (
     <>
@@ -467,16 +520,201 @@ function TodaySection({ ix, ctx, isToday }: { ix: UsageIndex; ctx: Ctx; isToday:
       <Card>
         <StackedBars
           title="Who is using it"
+          right={
+            <View style={{ width: 150 }}>
+              <Segmented
+                compact
+                options={[
+                  { key: 'basic', label: 'Basic' },
+                  { key: 'expanded', label: 'Expanded' },
+                ]}
+                value={whoMode}
+                onChange={setWhoMode}
+              />
+            </View>
+          }
           keys={[
             { key: 'trial', label: 'In trial (D0–14)', color: '#199e70' },
             { key: 'past', label: 'Past trial (D15+)', color: '#c98500' },
           ]}
           rows={ages.map((a) => ({ x: `D${a.age}`, values: a.age <= 14 ? { trial: a.count, past: 0 } : { trial: 0, past: a.count } }))}
-          summary={`${int(ages.reduce((t, a) => t + a.count, 0))} by install age`}
+          summary={`${int(activeTotal)} by install age`}
+          readout={(i) => `D${ages[i].age} / ${int(ages[i].count)} ${ages[i].count === 1 ? 'visitor' : 'visitors'}`}
+          detail={whoMode === 'expanded' ? (i) => <CohortBar ix={ix} row={ages[i]} day={day} days={ctx.days} total={activeTotal} /> : undefined}
         />
         <Note>That day's actives by how old their install is. Dominated by the youngest bars means activity is propped up by acquisition; a long tail means older installs keep coming back.</Note>
       </Card>
     </>
+  );
+}
+
+/* The subscriptions reported on one day, one row per purchase: when that
+   install first ran, the store, the plan, a check when the store confirmed it
+   within an hour of a buy tap, and a button that drafts it into the ledger as
+   a sale (the price is the one thing a ping cannot carry). A purchase already
+   in the ledger reads Converted. */
+function SubsList({ day, platform }: { day: string; platform: UsageIndex['platform'] }) {
+  const { snap } = useData();
+  const [draft, setDraft] = useState<SubPing | null>(null);
+  const rows = useMemo(() => {
+    const letter = platform === 'ios' ? 'I' : platform === 'android' ? 'A' : null;
+    const out: { key: string; ping: SubPing; verified: boolean; converted: boolean }[] = [];
+    subscribePings(snap)
+      .filter((p) => p.date === day && (!letter || p.store === letter))
+      .forEach((p) => {
+        // One row per purchase. Which unit of a shared ping is which is not
+        // knowable, so the recorded and the verified ones are listed first.
+        for (let i = 0; i < p.count; i++) out.push({ key: `${p.ping}#${i}`, ping: p, verified: i < p.verified, converted: i < p.count - p.remaining });
+      });
+    return out;
+  }, [snap, day, platform]);
+
+  return (
+    <View style={{ gap: 8 }}>
+      <Text style={s.subHead}>Reported on {shortDate(day)}</Text>
+      {!rows.length ? <Text style={s.subEmpty}>None reported that day.</Text> : null}
+      {rows.map((r) => (
+        <View key={r.key} style={s.subRow}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <View style={s.subTitleRow}>
+              <Text style={s.subTitle} numberOfLines={1}>
+                {pingPlanName(r.ping.planLetter)}
+              </Text>
+              {r.verified ? <SymbolView name="checkmark.circle.fill" size={14} tintColor={C.up} /> : null}
+            </View>
+            <Text style={[s.subMeta, num]} numberOfLines={1}>
+              Installed {shortDate(r.ping.cohort)} · {r.ping.store === 'I' ? 'iOS' : r.ping.store === 'A' ? 'Android' : 'No store'}
+            </Text>
+          </View>
+          {r.converted ? (
+            <View style={[s.subBtn, s.subBtnDone]}>
+              <SymbolView name="checkmark" size={11} weight="bold" tintColor={C.dim} />
+              <Text style={[s.subBtnText, { color: C.dim }]}>Converted</Text>
+            </View>
+          ) : (
+            <Pressable
+              hitSlop={6}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setDraft(r.ping);
+              }}
+              style={({ pressed }) => [s.subBtn, pressed && { opacity: 0.6 }]}
+            >
+              <Text style={s.subBtnText}>Convert</Text>
+            </Pressable>
+          )}
+        </View>
+      ))}
+      {rows.some((r) => r.verified) ? <Text style={s.subEmpty}>A check means the store confirmed it within an hour of a buy tap.</Text> : null}
+      <SaleFromPingSheet ping={draft} onClose={() => setDraft(null)} />
+    </View>
+  );
+}
+
+/* Everything known about one bar of "Who is using it": one cohort on one day.
+   It has TWO normals, hence two blocks. Down the cohort's own life: is it
+   fading, and how much of what installed is left. Across cohorts at the same
+   AGE: is a day-N bar this tall usually. Neither answers the other. The web
+   dashboard shows the same thing in its hover card. */
+function CohortBar({ ix, row, day, days, total }: { ix: UsageIndex; row: { age: number; cohort: string; count: number }; day: string; days: string[]; total: number }) {
+  const norm = cohortNorm(ix, row.cohort, day, days);
+  const ages = ageNorm(ix, row.age, day, row.cohort);
+  const D = `D${row.age}`;
+  const whole = (v: number | null | undefined) => (v === null || v === undefined || !isFinite(v) ? null : `${Math.round(v)}%`);
+  /* "was → is", and a percentage only once the base can carry one: a cohort
+     is a handful of installs, and one person to two is not "+100%". */
+  const move = (label: string, before: number | null | undefined, note?: string): [string, ReactNode, string?] | null => {
+    if (before === null || before === undefined || !isFinite(before)) return null;
+    const p = pctChange(norm.now, before);
+    const was = before >= 10 || before === Math.round(before) ? int(before) : before.toFixed(1);
+    return [
+      label,
+      <>
+        {was} → {int(norm.now)}
+        {p === null || Math.abs(p) < 0.5 ? null : <Text style={{ color: p > 0 ? C.up : C.down }}> {p > 0 ? '▲' : '▼'} {Math.abs(p).toFixed(0)}%</Text>}
+      </>,
+      note,
+    ];
+  };
+  const sameDays = norm.range && norm.all && norm.range.days === norm.all.days;
+  const mine = [
+    norm.size
+      ? (['Still here', `${int(norm.now)} of ${int(norm.size)} · ${whole(norm.retained)}`] as [string, ReactNode])
+      : (['Still here', int(norm.now), 'installed before the counter'] as [string, ReactNode, string]),
+    move('vs the day before', norm.prev),
+    move('vs its own average', norm.all?.avg, norm.all ? `over ${int(norm.all.days)} ${norm.all.days === 1 ? 'day' : 'days'}` : undefined),
+    sameDays ? null : move('vs its average in range', norm.range?.avg, norm.range ? `over ${int(norm.range.days)} ${norm.range.days === 1 ? 'day' : 'days'}` : undefined),
+    norm.peak ? (['Its best day', int(norm.peak.count), `on D${norm.peak.age}`] as [string, ReactNode, string]) : null,
+  ];
+  const ret = ages.retention;
+  const theirs =
+    !ages.cohorts && ages.yesterday === null
+      ? [['No other cohort', `has reached ${D} yet`] as [string, ReactNode]]
+      : [
+          move(`The ${D} bar yesterday`, ages.yesterday),
+          move(`The usual ${D} bar`, ages.median, ages.cohorts ? `median of ${int(ages.cohorts)}` : undefined),
+          ret && ret.available
+            ? ([
+                `${D} retention`,
+                norm.retained === null ? whole(ret.pct) : `${whole(norm.retained)} vs ${whole(ret.pct)}`,
+                norm.retained === null ? 'typical · this one never counted' : 'typical',
+              ] as [string, ReactNode, string])
+            : null,
+        ];
+  const block = (title: string, lines: ([string, ReactNode, string?] | null)[]) => (
+    <View style={s.cbBlock}>
+      <Text style={s.cbGroup}>{title}</Text>
+      {lines.map((l) =>
+        l ? (
+          <View key={l[0]} style={s.cbLine}>
+            <Text style={s.cbLabel}>{l[0]}</Text>
+            <Text style={[s.cbValue, num]}>
+              {l[1]}
+              {l[2] ? <Text style={s.cbNote}> {l[2]}</Text> : null}
+            </Text>
+          </View>
+        ) : null,
+      )}
+    </View>
+  );
+  return (
+    <View style={s.cb}>
+      <Text style={s.cbHead}>
+        {shortDate(row.cohort)} · {row.age} {row.age === 1 ? 'day' : 'days'} old
+      </Text>
+      <Text style={[s.cbSub, num]}>
+        {int(row.count)} of {int(total)} active installs on {shortDate(day)}
+      </Text>
+      {block(`This cohort${norm.size ? ` · ${int(norm.size)} installed` : ''}`, mine)}
+      {block(`${D} across cohorts`, theirs)}
+    </View>
+  );
+}
+
+/* Returning against first runs across the range. On the main screen, under
+   the day's own chart, because it is the one range chart read every visit. */
+function GrowthCard({ ix, days, mode, setMode }: { ix: UsageIndex; days: string[]; mode: 'count' | 'share'; setMode: (m: 'count' | 'share') => void }) {
+  const growth = days.map((d) => ({ x: d, values: { back: returningOn(ix, d), fresh: newOn(ix, d) } }));
+  return (
+    <Card>
+      <Segmented
+        options={[
+          { key: 'count', label: 'Count' },
+          { key: 'share', label: 'Share' },
+        ]}
+        value={mode}
+        onChange={setMode}
+      />
+      <StackedBars
+        title="Growth & usage"
+        keys={WHO}
+        rows={growth}
+        xLabel={shortDate}
+        percent={mode === 'share'}
+        summary={`avg ${int(growth.reduce((t, r) => t + r.values.back + r.values.fresh, 0) / Math.max(1, days.length))}/day`}
+      />
+      <Note>Returning is the line to watch: first runs rise and fall with the store, but only returning activity means the app is holding anyone.</Note>
+    </Card>
   );
 }
 
@@ -485,17 +723,16 @@ function TodaySection({ ix, ctx, isToday }: { ix: UsageIndex; ctx: Ctx; isToday:
 function RangeSection({
   ix,
   ctx,
-  growthMode,
-  setGrowthMode,
   buildMode,
   setBuildMode,
   weekdayMetric,
   setWeekdayMetric,
+  part,
 }: {
+  /** Which card this is: general usage, the readings, or crashes and errors. */
+  part: 'usage' | 'measures' | 'errors';
   ix: UsageIndex;
   ctx: Ctx;
-  growthMode: 'count' | 'share';
-  setGrowthMode: (m: 'count' | 'share') => void;
   buildMode: 'count' | 'share';
   setBuildMode: (m: 'count' | 'share') => void;
   weekdayMetric: 'downloads' | 'fresh' | 'back' | 'hrv' | 'ledger' | 'sub';
@@ -524,7 +761,7 @@ function RangeSection({
     }, { V: 0, S: 0 });
     const installs = days.reduce((t, d) => t + newOn(ix, d), 0);
     const chart = (fn: (d: string) => number | null, color?: string) => ({ title: 'Per day', series: series(days, fn), format: int, color });
-    return [
+    const all: MetricSpec[] = [
       {
         key: 'back',
         label: 'Returning / day',
@@ -595,9 +832,10 @@ function RangeSection({
         },
       },
     ];
-  }, [ix, ctx, days, n]);
+    // First readings and the measuring rate belong with the readings.
+    return all.filter((t) => (t.key === 'act' || t.key === 'rate') === (part === 'measures'));
+  }, [ix, ctx, days, n, part]);
 
-  const growth = days.map((d) => ({ x: d, values: { back: returningOn(ix, d), fresh: newOn(ix, d) } }));
   const actSlots = slotsOver(ix, 'act', days);
   const hrvSlots = slotsOver(ix, 'hrv', days.filter((d) => !!ix.hrvMethodFirst && d >= ix.hrvMethodFirst));
   const mr = measureRate(ix, days);
@@ -635,7 +873,8 @@ function RangeSection({
         return { label: ln.label, value: int(total), sub: act ? `${pct((total / act) * 100, 1)} of active install-days` : undefined, total };
       })
       .filter((r) => r.total > 0)
-      .sort(byTotal);
+      // Most first: each card is a ranking of what people did.
+      .sort((a, b) => b.total - a.total);
   const firstFailures = days.reduce((t, d) => t + (knownTotal(ix, 'err', d) ?? 0), 0);
   const plat = platformsOver(ix, 'open', days);
 
@@ -674,29 +913,13 @@ function RangeSection({
 
   return (
     <>
-      <Section title="This range" note={`${shortDate(ctx.from)} – ${shortDate(ctx.last)} · ${n} days`} />
-      <MetricTiles specs={specs} />
+      <Text style={[s.rangeSub, num]}>
+        {shortDate(ctx.from)} – {shortDate(ctx.last)} · {n} days{part === 'errors' ? ' · install-days, not phones' : ''}
+      </Text>
+      {part === 'errors' ? null : <MetricTiles specs={specs} />}
 
-      <Card>
-        <Segmented
-          options={[
-            { key: 'count', label: 'Count' },
-            { key: 'share', label: 'Share' },
-          ]}
-          value={growthMode}
-          onChange={setGrowthMode}
-        />
-        <StackedBars
-          title="Growth & usage"
-          keys={WHO}
-          rows={growth}
-          xLabel={xl}
-          percent={growthMode === 'share'}
-          summary={`avg ${int(growth.reduce((t, r) => t + r.values.back + r.values.fresh, 0) / Math.max(1, n))}/day`}
-        />
-        <Note>Returning is the line to watch: first runs rise and fall with the store, but only returning activity means the app is holding anyone.</Note>
-      </Card>
-
+      {part === 'measures' ? (
+        <>
       <Card>
         <StackedBars
           title="How the first reading is taken"
@@ -757,6 +980,32 @@ function RangeSection({
         />
         <Note>A start with no completion is the app asking for something the person could not give it: a strap that would not pair, a session too long.</Note>
       </Card>
+        </>
+      ) : part === 'errors' ? (
+        <>
+      <Card>
+        <StackedBars
+          title="Crashes a day"
+          keys={STORES}
+          rows={fdays.map(({ d, f }) => ({ x: d, values: f.crashPlatforms }))}
+          xLabel={xl}
+          summary={int(fdays.reduce((t, x) => t + x.f.crashInstalls, 0))}
+        />
+        <Note>Uncaught failures: the app went down in front of somebody.</Note>
+      </Card>
+      <Card>
+        <StackedBars
+          title="Failures a day"
+          keys={STORES}
+          rows={fdays.map(({ d, f }) => ({ x: d, values: f.platforms }))}
+          xLabel={xl}
+          summary={int(fdays.reduce((t, x) => t + x.f.installs, 0))}
+        />
+        <Note>Every reported failure, crashes plus everything the app caught and handled.</Note>
+      </Card>
+        </>
+      ) : (
+        <>
 
       <Card>
         <OverlayBars
@@ -851,7 +1100,9 @@ function RangeSection({
       </Card>
 
       <Card title="What people do in there">
-        <Rows rows={[...lineRows(DO_LINES), { label: 'Installs reporting a first failure', value: int(firstFailures), total: firstFailures }].sort(byTotal)} />
+        <Rows
+          rows={[...lineRows(DO_LINES), { label: 'Installs reporting a first failure', value: int(firstFailures), total: firstFailures }].sort((a, b) => b.total - a.total)}
+        />
         <Note>Each line is a headcount for that one thing; somebody who did two of them is in both.</Note>
       </Card>
 
@@ -864,27 +1115,6 @@ function RangeSection({
         {lineRows(DIG_LINES).length ? <Rows rows={lineRows(DIG_LINES)} /> : <Note>Nothing in this range.</Note>}
       </Card>
 
-      <Section title="Crashes and failures" note="Install-days, not phones" />
-      <Card>
-        <StackedBars
-          title="Crashes a day"
-          keys={STORES}
-          rows={fdays.map(({ d, f }) => ({ x: d, values: f.crashPlatforms }))}
-          xLabel={xl}
-          summary={int(fdays.reduce((t, x) => t + x.f.crashInstalls, 0))}
-        />
-        <Note>Uncaught failures: the app went down in front of somebody.</Note>
-      </Card>
-      <Card>
-        <StackedBars
-          title="Failures a day"
-          keys={STORES}
-          rows={fdays.map(({ d, f }) => ({ x: d, values: f.platforms }))}
-          xLabel={xl}
-          summary={int(fdays.reduce((t, x) => t + x.f.installs, 0))}
-        />
-        <Note>Every reported failure, crashes plus everything the app caught and handled.</Note>
-      </Card>
 
       <Card>
         <StackedBars title="iOS vs Android" keys={STORES} rows={days.map((d) => ({ x: d, values: entry(ix, 'open', d)?.platforms ?? null }))} xLabel={xl} />
@@ -921,6 +1151,8 @@ function RangeSection({
           }))}
         />
       </Card>
+        </>
+      )}
     </>
   );
 }
@@ -928,6 +1160,7 @@ function RangeSection({
 /* ======================================================= ALL INSTALLS */
 
 function LifeSection({
+  part,
   ix,
   ctx,
   curveMode,
@@ -936,6 +1169,8 @@ function LifeSection({
   setTrendAge,
   releases,
 }: {
+  /** Which card this is: the retention charts, or the measuring ones. */
+  part: 'retention' | 'measures';
   ix: UsageIndex;
   ctx: Ctx;
   curveMode: 'all' | 'split';
@@ -960,7 +1195,7 @@ function LifeSection({
         ...(r.small && r.available ? [{ label: 'Sample', value: 'small' }] : []),
       ],
     });
-    return [
+    const all = [
       tile('d1', 'D1 retention', retentionAt(ix, cohorts, 1), 'Opened the app exactly one day after installing.'),
       tile('d7', 'D7 retention', retentionAt(ix, cohorts, 7), 'Opened on exactly day 7.'),
       tile('d14', 'D14 retention', retentionAt(ix, cohorts, 14), 'The last day of the trial.'),
@@ -970,7 +1205,9 @@ function LifeSection({
       tile('c7', 'Converted by D7', conversion(ix, cohorts, 7), 'A subscription reported within a week of installing.'),
       tile('c30', 'Converted by D30', conversion(ix, cohorts, 30), 'A subscription reported within 30 days.'),
     ];
-  }, [ix, cohorts]);
+    // The activation tiles belong with the readings; the rest are about staying.
+    return all.filter((t) => (t.key === 'a0' || t.key === 'a7') === (part === 'measures'));
+  }, [ix, cohorts, part]);
 
   /* Curves start at D1 (D0 is 100% by definition and would flatten every
      other day into the floor) and drop any point resting on fewer than
@@ -1007,8 +1244,12 @@ function LifeSection({
 
   return (
     <>
-      <Section title="All installs" note={`${cohorts.length} cohorts born ${shortDate(ctx.from)} – ${shortDate(ctx.last)} · ${int(installs)} installs`} />
+      <Text style={[s.rangeSub, num]}>
+        {cohorts.length} cohorts born {shortDate(ctx.from)} – {shortDate(ctx.last)} · {int(installs)} installs
+      </Text>
       <MetricTiles specs={specs} />
+      {part === 'retention' ? (
+        <>
 
       <Card>
         <Segmented
@@ -1153,6 +1394,9 @@ function LifeSection({
         <Note>How old the install was when a subscription was reported. D15 is the first day on the free tier.</Note>
       </Card>
 
+        </>
+      ) : (
+        <>
       <Card>
         <BarChart
           title="Activation"
@@ -1197,14 +1441,32 @@ function LifeSection({
         />
         <Note>Which sensors readings are taken with as installs get older, as shares of each age's readings.</Note>
       </Card>
+        </>
+      )}
     </>
   );
 }
 
 const s = StyleSheet.create({
-  section: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', marginTop: 14, paddingHorizontal: 4, gap: 10 },
-  sectionTitle: { color: C.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.4 },
-  sectionNote: { color: C.muted, fontSize: 12, flexShrink: 1, textAlign: 'right' },
+  rangeSub: { color: C.dim, fontSize: 12, marginTop: 1 },
+  subHead: { color: C.muted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },
+  subEmpty: { color: C.muted, fontSize: 12, lineHeight: 17 },
+  subRow: { flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 12, paddingVertical: 9, paddingHorizontal: 12 },
+  subTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  subTitle: { color: C.text, fontSize: 14, fontWeight: '700', flexShrink: 1 },
+  subMeta: { color: C.dim, fontSize: 12, marginTop: 1 },
+  subBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'rgba(255,255,255,0.14)' },
+  subBtnDone: { backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  subBtnText: { color: C.text, fontSize: 13, fontWeight: '600' },
+  cb: { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 12, marginBottom: 12, gap: 2 },
+  cbHead: { color: C.text, fontSize: 14, fontWeight: '700' },
+  cbSub: { color: C.dim, fontSize: 12 },
+  cbBlock: { marginTop: 10, gap: 5 },
+  cbGroup: { color: C.muted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginBottom: 1 },
+  cbLine: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', gap: 10 },
+  cbLabel: { color: C.dim, fontSize: 13 },
+  cbValue: { color: C.text, fontSize: 13, fontWeight: '600', flexShrink: 1, textAlign: 'right' },
+  cbNote: { color: C.muted, fontWeight: '500' },
   note: { color: C.muted, fontSize: 12, lineHeight: 17 },
   subhead: { color: C.muted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 6 },
   rows: { backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 14, paddingHorizontal: 12, paddingVertical: 2 },

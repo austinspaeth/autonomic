@@ -14,13 +14,20 @@ import { useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
 import Svg, { G, Line, Path, Rect, Text as SvgText } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
+import { useWide } from '../lib/wide';
 import { C, num } from '../theme';
 
 export type Key = { key: string; label: string; color: string; dashed?: boolean };
 
-function useScrub(n: number) {
+/** `sticky`: the selection stays where the finger left it instead of clearing. */
+function useScrub(n: number, sticky = false) {
   const [width, setWidth] = useState(0);
-  const [sel, setSel] = useState<number | null>(null);
+  const [picked, setSel] = useState<number | null>(null);
+  // A sticky chart always has a bar selected: the first, until one is touched.
+  const sel = picked !== null && picked < n ? picked : sticky && n ? 0 : null;
+  const drop = () => {
+    if (!sticky) setSel(null);
+  };
   const pick = (e: GestureResponderEvent) => {
     if (!width || !n) return;
     const i = Math.max(0, Math.min(n - 1, Math.floor((e.nativeEvent.locationX / width) * n)));
@@ -36,8 +43,8 @@ function useScrub(n: number) {
     onResponderTerminationRequest: () => false,
     onResponderGrant: pick,
     onResponderMove: pick,
-    onResponderRelease: () => setSel(null),
-    onResponderTerminate: () => setSel(null),
+    onResponderRelease: drop,
+    onResponderTerminate: drop,
   };
   return { width, sel, responders };
 }
@@ -52,10 +59,15 @@ function barTop(x: number, y: number, w: number, h: number, r: number) {
    or (while a finger is on the chart) the day being read. Two lines, so a
    long readout wraps instead of being cut off, and the line is always there
    so the chart never jumps when the finger lands. */
-function Head({ title, readout }: { title: string; readout: ReactNode }) {
+function Head({ title, readout, right }: { title: string; readout: ReactNode; right?: ReactNode }) {
   return (
     <View style={st.head}>
-      <Text style={st.title}>{title}</Text>
+      <View style={st.titleRow}>
+        <Text style={[st.title, { flexShrink: 1 }]} numberOfLines={1}>
+          {title}
+        </Text>
+        {right}
+      </View>
       <Text style={[st.readout, num]} numberOfLines={2}>
         {readout || ' '}
       </Text>
@@ -140,11 +152,22 @@ export function StackedBars({
   xLabel = (x) => x,
   format = (n) => String(Math.round(n)),
   percent,
-  height = 140,
+  height: heightProp,
   summary,
+  right,
+  detail,
+  readout,
 }: {
   title: string;
   keys: Key[];
+  /** Sits at the right of the title (a mode switch). */
+  right?: ReactNode;
+  /** Everything known about bar `index`, drawn above the chart. Passing it
+   *  makes the selection STICKY: a bar is always selected, and it stays on the
+   *  one the finger left. */
+  detail?: (index: number) => ReactNode;
+  /** The line shown while a bar is touched, in place of the per-key list. */
+  readout?: (index: number) => string;
   /** One per x; a null row is a gap (no data), not a zero. */
   rows: { x: string; values: Record<string, number> | null }[];
   xLabel?: (x: string) => string;
@@ -153,8 +176,9 @@ export function StackedBars({
   height?: number;
   summary?: string;
 }) {
+  const height = heightProp ?? (useWide() ? 230 : 140);
   const n = rows.length;
-  const { width, sel, responders } = useScrub(n);
+  const { width, sel, responders } = useScrub(n, !!detail);
   const { focus, toggle } = useFocus();
   const shownKeys = focus ? keys.filter((k) => k.key === focus) : keys;
   const totals = rows.map((r) => (r.values ? shownKeys.reduce((t, k) => t + (r.values![k.key] || 0), 0) : 0));
@@ -165,17 +189,24 @@ export function StackedBars({
   const pooled: Record<string, number> = {};
   rows.forEach((r) => keys.forEach((k) => (pooled[k.key] = (pooled[k.key] || 0) + (r.values?.[k.key] || 0))));
 
+  // Nothing to draw: the title and what it comes to, and no empty plot under them.
+  if (!keys.some((k) => pooled[k.key])) return <Head title={title} readout={summary ?? ''} right={right} />;
+
   return (
     <View>
       <Head
         title={title}
+        right={right}
         readout={
-          active ? (
+          active && !detail && readout ? (
+            readout(sel!)
+          ) : active && !detail ? (
             <>
               <Text style={st.when}>{xLabel(active.x)} </Text>
               {active.values
                 ? shownKeys
                     .filter((k) => active.values![k.key])
+                    .sort((a, b) => active.values![b.key] - active.values![a.key])
                     .map((k) => {
                       const v = active.values![k.key];
                       const tot = totals[sel!];
@@ -189,6 +220,7 @@ export function StackedBars({
           )
         }
       />
+      {detail && sel !== null ? detail(sel) : null}
       <View style={{ height }} {...responders}>
         {width > 0 && (
           <Svg width={width} height={height}>
@@ -233,7 +265,7 @@ export function OverlayBars({
   rows,
   xLabel = (x) => x,
   format = (n) => String(Math.round(n)),
-  height = 140,
+  height: heightProp,
   summary,
 }: {
   title: string;
@@ -245,6 +277,7 @@ export function OverlayBars({
   height?: number;
   summary?: string;
 }) {
+  const height = heightProp ?? (useWide() ? 230 : 140);
   const n = rows.length;
   const { width, sel, responders } = useScrub(n);
   const { focus, toggle } = useFocus();
@@ -256,6 +289,8 @@ export function OverlayBars({
   const active = sel !== null ? rows[sel] : null;
   const share = (r: { back: number | null; front: number | null }) =>
     r.back && r.front !== null ? ` (${Math.round((r.front / r.back) * 100)}%)` : '';
+
+  if (!rows.some((r) => r.back || r.front)) return <Head title={title} readout={summary ?? ''} />;
 
   return (
     <View>
@@ -345,6 +380,8 @@ export function Lines({
     return d;
   };
 
+  if (!series.some((x) => x.values.some((v) => v))) return <Head title={title} readout={summary ?? ''} />;
+
   return (
     <View>
       <Head
@@ -418,6 +455,7 @@ export function Lines({
 
 const st = StyleSheet.create({
   head: { marginBottom: 10, gap: 3 },
+  titleRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
   title: { color: C.text, fontSize: 16, fontWeight: '600' },
   readout: { color: C.dim, fontSize: 13, fontWeight: '600', minHeight: 18, lineHeight: 18 },
   when: { color: C.muted, fontWeight: '500' },

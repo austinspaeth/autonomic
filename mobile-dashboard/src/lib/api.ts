@@ -3,7 +3,7 @@
 import { idToken } from './auth';
 import { CONFIG } from './config';
 import { expandReport } from './compact';
-import type { CampaignLink, Churn, Entry, LoadResponse, PingReport, Platform, Sale, StoreVersions } from './types';
+import type { AccessCode, CampaignLink, Churn, Entry, LoadResponse, PingReport, Platform, Sale, StoreVersions } from './types';
 
 export class ApiError extends Error {
   status = 0;
@@ -60,6 +60,11 @@ export const api = {
   sync: (payload: SyncPayload) => call<{ ok?: boolean }>('SYNC', payload),
   /** Rewrites every campaign page from what is stored. */
   republishLinks: () => call<{ ok?: boolean; published?: number }>('LINKS_REPUBLISH'),
+  /** Every access code and whether it has been used. */
+  codes: () => call<{ rows: AccessCode[] }>('CODES'),
+  /** A new access code; an empty `code` asks the server to generate one. */
+  createCode: (payload: { days: number; code?: string; note?: string }) =>
+    call<{ ok: boolean; code?: AccessCode; error?: string }>('CODE_CREATE', payload),
 };
 
 export type SyncPayload = {

@@ -11,9 +11,10 @@
  *
  * It is DECLARATIVE, not fire-and-forget: `setCelebrations(kinds)` says which
  * effects should be running, and each one runs for as long as it is listed.
- * The alerts store lists only the FRONT toast's kind, so one effect runs at
- * a time, for the card being read, and dismissing it hands over to the next
- * card's effect (stopping this one lets what is already in the air fall away).
+ * The alerts store lists ONE kind, the front toast's, so the effect in the
+ * air is always the toast being looked at: it lasts exactly as long as that
+ * toast stays in front and stops (letting what is already in the air fall
+ * away) when it is cleared and the next one comes forward.
  *
  * Two things that only bite on a real phone:
  *   - The confetti library is INLINED (confettiBundle.ts), never fetched. A

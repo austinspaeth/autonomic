@@ -4,7 +4,18 @@ import { BlurView } from 'expo-blur';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
+import { topOf, usePicks, useView } from '../lib/views';
+import { BOARD_GUTTER, NAV_H, useWide } from '../lib/wide';
 import { C, R, num } from '../theme';
+
+/* Every vertical scroller takes these: dragging the list puts the keyboard
+   away, a tap on a control still lands while it is up, and the list insets
+   itself by the keyboard and scrolls the focused field clear of it. */
+export const KEYBOARD_SCROLL = {
+  keyboardDismissMode: 'on-drag',
+  keyboardShouldPersistTaps: 'handled',
+  automaticallyAdjustKeyboardInsets: true,
+} as const;
 
 /* The bottom chrome: the logo + view picker band, frosted, pinned above the
    home indicator. Screens pad their content by it. */
@@ -35,22 +46,44 @@ export function Screen({
   children: ReactNode;
 }) {
   const insets = useSafeAreaInsets();
-  const top = insets.top + (topBar ? TOP_BAR_HEIGHT : 0);
-  const bottom = insets.bottom + BOTTOM_CHROME + bottomExtra;
+  /* Wide: the navigation bar is at the top (and draws its own glass), so the
+     content clears that instead of the bottom chrome. */
+  const wide = useWide();
+  const top = insets.top + (wide ? NAV_H : topBar ? TOP_BAR_HEIGHT : 0);
+  const bottom = insets.bottom + (wide ? 0 : BOTTOM_CHROME) + bottomExtra;
+  const scroll = useRef<ScrollView>(null);
+  /* The scroll view outlives a change of view, so a new view would open
+     wherever the last one was left. Every view starts at its top. */
+  const view = useView();
+  const picks = usePicks();
+  const first = useRef(true);
+  useEffect(() => {
+    /* Wide: every view is on the one board, so picking one scrolls to its
+       section (and not on mount, which is not a pick). */
+    if (wide) {
+      const y = topOf(view);
+      if (!first.current && y !== null) scroll.current?.scrollTo({ y: Math.max(0, y - top - 12), animated: true });
+    } else scroll.current?.scrollTo({ y: 0, animated: false });
+    first.current = false;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [view, picks]);
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       {/* Plain top padding (never contentInset): iOS resets an inset scroll to
           zero after a reload or a pull-to-refresh, which slid the content up
           under the sticky bar and clipped it. Padding cannot be reset. */}
       <ScrollView
+        ref={scroll}
+        {...KEYBOARD_SCROLL}
         style={{ flex: 1, backgroundColor: C.bg }}
         automaticallyAdjustContentInsets={false}
         contentInsetAdjustmentBehavior="never"
         contentContainerStyle={{
           paddingTop: top + 12,
           paddingBottom: bottom + 24,
-          paddingHorizontal: 16,
-          gap: 12,
+          paddingHorizontal: wide ? BOARD_GUTTER : 16,
+          gap: wide ? 16 : 12,
+          width: '100%',
         }}
         scrollIndicatorInsets={{ top: topBar ? TOP_BAR_HEIGHT : 0, bottom: BOTTOM_CHROME + bottomExtra }}
         refreshControl={
@@ -73,7 +106,7 @@ export function Screen({
       {/* Frosted band under the status bar (plus the sticky bar, when there is
           one), so content scrolling up reads as passing under glass, matching
           the bottom chrome. */}
-      <View pointerEvents="box-none" style={[s.topBand, { height: top, paddingTop: insets.top }]}>
+      <View pointerEvents="box-none" style={[s.topBand, { height: top, paddingTop: insets.top }, wide && { display: 'none' }]}>
         {Platform.OS === 'ios' ? (
           <BlurView tint="systemChromeMaterialDark" intensity={90} style={StyleSheet.absoluteFill} />
         ) : (
@@ -149,10 +182,13 @@ export function Segmented<T extends string>({
   options,
   value,
   onChange,
+  compact,
 }: {
   options: { key: T; label: string }[];
   value: T;
   onChange: (v: T) => void;
+  /** A smaller control for a card's corner. */
+  compact?: boolean;
 }) {
   return (
     <View style={s.seg}>
@@ -166,9 +202,9 @@ export function Segmented<T extends string>({
               if (!on) Haptics.selectionAsync();
               onChange(o.key);
             }}
-            style={s.segItem}
+            style={[s.segItem, compact && s.segItemCompact]}
           >
-            <Text style={[s.segText, on && { color: C.text }]}>{o.label}</Text>
+            <Text style={[s.segText, compact && s.segTextCompact, on && { color: C.text }]}>{o.label}</Text>
           </Pressable>
         );
       })}
@@ -269,6 +305,8 @@ const s = StyleSheet.create({
      the pill fills exactly one slot of it. */
   seg: { flexDirection: 'row', backgroundColor: 'rgba(255,255,255,0.06)', borderRadius: 12, padding: 3 },
   segItem: { flex: 1, paddingVertical: 8, alignItems: 'center' },
+  segItemCompact: { paddingVertical: 5 },
+  segTextCompact: { fontSize: 12 },
   segPill: { backgroundColor: 'rgba(255,255,255,0.14)', borderRadius: 9 },
   segText: { color: C.dim, fontSize: 14, fontWeight: '600' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 6 },

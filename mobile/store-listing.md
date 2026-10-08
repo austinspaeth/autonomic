@@ -506,3 +506,213 @@ read-only. No transmission, no ads, no analytics, no third-party sharing.
 (Read/write split is `READ_TYPES` / `WRITE_TYPES` in
 `src/lib/health/healthConnect.ts` — keep this paragraph in sync with them, since
 requesting a write permission you don't justify is a Play review rejection.)
+
+---
+
+# United Kingdom — English (U.K.) / en-GB
+
+A second localization on both stores, aimed at how UK users search. People in the
+UK already find the app through the en-US fallback, and **adding an en-GB
+localization likely replaces that fallback in the UK storefront rather than
+adding to it**, which is why the core terms (`hrv`, `pots`, `long covid`,
+`pacing`) are all still here. Check App Store Connect → App Analytics (source
+type by territory) and Play Console's search terms for the UK before and after.
+
+What is different from en-US, and why:
+
+- **ME/CFS leads.** UK patients mostly say "ME", and the 2021 NICE guideline
+  made **pacing / energy management** standard NHS language, so both are in the
+  name, subtitle or keywords.
+- **"PoTS"**, as PoTS UK and the NHS write it (search is case-insensitive, this
+  is for the reader). UK spelling: artefacts, post-viral.
+- **Prices in £**: fill `£X.XX` from the UK price shown in App Store Connect →
+  Subscriptions → Pricing (and Play's GBP price). Never convert by hand; the
+  store's own figure includes VAT.
+- "your doctor" → "your GP or specialist".
+- **Every release now needs en-GB What's New too**; App Store Connect asks for
+  it per localization. Reuse the en-US text, respelled.
+- Screenshots fall back to the en-US set if none are uploaded for en-GB.
+  UK-specific shots would show hPa rather than inHg, once the app does.
+
+## App Store (en-GB)
+
+### Name (29/30)
+
+Autonomic: HRV, PoTS & Pacing
+
+Trades "Journal" (low search value) for "Pacing". The conservative alternative
+is the en-US name unchanged.
+
+### Subtitle (27/30)
+
+ME/CFS & long covid tracker
+
+### Keywords (97/100)
+
+dysautonomia,energy,management,fatigue,pem,heart,rate,variability,orthostatic,rmssd,watch,symptom
+
+Nothing already in the name or subtitle (autonomic, hrv, pots, pacing, me, cfs,
+long, covid, tracker) is repeated.
+
+### Promotional text (159/170)
+
+For long covid, ME/CFS and PoTS. Take a 5-minute HRV reading, then let it set your pacing budget for the day, in minutes of effort, fitted to your own history.
+
+### Description (3,925/4,000)
+
+The Terms of Use / Privacy Policy lines are required here too (Guideline 3.1.2).
+
+See your nervous system actually recover.
+
+Autonomic turns a chest strap, your Apple Watch, or your finger over the camera into a full HRV lab, grades every reading against published thresholds, and turns what it learns into a daily pacing budget fitted to you.
+
+Built for the long haul: ME/CFS, long covid and post-viral recovery, PoTS and dysautonomia, and anyone rebuilding their nervous system.
+
+Free to use, no account, no ads, no tracking. 14 days of full access on install, then the core stays free forever.
+
+
+PACING AND ENERGY MANAGEMENT, IN MINUTES
+
+• A budget for today in minutes of effort, fitted to your own readings and history, never a textbook number
+• It counts the whole day, not just what you log: workouts, steps, time on your feet, and minutes above your own exertion line
+• Legs up and breathwork buy minutes back
+• A pace marker shows where you are in the day, so what is left means something at 9am and at 6pm
+• It goes quiet when it should: on a day that reads as a downturn, no number is published at all
+• It tells you how often its estimate held, week by week, and it is on your widgets and your Apple Watch too
+
+
+LIVE 5-MINUTE HRV, DONE RIGHT
+
+• Capture beat-to-beat RR intervals from a chest strap, Apple Watch, Garmin, or your finger on the camera
+• A guided 5:00 session with paced breathing (4/6 resonance), live heart rate, SDNN and your beat-to-beat trace as it runs
+• Every metric computed on-device: SDNN, RMSSD, pNN50, PNS & SNS index, Baevsky stress index, LF/HF, coherence and more
+• Artefacts are flagged and corrected, and a noisy reading refuses to fake a score
+
+
+EVERY NUMBER GRADED, NO BLACK BOX
+
+• Every number scored great / good / ok / warning / crash against real thresholds
+• One daily Autonomic Score that rolls up HRV, sleep, symptoms, blood pressure and more
+• A plain-language outlook: what your body is ready for, from a full workout to a rest day
+• An early heads-up when your own markers drift: slower heart-rate recovery, a higher resting or overnight heart rate, a bigger standing rise
+
+
+PoTS TESTING ON YOUR WRIST: THE APPLE WATCH APP
+
+• A guided lie-and-stand test: rest, stand when it taps you, and watch your live delta against baseline
+• One tap from the watch face captures a PoTS Episode: baseline, the climb, and 60 seconds of recovery
+
+
+TRACK EVERYTHING, KEEP YOUR STREAK
+
+• Water, meals and food triggers, meds and supplements, symptoms, activities, sleep, blood pressure, stand tests and digestion
+• Define your own "clean day" (hydration, sleep, meds, triggers) and build a streak, with your longest run and a 30 day consistency rate
+• Tap a night for its full sleep report: stages, overnight heart rate and breathing, and how it compares with recent nights
+
+
+FIND WHAT HELPS OR HURTS
+
+• Insights: an on-device read of your own log that finds what is linked to what, and how sure it is
+
+
+YOUR DATA NEVER LEAVES YOUR PHONE
+
+• 100% offline-first: no account, no cloud, no ads. You own your data and can export it anytime
+• Reads HRV, resting HR, sleep, workouts and blood pressure from Apple Health, and writes back only what you ask
+
+
+WHAT'S FREE, WHAT'S PRO
+
+Free forever: unlimited live HRV captures, PoTS stand tests and episodes, journaling, manual readings, your daily score and outlook, the Apple Watch HR monitor, 14 days of charts and full export.
+
+Autonomic Pro adds the pacing budget, week / month / year progress, full historical analysis, Insights, PoTS results and AI doctor reports. It is £X.XX/month or £X.XX/year, billed to your Apple ID and renewing automatically until cancelled. Cancel anytime in your App Store settings.
+
+Terms of Use: https://autonomic.care/terms-of-service/
+Privacy Policy: https://autonomic.care/privacy-policy/
+
+
+IMPORTANT: Autonomic is a personal journal and education tool, not a medical device. It does not diagnose or treat any disease. Always discuss protocol or medication changes with your GP or specialist.
+
+## Google Play (en-GB translation)
+
+Store presence → Main store listing → Manage translations → English (United
+Kingdom).
+
+### App name (29/30)
+
+Autonomic: HRV, PoTS & Pacing
+
+### Short description (77/80)
+
+HRV and pacing for ME/CFS, long covid and PoTS. Energy management, on-device.
+
+### Full description (3,925/4,000)
+
+See your nervous system actually recover.
+
+Autonomic turns a Bluetooth heart rate strap, or just your finger over your phone's camera into a full HRV lab, grades every reading against published thresholds, and turns what it learns into a daily pacing budget fitted to you.
+
+Built for the long haul: ME/CFS, long covid and post-viral recovery, PoTS and dysautonomia, and anyone rebuilding their nervous system.
+
+Free to use, no account, no ads, no tracking. 14 days of full access on install, then the core stays free forever.
+
+
+PACING AND ENERGY MANAGEMENT, IN MINUTES
+
+• A budget for today in minutes of effort, fitted to your own readings and history, never a textbook number
+• It counts the whole day, not just what you log: workouts, steps, time on your feet, and minutes above your own exertion line
+• Legs up and breathwork buy minutes back
+• A pace marker shows where you are in the day, so what is left means something at 9am and at 6pm
+• It goes quiet when it should: on a day that reads as a downturn, no number is published at all
+• It tells you how often its estimate held, week by week, and it is on your home screen widgets too
+
+
+LIVE 5-MINUTE HRV, DONE RIGHT
+
+• Capture beat-to-beat RR intervals from a Bluetooth chest strap, your Garmin watch, or your phone's camera using your finger
+• A guided 5:00 session with paced breathing (4/6 resonance), live heart rate, SDNN and your beat-to-beat trace as it runs
+• Every metric computed on-device: SDNN, RMSSD, pNN50, PNS & SNS index, Baevsky stress index, LF/HF, coherence and more
+• Artefacts are flagged and corrected, and a noisy reading refuses to fake a score
+
+
+EVERY NUMBER GRADED, NO BLACK BOX
+
+• Every number scored great / good / ok / warning / crash against real thresholds
+• One daily Autonomic Score that rolls up HRV, sleep, symptoms, blood pressure and more
+• A plain-language outlook: what your body is ready for, from a full workout to a rest day
+• An early heads-up when your own markers drift: slower heart-rate recovery, a higher resting or overnight heart rate, a bigger standing rise
+
+
+PoTS AND ORTHOSTATIC TESTING
+
+• A guided lie-and-stand test with a chest strap: rest, stand when it tells you, and watch your live delta against baseline
+• Capture a PoTS Episode the moment one starts: baseline, the climb, and 60 seconds of recovery
+
+
+TRACK EVERYTHING, KEEP YOUR STREAK
+
+• Water, meals and food triggers, meds and supplements, symptoms, activities, sleep, blood pressure, stand tests and digestion
+• Define your own "clean day" (hydration, sleep, meds, triggers) and build a streak, with your longest run and a 30 day consistency rate
+• Tap a night for its full sleep report: stages, overnight heart rate and breathing, and how it compares with recent nights
+• Milestones, so recovery actually adds up
+
+
+FIND WHAT HELPS OR HURTS
+
+• Insights: an on-device read of your own log that finds what is linked to what, and how sure it is
+
+
+YOUR DATA NEVER LEAVES YOUR PHONE
+
+• 100% offline-first: no account, no cloud, no ads. You own your data and can export it anytime
+• Reads HRV, resting HR, sleep, workouts and blood pressure from Health Connect, and writes back only what you ask
+
+
+WHAT'S FREE, WHAT'S PRO
+
+Free forever: unlimited live HRV captures, PoTS stand tests and episodes from a chest strap, journaling, manual readings, your daily Autonomic Score and outlook, 14 days of progress charts, and backup and export.
+
+Autonomic Pro adds the pacing budget, week / month / year progress, full historical analysis, Insights, PoTS results and AI doctor reports. It is £X.XX per month or £X.XX per year, billed through Google Play. Subscriptions renew automatically until cancelled; manage or cancel anytime in Google Play > Subscriptions.
+
+
+IMPORTANT: Autonomic is a personal journal and education tool, not a medical device. It does not diagnose or treat any disease. Always discuss protocol or medication changes with your GP or specialist.

@@ -19,6 +19,12 @@ export function easternDay(ms = Date.now()): string {
   return new Date(ms - offsetMs).toISOString().slice(0, 10);
 }
 
+/** How far into its US Eastern day an instant is, in hours (0 to 24). */
+export function easternClock(ms = Date.now()): number {
+  const local = ms - (isEasternDst(ms) ? 4 : 5) * 3600 * 1000;
+  return (((local % 86400000) + 86400000) % 86400000) / 3600000;
+}
+
 export function addDays(iso: string, n: number): string {
   const d = new Date(`${iso}T12:00:00Z`);
   d.setUTCDate(d.getUTCDate() + n);

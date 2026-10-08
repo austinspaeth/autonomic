@@ -7,11 +7,14 @@ import * as Auth from '../lib/auth';
 import { DataProvider } from '../lib/data';
 import { AlertsProvider } from '../lib/alertsStore';
 import { CelebrationLayer } from '../components/Celebration';
+import { useOtaUpdates } from '../lib/updates';
 import { C } from '../theme';
 
 export default function RootLayout() {
   const [restored, setRestored] = useState(false);
   const tokens = useSyncExternalStore(Auth.subscribe, Auth.current);
+
+  useOtaUpdates();
 
   useEffect(() => {
     Auth.restore().finally(() => setRestored(true));

@@ -1,5 +1,5 @@
 /* The usage report arrives COMPACT: each row is the stored maps as they are,
- * `{ day, total, c: { cohortKey: n }, b?: { buildKey: n }, e?: { "key~V": n } }`,
+ * `{ day, total, c: { cohortKey: n }, b?: { buildKey: n }, e?: { "key~V": n }, h?: { hourKey: n } }`,
  * because every field the expanded form spells out is in the keys. This is
  * the server's expansion (sls/lambdas/ping/main.js readDays), done here, so
  * every view keeps reading the expanded shape it always has.
@@ -38,7 +38,7 @@ function buildOf(key: string, count: number): PingBuild {
   };
 }
 
-type CompactRow = { day: string; total: number; c?: Record<string, number>; b?: Record<string, number>; e?: Record<string, number> };
+type CompactRow = { day: string; total: number; c?: Record<string, number>; b?: Record<string, number>; e?: Record<string, number>; h?: Record<string, number> };
 
 function rowOf(r: CompactRow): PingRow {
   const out: PingRow = {
@@ -47,6 +47,7 @@ function rowOf(r: CompactRow): PingRow {
     cohorts: Object.entries(r.c || {}).map(([k, n]) => cohortOf(k, n)),
     builds: Object.entries(r.b || {}).map(([k, n]) => buildOf(k, n)),
   };
+  if (r.h) out.hours = r.h;
   if (r.e) {
     out.evidence = Object.entries(r.e)
       .map(([k, n]) => {

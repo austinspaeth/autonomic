@@ -1,7 +1,7 @@
 /* Metric cards that open.
  *
- * At rest a card is three things: its title, its number, and the change in
- * green or red. Tap it and it springs open into a full-width square holding
+ * At rest a card is compact and outlined, like the web dashboard's: its
+ * title, its number, and the change in green or red, two to a row. Tap it and it springs open into a full-width square holding
  * what the number is made of: its comparisons, its breakdowns and a minimal
  * bar chart across the range. Tap again (or another card) to close it.
  *
@@ -14,9 +14,11 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeOut, LinearTransition, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
-import { C, R, num } from '../theme';
+import { C, num } from '../theme';
 import { BarChart, SplitBar, type Part } from './charts';
 import type { Series } from '../lib/metrics';
+import type { PaceModel } from '../lib/pace';
+import { Pace } from './Pace';
 
 export type Change = {
   value: number;
@@ -27,8 +29,11 @@ export type Change = {
 
 export type Comparison = {
   label: string;
-  /** A percentage change, drawn as a coloured pill. */
+  /** A percentage change, drawn as a coloured pill. The number it is measured
+   *  against is printed after the label: "vs the day before (27)". */
   change?: Change;
+  /** How that number is written (default: a plain count). */
+  format?: (n: number) => string;
   /** Or a plain value. */
   value?: string;
 };
@@ -37,15 +42,17 @@ export type MetricSpec = {
   key: string;
   label: string;
   value: string;
+  /** A second, quieter figure on the number's own line ("/ 55%"). */
+  aside?: string;
   change?: Change;
-  /** Spans the full width even at rest (the headline card). */
-  wide?: boolean;
   /** One line under the number in the opened card. */
   note?: string;
+  /** A day still filling: is it on track, against yesterday and the range at the same clock time. */
+  pace?: { model: PaceModel; color?: string } | null;
   comparisons?: Comparison[];
   splits?: { title: string; parts: Part[]; format?: (n: number) => string }[];
-  /** Anything else the opened card should hold, after its comparisons. */
-  extra?: ReactNode;
+  /** Anything the deep dive holds beyond numbers (a list), drawn above the chart. */
+  body?: ReactNode;
   chart?: { title: string; series: Series; format?: (n: number) => string; color?: string; unknownBefore?: string | null; unknownAfter?: string | null };
 };
 
@@ -54,8 +61,12 @@ export type MetricSpec = {
 const SPRING_CFG = { damping: 17, stiffness: 170, mass: 0.9 };
 const SPRING = LinearTransition.springify().damping(SPRING_CFG.damping).stiffness(SPRING_CFG.stiffness).mass(SPRING_CFG.mass);
 
-const VALUE_SIZE = { small: 28, big: 44 };
-const CHANGE_SIZE = { small: 13, big: 15 };
+/** At this grid width (an iPad or a Mac window) the cards go four across. */
+const WIDE_GRID = 600;
+
+const VALUE_SIZE = { small: 24, big: 44 };
+const ASIDE_SIZE = { small: 14, big: 20 };
+const CHANGE_SIZE = { small: 12, big: 15 };
 
 /** 0 at rest, 1 opened, sprung. Font size is animated directly (not scaled)
  *  so the line's own height grows with it and nothing overlaps mid-flight. */
@@ -67,16 +78,24 @@ function useGrow(big: boolean) {
   return t;
 }
 
-function GrowingValue({ text, big }: { text: string; big: boolean }) {
+function GrowingValue({ text, aside, big }: { text: string; aside?: string; big: boolean }) {
   const t = useGrow(big);
   const style = useAnimatedStyle(() => {
     const size = VALUE_SIZE.small + (VALUE_SIZE.big - VALUE_SIZE.small) * t.value;
     return { fontSize: size, lineHeight: size * 1.18, letterSpacing: -0.5 - 0.7 * t.value };
   });
+  const asideStyle = useAnimatedStyle(() => ({ fontSize: ASIDE_SIZE.small + (ASIDE_SIZE.big - ASIDE_SIZE.small) * t.value }));
   return (
-    <Animated.Text style={[st.value, num, style]} numberOfLines={1}>
-      {text}
-    </Animated.Text>
+    <View style={st.valueRow}>
+      <Animated.Text style={[st.value, num, style]} numberOfLines={1}>
+        {text}
+      </Animated.Text>
+      {aside ? (
+        <Animated.Text style={[st.aside, num, asideStyle]} numberOfLines={1}>
+          {aside}
+        </Animated.Text>
+      ) : null}
+    </View>
   );
 }
 
@@ -87,6 +106,9 @@ function GrowingChange({ change, big }: { change?: Change; big: boolean }) {
   }));
   return <ChangeText change={change} animatedStyle={style} />;
 }
+
+/** A count as it stands: whole when it is whole, one decimal for an average. */
+const plain = (n: number) => (Number.isInteger(n) ? n.toLocaleString('en-US') : n.toLocaleString('en-US', { minimumFractionDigits: 1, maximumFractionDigits: 1 }));
 
 function pctOf(change: Change): number | null {
   if (!change || !change.base) return null;
@@ -133,13 +155,13 @@ export function MetricTiles({ specs }: { specs: MetricSpec[] }) {
             layout={SPRING}
             style={[
               st.tile,
-              m.wide || isOpen ? st.full : st.half,
-              isOpen && gridW ? { minHeight: gridW } : null,
+              isOpen ? st.full : gridW >= WIDE_GRID ? st.quarter : st.half,
+              isOpen && gridW ? { minHeight: Math.min(gridW, 420) } : null,
               isOpen && st.open,
             ]}
           >
             <Pressable
-              style={st.press}
+              style={[st.press, gridW >= WIDE_GRID && st.pressWide]}
               onPress={() => {
                 Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
                 setOpen(isOpen ? null : m.key);
@@ -150,25 +172,28 @@ export function MetricTiles({ specs }: { specs: MetricSpec[] }) {
                   {m.label}
                 </Text>
               </View>
-              <GrowingValue text={m.value} big={!!m.wide || isOpen} />
-              <GrowingChange change={m.change} big={!!m.wide || isOpen} />
+              <GrowingValue text={m.value} aside={m.aside} big={isOpen} />
+              <GrowingChange change={m.change} big={isOpen} />
 
               {isOpen ? (
                 <Animated.View entering={FadeIn.delay(140).duration(240)} exiting={FadeOut.duration(90)} style={st.detail}>
                   {m.note ? <Text style={st.note}>{m.note}</Text> : null}
 
+                  {m.pace ? <Pace pace={m.pace.model} color={m.pace.color} /> : null}
+
                   {m.comparisons?.length ? (
                     <View style={st.rows}>
                       {m.comparisons.map((c) => (
                         <View key={c.label} style={st.row}>
-                          <Text style={st.rowLabel}>{c.label}</Text>
+                          <Text style={st.rowLabel}>
+                            {c.label}
+                            {c.change && typeof c.change.base === 'number' ? <Text style={[st.rowBase, num]}> ({(c.format ?? plain)(c.change.base)})</Text> : null}
+                          </Text>
                           {c.change !== undefined ? <ChangePill change={c.change} /> : <Text style={[st.rowValue, num]}>{c.value}</Text>}
                         </View>
                       ))}
                     </View>
                   ) : null}
-
-                  {m.extra}
 
                   {m.splits?.map((sp) => (
                     <View key={sp.title} style={{ gap: 8 }}>
@@ -176,6 +201,8 @@ export function MetricTiles({ specs }: { specs: MetricSpec[] }) {
                       <SplitBar parts={sp.parts} format={sp.format} />
                     </View>
                   ))}
+
+                  {m.body}
 
                   {m.chart ? (
                     <View style={{ marginTop: 2 }}>
@@ -208,22 +235,30 @@ export function Glide({ children }: { children: ReactNode }) {
   return <Animated.View layout={SPRING}>{children}</Animated.View>;
 }
 
+/* A slightly lighter grey edge on the dark grey card. */
+const TILE_BORDER = 'rgba(255,255,255,0.10)';
+
 const st = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
-  tile: { backgroundColor: C.surface, borderRadius: R.tile, overflow: 'hidden' },
+  tile: { backgroundColor: C.surface, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: TILE_BORDER },
   half: { width: '47.5%', flexGrow: 1 },
+  quarter: { width: '23%', flexGrow: 1 },
   full: { width: '100%' },
-  open: { borderRadius: 24, backgroundColor: '#18181b', borderWidth: StyleSheet.hairlineWidth, borderColor: 'rgba(255,255,255,0.10)' },
-  press: { padding: 14, gap: 2, flexGrow: 1 },
+  open: { borderRadius: 24, backgroundColor: '#18181b' },
+  press: { paddingHorizontal: 12, paddingVertical: 10, gap: 1, flexGrow: 1 },
+  pressWide: { paddingHorizontal: 16, paddingVertical: 14, gap: 3 },
   head: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between', gap: 8 },
-  label: { color: C.dim, fontSize: 13, fontWeight: '500', flexShrink: 1 },
-  value: { color: C.text, fontWeight: '700', marginTop: 2 },
+  label: { color: C.dim, fontSize: 12, fontWeight: '500', flexShrink: 1 },
+  valueRow: { flexDirection: 'row', alignItems: 'baseline', gap: 6, marginTop: 2 },
+  value: { color: C.text, fontWeight: '700', flexShrink: 1 },
+  aside: { color: C.dim, fontWeight: '600' },
   change: { fontWeight: '700' },
   detail: { gap: 16, marginTop: 16 },
   note: { color: C.muted, fontSize: 13, lineHeight: 18, marginTop: -8 },
   rows: { gap: 2, backgroundColor: 'rgba(255,255,255,0.03)', borderRadius: 14, padding: 4 },
   row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8, paddingHorizontal: 10 },
-  rowLabel: { color: C.dim, fontSize: 14 },
+  rowLabel: { color: C.dim, fontSize: 14, flexShrink: 1 },
+  rowBase: { color: C.muted },
   rowValue: { color: C.text, fontSize: 14, fontWeight: '600' },
   pill: { borderRadius: 999, paddingHorizontal: 9, paddingVertical: 3 },
   section: { color: C.muted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6 },

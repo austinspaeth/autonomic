@@ -4,13 +4,13 @@
  * date+store record, so store data is merged over what is already recorded
  * for that day rather than wiping the fields left blank here. */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { Sheet } from '../components/Sheet';
-import { Choice, DangerButton, DateField, Field, FormScroll, newId, num, NumberField, RevealInput, SaveButton } from '../components/forms';
-import { Segmented } from '../components/ui';
+import { Choice, DangerButton, DateField, Field, newId, num, NumberField, SaveButton } from '../components/forms';
+import { KEYBOARD_SCROLL, Segmented } from '../components/ui';
 import { api } from '../lib/api';
 import { useData } from '../lib/data';
 import { addDays, easternDay, shortDate } from '../lib/dates';
@@ -123,7 +123,12 @@ function EntrySheet({ kind, onClose }: { kind: Kind | null; onClose: () => void 
                 }
               }}
             />
-            <FormScroll style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 40 }}>
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: 40 }}
+              {...KEYBOARD_SCROLL}
+              showsVerticalScrollIndicator={false}
+            >
               <Animated.View key={`${mode}|${prefill?.ping ?? ''}|${churnSale?.id ?? ''}`} entering={FadeIn.duration(180)}>
                 {kind === 'store' ? (
                   mode === 'batch' ? <StoreBatch done={close} /> : <StoreForm done={close} />
@@ -149,7 +154,7 @@ function EntrySheet({ kind, onClose }: { kind: Kind | null; onClose: () => void 
                   <SaleForm prefill={prefill ?? undefined} done={close} />
                 )}
               </Animated.View>
-            </FormScroll>
+            </ScrollView>
           </View>
         ) : null
       }
@@ -471,7 +476,7 @@ function UnattachedChurn({ done }: { done: () => void }) {
 
 /* ------------------------------------------------------------ from ping */
 
-type SalePrefill = { date: string; platform: Platform; plan: Sale['plan']; cohort: string; note: string; ping: string; hint: string };
+export type SalePrefill = { date: string; platform: Platform; plan: Sale['plan']; cohort: string; note: string; ping: string; hint: string };
 
 const PING_PLAN: Record<string, Sale['plan']> = { Y: 'annual', P: 'annual', F: 'annual', M: 'monthly' };
 const PING_PLAN_NAME: Record<string, string> = { Y: 'Yearly', M: 'Monthly', P: 'Promo year', F: 'Founder year' };
@@ -484,47 +489,79 @@ const TIER_NAME: Record<string, string> = { F: 'Free', T: 'Trial', P: 'Pro' };
  * stores the ping's identity (`arrival day|cohort key`), which is what makes
  * the ping read as claimed here and on the web, wherever the date ends up.
  */
-function FromPing({ onPick }: { onPick: (p: SalePrefill) => void }) {
-  const { snap } = useData();
-  const list = useMemo(() => {
-    const sales = snap?.load?.sales || [];
-    const claimed = new Map<string, number>();
-    sales.forEach((x) => x.ping && claimed.set(x.ping, (claimed.get(x.ping) || 0) + Math.max(1, x.qty || 1)));
-    const lastPrice = (platform: Platform, plan: Sale['plan']) =>
-      [...sales]
-        .filter((x) => !x.refunded && x.platform === platform && x.plan === plan && x.price > 0)
-        .sort((a, b) => b.date.localeCompare(a.date))[0]?.price;
-    const out: (SalePrefill & { remaining: number; tier: string; planLetter: string | null })[] = [];
-    (snap?.pings?.sub || []).forEach((row) => {
-      (row.cohorts || []).forEach((c) => {
-        const ref = `${row.day}|${c.key}`;
-        const remaining = c.count - (claimed.get(ref) || 0);
-        if (remaining <= 0) return;
-        const letter = c.slot && PING_PLAN[c.slot] ? c.slot : null;
-        const plan = letter ? PING_PLAN[letter] : 'unknown';
-        const platform: Platform = c.platform === 'A' ? 'android' : 'ios';
-        const last = plan !== 'unknown' ? lastPrice(platform, plan) : undefined;
-        let hint = `Drafted from a subscribe ping on ${shortDate(row.day)} from an install of ${shortDate(c.cohort)}. Enter the price paid.`;
-        if (c.platform !== 'A' && c.platform !== 'I') hint += ' The ping named no store, so check it.';
-        if (!letter) hint += ' It came from an older build whose ping also fired on restores: make sure this was a sale, and set the plan.';
-        else if (letter === 'P' || letter === 'F') hint += ` This was the ${PING_PLAN_NAME[letter].toLowerCase()}, sold below list price.`;
-        else if (last) hint += ` The last ${plan} ${platform === 'ios' ? 'iOS' : 'Android'} purchase was $${last.toFixed(2)}.`;
-        out.push({
-          date: row.day,
-          platform,
-          plan,
-          cohort: c.cohort,
-          note: `From subscribe ping${letter ? ` · ${PING_PLAN_NAME[letter]}` : ''}`,
-          ping: ref,
-          hint,
-          remaining,
-          tier: c.tier || '?',
-          planLetter: letter,
-        });
+/** Every subscribe ping in the report as a draftable purchase, newest first,
+ *  with how many of its purchases are still unrecorded (`remaining`) and how
+ *  many the store confirmed within an hour of a buy tap (`verified`). */
+export type SubPing = SalePrefill & { count: number; remaining: number; verified: number; tier: string; planLetter: string | null; store: 'I' | 'A' | 'U' };
+
+export function subscribePings(snap: ReturnType<typeof useData>['snap']): SubPing[] {
+  const sales = snap?.load?.sales || [];
+  const claimed = new Map<string, number>();
+  sales.forEach((x) => x.ping && claimed.set(x.ping, (claimed.get(x.ping) || 0) + Math.max(1, x.qty || 1)));
+  const lastPrice = (platform: Platform, plan: Sale['plan']) =>
+    [...sales]
+      .filter((x) => !x.refunded && x.platform === platform && x.plan === plan && x.price > 0)
+      .sort((a, b) => b.date.localeCompare(a.date))[0]?.price;
+  const out: SubPing[] = [];
+  (snap?.pings?.sub || []).forEach((row) => {
+    const verified = new Map<string, number>();
+    (row.evidence || []).forEach((ev) => ev.evidence === 'V' && verified.set(ev.key, (verified.get(ev.key) || 0) + ev.count));
+    (row.cohorts || []).forEach((c) => {
+      const ref = `${row.day}|${c.key}`;
+      const letter = c.slot && PING_PLAN[c.slot] ? c.slot : null;
+      const plan = letter ? PING_PLAN[letter] : 'unknown';
+      const platform: Platform = c.platform === 'A' ? 'android' : 'ios';
+      const last = plan !== 'unknown' ? lastPrice(platform, plan) : undefined;
+      let hint = `Drafted from a subscribe ping on ${shortDate(row.day)} from an install of ${shortDate(c.cohort)}. Enter the price paid.`;
+      if (c.platform !== 'A' && c.platform !== 'I') hint += ' The ping named no store, so check it.';
+      if (!letter) hint += ' It came from an older build whose ping also fired on restores: make sure this was a sale, and set the plan.';
+      else if (letter === 'P' || letter === 'F') hint += ` This was the ${PING_PLAN_NAME[letter].toLowerCase()}, sold below list price.`;
+      else if (last) hint += ` The last ${plan} ${platform === 'ios' ? 'iOS' : 'Android'} purchase was $${last.toFixed(2)}.`;
+      out.push({
+        date: row.day,
+        platform,
+        plan,
+        cohort: c.cohort,
+        note: `From subscribe ping${letter ? ` · ${PING_PLAN_NAME[letter]}` : ''}`,
+        ping: ref,
+        hint,
+        count: c.count,
+        remaining: Math.max(0, c.count - (claimed.get(ref) || 0)),
+        verified: Math.min(c.count, verified.get(c.key) || 0),
+        tier: c.tier || '?',
+        planLetter: letter,
+        store: c.platform === 'A' || c.platform === 'I' ? c.platform : 'U',
       });
     });
-    return out.sort((a, b) => b.date.localeCompare(a.date));
-  }, [snap]);
+  });
+  return out.sort((a, b) => b.date.localeCompare(a.date));
+}
+
+export const pingPlanName = (letter: string | null) => (letter ? PING_PLAN_NAME[letter] : 'Plan unknown');
+
+/** The sale form on its own card, drafted from one subscribe ping. */
+export function SaleFromPingSheet({ ping, onClose }: { ping: SalePrefill | null; onClose: () => void }) {
+  return (
+    <Sheet visible={!!ping} onClose={onClose} title="New sale" full>
+      {(close) =>
+        ping ? (
+          <ScrollView
+            style={{ flex: 1 }}
+            contentContainerStyle={{ paddingBottom: 40 }}
+            {...KEYBOARD_SCROLL}
+            showsVerticalScrollIndicator={false}
+          >
+            <SaleForm key={ping.ping} prefill={ping} done={close} />
+          </ScrollView>
+        ) : null
+      }
+    </Sheet>
+  );
+}
+
+function FromPing({ onPick }: { onPick: (p: SalePrefill) => void }) {
+  const { snap } = useData();
+  const list = useMemo(() => subscribePings(snap).filter((p) => p.remaining > 0), [snap]);
 
   if (!list.length) return <Text style={st.empty}>Every subscribe ping has a purchase recorded against it.</Text>;
   return (
@@ -612,7 +649,7 @@ function StoreBatch({ done }: { done: () => void }) {
             <View key={p} style={st.batchRow}>
               <Text style={[st.batchPlat, { color: p === 'ios' ? C.ios : C.android }]}>{p === 'ios' ? 'iOS' : 'And'}</Text>
               {fieldKeys.map((f) => (
-                <RevealInput
+                <TextInput
                   key={f}
                   value={valueOf(d, p, f)}
                   onChangeText={(t) => setCells((c) => ({ ...c, [cellKey(d, p, f)]: t.replace(/[^0-9]/g, '') }))}

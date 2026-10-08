@@ -1,0 +1,78 @@
+<!doctype html>
+<!--
+  Reddit post image for the Dysautonomia Awareness Month giveaway, rendered by
+  render.mjs at 1920x1080 (16:9, shown full width and uncropped in Reddit's
+  feed) at 2x. Watch left, ribbon centre, Polar H10 right, "October Giveaway"
+  underneath in off-white; the watch and strap are filled from the landing site's
+  PrizeWatchArt / PrizeStrapArt components.
+
+  The ribbon is turquoise on its left half and blue on its right, lit as if by
+  two light sources: a teal glow sits left of centre and a blue one right, and
+  the ribbon's own gradient crosses between them softly rather than splitting.
+-->
+<html><head><meta charset="utf-8"/>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@700&display=block" rel="stylesheet"/>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:#060607;overflow:hidden}
+  .stage{position:relative;overflow:hidden;width:1920px;height:1080px;
+    background:radial-gradient(ellipse at 50% 50%, #0b1315 0%, #060607 70%)}
+
+  /* Two glows, one per light: teal from the left, blue from the right. They
+     overlap behind the ribbon so the middle reads as one light, not two. */
+  .glow{position:absolute;border-radius:50%;pointer-events:none}
+  .glow.teal{left:-260px;top:-560px;width:2200px;height:2200px;
+    background:radial-gradient(closest-side,rgba(45,212,191,.34) 0%,rgba(45,212,191,.18) 22%,rgba(45,212,191,.08) 52%,rgba(45,212,191,.025) 80%,rgba(45,212,191,0) 100%)}
+  .glow.blue{left:-20px;top:-560px;width:2200px;height:2200px;
+    background:radial-gradient(closest-side,rgba(59,130,246,.30) 0%,rgba(59,130,246,.16) 22%,rgba(59,130,246,.07) 52%,rgba(59,130,246,.02) 80%,rgba(59,130,246,0) 100%)}
+
+  .ribbon,.watch,.strap{position:absolute}
+  .ribbon svg,.watch svg,.strap svg{display:block;width:100%;height:100%;overflow:visible}
+  .ribbon{left:740px;top:105px;width:440px;height:616px;
+    filter:drop-shadow(-14px 0 30px rgba(45,212,191,.45)) drop-shadow(14px 0 30px rgba(59,130,246,.45))
+           drop-shadow(0 0 80px rgba(52,170,220,.28))}
+  .watch{left:225px;top:205px;width:330px;height:413px;filter:drop-shadow(0 30px 60px rgba(0,0,0,.6))}
+  .strap{left:1215px;top:255px;width:620px;height:310px;
+    filter:drop-shadow(0 30px 60px rgba(0,0,0,.6))}
+
+  /* Off-white words, with a wide, diffuse turquoise haze behind them. */
+  .title{position:absolute;left:0;right:0;top:835px;text-align:center;
+    font-family:"Space Grotesk",-apple-system,BlinkMacSystemFont,sans-serif;font-weight:700;
+    font-size:124px;letter-spacing:-1px;color:#f4f8f7;
+    text-shadow:0 0 40px rgba(45,212,191,.42),0 0 90px rgba(45,212,191,.32),0 0 160px rgba(45,212,191,.22)}
+</style></head>
+<body>
+<div class="stage">
+  <div class="glow teal"></div>
+  <div class="glow blue"></div>
+
+  <div class="watch">%%WATCH%%</div>
+
+  <div class="ribbon">
+    <svg viewBox="0 0 100 140">
+      <defs>
+        <!-- left-to-right: turquoise into blue, with a long soft crossover -->
+        <linearGradient id="rg" gradientUnits="userSpaceOnUse" x1="22" y1="0" x2="78" y2="0">
+          <stop offset="0%" stop-color="#2dd4bf"/><stop offset="38%" stop-color="#22c3c6"/>
+          <stop offset="62%" stop-color="#3aa6e6"/><stop offset="100%" stop-color="#3b82f6"/>
+        </linearGradient>
+        <!-- depth: darker toward the bottom, as the original -->
+        <linearGradient id="rd" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="140">
+          <stop offset="0%" stop-color="#fff" stop-opacity=".18"/><stop offset="35%" stop-color="#000" stop-opacity="0"/><stop offset="100%" stop-color="#000" stop-opacity=".22"/>
+        </linearGradient>
+        <linearGradient id="rs" gradientUnits="userSpaceOnUse" x1="10" y1="10" x2="70" y2="70">
+          <stop offset="0%" stop-color="#ecfeff" stop-opacity="0"/><stop offset="50%" stop-color="#ecfeff" stop-opacity=".5"/><stop offset="100%" stop-color="#ecfeff" stop-opacity="0"/>
+        </linearGradient>
+      </defs>
+      <path d="M80 134 L43 63 C29 37 32 9 50 9 C68 9 71 37 57 63 L20 134" fill="none" stroke="url(#rg)" stroke-width="17" stroke-linejoin="round"/>
+      <path d="M80 134 L43 63 C29 37 32 9 50 9 C68 9 71 37 57 63 L20 134" fill="none" stroke="url(#rd)" stroke-width="17" stroke-linejoin="round"/>
+      <path d="M80 134 L43 63 C29 37 32 9 50 9 C68 9 71 37 57 63 L20 134" fill="none" stroke="url(#rs)" stroke-width="17" stroke-linejoin="round" style="mix-blend-mode:screen"/>
+      <path d="M80 134 L43 63 C29 37 32 9 50 9 C68 9 71 37 57 63 L20 134" fill="none" stroke="#eef6ff" stroke-opacity=".25" stroke-width="1.4" stroke-linejoin="round" transform="translate(-4 -2)"/>
+    </svg>
+  </div>
+
+  <div class="strap">%%STRAP%%</div>
+
+  <div class="title">October Giveaway</div>
+</div>
+</body></html>

@@ -11,19 +11,22 @@
    is arithmetic over the menu's fixed row sizes, anchored on where the touch
    landed inside the picker, so it never waits on a measurement and cannot be
    thrown off by the menu's own slide-in. */
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { BlurView } from 'expo-blur';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
-import Animated, { FadeIn, FadeOut, SlideInDown, SlideOutDown } from 'react-native-reanimated';
+import Animated, { cancelAnimation, Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withRepeat, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { setView, useView, VIEWS, type ViewKey } from '../lib/views';
+import { NAV_H, useWide } from '../lib/wide';
 import { C } from '../theme';
+import { BrandMark } from './BrandMark';
 import { Sheet } from './Sheet';
 import { AlertHistory } from './AlertViews';
 import { AddSheet } from '../features/AddSheet';
 import { useAlerts } from '../lib/alertsStore';
+import { useData } from '../lib/data';
 import { BOTTOM_CHROME } from './ui';
 
 const PICKER_H = 44;
@@ -36,10 +39,82 @@ const MENU_H = MENU_PAD * 2 + VIEWS.length * ROW_H + (VIEWS.length - 1) * ROW_GA
 /** How far outside the menu's sides a finger may stray and still hover a row. */
 const SIDE_SLOP = 24;
 
+/* The menu is opened by a finger already on its way up to a row, so it has to
+   be THERE almost at once: a short rise from just under its resting place
+   rather than a slide in from off screen, on a stiff spring damped to within a
+   hair of critical (about 1% of overshoot, settled in roughly 120ms). */
+const MENU_SPRING = { stiffness: 900, damping: 50, mass: 1 };
+const menuIn = () => {
+  'worklet';
+  return {
+    initialValues: { opacity: 0, transform: [{ translateY: 14 }, { scale: 0.97 }] },
+    animations: {
+      opacity: withTiming(1, { duration: 80 }),
+      transform: [{ translateY: withSpring(0, MENU_SPRING) }, { scale: withSpring(1, MENU_SPRING) }],
+    },
+  };
+};
+/* The same arrival from above, for the picker at the top of a wide screen. */
+const menuInDown = () => {
+  'worklet';
+  return {
+    initialValues: { opacity: 0, transform: [{ translateY: -14 }, { scale: 0.97 }] },
+    animations: {
+      opacity: withTiming(1, { duration: 80 }),
+      transform: [{ translateY: withSpring(0, MENU_SPRING) }, { scale: withSpring(1, MENU_SPRING) }],
+    },
+  };
+};
+const menuOut = () => {
+  'worklet';
+  return {
+    initialValues: { opacity: 1, transform: [{ translateY: 0 }] },
+    animations: { opacity: withTiming(0, { duration: 100 }), transform: [{ translateY: withTiming(8, { duration: 100 }) }] },
+  };
+};
+
 type Rect = { x: number; y: number; w: number; h: number };
+
+/* Refresh, on a wide screen (a phone pulls the page down instead). The arrow
+   turns for as long as the fetch runs and always finishes the turn it is on,
+   so it comes to rest upright rather than stopping mid-spin. */
+function RefreshButton() {
+  const { loading, refresh } = useData();
+  const turn = useSharedValue(0);
+  useEffect(() => {
+    if (loading) {
+      turn.value = turn.value % 360;
+      turn.value = withRepeat(withTiming(turn.value + 360, { duration: 850, easing: Easing.linear }), -1, false);
+    } else {
+      cancelAnimation(turn);
+      const rest = Math.ceil(turn.value / 360) * 360;
+      turn.value = withTiming(rest, { duration: Math.max(120, ((rest - turn.value) / 360) * 850), easing: Easing.out(Easing.quad) });
+    }
+  }, [loading, turn]);
+  const spin = useAnimatedStyle(() => ({ transform: [{ rotate: `${turn.value}deg` }] }));
+  return (
+    <Pressable
+      hitSlop={10}
+      disabled={loading}
+      accessibilityLabel="Refresh"
+      onPress={() => {
+        Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+        refresh();
+      }}
+      style={({ pressed }) => [s.icon, pressed && { opacity: 0.6 }]}
+    >
+      <Animated.View style={spin}>
+        <SymbolView name="arrow.clockwise" size={20} weight="medium" tintColor="#ffffff" />
+      </Animated.View>
+    </Pressable>
+  );
+}
 
 export function BottomBar() {
   const insets = useSafeAreaInsets();
+  const wide = useWide();
+  const wideRef = useRef(wide);
+  wideRef.current = wide;
   const current = useView();
   const [open, setOpen] = useState(false);
   const [hover, setHover] = useState<ViewKey | null>(null);
@@ -47,7 +122,9 @@ export function BottomBar() {
   const [addOpen, setAddOpen] = useState(false);
   const [pickerBox, setPickerBox] = useState({ x: 0, w: 0 });
   const { unread, markRead } = useAlerts();
-  const label = VIEWS.find((v) => v.key === current)?.label ?? '';
+  /* Wide: every view is on the board at once, so the picker does not choose
+     a page, it scrolls to a section, and has no "current" one to name. */
+  const label = wide ? 'Jump to section' : VIEWS.find((v) => v.key === current)?.label ?? '';
 
   /* Gesture state lives in refs: the responder is created once. */
   const openRef = useRef(false);
@@ -75,8 +152,9 @@ export function BottomBar() {
   /** The row under a page point, or null. Rows run top to bottom in VIEWS order. */
   const rowAt = (px: number, py: number): ViewKey | null => {
     const p = picker.current;
-    const bottom = p.y - (BOTTOM_CHROME - PICKER_H) / 2 - MENU_GAP;
-    const top = bottom - MENU_H;
+    // The menu hangs under the picker on a wide screen and rises over it on a phone.
+    const top = wideRef.current ? p.y + PICKER_H + (NAV_H - PICKER_H) / 2 + MENU_GAP : p.y - (BOTTOM_CHROME - PICKER_H) / 2 - MENU_GAP - MENU_H;
+    const bottom = top + MENU_H;
     if (px < p.x - SIDE_SLOP || px > p.x + p.w + SIDE_SLOP) return null;
     if (py < top || py > bottom) return null;
     const i = Math.floor((py - top - MENU_PAD + ROW_GAP / 2) / (ROW_H + ROW_GAP));
@@ -117,105 +195,141 @@ export function BottomBar() {
   ).current;
 
   const menuBottom = insets.bottom + BOTTOM_CHROME + MENU_GAP;
+  const menuTop = insets.top + NAV_H + MENU_GAP;
+
+  /* Add store data, a sale or churn. Same size and weight as the bell so
+     the two strokes match. */
+  const plusEl = (
+    <Pressable
+      hitSlop={10}
+      onPress={() => {
+        Haptics.selectionAsync();
+        show(false);
+        setAddOpen(true);
+      }}
+      style={({ pressed }) => [s.icon, pressed && { opacity: 0.6 }]}
+    >
+      <SymbolView name="plus" size={22} weight="medium" tintColor="#ffffff" />
+    </Pressable>
+  );
+  const pickerEl = (
+    <View
+      {...responder.panHandlers}
+      onLayout={(e) => {
+        const { x, width, height } = e.nativeEvent.layout;
+        picker.current = { ...picker.current, w: width, h: height };
+        setPickerBox({ x, w: width });
+      }}
+      style={[s.squircle, wide && s.squircleWide, open && s.squircleOpen]}
+    >
+      {/* Untouchable, so every touch lands on the squircle itself and
+          locationX/Y are measured from its corner, which rowAt relies on. */}
+      <View pointerEvents="none" style={s.squircleInner}>
+        <Text style={s.squircleText} numberOfLines={1}>
+          {label}
+        </Text>
+        <View style={s.chevron}>
+          <SymbolView name={open !== wide ? 'chevron.down' : 'chevron.up'} size={11} weight="semibold" tintColor={C.dim} />
+        </View>
+      </View>
+    </View>
+  );
+  /* Alerts: opens the full history, grouped by day. */
+  const bellEl = (
+    <Pressable
+      hitSlop={10}
+      onPress={() => {
+        Haptics.selectionAsync();
+        show(false);
+        setBellOpen(true);
+        markRead();
+      }}
+      style={({ pressed }) => [s.icon, pressed && { opacity: 0.6 }]}
+    >
+      <SymbolView name="bell" size={22} weight="medium" tintColor="#ffffff" />
+      {unread ? (
+        <View style={s.badge}>
+          <Text style={s.badgeText}>{unread > 99 ? '99+' : unread}</Text>
+        </View>
+      ) : null}
+    </Pressable>
+  );
 
   return (
     <>
       {open ? (
-        <Animated.View entering={FadeIn.duration(160)} exiting={FadeOut.duration(140)} style={[StyleSheet.absoluteFill, s.backdrop]}>
+        <Animated.View entering={FadeIn.duration(90)} exiting={FadeOut.duration(110)} style={[StyleSheet.absoluteFill, s.backdrop]}>
           <Pressable style={StyleSheet.absoluteFill} onPress={() => show(false)} />
         </Animated.View>
       ) : null}
       {open ? (
-        <Animated.View
-          entering={SlideInDown.springify().damping(22).stiffness(260)}
-          exiting={SlideOutDown.duration(160)}
-          style={[s.menu, { bottom: menuBottom, left: pickerBox.x, width: pickerBox.w || undefined, height: MENU_H }]}
-        >
-          {Platform.OS === 'ios' ? (
-            <BlurView tint="systemChromeMaterialDark" intensity={90} style={StyleSheet.absoluteFill} />
-          ) : (
-            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(24,24,27,0.98)' }]} />
-          )}
-          {VIEWS.map((v) => {
-            const on = v.key === current;
-            const hot = v.key === hover;
-            return (
-              <Pressable key={v.key} onPress={() => choose(v.key)} style={[s.option, on && s.optionOn, hot && s.optionHot]}>
-                <Text style={[s.optionText, (on || hot) && { color: C.text }, on && { fontWeight: '700' }]} numberOfLines={1}>
-                  {v.label}
-                </Text>
-                {on ? <SymbolView name="checkmark" size={14} weight="bold" tintColor={C.accent} /> : null}
-              </Pressable>
-            );
-          })}
-        </Animated.View>
+        /* The bar's own centred column, so the menu sits over the picker at any width. */
+        <View pointerEvents="box-none" style={[s.menuRail, wide ? { top: menuTop } : { bottom: menuBottom }]}>
+          <View pointerEvents="box-none" style={s.menuColumn}>
+            <Animated.View
+              entering={wide ? menuInDown : menuIn}
+              exiting={menuOut}
+              style={[s.menu, { bottom: 0, left: pickerBox.x, width: pickerBox.w || undefined, height: MENU_H }]}
+            >
+              {Platform.OS === 'ios' ? (
+                <BlurView tint="systemChromeMaterialDark" intensity={90} style={StyleSheet.absoluteFill} />
+              ) : (
+                <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(24,24,27,0.98)' }]} />
+              )}
+              {VIEWS.map((v) => {
+                const on = !wide && v.key === current;
+                const hot = v.key === hover;
+                return (
+                  <Pressable key={v.key} onPress={() => choose(v.key)} style={[s.option, on && s.optionOn, hot && s.optionHot]}>
+                    <Text style={[s.optionText, (on || hot) && { color: C.text }, on && { fontWeight: '700' }]} numberOfLines={1}>
+                      {v.label}
+                    </Text>
+                    {on ? <SymbolView name="checkmark" size={14} weight="bold" tintColor="#ffffff" /> : null}
+                  </Pressable>
+                );
+              })}
+            </Animated.View>
+          </View>
+        </View>
       ) : null}
 
-      <View style={[s.wrap, { height: BOTTOM_CHROME + insets.bottom, paddingBottom: insets.bottom }]}>
-        {Platform.OS === 'ios' ? (
+      <View style={[s.wrap, wide ? { top: 0, height: NAV_H + insets.top, paddingTop: insets.top } : { bottom: 0, height: BOTTOM_CHROME + insets.bottom, paddingBottom: insets.bottom }]}>
+        {wide ? (
+          // Black glass rather than the phone's grey chrome: still see-through.
+          <>
+            <BlurView tint="dark" intensity={70} style={StyleSheet.absoluteFill} />
+            <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(0,0,0,0.62)' }]} />
+          </>
+        ) : Platform.OS === 'ios' ? (
           <BlurView tint="systemChromeMaterialDark" intensity={90} style={StyleSheet.absoluteFill} />
         ) : (
           <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(12,12,14,0.96)' }]} />
         )}
-        <View style={s.hairline} />
+        <View style={[s.hairline, wide ? { bottom: 0 } : { top: 0 }]} />
 
-        <View style={s.bar}>
-          {/* Add store data, a sale or churn. Same size and weight as the bell so
-              the two strokes match. */}
-          <Pressable
-            hitSlop={10}
-            onPress={() => {
-              Haptics.selectionAsync();
-              show(false);
-              setAddOpen(true);
-            }}
-            style={({ pressed }) => [s.icon, pressed && { opacity: 0.6 }]}
-          >
-            <SymbolView name="plus" size={22} weight="medium" tintColor="#ffffff" />
-          </Pressable>
-          <View
-            {...responder.panHandlers}
-            onLayout={(e) => {
-              const { x, width, height } = e.nativeEvent.layout;
-              picker.current = { ...picker.current, w: width, h: height };
-              setPickerBox({ x, w: width });
-            }}
-            style={[s.squircle, open && s.squircleOpen]}
-          >
-            {/* Untouchable, so every touch lands on the squircle itself and
-                locationX/Y are measured from its corner, which rowAt relies on. */}
-            <View pointerEvents="none" style={s.squircleInner}>
-              <Text style={s.squircleText} numberOfLines={1}>
-                {label}
-              </Text>
-              <View style={s.chevron}>
-                <SymbolView name={open ? 'chevron.down' : 'chevron.up'} size={11} weight="semibold" tintColor={C.dim} />
-              </View>
-            </View>
+        {wide ? (
+          /* Wide: the mark and the section jump at the left, the actions at
+             the far right. The date lives in the filter bar at the bottom. */
+          <View style={[s.bar, s.barWide]}>
+            <BrandMark size={20} />
+            <View style={s.navRule} />
+            {pickerEl}
+            <View style={{ flex: 1 }} />
+            {bellEl}
+            <RefreshButton />
+            {plusEl}
           </View>
-          {/* Alerts: opens the full history, grouped by day. */}
-          <Pressable
-            hitSlop={10}
-            onPress={() => {
-              Haptics.selectionAsync();
-              show(false);
-              setBellOpen(true);
-              markRead();
-            }}
-            style={({ pressed }) => [s.icon, pressed && { opacity: 0.6 }]}
-          >
-            <SymbolView name="bell" size={22} weight="medium" tintColor="#ffffff" />
-            {unread ? (
-              <View style={s.badge}>
-                <Text style={s.badgeText}>{unread > 99 ? '99+' : unread}</Text>
-              </View>
-            ) : null}
-          </Pressable>
-        </View>
+        ) : (
+          <View style={s.bar}>
+            {plusEl}
+            {pickerEl}
+            {bellEl}
+          </View>
+        )}
 
         <AddSheet visible={addOpen} onClose={() => setAddOpen(false)} />
 
-        <Sheet visible={bellOpen} onClose={() => setBellOpen(false)} title="Alerts" full>
+        <Sheet visible={bellOpen} onClose={() => setBellOpen(false)} title="Alerts" full bleed>
           {() => <AlertHistory />}
         </Sheet>
       </View>
@@ -224,9 +338,9 @@ export function BottomBar() {
 }
 
 const s = StyleSheet.create({
-  wrap: { position: 'absolute', left: 0, right: 0, bottom: 0, overflow: 'hidden' },
-  hairline: { position: 'absolute', top: 0, left: 0, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: C.hairline },
-  bar: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 18 },
+  wrap: { position: 'absolute', left: 0, right: 0, overflow: 'hidden', zIndex: 202 },
+  hairline: { position: 'absolute', left: 0, right: 0, height: StyleSheet.hairlineWidth, backgroundColor: C.hairline },
+  bar: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 14, paddingHorizontal: 18, width: '100%' },
   squircle: {
     flex: 1,
     height: PICKER_H,
@@ -238,11 +352,18 @@ const s = StyleSheet.create({
     borderRadius: 14,
     paddingHorizontal: 14,
   },
+  barWide: { gap: 16, paddingHorizontal: 24 },
+  navRule: { width: StyleSheet.hairlineWidth, height: 24, backgroundColor: 'rgba(255,255,255,0.22)' },
+  squircleWide: { flex: 0, width: 230 },
   squircleInner: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center' },
   squircleOpen: { backgroundColor: 'rgba(255,255,255,0.10)', borderColor: 'rgba(255,255,255,0.18)' },
   chevron: { position: 'absolute', right: 14, top: 0, bottom: 0, justifyContent: 'center' },
   icon: { width: 32, height: 44, alignItems: 'center', justifyContent: 'center' },
-  backdrop: { backgroundColor: 'rgba(0,0,0,0.35)' },
+  /* Above the toasts, which carry a zIndex of their own (up to 100): the
+     menu is the thing being used, so nothing sits over it. */
+  backdrop: { backgroundColor: 'rgba(0,0,0,0.35)', zIndex: 200 },
+  menuRail: { position: 'absolute', left: 0, right: 0, height: MENU_H, alignItems: 'center', zIndex: 201 },
+  menuColumn: { width: '100%', height: MENU_H },
   menu: {
     position: 'absolute',
     padding: MENU_PAD,

@@ -3,9 +3,8 @@
  * While the app is in front it asks for the last 45 days of pings every
  * POLL_MS, diffs them against the baseline it last saw, and announces what
  * rose: a toast per event (they stack until dismissed) and an entry in the
- * history the bell opens. Confetti follows the FRONT toast only: one effect
- * at a time, the one for the card being read, and dismissing it hands the sky
- * to the next card's kind (or clears it). The baseline is
+ * history the bell opens. The celebration for a kind runs for as long as a
+ * toast of that kind is up, and stops when the last one is cleared. The baseline is
  * remembered on disk, so what arrived while the app was closed is announced
  * when it opens, up to MAX_CATCHUP_MS; a first launch seeds in silence.
  *
@@ -20,7 +19,7 @@ import { api } from './api';
 import { mergeReport, useData } from './data';
 import { onPush, registerForPush } from './push';
 import { addDays, easternDay, shortDate } from './dates';
-import { deckOrder, diff, MAX_CATCHUP_MS, records, snapshot, type AlertEvent, type Snapshot } from './alerts';
+import { diff, MAX_CATCHUP_MS, records, snapshot, type AlertEvent, type Snapshot } from './alerts';
 import { setCelebrations, whenCelebrationReady, type CelebrationKind } from '../components/Celebration';
 
 const BASE_KEY = 'master.alerts.baseline.v1';
@@ -29,6 +28,13 @@ const SEEN_KEY = 'master.alerts.seen.v1';
 const PURGE_KEY = 'master.alerts.crashPurge.v1';
 const POLL_MS = 45 * 1000;
 const HISTORY_MAX = 500;
+
+/** Toasts front to back. A kind not listed goes behind all of these. */
+const TOAST_PRIORITY: AlertEvent['kind'][] = ['crash', 'sale', 'record', 'download', 'visitor', 'reading'];
+export const toastRank = (k: AlertEvent['kind']) => {
+  const i = TOAST_PRIORITY.indexOf(k);
+  return i < 0 ? TOAST_PRIORITY.length : i;
+};
 
 const CELEBRATION: Partial<Record<AlertEvent['kind'], CelebrationKind>> = {
   sale: 'sale',
@@ -182,13 +188,19 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
 
   const all = [...previews, ...history];
 
-  /* One celebration at a time: the front card's. A front card with no
-     confetti of its own (a crash, a reading) leaves the sky clear rather than
-     borrowing the effect of a card behind it. */
-  const front = deckOrder(live, all)[0];
-  const running = (front && CELEBRATION[front.kind]) || null;
+  /* ONE effect at a time: the one belonging to the toast at the FRONT of the
+     deck, the one being looked at (the deck's own order, `toastRank`). So a
+     sale toast shows the sale's confetti and nothing else; dismissing it
+     brings the next toast forward and its confetti with it. A front toast
+     with no effect of its own (a crash) leaves the sky empty, rather than
+     borrowing the celebration of a card behind it. */
+  const front = live
+    .map((id) => all.find((e) => e.id === id)?.kind)
+    .filter((k): k is AlertEvent['kind'] => !!k)
+    .sort((x, y) => toastRank(x) - toastRank(y))[0];
+  const running = (front && CELEBRATION[front]) || '';
   useEffect(() => {
-    setCelebrations(running ? [running] : []);
+    setCelebrations(running ? (running.split(',') as CelebrationKind[]) : []);
   }, [running]);
   useEffect(() => () => setCelebrations([]), []);
 

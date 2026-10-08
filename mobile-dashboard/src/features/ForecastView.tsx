@@ -9,10 +9,12 @@ import Slider from '@react-native-community/slider';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
+import { SymbolView } from 'expo-symbols';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { Chips } from '../components/charts';
 import { MetricTiles, type MetricSpec } from '../components/MetricTiles';
 import { Lines, StackedBars } from '../components/series';
-import { Card, Divider, Segmented } from '../components/ui';
+import { Card } from '../components/ui';
 import { useData } from '../lib/data';
 import { addDays, easternDay } from '../lib/dates';
 import { actuals, paceLevers, scenarios, type Levers } from '../lib/forecast';
@@ -21,8 +23,15 @@ import { ledger } from '../lib/sales';
 import { buildBase, type StoreFilter } from '../lib/store';
 import { C, num } from '../theme';
 
-type Horizon = '6' | '12' | '24' | '36';
-type Metric = 'cash' | 'mrr' | 'payers';
+export type Horizon = '6' | '12' | '24' | '36' | '60';
+export const HORIZONS: { key: Horizon; label: string }[] = [
+  { key: '6', label: '6M' },
+  { key: '12', label: '1Y' },
+  { key: '24', label: '2Y' },
+  { key: '36', label: '3Y' },
+  { key: '60', label: '5Y' },
+];
+type Metric = 'arr' | 'mrr' | 'cash';
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
 const monthLabel = (k: string) => `${MONTHS[Number(k.slice(5, 7)) - 1]} ${k.slice(2, 4)}`;
@@ -37,12 +46,25 @@ type Control = {
   note?: string;
 };
 
-export function ForecastView({ platform }: { platform: StoreFilter }) {
+/** The store and the horizon come from the floating filter bar, as every other view's filters do. */
+export function ForecastView({ platform, horizon }: { platform: StoreFilter; horizon: Horizon }) {
   const { snap } = useData();
   const cur = snap?.load?.settings?.currency || '$';
   const $ = (n: number) => money(n, cur);
-  const [horizon, setHorizon] = useState<Horizon>('12');
-  const [metric, setMetric] = useState<Metric>('cash');
+  const [metric, setMetric] = useState<Metric>('arr');
+  /* The assumptions card: shut on arrival. `t` runs 0 to 1 on a stiff spring
+     damped just short of critical, so it opens fast with barely any give. */
+  const [open, setOpen] = useState(false);
+  const [shut, setShut] = useState(0);
+  const [tall, setTall] = useState(0);
+  const sized = shut > 0 && tall > 0;
+  const t = useSharedValue(0);
+  useEffect(() => {
+    t.value = withSpring(open ? 1 : 0, { stiffness: 520, damping: 40, mass: 1 });
+  }, [open, t]);
+  const frame = useAnimatedStyle(() => (sized ? { height: shut + (tall - shut) * t.value } : {}));
+  const summaryFade = useAnimatedStyle(() => ({ opacity: 1 - Math.min(1, Math.max(0, t.value * 2)) }));
+  const leversFade = useAnimatedStyle(() => ({ opacity: Math.min(1, Math.max(0, t.value * 2 - 1)) }));
 
   const base = useMemo(() => buildBase(snap ?? null, platform), [snap, platform]);
   const a = useMemo(() => {
@@ -83,8 +105,23 @@ export function ForecastView({ platform }: { platform: StoreFilter }) {
       fmt: (v) => `${v.toFixed(2)}%`,
       note: a.churn === null ? 'nothing churned yet · assumption' : a.churnSource === 'entered' ? 'from churn you entered by hand' : undefined,
     },
+    {
+      key: 'annualRenew',
+      label: 'Annual plans renewing',
+      min: () => 0,
+      max: () => 100,
+      step: 1,
+      fmt: (v) => `${v.toFixed(0)}%`,
+      note: live.annualRenew === null ? 'following monthly churn: twelve months of it' : 'set by hand · reset to follow monthly churn',
+    },
     { key: 'spread', label: 'Scenario spread', min: () => 5, max: () => 80, step: 5, fmt: (v) => `±${v.toFixed(0)}%`, note: 'width of the bear / optimistic band' },
   ];
+
+  /* The annual renewal rate is null until it is set by hand: until then it
+     follows the churn slider (twelve months of it), and so does its thumb. */
+  const followChurn = (l: Levers) => Math.pow(1 - l.churn / 100, 12) * 100;
+  const valueOf = (l: Levers, k: keyof Levers) => (k === 'annualRenew' ? (l.annualRenew ?? followChurn(l)) : (l[k] as number));
+  const baseOf = (k: keyof Levers) => (k === 'annualRenew' ? followChurn(live) : (pace[k] as number));
 
   const changed = (Object.keys(pace) as (keyof Levers)[]).filter((k) => levers[k] !== pace[k]).length;
 
@@ -102,11 +139,37 @@ export function ForecastView({ platform }: { platform: StoreFilter }) {
       ],
     },
     {
+      key: 'arr',
+      label: 'ARR then',
+      value: $(e.endMrr * 12),
+      change: a.startMrr ? { value: e.endMrr * 12, base: a.startMrr * 12 } : null,
+      note: `MRR times twelve at the end of the forecast. Bear to optimistic: ${$((lastBear?.mrr ?? 0) * 12)} – ${$((lastHigh?.mrr ?? 0) * 12)}.`,
+      comparisons: [
+        { label: 'Today', value: $(a.startMrr * 12) },
+        { label: 'Levels off around', value: e.plateauMrr === null ? '–' : $(e.plateauMrr * 12) },
+      ],
+    },
+    {
       key: 'cash',
       label: 'Cash collected',
       value: $(e.totalBookings),
       note: `New purchases plus renewals, before the store cut. Bear to optimistic: ${$(lo.totalBookings)} – ${$(hi.totalBookings)}.`,
       comparisons: [{ label: 'Next 30 days', value: $(e.bookingsNext30) }],
+    },
+    {
+      key: 'perInstall',
+      label: 'Cash per install',
+      value: e.totalInstalls ? $(e.totalBookings / e.totalInstalls) : '–',
+      note: 'Everything collected over the forecast, divided by every install in it. What an install is worth before the store cut, and the most you could pay for one.',
+      comparisons: [
+        { label: 'Cash collected', value: $(e.totalBookings) },
+        { label: 'Installs', value: int(e.totalInstalls) },
+        { label: 'Cash per new paying user', value: e.totalConv ? $(e.totalBookings / e.totalConv) : '–' },
+        {
+          label: 'Bear to optimistic',
+          value: lo.totalInstalls && hi.totalInstalls ? `${$(lo.totalBookings / lo.totalInstalls)} – ${$(hi.totalBookings / hi.totalInstalls)}` : '–',
+        },
+      ],
     },
     {
       key: 'payers',
@@ -122,53 +185,79 @@ export function ForecastView({ platform }: { platform: StoreFilter }) {
     },
   ];
 
-  const series = metric === 'cash' ? (m: (typeof e.months)[number]) => m.cumBookings : metric === 'mrr' ? (m: (typeof e.months)[number]) => m.mrr : (m: (typeof e.months)[number]) => m.payers;
-  const fmt = metric === 'payers' ? int : $;
+  type M = (typeof e.months)[number];
+  const series = metric === 'cash' ? (m: M) => m.cumBookings : metric === 'mrr' ? (m: M) => m.mrr : (m: M) => m.mrr * 12;
+  const fmt = $;
 
   return (
     <>
       <Card>
-        <View style={s.headRow}>
+        <Pressable
+          onPress={() => {
+            Haptics.selectionAsync();
+            setOpen(!open);
+          }}
+          style={s.headRow}
+        >
           <Text style={s.cardTitle}>Assumptions</Text>
-          <Pressable
-            disabled={!changed}
-            onPress={() => {
-              Haptics.selectionAsync();
-              setLevers(pace);
-              setLive(pace);
-            }}
-            style={({ pressed }) => [s.reset, (!changed || pressed) && { opacity: 0.45 }]}
+          <View style={s.headRight}>
+            <Pressable
+              disabled={!changed}
+              hitSlop={8}
+              onPress={() => {
+                Haptics.selectionAsync();
+                setLevers(pace);
+                setLive(pace);
+              }}
+              style={({ pressed }) => [s.reset, (!changed || pressed) && { opacity: 0.45 }]}
+            >
+              <Text style={s.resetText}>{changed ? `Current pace · ${changed} changed` : 'Current pace'}</Text>
+            </Pressable>
+            <SymbolView name={open ? 'chevron.up' : 'chevron.down'} size={13} weight="semibold" tintColor={C.dim} />
+          </View>
+        </Pressable>
+        {/* Closed, the card is a list of what the forecast assumes; open, the
+            same list as sliders. Both are laid out and measured, and the card
+            moves between their two heights, so nothing below it jumps. */}
+        <Animated.View style={[{ overflow: 'hidden' }, frame]}>
+          <Animated.View
+            pointerEvents={open ? 'none' : 'auto'}
+            onLayout={(ev) => setShut(ev.nativeEvent.layout.height)}
+            style={[sized ? s.layer : null, summaryFade]}
           >
-            <Text style={s.resetText}>{changed ? `Current pace · ${changed} changed` : 'Current pace'}</Text>
-          </Pressable>
-        </View>
-        <Segmented
-          options={[
-            { key: '6', label: '6 mo' },
-            { key: '12', label: '1 yr' },
-            { key: '24', label: '2 yr' },
-            { key: '36', label: '3 yr' },
-          ]}
-          value={horizon}
-          onChange={setHorizon}
-        />
-        {CONTROLS.map((c) => (
-          <Lever
-            key={c.key}
-            c={c}
-            value={live[c.key] as number}
-            base={pace[c.key] as number}
-            onLive={(v) => setLive((l) => ({ ...l, [c.key]: v }))}
-            onDone={(v) => {
-              setLevers((l) => ({ ...l, [c.key]: v }));
-              setLive((l) => ({ ...l, [c.key]: v }));
-            }}
-            onReset={() => {
-              setLevers((l) => ({ ...l, [c.key]: pace[c.key] }));
-              setLive((l) => ({ ...l, [c.key]: pace[c.key] }));
-            }}
-          />
-        ))}
+            <Pressable onPress={() => setOpen(true)} style={s.summary}>
+              {CONTROLS.map((c) => {
+                const v = valueOf(live, c.key);
+                const moved = Math.abs(v - baseOf(c.key)) > c.step / 2;
+                return (
+                  <View key={c.key} style={s.sumRow}>
+                    <Text style={s.sumLabel}>{c.label}</Text>
+                    <Text style={[s.sumValue, num, moved && { color: C.series }]}>{c.fmt(v)}</Text>
+                  </View>
+                );
+              })}
+            </Pressable>
+          </Animated.View>
+          <Animated.View pointerEvents={open ? 'auto' : 'none'} onLayout={(ev) => setTall(ev.nativeEvent.layout.height)} style={[s.layer, s.levers, leversFade]}>
+            {CONTROLS.map((c) => (
+              <Lever
+                key={c.key}
+                c={c}
+                value={valueOf(live, c.key)}
+                base={baseOf(c.key)}
+                onLive={(v) => setLive((l) => ({ ...l, [c.key]: v }))}
+                onDone={(v) => {
+                  setLevers((l) => ({ ...l, [c.key]: v }));
+                  setLive((l) => ({ ...l, [c.key]: v }));
+                }}
+                onReset={() => {
+                  setLevers((l) => ({ ...l, [c.key]: pace[c.key] }));
+                  setLive((l) => ({ ...l, [c.key]: pace[c.key] }));
+                }}
+              />
+            ))}
+          </Animated.View>
+        </Animated.View>
       </Card>
 
       <MetricTiles specs={specs} />
@@ -176,15 +265,15 @@ export function ForecastView({ platform }: { platform: StoreFilter }) {
       <Card>
         <Chips
           options={[
-            { key: 'cash', label: 'Cash collected' },
+            { key: 'arr', label: 'ARR' },
             { key: 'mrr', label: 'MRR' },
-            { key: 'payers', label: 'Paying users' },
+            { key: 'cash', label: 'Cash collected' },
           ]}
           value={metric}
           onChange={setMetric}
         />
         <Lines
-          title={metric === 'cash' ? 'Cash collected, to date' : metric === 'mrr' ? 'Monthly recurring revenue' : 'Paying users'}
+          title={metric === 'cash' ? 'Cash collected, to date' : metric === 'mrr' ? 'Monthly recurring revenue' : 'Annual recurring revenue'}
           xs={e.months.map((m) => monthLabel(m.key))}
           series={[
             { key: 'hi', label: 'Optimistic', color: '#199e70', dashed: true, values: hi.months.map(series) },
@@ -220,23 +309,6 @@ export function ForecastView({ platform }: { platform: StoreFilter }) {
           xLabel={monthLabel}
           format={int}
         />
-      </Card>
-
-      <Card title="Month by month">
-        {e.months.map((m, i) => (
-          <View key={m.key}>
-            {i ? <Divider /> : null}
-            <View style={s.row}>
-              <Text style={s.rowLabel}>{monthLabel(m.key)}</Text>
-              <View style={{ alignItems: 'flex-end' }}>
-                <Text style={[s.rowValue, num]}>{$(m.bookings)}</Text>
-                <Text style={s.rowSub}>
-                  MRR {$(m.mrr)} · {int(m.payers)} paying · {int(m.installs)} installs
-                </Text>
-              </View>
-            </View>
-          </View>
-        ))}
       </Card>
     </>
   );
@@ -304,6 +376,13 @@ function Lever({
 
 const s = StyleSheet.create({
   headRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
+  headRight: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  layer: { position: 'absolute', top: 0, left: 0, right: 0 },
+  levers: { gap: 10 },
+  summary: { gap: 7, paddingTop: 2 },
+  sumRow: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 10 },
+  sumLabel: { color: C.dim, fontSize: 14, flexShrink: 1 },
+  sumValue: { color: C.text, fontSize: 14, fontWeight: '600' },
   cardTitle: { color: C.text, fontSize: 18, fontWeight: '700' },
   reset: { backgroundColor: 'rgba(255,255,255,0.08)', borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6 },
   resetText: { color: C.text, fontSize: 12, fontWeight: '600' },
@@ -314,8 +393,4 @@ const s = StyleSheet.create({
   leverFoot: { flexDirection: 'row', justifyContent: 'space-between', gap: 10 },
   leverNote: { color: C.muted, fontSize: 11, flex: 1 },
   leverReset: { color: C.series, fontSize: 12, fontWeight: '700' },
-  row: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 9 },
-  rowLabel: { color: C.text, fontSize: 15, fontWeight: '600' },
-  rowValue: { color: C.text, fontSize: 15, fontWeight: '700' },
-  rowSub: { color: C.muted, fontSize: 11, marginTop: 1 },
 });

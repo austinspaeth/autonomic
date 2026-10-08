@@ -4,7 +4,7 @@
  * because "2 sales" from a 9-day-old iOS trial and a 17-day-old Android free
  * install is the same number and none of the news. */
 import { useEffect, useMemo, useState } from 'react';
-import { PanResponder, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { PanResponder, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import Animated, {
   Easing,
   FadeIn,
@@ -20,11 +20,13 @@ import { BlurView } from 'expo-blur';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { deckOrder, PLAN_CHIP, SENSOR_CHIP, STORE_CHIP, TIER, type AlertEvent, type AlertRow } from '../lib/alerts';
-import { useAlerts } from '../lib/alertsStore';
+import { PLAN_CHIP, SENSOR_CHIP, STORE_CHIP, TIER, type AlertEvent, type AlertRow } from '../lib/alerts';
+import { toastRank, useAlerts } from '../lib/alertsStore';
+import { setView } from '../lib/views';
 import { longDate } from '../lib/dates';
+import { useWide } from '../lib/wide';
 import { C, num } from '../theme';
-import { BOTTOM_CHROME } from './ui';
+import { BOTTOM_CHROME, Segmented } from './ui';
 
 export const KIND_STYLE: Record<AlertEvent['kind'], { icon: SFSymbol; color: string; label: string }> = {
   record: { icon: 'trophy.fill', color: '#FFC93C', label: 'All-time high' },
@@ -97,12 +99,16 @@ export function InstallRows({ event }: { event: AlertEvent }) {
 /* ---------------------------------------------------------------- toasts */
 
 /* The live toasts are a DECK, like the stacked modal cards: the most
-   important sits in front (TOAST_PRIORITY, newest first within a kind), and
+   important sits in front (`toastRank`, newest first within a kind), and
    every card behind it is a little smaller and a little higher, peeking over
    its top edge. Tapping, swiping or ✕ dismisses the front card and the next
    one comes forward; the details are in the bell's history. Nothing bounces:
    a card DESCENDS onto the deck (it fades in while settling down from
    slightly larger and higher to its place) and the others ease into theirs. */
+
+/* Front to back: `toastRank` (lib/alertsStore), which also decides whose
+   confetti is in the air. */
+const rank = toastRank;
 
 const TOAST_H = 86;
 /** How much of each card behind shows above the one in front of it. */
@@ -223,9 +229,16 @@ function Toast({
     >
       <AnimatedBlur tint="systemChromeMaterialDark" animatedProps={blur} style={StyleSheet.absoluteFill} />
       <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: `${k.color}12` }, fade]} />
-      {/* Tapping a toast closes it; the details live in the alerts history. */}
+      {/* Tapping a toast closes it and goes to App usage. The ✕ and a swipe
+          only close it. */}
       <Animated.View style={[st.toastFill, fade]}>
-        <Pressable onPress={() => gone(0)} style={st.toast}>
+        <Pressable
+          onPress={() => {
+            setView('usage');
+            gone(0);
+          }}
+          style={st.toast}
+        >
           <View style={st.toastHead}>
             <Icon kind={event.kind} size={40} />
             <View style={{ flex: 1, minWidth: 0, paddingRight: 26 }}>
@@ -252,13 +265,23 @@ export function ToastStack({ raisedBy = 0 }: { raisedBy?: number }) {
   const insets = useSafeAreaInsets();
   const { history, live, dismiss, dismissAll } = useAlerts();
   const [frontH, setFrontH] = useState(TOAST_H);
-  const shown = deckOrder(live, history);
+  // Centred, and no wider than the app's column on an iPad or a Mac.
+  const { width: winW } = useWindowDimensions();
+  const wide = useWide();
+  const deckW = Math.min(winW, 444) - 24;
+  // Most important first, newest first within a kind (`live` is in arrival
+  // order, and the sort is stable).
+  const shown = [...live]
+    .reverse()
+    .map((id) => history.find((e) => e.id === id))
+    .filter((e): e is AlertEvent => !!e)
+    .sort((a, b) => rank(a.kind) - rank(b.kind));
   if (!shown.length) return null;
-  const bottom = insets.bottom + BOTTOM_CHROME + raisedBy + 10;
+  const bottom = insets.bottom + (wide ? 0 : BOTTOM_CHROME) + raisedBy + 10;
   const behind = Math.min(shown.length - 1, MAX_DEPTH - 1);
   const front = Math.max(TOAST_H, frontH);
   return (
-    <View pointerEvents="box-none" style={[st.deck, { bottom, height: front + PEEK * behind + (shown.length > 1 ? 44 : 0) }]}>
+    <View pointerEvents="box-none" style={[st.deck, { left: (winW - deckW) / 2, width: deckW, bottom, height: front + PEEK * behind + (shown.length > 1 ? 44 : 0) }]}>
       {shown.length > 1 ? (
         <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={st.closeAllWrap}>
           <Pressable
@@ -283,11 +306,21 @@ export function ToastStack({ raisedBy = 0 }: { raisedBy?: number }) {
 
 /* --------------------------------------------------------------- history */
 
+type HistoryTab = 'all' | 'sale' | 'download';
+const HISTORY_TABS: { key: HistoryTab; label: string }[] = [
+  { key: 'all', label: 'All' },
+  { key: 'sale', label: 'Sales' },
+  { key: 'download', label: 'New' },
+];
+
 export function AlertHistory() {
+  const insets = useSafeAreaInsets();
   const { history, clearHistory } = useAlerts();
   const [open, setOpen] = useState<string | null>(null);
+  const [tab, setTab] = useState<HistoryTab>('all');
+  const shown = tab === 'all' ? history : history.filter((e) => e.kind === tab);
   const groups = new Map<string, AlertEvent[]>();
-  history.forEach((e) => {
+  shown.forEach((e) => {
     const d = new Date(e.at);
     const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     (groups.get(k) || groups.set(k, []).get(k)!).push(e);
@@ -310,51 +343,63 @@ export function AlertHistory() {
   }
 
   return (
-    <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 }} showsVerticalScrollIndicator={false}>
-      {[...groups.entries()].map(([k, list]) => (
-        <View key={k} style={{ marginBottom: 18 }}>
-          <View style={st.dayHead}>
-            <Text style={st.dayLabel}>{label(k)}</Text>
-            <Text style={st.dayCount}>{list.length}</Text>
-          </View>
-          <View style={st.dayCard}>
-            {list.map((e, i) => {
-              const isOpen = open === e.id;
-              return (
-                <Animated.View key={e.id} layout={ROW_EASE}>
-                  {i ? <View style={st.sep} /> : null}
-                  <Pressable onPress={() => setOpen(isOpen ? null : e.id)} style={st.hItem}>
-                    <View style={st.toastHead}>
-                      <Icon kind={e.kind} size={30} />
-                      <View style={{ flex: 1, minWidth: 0 }}>
-                        <Text style={st.title}>{e.title}</Text>
-                        <Text style={st.body} numberOfLines={isOpen ? undefined : 1}>
-                          {e.body}
-                        </Text>
-                      </View>
-                      <Text style={st.time}>{timeOf(e.at)}</Text>
-                    </View>
-                    {isOpen ? (
-                      <Animated.View entering={FadeIn.duration(200)}>
-                        <InstallRows event={e} />
+    <View style={{ flex: 1 }}>
+      <View style={st.tabs}>
+        <Segmented options={HISTORY_TABS} value={tab} onChange={setTab} />
+      </View>
+      {/* The sheet bleeds to the bottom edge, so the list scrolls under the
+          home indicator and pads itself clear of it at the end. */}
+      <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 + insets.bottom }} showsVerticalScrollIndicator={false}>
+        <Animated.View key={tab} entering={FadeIn.duration(180)}>
+          {!shown.length ? (
+            <Text style={st.tabEmpty}>{tab === 'sale' ? 'No sales in the history yet.' : 'No new installs in the history yet.'}</Text>
+          ) : null}
+            {[...groups.entries()].map(([k, list]) => (
+              <View key={k} style={{ marginBottom: 18 }}>
+                <View style={st.dayHead}>
+                  <Text style={st.dayLabel}>{label(k)}</Text>
+                  <Text style={st.dayCount}>{list.length}</Text>
+                </View>
+                <View style={st.dayCard}>
+                  {list.map((e, i) => {
+                    const isOpen = open === e.id;
+                    return (
+                      <Animated.View key={e.id} layout={ROW_EASE}>
+                        {i ? <View style={st.sep} /> : null}
+                        <Pressable onPress={() => setOpen(isOpen ? null : e.id)} style={st.hItem}>
+                          <View style={st.toastHead}>
+                            <Icon kind={e.kind} size={30} />
+                            <View style={{ flex: 1, minWidth: 0 }}>
+                              <Text style={st.title}>{e.title}</Text>
+                              <Text style={st.body} numberOfLines={isOpen ? undefined : 1}>
+                                {e.body}
+                              </Text>
+                            </View>
+                            <Text style={st.time}>{timeOf(e.at)}</Text>
+                          </View>
+                          {isOpen ? (
+                            <Animated.View entering={FadeIn.duration(200)}>
+                              <InstallRows event={e} />
+                            </Animated.View>
+                          ) : null}
+                        </Pressable>
                       </Animated.View>
-                    ) : null}
-                  </Pressable>
-                </Animated.View>
-              );
-            })}
-          </View>
-        </View>
-      ))}
-      <Pressable onPress={clearHistory} style={({ pressed }) => [st.clear, pressed && { opacity: 0.6 }]}>
-        <Text style={st.clearText}>Clear history</Text>
-      </Pressable>
-    </ScrollView>
+                    );
+                  })}
+                </View>
+              </View>
+            ))}
+            <Pressable onPress={clearHistory} style={({ pressed }) => [st.clear, pressed && { opacity: 0.6 }]}>
+              <Text style={st.clearText}>Clear history</Text>
+            </Pressable>
+        </Animated.View>
+      </ScrollView>
+    </View>
   );
 }
 
 const st = StyleSheet.create({
-  deck: { position: 'absolute', left: 12, right: 12 },
+  deck: { position: 'absolute' },
   closeAllWrap: { position: 'absolute', top: 0, left: 0, right: 0, alignItems: 'center' },
   closeAll: {
     flexDirection: 'row',
@@ -396,6 +441,8 @@ const st = StyleSheet.create({
   chipText: { color: C.dim, fontSize: 11, fontWeight: '600' },
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 30 },
   emptyText: { color: C.muted, fontSize: 14, textAlign: 'center', lineHeight: 20 },
+  tabs: { marginBottom: 16 },
+  tabEmpty: { color: C.muted, fontSize: 14, textAlign: 'center', paddingVertical: 40 },
   dayHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8, paddingHorizontal: 4 },
   dayLabel: { color: C.text, fontSize: 15, fontWeight: '700' },
   dayCount: { color: C.muted, fontSize: 12 },

@@ -93,6 +93,9 @@ export type PingRow = {
   builds?: PingBuild[];
   /** sub rows only: how each purchase was known, V verified / S store-only. */
   evidence?: { key: string; evidence: 'V' | 'S'; count: number }[];
+  /** open rows only: when each open arrived, `{ "14I": n, "09AN": n }` (Eastern
+   *  hour, store, `N` for a first run). Absent before the server counted it. */
+  hours?: Record<string, number>;
 };
 
 export type Fault = {
@@ -106,6 +109,9 @@ export type Fault = {
   platforms: Record<string, number>;
   versions: Record<string, number>;
   occPlatforms?: Record<string, number>;
+  /** When the first and the latest report for this failure on this day arrived (ISO). */
+  firstAt?: string | null;
+  lastAt?: string | null;
 };
 
 export type PingKind =
@@ -126,3 +132,16 @@ export type StoreSide = {
 };
 
 export type StoreVersions = { at?: string; ios?: StoreSide; android?: StoreSide; cached?: boolean };
+
+/** An access code: days of full access handed to one person, redeemed in the app once. */
+export type AccessCode = {
+  code: string;
+  days: number;
+  note: string;
+  createdAt: string | null;
+  /** A code works once: true from the moment the app was told it is good. */
+  used: boolean;
+  redeemedAt: string | null;
+  redeemedPlatform: string | null;
+  redeemedVersion: string | null;
+};

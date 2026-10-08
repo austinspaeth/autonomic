@@ -37,6 +37,9 @@ export type DayEntry = {
   /** sub only: purchase evidence, V verified / S store-only. */
   evidence: { V: number; S: number };
   unattributed: number;
+  /** open only: arrivals per Eastern hour (24 slots), everyone and first runs,
+   *  inside the filter. Null on a day the server was not counting hours. */
+  hours: { all: number[]; fresh: number[] } | null;
 };
 
 export type UsageIndex = {
@@ -81,7 +84,19 @@ function entryOf(row: PingRow, letter: Letter | null): DayEntry {
     cohortSlots: {},
     evidence: { V: 0, S: 0 },
     unattributed: 0,
+    hours: null,
   };
+  if (row.hours) {
+    const all = new Array<number>(24).fill(0);
+    const fresh = new Array<number>(24).fill(0);
+    Object.entries(row.hours).forEach(([k, n]) => {
+      const m = /^(\d{2})([IAU])(N?)$/.exec(k);
+      if (!m || Number(m[1]) > 23 || (letter && m[2] !== letter)) return;
+      all[Number(m[1])] += n;
+      if (m[3]) fresh[Number(m[1])] += n;
+    });
+    e.hours = { all, fresh };
+  }
   let kept = 0;
   (row.cohorts || []).forEach((c) => {
     const p = (c.platform || 'U') as Letter;
@@ -157,6 +172,16 @@ export const newOn = (ix: UsageIndex, d: string) => countOn(ix, d, d);
 export const returningOn = (ix: UsageIndex, d: string) => Math.max(0, activeOn(ix, d) - newOn(ix, d));
 export const cohortSize = (ix: UsageIndex, c: string) => countOn(ix, c, c);
 export const isMature = (ix: UsageIndex, c: string, n: number) => !!ix.last && ageDays(c, ix.last) >= n;
+
+/** One day as the pace maths wants it: its count, and when it arrived. The
+ *  hours are dropped unless they account for the whole day (the day the
+ *  server began counting them is only part-covered, and would read early). */
+export function paceDay(ix: UsageIndex, d: string, who: 'all' | 'fresh'): { total: number; hours: number[] | null } {
+  const total = who === 'fresh' ? newOn(ix, d) : activeOn(ix, d);
+  const hours = entry(ix, 'open', d)?.hours?.[who] ?? null;
+  const seen = hours ? hours.reduce((a, b) => a + b, 0) : 0;
+  return { total, hours: hours && total > 0 && seen >= total * 0.98 ? hours : null };
+}
 
 export function rangeDays(from: string, to: string): string[] {
   const out: string[] = [];
@@ -294,6 +319,77 @@ export function activeByCohort(ix: UsageIndex, d: string): { age: number; cohort
     .map(([c, n]) => ({ age: ageDays(c, d), cohort: c, count: n }))
     .filter((x) => x.age >= 0)
     .sort((a, b) => a.age - b.age);
+}
+
+/**
+ * One cohort on one day, against its OWN life: the day before, its average
+ * (over the range and over everything), its best day, and how much of what
+ * installed is left. `size` is null for a cohort born before the counter,
+ * whose size was never observed. Ported from the web dashboard's `cohortNorm`.
+ */
+export function cohortNorm(ix: UsageIndex, cohort: string, day: string, days: string[]) {
+  const has = new Set(ix.days);
+  const alive = (d: string) => has.has(d) && d >= cohort && d <= day;
+  const mean = (list: string[]) => {
+    let sum = 0;
+    let n = 0;
+    list.forEach((d) => {
+      if (!alive(d)) return;
+      sum += countOn(ix, d, cohort);
+      n += 1;
+    });
+    return n ? { avg: sum / n, days: n } : null;
+  };
+  let peak: { count: number; age: number } | null = null;
+  ix.days.forEach((d) => {
+    if (!alive(d)) return;
+    const n = countOn(ix, d, cohort);
+    if (!peak || n > peak.count) peak = { count: n, age: ageDays(cohort, d) };
+  });
+  const prevDay = addDays(day, -1);
+  const size = cohortSize(ix, cohort) || null;
+  const now = countOn(ix, day, cohort);
+  return {
+    now,
+    prev: alive(prevDay) ? countOn(ix, prevDay, cohort) : null,
+    range: mean(days),
+    all: mean(ix.days),
+    size,
+    retained: size ? (now / size) * 100 : null,
+    peak: peak as { count: number; age: number } | null,
+  };
+}
+
+/**
+ * The other axis of the same bar: what a day-N bar usually looks like, across
+ * cohorts. `yesterday` is the bar that stood in this slot the day before (a
+ * different cohort; null when none was born to fill it), `median` the usual
+ * count at this age and `retention` the usual rate. Both exclude the cohort
+ * being asked about, and every cohort counted must have REACHED day N by
+ * `day`, so a past day never borrows from its own future. Ported from the web
+ * dashboard's `ageNorm`.
+ */
+export function ageNorm(ix: UsageIndex, age: number, day: string, exclude: string) {
+  const prevDay = addDays(day, -1);
+  const prevCohort = addDays(prevDay, -age);
+  const yesterday = cohortSize(ix, prevCohort) ? countOn(ix, prevDay, prevCohort) : null;
+  const counts: number[] = [];
+  const others: string[] = [];
+  ix.cohorts.forEach((c) => {
+    if (c === exclude) return;
+    const at = addDays(c, age);
+    if (at > day || !cohortSize(ix, c)) return;
+    counts.push(countOn(ix, at, c));
+    others.push(c);
+  });
+  counts.sort((a, b) => a - b);
+  const m = counts.length;
+  return {
+    yesterday,
+    median: m ? (m % 2 ? counts[(m - 1) / 2] : (counts[m / 2 - 1] + counts[m / 2]) / 2) : null,
+    cohorts: m,
+    retention: others.length ? retentionAt(ix, others, age) : null,
+  };
 }
 
 /* -------------------------------------------------------- retention */

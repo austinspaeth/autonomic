@@ -57,6 +57,7 @@ export function PingsView() {
         by.set(row.day, list);
       });
     });
+    by.forEach((list) => list.sort((a, b) => b.total - a.total));
     return [...by.entries()].sort((a, b) => b[0].localeCompare(a[0]));
   }, [snap, route]);
 

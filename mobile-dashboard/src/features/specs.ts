@@ -4,7 +4,10 @@
  * length, the per-day average and the best day, and broken down by store.
  * (App usage builds its own, in features/UsageView.tsx.)
  */
+import { createElement } from 'react';
 import type { MetricSpec, Change, Comparison } from '../components/MetricTiles';
+import { bookOn, ledger, PLANS, renewals, summarize as summarizeLedger, type PlanKey } from '../lib/sales';
+import { RevenueBody, type RevenueDay } from './RevenueDeepDive';
 import type { Part } from '../components/charts';
 import type { Snapshot } from '../lib/data';
 import { addDays, shortDate } from '../lib/dates';
@@ -14,9 +17,87 @@ import { buildBase, cumAt, dayRec, summarize, trialExit, type Field, type StoreB
 import { C } from '../theme';
 
 const fmtPct = (v: number | null) => (v === null ? '–' : `${v.toFixed(1)}%`);
+/** Two decimals: a share of impressions that paid is a fraction of a percent. */
+const fmtPct2 = (v: number | null) => (v === null ? '–' : `${v.toFixed(2)}%`);
 const daysBetween = (a: string, b: string) => Math.round((Date.parse(`${b}T12:00:00Z`) - Date.parse(`${a}T12:00:00Z`)) / 86400000);
 
 const COUNT_COLOR = C.series;
+
+/* ----------------------------------------------------------- revenue */
+
+/** Past this many days the revenue chart buckets by month. */
+const MONTHLY_AFTER = 120;
+
+/** Everything the Revenue card says: first payments from the ledger and the
+ *  renewals it implies, for the window, the one before it, and by day. */
+function revenueOf(snap: Snapshot | null, platform: StoreFilter, w: GlanceWindow, n: number) {
+  const l = ledger(snap?.load?.sales, snap?.load?.churn, platform);
+  const cur = summarizeLedger(l, w.from, w.to);
+  const prev = summarizeLedger(l, w.prevFrom, w.prevTo);
+  const ren = renewals(l, w.from, w.to);
+  const renPrev = renewals(l, w.prevFrom, w.prevTo);
+  const sum = (rs: { amount: number }[]) => rs.reduce((t, r) => t + r.amount, 0);
+  const upcoming = renewals(l, addDays(w.to, 1), addDays(w.to, 30));
+
+  const byDay = new Map<string, RevenueDay>();
+  const at = (day: string) => byDay.get(day) || byDay.set(day, { day, fresh: 0, renew: 0, purchases: 0, charges: 0 }).get(day)!;
+  l.rows.forEach((r) => {
+    if (r.refunded || r.date < w.from || r.date > w.to) return;
+    const d = at(r.date);
+    d.fresh += r.price * r.qty;
+    d.purchases += r.qty;
+  });
+  const renewByPlan: Record<PlanKey, number> = { monthly: 0, annual: 0, lifetime: 0, unknown: 0 };
+  ren.forEach((r) => {
+    const d = at(r.date);
+    d.renew += r.amount;
+    d.charges += 1;
+    renewByPlan[r.plan] += r.amount;
+  });
+  const days = [...byDay.values()].filter((d) => d.fresh + d.renew > 0).sort((a, b) => b.day.localeCompare(a.day));
+  const best = days.reduce<RevenueDay | null>((m, d) => (!m || d.fresh + d.renew > m.fresh + m.renew ? d : m), null);
+
+  const monthly = n > MONTHLY_AFTER;
+  const buckets: { x: string; fresh: number; renew: number }[] = [];
+  for (let d = w.from; d <= w.to; d = addDays(d, 1)) {
+    const x = monthly ? `${d.slice(0, 7)}-01` : d;
+    const last = buckets[buckets.length - 1];
+    const b = last && last.x === x ? last : (buckets.push({ x, fresh: 0, renew: 0 }), buckets[buckets.length - 1]);
+    const day = byDay.get(d);
+    if (day) {
+      b.fresh += day.fresh;
+      b.renew += day.renew;
+    }
+  }
+
+  /* Per store, only when both are on screen. Renewals follow their purchase's store. */
+  const store = (p: 'ios' | 'android') => {
+    const sl = ledger(snap?.load?.sales, [], p);
+    return summarizeLedger(sl, w.from, w.to).totalBookings + sum(renewals(sl, w.from, w.to));
+  };
+  return {
+    fresh: cur.totalBookings,
+    renew: sum(ren),
+    total: cur.totalBookings + sum(ren),
+    prevFresh: prev.totalBookings,
+    prevRenew: sum(renPrev),
+    prevTotal: prev.totalBookings + sum(renPrev),
+    purchases: cur.totalUnits,
+    charges: ren.length,
+    refunds: cur.refunds,
+    byPlan: cur.bookings,
+    renewByPlan,
+    days,
+    best,
+    buckets,
+    monthly,
+    mrr: bookOn(l, w.to).mrr,
+    upcoming: sum(upcoming),
+    upcomingCharges: upcoming.length,
+    cut: snap?.load?.settings?.storeCutPct ?? 0,
+    stores: platform === 'all' ? { ios: store('ios'), android: store('android') } : null,
+  };
+}
 
 /* ------------------------------------------------------------ glance */
 
@@ -89,7 +170,6 @@ export function glanceSpecs(snap: Snapshot | null, platform: StoreFilter, b: Sto
 
   const downloads = field('downloads');
   const sales = field('sales');
-  const revenue = field('revenue');
   const crossedNow = crossed(b, w.from, w.to);
   const crossedPrev = crossed(b, w.prevFrom, w.prevTo);
   /* Conversion in a window: paid in it over the installs that FINISHED THE
@@ -101,6 +181,26 @@ export function glanceSpecs(snap: Snapshot | null, platform: StoreFilter, b: Sto
   const convIn = (sales: number, cross: number) => (cross ? (sales / cross) * 100 : null);
   const convNow = convIn(s.sales, crossedNow);
   const convPrev = convIn(ps.sales, crossedPrev);
+
+  const rev = revenueOf(snap, platform, w, n);
+
+  /* The paid rates divide purchases by store traffic, so they stop where the
+     store reports stop: a purchase on a day with no report yet has no
+     impressions to be a share of. */
+  const sr = reportedTo < w.to ? summarize(b, w.from, reportedTo) : s;
+  const srOf = (base: StoreBase | null) => (base ? summarize(base, w.from, reportedTo) : null);
+  const paidRate = (sales: number, traffic: number) => (traffic ? (sales / traffic) * 100 : null);
+  const paidChange = (f: (x: Summary) => number | null): Change => {
+    const now = f(sr);
+    const before = f(ps);
+    return now !== null && before !== null && w.deltaOK ? { value: now, base: before } : null;
+  };
+  const paidRows = (f: (x: Summary) => number | null): Comparison[] => {
+    const i = srOf(bI);
+    const a = srOf(bA);
+    return i && a ? [{ label: 'iOS', value: fmtPct2(f(i)) }, { label: 'Android', value: fmtPct2(f(a)) }] : [];
+  };
+  const paidNote = 'Purchases in the range over store traffic in the range. A purchase usually follows its impression by days, so read it as a rate of flow, not of the same people.';
 
   return [
     {
@@ -179,16 +279,40 @@ export function glanceSpecs(snap: Snapshot | null, platform: StoreFilter, b: Sto
     {
       key: 'revenue',
       label: 'Revenue',
-      value: $(s.revenue),
-      change: ch(s.revenue, ps.revenue),
+      value: $(rev.total),
+      change: ch(rev.total, rev.prevTotal),
+      note: 'Money from people paying for the first time, plus renewals. Nothing reports a renewal, so every subscription not marked cancelled is assumed to renew each term.',
       comparisons: [
-        { label: prevLabel, change: ch(s.revenue, ps.revenue) },
-        { label: 'Per day', value: $(s.revenue / n) },
-        { label: 'Best day', value: best(revenue, $) },
+        { label: prevLabel, change: ch(rev.total, rev.prevTotal), format: $ },
+        { label: `New ${prevLabel}`, change: ch(rev.fresh, rev.prevFresh), format: $ },
+        { label: `Renewals ${prevLabel}`, change: ch(rev.renew, rev.prevRenew), format: $ },
+        { label: 'New this period', value: `${$(rev.fresh)} · ${int(rev.purchases)} ${rev.purchases === 1 ? 'purchase' : 'purchases'}` },
+        { label: 'Renewals (est.)', value: `${$(rev.renew)} · ${int(rev.charges)} ${rev.charges === 1 ? 'charge' : 'charges'}` },
+        { label: 'Share from renewals', value: rev.total ? `${((rev.renew / rev.total) * 100).toFixed(0)}%` : '–' },
+        { label: `After the stores' ${rev.cut}%`, value: $(rev.total * (1 - rev.cut / 100)) },
+        { label: 'Per day', value: $(rev.total / n) },
+        { label: 'Best day', value: rev.best ? `${$(rev.best.fresh + rev.best.renew)} · ${shortDate(rev.best.day)}` : '–' },
+        { label: 'Days with revenue', value: `${int(rev.days.length)} of ${int(n)}` },
+        { label: 'Per new purchase', value: rev.purchases ? $(rev.fresh / rev.purchases) : '–' },
+        ...(rev.refunds ? [{ label: 'Refunded purchases', value: int(rev.refunds) }] : []),
+        { label: 'MRR now', value: $(rev.mrr) },
+        { label: 'Renewals due, next 30 days', value: `${$(rev.upcoming)} · ${int(rev.upcomingCharges)}` },
         { label: 'Per paying user, all time', value: s.arppu === null ? '–' : $(s.arppu) },
       ],
-      splits: split('By store', (x) => x.revenue, $),
-      chart: { title: 'Per day', series: revenue, format: $, color: '#c98500' },
+      splits: [
+        {
+          title: 'Where it came from',
+          parts: [
+            { key: 'fresh', label: 'New', value: rev.fresh, color: '#c98500' },
+            { key: 'renew', label: 'Renewals (est.)', value: rev.renew, color: '#199e70' },
+          ],
+          format: $,
+        },
+        { title: 'New, by plan', parts: PLANS.map((p) => ({ key: p.key, label: p.label, value: rev.byPlan[p.key], color: p.color })), format: $ },
+        { title: 'Renewals, by plan', parts: PLANS.map((p) => ({ key: p.key, label: p.label, value: rev.renewByPlan[p.key], color: p.color })), format: $ },
+        ...(rev.stores ? [{ title: 'By store', parts: storeParts(rev.stores.ios, rev.stores.android), format: $ }] : []),
+      ],
+      body: createElement(RevenueBody, { buckets: rev.buckets, monthly: rev.monthly, days: rev.days, format: $ }),
     },
     {
       key: 'impToInstall',
@@ -204,6 +328,19 @@ export function glanceSpecs(snap: Snapshot | null, platform: StoreFilter, b: Sto
       chart: { title: 'Per day', series: ratio('downloads', 'impressions'), format: fmtPct, color: COUNT_COLOR, unknownAfter },
     },
     {
+      key: 'impToPv',
+      label: 'Impression → page view',
+      value: fmtPct(s.tapThrough),
+      change: s.tapThrough !== null && ps.tapThrough !== null && w.deltaOK ? { value: s.tapThrough, base: ps.tapThrough } : null,
+      comparisons: [
+        { label: 'Impressions', value: int(s.impressions) },
+        { label: 'Product page views', value: int(s.pageViews) },
+        { label: `Previous ${n} days`, value: fmtPct(ps.tapThrough) },
+        ...rateRows((x) => x.tapThrough),
+      ],
+      chart: { title: 'Per day', series: ratio('pageViews', 'impressions'), format: fmtPct, color: '#d95926', unknownAfter },
+    },
+    {
       key: 'pvToInstall',
       label: 'Page view → install',
       value: fmtPct(s.ppvConv),
@@ -217,17 +354,34 @@ export function glanceSpecs(snap: Snapshot | null, platform: StoreFilter, b: Sto
       chart: { title: 'Per day', series: ratio('downloads', 'pageViews'), format: fmtPct, color: '#3987e5', unknownAfter },
     },
     {
-      key: 'impToPv',
-      label: 'Impression → page view',
-      value: fmtPct(s.tapThrough),
-      change: s.tapThrough !== null && ps.tapThrough !== null && w.deltaOK ? { value: s.tapThrough, base: ps.tapThrough } : null,
+      key: 'impToPaid',
+      label: 'Impression → paid',
+      value: fmtPct2(paidRate(sr.sales, sr.impressions)),
+      change: paidChange((x) => paidRate(x.sales, x.impressions)),
+      note: paidNote,
       comparisons: [
-        { label: 'Impressions', value: int(s.impressions) },
-        { label: 'Product page views', value: int(s.pageViews) },
-        { label: `Previous ${n} days`, value: fmtPct(ps.tapThrough) },
-        ...rateRows((x) => x.tapThrough),
+        { label: 'Impressions', value: int(sr.impressions) },
+        { label: 'Purchases', value: int(sr.sales) },
+        { label: 'Impressions per purchase', value: sr.sales ? int(sr.impressions / sr.sales) : '–' },
+        { label: `Previous ${n} days`, value: fmtPct2(paidRate(ps.sales, ps.impressions)) },
+        ...paidRows((x) => paidRate(x.sales, x.impressions)),
       ],
-      chart: { title: 'Per day', series: ratio('pageViews', 'impressions'), format: fmtPct, color: '#d95926', unknownAfter },
+      chart: { title: 'Per day', series: ratio('sales', 'impressions'), format: fmtPct2, color: '#c98500', unknownAfter },
+    },
+    {
+      key: 'pvToPaid',
+      label: 'Page view → paid',
+      value: fmtPct2(paidRate(sr.sales, sr.pageViews)),
+      change: paidChange((x) => paidRate(x.sales, x.pageViews)),
+      note: paidNote,
+      comparisons: [
+        { label: 'Product page views', value: int(sr.pageViews) },
+        { label: 'Purchases', value: int(sr.sales) },
+        { label: 'Page views per purchase', value: sr.sales ? int(sr.pageViews / sr.sales) : '–' },
+        { label: `Previous ${n} days`, value: fmtPct2(paidRate(ps.sales, ps.pageViews)) },
+        ...paidRows((x) => paidRate(x.sales, x.pageViews)),
+      ],
+      chart: { title: 'Per day', series: ratio('sales', 'pageViews'), format: fmtPct2, color: '#199e70', unknownAfter },
     },
   ];
 }

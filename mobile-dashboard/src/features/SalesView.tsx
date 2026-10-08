@@ -12,10 +12,12 @@ import { BarChart, SplitBar } from '../components/charts';
 import { MetricTiles, type Change, type MetricSpec } from '../components/MetricTiles';
 import { StackedBars, type Key } from '../components/series';
 import { Card, Divider, Dot, Empty, Pill } from '../components/ui';
+import { DeepDive, DeepDiveGrid } from '../components/DeepDive';
+import { RenewalCalendar } from './RenewalCalendar';
 import { useData } from '../lib/data';
 import { addDays, shortDate } from '../lib/dates';
 import { int, money } from '../lib/format';
-import { bookOn, bookingsOf, daysToBuy, ledger, mrrOf, PLANS, renewals, summarize, type PlanKey, type Renewal, type SalesFilter } from '../lib/sales';
+import { addMonths, bookOn, bookingsOf, daysToBuy, ledger, mrrOf, PLANS, renewals, summarize, type PlanKey, type SalesFilter } from '../lib/sales';
 import type { Sale } from '../lib/types';
 import { rangeDays } from '../lib/usage';
 import { C, num } from '../theme';
@@ -45,9 +47,9 @@ export function SalesView({ dk, range, platform }: { dk: string; range: '7' | '3
     const ps = summarize(l, prevFrom, prevTo);
     const ren = renewals(l, from, dk);
     const renPrev = renewals(l, prevFrom, prevTo);
-    const upcoming = renewals(l, addDays(dk, 1), addDays(dk, 30));
-    // Already charged: the 30 days ending on the selected date, newest first.
-    const recent = renewals(l, addDays(dk, -29), dk).reverse();
+    // A year ahead: as far as one annual term can put a charge.
+    const ahead = renewals(l, addDays(dk, 1), addDays(dk, 365));
+    const upcoming = ahead.filter((x) => x.date <= addDays(dk, 30));
     const ios = platform === 'all' ? bookOn(ledger(snap?.load?.sales, [], 'ios'), dk) : null;
     const android = platform === 'all' ? bookOn(ledger(snap?.load?.sales, [], 'android'), dk) : null;
     // Days for short ranges, months for long ones, so the bars stay readable.
@@ -56,12 +58,17 @@ export function SalesView({ dk, range, platform }: { dk: string; range: '7' | '3
       ? [...new Set(days.map((d) => `${d.slice(0, 7)}-01`))]
       : days;
     const inBucket = (d: string, b: string) => (monthly ? d.slice(0, 7) === b.slice(0, 7) : d === b);
-    return { l, from, days, prevOK, book, book30, s, ps, ren, renPrev, upcoming, recent, ios, android, buckets, inBucket, monthly };
+    return { l, from, days, prevOK, book, book30, s, ps, ren, renPrev, upcoming, ahead, ios, android, buckets, inBucket, monthly };
   }, [snap, dk, range, platform]);
 
   const ch = (a: number, b: number): Change => (m.prevOK ? { value: a, base: b } : null);
   const renTotal = m.ren.reduce((t, r) => t + r.amount, 0);
   const renPrevTotal = m.renPrev.reduce((t, r) => t + r.amount, 0);
+
+  const netNew = m.book.mrr - m.book30.mrr;
+  const [due, setDue] = useState<string | null>(null);
+  const sum = (rs: { amount: number }[]) => rs.reduce((t, x) => t + x.amount, 0);
+  const within = (n: number) => m.ahead.filter((x) => x.date <= addDays(dk, n));
 
   const specs: MetricSpec[] = [
     {
@@ -71,12 +78,37 @@ export function SalesView({ dk, range, platform }: { dk: string; range: '7' | '3
       change: { value: m.book.mrr, base: m.book30.mrr },
       note: 'The rate the book runs at: an annual plan counts as a twelfth of its price. Net of churn.',
       comparisons: [
-        { label: `vs ${shortDate(addDays(m.from, -1))}`, change: { value: m.book.mrr, base: m.book30.mrr } },
+        { label: `vs ${shortDate(addDays(m.from, -1))}`, change: { value: m.book.mrr, base: m.book30.mrr }, format: $ },
         { label: 'ARR', value: $(m.book.arr) },
         { label: 'Monthly plans', value: $(m.book.byPlan.monthly) },
         { label: 'Annual plans', value: $(m.book.byPlan.annual) },
       ],
       splits: m.ios && m.android ? [{ title: 'By store', parts: [{ key: 'I', label: 'iOS', value: m.ios.mrr, color: C.ios }, { key: 'A', label: 'Android', value: m.android.mrr, color: C.android }], format: $ }] : undefined,
+    },
+    {
+      key: 'arr',
+      label: 'ARR',
+      value: $(m.book.arr),
+      change: { value: m.book.arr, base: m.book30.arr },
+      note: 'MRR times twelve: what the book would bring in over a year if nothing changed.',
+      comparisons: [
+        { label: `vs ${shortDate(addDays(m.from, -1))}`, change: { value: m.book.arr, base: m.book30.arr }, format: $ },
+        { label: 'From monthly plans', value: $(m.book.byPlan.monthly * 12) },
+        { label: 'From annual plans', value: $(m.book.byPlan.annual * 12) },
+        { label: 'Per active subscription', value: m.book.active ? $(m.book.arr / m.book.active) : '–' },
+      ],
+    },
+    {
+      key: 'netNew',
+      label: 'Net new MRR',
+      value: `${netNew >= 0 ? '+' : ''}${$(netNew)}`,
+      note: 'How far the book moved over the range: MRR added by new purchases, less what churned.',
+      comparisons: [
+        { label: `MRR on ${shortDate(addDays(m.from, -1))}`, value: $(m.book30.mrr) },
+        { label: 'MRR now', value: $(m.book.mrr) },
+        { label: 'Churned in range', value: $(m.s.churnedMrr) },
+        { label: 'Added in range', value: $(netNew + m.s.churnedMrr) },
+      ],
     },
     {
       key: 'active',
@@ -110,7 +142,6 @@ export function SalesView({ dk, range, platform }: { dk: string; range: '7' | '3
       note: 'Nothing reports renewals, so every subscription not marked cancelled is assumed to renew each term.',
       comparisons: [
         { label: 'Charges', value: int(m.ren.length) },
-        { label: 'Last 30 days', value: $(m.recent.reduce((t, r) => t + r.amount, 0)) },
         { label: 'Next 30 days', value: $(m.upcoming.reduce((t, r) => t + r.amount, 0)) },
       ],
     },
@@ -192,10 +223,6 @@ export function SalesView({ dk, range, platform }: { dk: string; range: '7' | '3
       </Card>
 
       <Card>
-        <StackedBars title="Purchases by plan" keys={planKeys(['monthly', 'annual', 'lifetime', 'unknown'])} rows={unitRows} xLabel={xl} summary={`${int(m.s.totalUnits)} purchases`} />
-      </Card>
-
-      <Card>
         <StackedBars
           title="Churn"
           keys={[
@@ -209,117 +236,149 @@ export function SalesView({ dk, range, platform }: { dk: string; range: '7' | '3
         />
       </Card>
 
-      <Card title="Renewals">
-        <Text style={s.subhead}>
-          Upcoming · next 30 days{m.upcoming.length ? ` · ${int(m.upcoming.length)} · ${$(m.upcoming.reduce((t, r) => t + r.amount, 0))}` : ''}
-        </Text>
-        <RenewalList list={m.upcoming} format={$} empty="Nothing due in the next 30 days." />
-        <Text style={s.subhead}>
-          Renewed · {shortDate(addDays(dk, -29))} – {shortDate(dk)}
-          {m.recent.length ? ` · ${int(m.recent.length)} · ${$(m.recent.reduce((t, r) => t + r.amount, 0))}` : ''}
-        </Text>
-        <RenewalList list={m.recent} format={$} empty="Nothing renewed in these 30 days." />
-        <Text style={s.note}>
-          Estimated: each subscription not marked cancelled renewing on its own date. Pick an earlier day in the calendar to see older renewals.
-        </Text>
-      </Card>
-
-      <Card>
-        <BarChart
-          title="How long people take to buy"
-          series={buy.buckets.map((b) => ({ day: b.label, value: b.value }))}
-          summary={`${int(buy.total - buy.without)} with an install date`}
-          xLabel={(k) => k}
-          color="#199e70"
-        />
-        <Text style={s.note}>
-          Days between installing and paying.{buy.without ? ` ${int(buy.without)} of ${int(buy.total)} purchases carry no install date and are left out.` : ''}
-        </Text>
-      </Card>
-
-      <Card title="Plan mix">
-        <SplitBar parts={PLANS.map((p) => ({ key: p.key, label: p.label, value: m.s.units[p.key], color: p.color }))} format={int} />
-        <Text style={s.subhead}>Live now</Text>
-        <SplitBar
-          parts={[
-            { key: 'monthly', label: 'Monthly', value: m.book.activeByPlan.monthly, color: PLANS[0].color },
-            { key: 'annual', label: 'Annual', value: m.book.activeByPlan.annual, color: PLANS[1].color },
-          ]}
-          format={int}
-        />
-      </Card>
-
-      <Card title={`Every purchase in range · ${list.length}`}>
-        {list.length ? (
-          list.slice(0, 60).map((r, i) => (
-            <View key={r.id}>
-              {i ? <Divider /> : null}
-              <Pressable onPress={() => setEditing(r)} style={({ pressed }) => [s.row, pressed && { opacity: 0.6 }]}>
-                <Dot color={r.platform === 'ios' ? C.ios : C.android} />
-                <View style={{ flex: 1 }}>
-                  <Text style={s.rowTitle}>
-                    {PLANS.find((p) => p.key === r.plan)?.label}
-                    {r.qty > 1 ? ` ×${r.qty}` : ''}
-                  </Text>
-                  <Text style={s.rowSub}>
-                    {[shortDate(r.date), r.cohort ? `installed ${shortDate(r.cohort)}` : null, r.cancelled ? `cancelled ${shortDate(r.cancelled)}` : null]
-                      .filter(Boolean)
-                      .join(' · ')}
-                  </Text>
+      <DeepDiveGrid>
+        <DeepDive icon="arrow.clockwise" title="Renewals" sub={`${$(sum(m.upcoming))} due in the next 30 days · ${int(m.upcoming.length)} ${m.upcoming.length === 1 ? 'charge' : 'charges'}`}>
+          <Card>
+            <View style={s.stats}>
+              {([7, 30, 90, 365] as const).map((n) => (
+                <View key={n} style={s.stat}>
+                  <Text style={s.statLabel}>{n === 365 ? 'Next year' : `Next ${n} days`}</Text>
+                  <Text style={[s.statValue, num]}>{$(sum(within(n)))}</Text>
+                  <Text style={[s.statSub, num]}>{int(within(n).length)} due</Text>
                 </View>
-                {r.refunded ? <Pill label="REFUNDED" color={C.down} /> : null}
-                <Text style={[s.rowValue, num]}>{$(r.price * r.qty)}</Text>
-              </Pressable>
+              ))}
             </View>
-          ))
-        ) : (
-          <Empty>No purchases in this range.</Empty>
-        )}
-      </Card>
+            <Text style={s.note}>Estimated: nothing reports a renewal, so each subscription not marked cancelled is assumed to renew on its own date.</Text>
+          </Card>
 
-      <SaleEditor sale={editing} onClose={() => setEditing(null)} />
+          <Card>
+            <BarChart
+              title="Coming up, next 30 days"
+              series={Array.from({ length: 30 }, (_, i) => addDays(dk, i + 1)).map((d) => ({ day: d, value: sum(m.ahead.filter((x) => x.date === d)) }))}
+              summary={$(sum(m.upcoming))}
+              format={$}
+              color="#199e70"
+            />
+          </Card>
+
+          <Card title="Renewal calendar">
+            <RenewalCalendar from={dk} renewals={m.ahead} format={$} selected={due} onSelect={setDue} />
+            <Text style={s.note}>Each day shows the dollars due on it. Tap one to see what is renewing.</Text>
+          </Card>
+
+          <Card>
+            <BarChart
+              title="By month, next 12 months"
+              series={Array.from({ length: 12 }, (_, i) => addMonths(`${addDays(dk, 1).slice(0, 7)}-01`, i)).map((mo) => ({
+                day: mo,
+                value: sum(m.ahead.filter((x) => x.date.slice(0, 7) === mo.slice(0, 7))),
+              }))}
+              summary={$(sum(m.ahead))}
+              format={$}
+              color="#199e70"
+              xLabel={(k) => `${shortDate(k).split(' ')[0]} ${k.slice(2, 4)}`}
+            />
+          </Card>
+
+          <Card title="Upcoming renewals · next 30 days">
+            {m.upcoming.length ? (
+              m.upcoming.map((r, i) => (
+                <View key={`${r.sale.id}-${r.date}`}>
+                  {i ? <Divider /> : null}
+                  <View style={s.row}>
+                    <Dot color={PLANS.find((p) => p.key === r.plan)?.color || C.dim} />
+                    <Text style={s.rowTitle}>{shortDate(r.date)}</Text>
+                    <Text style={s.rowSub}>
+                      {r.plan === 'annual' ? 'Annual' : 'Monthly'} · {r.sale.platform === 'ios' ? 'iOS' : 'Android'}
+                    </Text>
+                    <Text style={[s.rowValue, num]}>{$(r.amount)}</Text>
+                  </View>
+                </View>
+              ))
+            ) : (
+              <Empty>Nothing due in the next 30 days.</Empty>
+            )}
+            <Text style={s.note}>Estimated: each live subscription renewing on its own date.</Text>
+          </Card>
+
+        </DeepDive>
+
+        <DeepDive icon="cart" title="Purchases" sub={`${int(list.length)} in range · ${$(m.s.totalBookings)}`}>
+          <Card>
+            <StackedBars title="Purchases by plan" keys={planKeys(['monthly', 'annual', 'lifetime', 'unknown'])} rows={unitRows} xLabel={xl} summary={`${int(m.s.totalUnits)} purchases`} />
+          </Card>
+
+          <Card>
+            <BarChart
+              title="How long"
+              series={buy.buckets.map((b) => ({ day: b.label, value: b.value }))}
+              summary={`${int(buy.total - buy.without)} with an install date`}
+              xLabel={(k) => k}
+              color="#199e70"
+            />
+            <Text style={s.note}>
+              Days between installing and paying.{buy.without ? ` ${int(buy.without)} of ${int(buy.total)} purchases carry no install date and are left out.` : ''}
+            </Text>
+          </Card>
+
+          <Card title="Plan mix">
+            <SplitBar parts={PLANS.map((p) => ({ key: p.key, label: p.label, value: m.s.units[p.key], color: p.color }))} format={int} />
+            <Text style={s.subhead}>Live now</Text>
+            <SplitBar
+              parts={[
+                { key: 'monthly', label: 'Monthly', value: m.book.activeByPlan.monthly, color: PLANS[0].color },
+                { key: 'annual', label: 'Annual', value: m.book.activeByPlan.annual, color: PLANS[1].color },
+              ]}
+              format={int}
+            />
+          </Card>
+
+          <Card title={`Every purchase in range · ${list.length}`}>
+            {list.length ? (
+              list.slice(0, 60).map((r, i) => (
+                <View key={r.id}>
+                  {i ? <Divider /> : null}
+                  <Pressable onPress={() => setEditing(r)} style={({ pressed }) => [s.row, pressed && { opacity: 0.6 }]}>
+                    <Dot color={r.platform === 'ios' ? C.ios : C.android} />
+                    <View style={{ flex: 1 }}>
+                      <Text style={s.rowTitle}>
+                        {PLANS.find((p) => p.key === r.plan)?.label}
+                        {r.qty > 1 ? ` ×${r.qty}` : ''}
+                      </Text>
+                      <Text style={s.rowSub}>
+                        {[shortDate(r.date), r.cohort ? `installed ${shortDate(r.cohort)}` : null, r.cancelled ? `cancelled ${shortDate(r.cancelled)}` : null]
+                          .filter(Boolean)
+                          .join(' · ')}
+                      </Text>
+                    </View>
+                    {r.refunded ? <Pill label="REFUNDED" color={C.down} /> : null}
+                    <Text style={[s.rowValue, num]}>{$(r.price * r.qty)}</Text>
+                  </Pressable>
+                </View>
+              ))
+            ) : (
+              <Empty>No purchases in this range.</Empty>
+            )}
+          </Card>
+
+          {/* Inside the card, so the editor can rise over it. */}
+          <SaleEditor sale={editing} onClose={() => setEditing(null)} />
+        </DeepDive>
+      </DeepDiveGrid>
     </>
   );
 }
 
-/** One line per renewal charge: plan dot, date, plan · store, amount. */
-function RenewalList({ list, format, empty }: { list: Renewal[]; format: (n: number) => string; empty: string }) {
-  const [all, setAll] = useState(false);
-  if (!list.length) return <Empty>{empty}</Empty>;
-  const shown = all ? list : list.slice(0, RENEWALS_SHOWN);
-  return (
-    <View>
-      {shown.map((r, i) => (
-        <View key={`${r.sale.id}-${r.date}`}>
-          {i ? <Divider /> : null}
-          <View style={s.row}>
-            <Dot color={PLANS.find((p) => p.key === r.plan)?.color || C.dim} />
-            <Text style={s.rowTitle}>{shortDate(r.date)}</Text>
-            <Text style={s.rowSub}>
-              {r.plan === 'annual' ? 'Annual' : 'Monthly'} · {r.sale.platform === 'ios' ? 'iOS' : 'Android'}
-            </Text>
-            <Text style={[s.rowValue, num]}>{format(r.amount)}</Text>
-          </View>
-        </View>
-      ))}
-      {list.length > RENEWALS_SHOWN ? (
-        <Pressable hitSlop={8} onPress={() => setAll((a) => !a)} style={({ pressed }) => [s.more, pressed && { opacity: 0.6 }]}>
-          <Text style={s.moreText}>{all ? 'Show fewer' : `Show all ${int(list.length)}`}</Text>
-        </Pressable>
-      ) : null}
-    </View>
-  );
-}
-
-const RENEWALS_SHOWN = 10;
-
 const s = StyleSheet.create({
   note: { color: C.muted, fontSize: 12, lineHeight: 17 },
+  stats: { flexDirection: 'row', flexWrap: 'wrap', rowGap: 14 },
+  stat: { width: '50%' },
+  statLabel: { color: C.dim, fontSize: 12 },
+  statValue: { color: C.text, fontSize: 22, fontWeight: '700', letterSpacing: -0.4, marginTop: 1 },
+  statSub: { color: C.muted, fontSize: 12 },
   subhead: { color: C.muted, fontSize: 11, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 4 },
   row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 9 },
   rowTitle: { color: C.text, fontSize: 15, fontWeight: '500' },
   rowSub: { color: C.muted, fontSize: 12, flexShrink: 1 },
   rowValue: { color: C.text, fontSize: 15, fontWeight: '600', marginLeft: 'auto' },
-  more: { paddingVertical: 8, alignItems: 'center' },
-  moreText: { color: C.series, fontSize: 13, fontWeight: '700' },
 });

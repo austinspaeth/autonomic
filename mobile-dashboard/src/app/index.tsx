@@ -1,10 +1,12 @@
 /* The one screen. A sticky date header picks the day, the bottom bar picks
-   the view. At a glance reads the store funnel over a range ending on that
+   the view. On a wide screen (an iPad, a Mac window) nothing is picked: every
+   view is on one board, in columns, under the one date and filter (`Board`).
+   The rest of this note is about what the views read. At a glance reads the store funnel over a range ending on that
    day; the other views read that one day. Every ping counter is per US
    Eastern day. While the selected day is today it is still filling, so the
    ping views give it neutral reference numbers rather than a red/green delta
    against whole days; a past day is complete and gets the delta. */
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useMemo, useState, type ReactNode } from 'react';
 import * as Haptics from 'expo-haptics';
 import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
 import Animated, { FadeIn, FadeInLeft, FadeInRight } from 'react-native-reanimated';
@@ -14,21 +16,22 @@ import { BarChart, Chips, WeekdayChart } from '../components/charts';
 import { DateHeader } from '../components/DateHeader';
 import { FILTER_BAR_GAP, FILTER_BAR_HEIGHT, FilterBar } from '../components/FilterBar';
 import { Card, Screen, Segmented } from '../components/ui';
-import { AccountView } from '../features/AccountView';
 import { glanceSpecs } from '../features/specs';
 import { UsageView } from '../features/UsageView';
 import { SalesView } from '../features/SalesView';
-import { ForecastView } from '../features/ForecastView';
+import { ForecastView, HORIZONS, type Horizon } from '../features/ForecastView';
 import { ErrorsView } from '../features/ErrorsView';
 import { PingsView } from '../features/PingsView';
 import { LinksView } from '../features/LinksView';
+import { CodesView } from '../features/CodesView';
 import { Glide, MetricTiles } from '../components/MetricTiles';
 import { useData } from '../lib/data';
 import { addDays, ago, easternDay, shortDate } from '../lib/dates';
 import { int, money } from '../lib/format';
 import { pingRows } from '../lib/metrics';
 import { buildBase, downloadBuckets, summarize, weekdayStats, type Field, type StoreFilter } from '../lib/store';
-import { useView, VIEWS } from '../lib/views';
+import { noteTop, useView, VIEWS, type ViewKey } from '../lib/views';
+import { useColumns, useWide, WIDE_FILTER_H, WIDE_FILTER_MARGIN } from '../lib/wide';
 import { C } from '../theme';
 
 
@@ -39,6 +42,7 @@ export default function Main() {
   const [picked, setPicked] = useState<string | null>(null);
   const [dir, setDir] = useState<1 | -1>(1);
   const [glance, setGlance] = useState<GlanceState>({ range: '30', mode: 'period', metric: 'downloads', platform: 'all' });
+  const [horizon, setHorizon] = useState<Horizon>('12');
   const patchGlance = useCallback((p: Partial<GlanceState>) => setGlance((g) => ({ ...g, ...p })), []);
   const dk = picked && picked < today ? picked : today;
   const isToday = dk === today;
@@ -69,8 +73,95 @@ export default function Main() {
   /* Views that read a day get the date header; views that read a range of it
      also get the floating range + store filter. */
   const dated = view === 'glance' || view === 'usage' || view === 'sales' || view === 'errors';
-  const filtered = dated;
+  const filtered = dated || view === 'forecast';
   const title = VIEWS.find((v) => v.key === view)?.label;
+  /* Wide: the filter bar floats clear of the bottom edge on its own, always
+     there, and carries the date control. */
+  const wide = useWide();
+  const columns = useColumns();
+  const dateEl = dated && !wide ? <DateHeader dk={dk} today={today} earliest={earliest} intensity={intensity} onChange={onChange} /> : null;
+  const filterRoom = wide ? WIDE_FILTER_H + WIDE_FILTER_MARGIN + 10 : !filtered ? 0 : FILTER_BAR_HEIGHT + FILTER_BAR_GAP;
+
+  /* One view's cards. A phone shows one of these; the board shows them all. */
+  const body = (key: ViewKey) =>
+    key === 'usage' ? (
+      <UsageView dk={dk} isToday={isToday} range={glance.range} platform={glance.platform} />
+    ) : key === 'sales' ? (
+      <SalesView dk={dk} range={glance.range} platform={glance.platform} />
+    ) : key === 'errors' ? (
+      <ErrorsView dk={dk} range={glance.range} platform={glance.platform} />
+    ) : key === 'glance' ? (
+      <Glance dk={dk} st={glance} set={patchGlance} />
+    ) : key === 'forecast' ? (
+      <ForecastView platform={glance.platform} horizon={horizon} />
+    ) : key === 'pings' ? (
+      <PingsView />
+    ) : key === 'codes' ? (
+      <CodesView />
+    ) : (
+      <LinksView />
+    );
+  const statusEl = (
+    /* A fixed-height row: a spinner slot, the text, and an empty slot of
+       the same width, so the text stays centred and nothing moves when
+       the spinner comes and goes. */
+    <View style={s.status}>
+      <View style={s.statusSlot}>{loading ? <ActivityIndicator size="small" color={C.dim} /> : null}</View>
+      <Text style={s.statusText}>{loading ? 'Updating…' : snap ? `Updated ${ago(snap.at)}` : 'Loading…'}</Text>
+      <View style={s.statusSlot} />
+    </View>
+  );
+  const errorEl = error ? (
+    <Card>
+      <Text style={{ color: C.down, fontSize: 14 }}>{error}</Text>
+    </Card>
+  ) : null;
+
+  if (wide) {
+    return (
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
+        <Screen
+          onRefresh={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            refresh();
+          }}
+          refreshing={false}
+          bottomExtra={filterRoom}
+        >
+          {statusEl}
+          {errorEl}
+          {!snap ? (
+            <Card>
+              <ActivityIndicator color={C.dim} />
+            </Card>
+          ) : (
+            <Board
+              columns={columns}
+              body={body}
+              heads={{
+                // The forecast looks forward, so it has its own span, not the range.
+                forecast: (
+                  <View style={{ width: 230 }}>
+                    <Segmented compact options={HORIZONS} value={horizon} onChange={setHorizon} />
+                  </View>
+                ),
+              }}
+            />
+          )}
+        </Screen>
+        <FilterBar
+          platform={glance.platform}
+          onPlatform={(platform) => patchGlance({ platform })}
+          ranges={RANGES}
+          range={glance.range}
+          onRange={(range) => patchGlance({ range })}
+          date={<DateHeader bare dk={dk} today={today} earliest={earliest} intensity={intensity} onChange={onChange} />}
+        />
+        <ToastStack raisedBy={filterRoom} />
+        <BottomBar />
+      </View>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
@@ -80,26 +171,13 @@ export default function Main() {
           refresh();
         }}
         refreshing={false}
-        bottomExtra={filtered ? FILTER_BAR_HEIGHT + FILTER_BAR_GAP : 0}
-        topBar={dated ? <DateHeader dk={dk} today={today} earliest={earliest} intensity={intensity} onChange={onChange} /> : undefined}
-        title={dated ? undefined : title}
+        bottomExtra={filterRoom}
+        topBar={dateEl ?? undefined}
+        title={dated || view === 'forecast' || view === 'pings' ? undefined : title}
       >
-        {dated ? (
-          /* A fixed-height row: a spinner slot, the text, and an empty slot of
-             the same width, so the text stays centred and nothing moves when
-             the spinner comes and goes. */
-          <View style={s.status}>
-            <View style={s.statusSlot}>{loading ? <ActivityIndicator size="small" color={C.dim} /> : null}</View>
-            <Text style={s.statusText}>{loading ? 'Updating…' : snap ? `Updated ${ago(snap.at)}` : 'Loading…'}</Text>
-            <View style={s.statusSlot} />
-          </View>
-        ) : null}
+        {dated ? statusEl : null}
 
-        {error ? (
-          <Card>
-            <Text style={{ color: C.down, fontSize: 14 }}>{error}</Text>
-          </Card>
-        ) : null}
+        {errorEl}
 
         {!snap ? (
           <Card>
@@ -107,31 +185,17 @@ export default function Main() {
           </Card>
         ) : !dated ? (
           <Animated.View key={view} entering={FadeIn.duration(180)} style={{ gap: 12 }}>
-            {view === 'forecast' ? (
-              <ForecastView platform={glance.platform} />
-            ) : view === 'pings' ? (
-              <PingsView />
-            ) : view === 'links' ? (
-              <LinksView />
-            ) : (
-              <AccountView />
-            )}
+            {body(view)}
           </Animated.View>
         ) : (
           <Animated.View key={`${view}|${dk}`} entering={(dir > 0 ? FadeInRight : FadeInLeft).duration(220)} style={{ gap: 12 }}>
-            {view === 'usage' ? (
-              <UsageView dk={dk} isToday={isToday} range={glance.range} platform={glance.platform} />
-            ) : view === 'sales' ? (
-              <SalesView dk={dk} range={glance.range} platform={glance.platform} />
-            ) : view === 'errors' ? (
-              <ErrorsView dk={dk} range={glance.range} platform={glance.platform} />
-            ) : (
-              <Glance dk={dk} st={glance} set={patchGlance} />
-            )}
+            {body(view)}
           </Animated.View>
         )}
       </Screen>
-      {filtered ? (
+      {view === 'forecast' ? (
+        <FilterBar platform={glance.platform} onPlatform={(platform) => patchGlance({ platform })} ranges={HORIZONS} range={horizon} onRange={setHorizon} />
+      ) : filtered ? (
         <FilterBar
           platform={glance.platform}
           onPlatform={(platform) => patchGlance({ platform })}
@@ -140,8 +204,52 @@ export default function Main() {
           onRange={(range) => patchGlance({ range })}
         />
       ) : null}
-      <ToastStack raisedBy={filtered ? FILTER_BAR_HEIGHT + FILTER_BAR_GAP : 0} />
+      <ToastStack raisedBy={filterRoom} />
       <BottomBar />
+    </View>
+  );
+}
+
+/* Which sections stand in which column, by how many columns there are. Set by
+   hand rather than balanced by measurement: a section must not hop columns as
+   its data loads, and the longest reads (usage, forecast, raw pings) are kept
+   apart so the columns end near each other. */
+const LAYOUTS: Record<number, ViewKey[][]> = {
+  1: [['usage', 'glance', 'sales', 'forecast', 'errors', 'pings', 'links', 'codes']],
+  2: [
+    ['usage', 'sales', 'errors', 'links'],
+    ['glance', 'forecast', 'codes', 'pings'],
+  ],
+  3: [
+    ['usage', 'errors', 'links'],
+    ['glance', 'sales', 'codes'],
+    ['forecast', 'pings'],
+  ],
+};
+
+/**
+ * The wide screen's one page: every view as a titled section, in columns that
+ * fill the window. All of it reads the one date and the one filter, so it is a
+ * single picture of the day rather than eight pages to visit. Each section
+ * reports where it starts, which is what the top bar's jump menu scrolls to.
+ */
+function Board({ columns, body, heads }: { columns: number; body: (key: ViewKey) => ReactNode; heads: Partial<Record<ViewKey, ReactNode>> }) {
+  const layout = LAYOUTS[columns] ?? LAYOUTS[1];
+  return (
+    <View style={s.board} onLayout={(e) => noteTop('board', e.nativeEvent.layout.y)}>
+      {layout.map((keys, i) => (
+        <View key={i} style={s.column}>
+          {keys.map((key) => (
+            <View key={key} style={s.section} onLayout={(e) => noteTop(key, e.nativeEvent.layout.y)}>
+              <View style={s.sectionHead}>
+                <Text style={s.sectionTitle}>{VIEWS.find((v) => v.key === key)?.label}</Text>
+                {heads[key]}
+              </View>
+              {body(key)}
+            </View>
+          ))}
+        </View>
+      ))}
     </View>
   );
 }
@@ -264,6 +372,11 @@ const s_ = StyleSheet.create({
 
 
 const s = StyleSheet.create({
+  board: { flexDirection: 'row', alignItems: 'flex-start', gap: 24 },
+  column: { flex: 1, minWidth: 0, gap: 36 },
+  section: { gap: 14 },
+  sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 34, paddingBottom: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.14)' },
+  sectionTitle: { color: C.text, fontSize: 22, fontWeight: '700', letterSpacing: -0.4 },
   status: { height: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   statusSlot: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
   statusText: { color: C.muted, fontSize: 12, lineHeight: 20 },
@@ -273,5 +386,4 @@ const s = StyleSheet.create({
   heroSub: { color: C.muted, fontSize: 13 },
   tileSub: { color: C.muted, fontSize: 12 },
   foot: { color: C.muted, fontSize: 12, paddingHorizontal: 4 },
-  section: { color: C.dim, fontSize: 13, fontWeight: '600', textTransform: 'uppercase', letterSpacing: 0.6, marginTop: 12, paddingHorizontal: 4 },
 });

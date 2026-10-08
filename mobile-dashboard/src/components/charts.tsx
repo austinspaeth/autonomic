@@ -11,6 +11,7 @@ import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View, type GestureResponderEvent } from 'react-native';
 import Svg, { G, Line, Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
+import { useWide } from '../lib/wide';
 import { C, num } from '../theme';
 import { shortDate } from '../lib/dates';
 import type { Series } from '../lib/metrics';
@@ -24,7 +25,7 @@ function barPath(x: number, y: number, w: number, h: number, r: number) {
 export function BarChart({
   series,
   color = C.series,
-  height = 140,
+  height: heightProp,
   format = (n: number) => String(Math.round(n)),
   title,
   summary,
@@ -49,6 +50,7 @@ export function BarChart({
   /** How an x key reads (defaults to a short date). */
   xLabel?: (key: string) => string;
 }) {
+  const height = heightProp ?? (useWide() ? 230 : 140);
   const [width, setWidth] = useState(0);
   const [sel, setSel] = useState<number | null>(null);
 
@@ -68,6 +70,16 @@ export function BarChart({
   };
 
   const active = sel !== null ? series[sel] : null;
+
+  // Nothing to draw: the title and what it comes to, and no empty plot under them.
+  if (!series.some((p) => p.value > 0)) {
+    return (
+      <View style={[st.head, compact && st.headCompact, { marginBottom: 0 }]}>
+        <Text style={compact ? st.titleCompact : st.title}>{title}</Text>
+        <Text style={[compact ? st.valueCompact : st.value, num]}>{summary}</Text>
+      </View>
+    );
+  }
 
   return (
     <View>
@@ -123,7 +135,8 @@ export function BarChart({
 export type Part = { key: string; label: string; value: number; color: string };
 
 export function SplitBar({ parts, format = (n: number) => String(n) }: { parts: Part[]; format?: (n: number) => string }) {
-  const shown = parts.filter((p) => p.value > 0);
+  // Most first, in the strip and the legend alike (a tie keeps its given order).
+  const shown = parts.filter((p) => p.value > 0).sort((a, b) => b.value - a.value);
   const total = shown.reduce((t, p) => t + p.value, 0);
   if (!total) return <Text style={st.axisText}>Nothing yet</Text>;
   return (

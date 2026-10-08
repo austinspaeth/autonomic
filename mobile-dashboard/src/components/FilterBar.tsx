@@ -1,9 +1,12 @@
 /* The floating filter bar for At a glance, fixed just above the bottom bar:
    one fully rounded pill of dark glass holding
 
-     ( 🍎 🤖 │ 7D  30D  90D  All )
+     ( 🍎 🤖 │ 7D  30D  90D  All )            a phone
+     ( 🍎 🤖 │ 7D  30D  90D  All │ ‹ Today › )   wide
 
-   two round platform toggles and the range control. A platform toggle lights
+   two round platform toggles and the range control, and on a wide screen the
+   date as well, so everything that decides WHAT the board shows is one
+   control and the top bar is left to navigation and actions. A platform toggle lights
    in its store's colour (iOS blue, Android green) and narrows the view to
    that store. Only one is ever on: tapping the other switches to it, tapping
    the lit one clears the filter. */
@@ -15,6 +18,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import type { StoreFilter } from '../lib/store';
+import { useWide, WIDE_FILTER_H, WIDE_FILTER_MARGIN } from '../lib/wide';
 import { C } from '../theme';
 import { BOTTOM_CHROME, SlidingPill } from './ui';
 
@@ -47,7 +51,10 @@ export function FilterBar<R extends string>({
   ranges,
   range,
   onRange,
+  date,
 }: {
+  /** The date control, on a wide screen: it rides at the right end of the bar, past a second rule. */
+  date?: ReactNode;
   platform: StoreFilter;
   onPlatform: (p: StoreFilter) => void;
   ranges: { key: R; label: string }[];
@@ -55,19 +62,23 @@ export function FilterBar<R extends string>({
   onRange: (r: R) => void;
 }) {
   const insets = useSafeAreaInsets();
+  const wide = useWide();
+  const h = wide ? WIDE_FILTER_H : FILTER_BAR_HEIGHT;
+  const inner = h - PAD * 2;
+  const roundSize = { width: inner, height: inner, borderRadius: inner / 2 };
   const toggle = (p: 'ios' | 'android') => {
     Haptics.selectionAsync();
     onPlatform(platform === p ? 'all' : p);
   };
 
   return (
-    <View pointerEvents="box-none" style={[s.wrap, { bottom: insets.bottom + BOTTOM_CHROME + FILTER_BAR_GAP }]}>
-      <Glass style={s.bar}>
+    <View pointerEvents="box-none" style={[s.wrap, { height: h, bottom: wide ? insets.bottom + WIDE_FILTER_MARGIN : insets.bottom + BOTTOM_CHROME + FILTER_BAR_GAP }]}>
+      <Glass style={[s.bar, wide ? null : s.capped, { borderRadius: h / 2 }]}>
         <Pressable
           onPress={() => toggle('ios')}
           accessibilityLabel="Filter to iOS"
           accessibilityState={{ selected: platform === 'ios' }}
-          style={[s.round, platform === 'ios' && { backgroundColor: C.ios }]}
+          style={[s.round, roundSize, platform === 'ios' && { backgroundColor: C.ios }]}
         >
           <SymbolView name="apple.logo" size={18} weight="medium" tintColor="#ffffff" style={{ marginTop: -2 }} />
         </Pressable>
@@ -75,14 +86,15 @@ export function FilterBar<R extends string>({
           onPress={() => toggle('android')}
           accessibilityLabel="Filter to Android"
           accessibilityState={{ selected: platform === 'android' }}
-          style={[s.round, platform === 'android' && { backgroundColor: C.android }]}
+          style={[s.round, roundSize, platform === 'android' && { backgroundColor: C.android }]}
         >
           <Svg width={20} height={20} viewBox="0 0 24 24">
             <Path d={ANDROID_D} fill="#ffffff" />
           </Svg>
         </Pressable>
         <View style={s.divider} />
-        <View style={s.ranges}>
+        {/* A phone's ranges share the bar's width; a wide bar is as long as what it holds. */}
+        <View style={[s.ranges, wide && { flex: 0, width: ranges.length * RANGE_W }]}>
           <SlidingPill count={ranges.length} index={Math.max(0, ranges.findIndex((o) => o.key === range))} style={s.segPill} />
           {ranges.map((o) => {
             const on = o.key === range;
@@ -93,13 +105,19 @@ export function FilterBar<R extends string>({
                   if (!on) Haptics.selectionAsync();
                   onRange(o.key);
                 }}
-                style={s.seg}
+                style={[s.seg, { height: inner }]}
               >
                 <Text style={[s.segText, on && { color: C.text }]}>{o.label}</Text>
               </Pressable>
             );
           })}
         </View>
+        {date ? (
+          <>
+            <View style={s.divider} />
+            {date}
+          </>
+        ) : null}
       </Glass>
     </View>
   );
@@ -107,10 +125,13 @@ export function FilterBar<R extends string>({
 
 /* Inner controls sit inside an even 8pt inset on every side. */
 const PAD = 8;
+/** One range's slot on a wide bar. */
+const RANGE_W = 68;
 const INNER = FILTER_BAR_HEIGHT - PAD * 2;
 
 const s = StyleSheet.create({
-  wrap: { position: 'absolute', left: 16, right: 16, height: FILTER_BAR_HEIGHT },
+  wrap: { position: 'absolute', left: 16, right: 16, height: FILTER_BAR_HEIGHT, alignItems: 'center' },
+  capped: { width: '100%', maxWidth: 520 },
   glass: {
     overflow: 'hidden',
     borderWidth: StyleSheet.hairlineWidth,

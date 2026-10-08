@@ -1,0 +1,784 @@
+{
+  "name": "Tips, lists and dad life",
+  "created": "2026-10-07",
+  "numberFrom": 6,
+  "notes": "Ten slideshows: three single tips (the start of a numbered series), three funny ones (two about parenting with POTS), a word-only one, two that go for the heart, and a morning routine. Every one ends on the app.",
+  "account": {
+    "handle": "POTSDad",
+    "sound": "original sound - POTSDad"
+  },
+  "style": {
+    "type": "bold",
+    "signature": "POTSDad"
+  },
+  "creatives": [
+    {
+      "id": "c1",
+      "name": "Tip 1: water before you stand",
+      "title": "POTS tip #1: water and electrolytes before your feet hit the floor 💧",
+      "goal": "First of a numbered single-tip series. Save-worthy, one idea only.",
+      "caption": "POTS tip #1. One tip at a time, because nobody with brain fog needs a list of 30 🩵 Not medical advice, ask your doctor what's right for you. #pots #potstips #dysautonomia #chronicillness #spoonie",
+      "stats": {
+        "likes": "27.4K",
+        "comments": "611",
+        "saves": "14.8K",
+        "shares": "2,902"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "text": [
+            "POTS tip #1:",
+            "Drink *16 oz of water* before your feet hit the floor.",
+            "Preferably with electrolytes in it. 🧂:awesome:"
+          ],
+          "img": {
+            "src": "img/c1s1.jpg",
+            "pos": "49% 57%",
+            "source": "unsplash",
+            "shows": "A wooden spoon heaped with coarse salt on a near-black surface, a few grains scattered around it, shot from above.",
+            "frame": "Spoon in the lower half, centred; the tip sits in the dark space above it.",
+            "credit": "Unsplash photo 1518110925495-5fe2fda0442c (photographer not looked up yet)",
+            "zoom": 1.45
+          },
+          "copyAt": "top",
+          "overlay": 77,
+          "textY": 26
+        },
+        {
+          "layout": "photo",
+          "text": [
+            "I set it out before bed so it is *ready when I wake up.*",
+            "Electrolytes help boost blood volume, which *steadies your blood pressure* when you stand."
+          ],
+          "fine": "Not medical advice. Ask your doctor about fluids and salt.",
+          "img": {
+            "src": "img/c1s2.jpg",
+            "pos": "28% 84%",
+            "source": "unsplash",
+            "search": "hand reaching water bottle bed",
+            "shows": "A hand reaching for a water bottle from bed, sheets in the frame. No face.",
+            "frame": "Hand and bottle in the top half; the copy covers the darkened bottom.",
+            "zoom": 1.16
+          },
+          "textSize": 0.83,
+          "textY": 295,
+          "overlay": 63
+        },
+        {
+          "layout": "phone",
+          "cta": true,
+          "text": [
+            "I log it so I can see *how fluids impact my POTS.*",
+            "Free app I built, link in bio. 🩵"
+          ],
+          "img": {
+            "src": "img/c1s3.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "The Water sheet: 0.5 L, 2 cups, the first two glasses filled in blue, goal 3 L a day.",
+            "frame": "Full-height screenshot; the two filled glasses sit beside the copy."
+          },
+          "phoneX": -98,
+          "phoneSize": 0.82,
+          "phoneY": -62
+        }
+      ],
+      "music": {
+        "mood": "Calm morning, light and clean",
+        "notes": "Soft, bright and unhurried, like the first ten minutes of a day. Nothing dramatic: a tip should feel like a friend telling you something, not an ad. Pick something you would be happy to reuse on every tip in the series so they are recognisable.",
+        "bpm": "80-95",
+        "search": [
+          "soft morning lofi",
+          "calm acoustic morning",
+          "gentle piano light"
+        ],
+        "file": "audio/c1.mp3",
+        "fileName": "atlasaudio-morning-606267.mp3"
+      }
+    },
+    {
+      "id": "c2",
+      "name": "The POTS dictionary",
+      "title": "The POTS dictionary, volume 1 📖",
+      "goal": "Funny and shareable. People tag the friend who gets it.",
+      "caption": "Words you only learn the hard way 🩵 What would you add to volume 2? #pots #dysautonomia #chronicillnesshumor #spoonie #longcovid",
+      "stats": {
+        "likes": "64.1K",
+        "comments": "4,870",
+        "saves": "9,204",
+        "shares": "11.6K"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "text": [
+            "The POTS dictionary.",
+            "*Words I never wanted to learn.*"
+          ],
+          "img": {
+            "src": "img/c2s1.jpg",
+            "pos": "70% 50%",
+            "source": "unsplash",
+            "shows": "An open dictionary page shot at an angle, shallow focus, the sharp entries on the right.",
+            "frame": "The in-focus column behind the headline; darkened so the print reads as texture.",
+            "credit": "Unsplash photo 1583361704493-d4d4d1b1d70a (photographer not looked up yet)"
+          },
+          "overlay": 100,
+          "textSize": 1.22,
+          "textY": -100
+        },
+        {
+          "layout": "list",
+          "kicker": "POTS dictionary, vol. 1",
+          "text": [
+            "Preload: chugging water before attempting to be a person",
+            "Spoons: energy, but you only get 12",
+            "Coat hanger pain: your neck filing a complaint",
+            "Presyncope: the room carries on without you",
+            "Pacing: quitting while you're ahead, on purpose"
+          ],
+          "img": {
+            "src": "img/c2s2.jpg",
+            "pos": "center",
+            "source": "unsplash",
+            "shows": "Plain white paper with a fine grain.",
+            "frame": "Texture only, behind the list.",
+            "credit": "Unsplash photo 1604147706283-d7119b5b822c (photographer not looked up yet)"
+          }
+        },
+        {
+          "layout": "phone",
+          "cta": true,
+          "text": [
+            "I track all of them, so I *know what helps and what hurts.*",
+            "Free app I built, link in bio. 🩵"
+          ],
+          "img": {
+            "src": "img/c2s3.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "The Journal's Symptoms list (light headed, palpitations, fatigue, brain fog), Triggers and Hydration.",
+            "frame": "Symptoms card beside the copy."
+          },
+          "phoneX": -98,
+          "phoneSize": 0.82
+        }
+      ],
+      "music": {
+        "mood": "Playful and deadpan",
+        "notes": "Something with a wink: plucky strings, a bouncy bass line or a quirky comedy bed. It should make the list read as jokes, so keep it light and steady with no vocals over the list slide.",
+        "bpm": "100-115",
+        "search": [
+          "quirky comedy",
+          "playful pizzicato",
+          "funny upbeat"
+        ],
+        "file": "audio/c2.mp3",
+        "fileName": "vjgalaxy-french-indie-electropop-le-loup-en-amont-deadpan-606781.mp3"
+      }
+    },
+    {
+      "id": "c3",
+      "name": "Things my kids think are normal",
+      "title": "Things my kids think are normal because Dad has POTS 😂",
+      "goal": "Parenting humour. The POTSDad voice at its most itself.",
+      "caption": "They have never once questioned why Dad is on the floor 😂🩵 Chronically ill parents, what's yours? #pots #potsdad #chronicillnessparent #dysautonomia #dadlife",
+      "stats": {
+        "likes": "93.7K",
+        "comments": "6,215",
+        "saves": "7,340",
+        "shares": "15.9K"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "text": [
+            "Things my kids think are *totally normal* because their dad has POTS."
+          ],
+          "img": {
+            "src": "",
+            "pos": "center 30%",
+            "source": "mine",
+            "shows": "You lying flat on the living room or kitchen floor, toys around you, looking at the camera like this is a regular Tuesday.",
+            "frame": "Shot from above or from kid height. Your face in the upper third; the hook goes across the middle."
+          }
+        },
+        {
+          "layout": "list",
+          "kicker": "Normal at our house",
+          "text": [
+            "1. Dad lying on the kitchen floor",
+            "2. Salt on everything",
+            "3. \"Is your heart doing the thing?\"",
+            "4. Hide and seek where Dad always hides lying down",
+            "5. The couch is base camp"
+          ],
+          "img": {
+            "src": "",
+            "pos": "center",
+            "source": "unsplash",
+            "search": "toys on living room floor",
+            "shows": "Kids' toys scattered on a living room floor. No people.",
+            "frame": "Darkened about 85% under the list."
+          }
+        },
+        {
+          "layout": "phone",
+          "cta": true,
+          "text": [
+            "I track my numbers so I know which days are *floor days.*",
+            "Free app I built, link in bio. 🩵"
+          ],
+          "img": {
+            "src": "img/c3s3.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "The Journal home: the Outlook card with the Autonomic score (96), the pacing strip and key figures, giveaway card below.",
+            "frame": "Full-height screenshot from the top."
+          },
+          "phoneSize": 0.82,
+          "phoneX": -86
+        }
+      ],
+      "music": {
+        "mood": "Warm, goofy family comedy",
+        "notes": "A sitcom-ish feel-good bed: ukulele, whistling, hand claps. The joke is affectionate, so nothing sarcastic or sad. A trending 'things my kids think are normal' style sound would work too.",
+        "bpm": "105-120",
+        "search": [
+          "happy ukulele whistle",
+          "family comedy",
+          "feel good quirky"
+        ]
+      }
+    },
+    {
+      "id": "c4",
+      "name": "To the parent on the bench",
+      "title": "To the parent who had to sit down at the playground today",
+      "goal": "Heart strings. Written to be sent to someone.",
+      "caption": "If nobody told you today: showing up counts 🩵 Send this to a parent who needs it. #chronicillnessparent #pots #dysautonomia #longcovid #potsdad",
+      "stats": {
+        "likes": "141K",
+        "comments": "7,902",
+        "saves": "22.6K",
+        "shares": "31.4K"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "text": [
+            "To the parent who had to *sit down* at the playground today."
+          ],
+          "img": {
+            "src": "",
+            "pos": "center 60%",
+            "source": "unsplash",
+            "search": "empty park bench playground",
+            "shows": "An empty bench at the edge of a playground, late afternoon light. No people.",
+            "frame": "Bench in the lower half; the hook sits in the sky or trees above it."
+          },
+          "copyAt": "top"
+        },
+        {
+          "layout": "photo",
+          "text": [
+            "You didn't miss it.",
+            "You were *right there.*"
+          ],
+          "img": {
+            "src": "",
+            "pos": "center 30%",
+            "source": "unsplash",
+            "search": "child on swing from behind",
+            "shows": "A child on a swing or slide seen from behind or far away, no face readable.",
+            "frame": "Child in the top half, as if seen from the bench. Copy over the darkened lower half."
+          }
+        },
+        {
+          "layout": "photo",
+          "text": [
+            "They won't remember that you sat.",
+            "They'll remember *that you came.*"
+          ],
+          "img": {
+            "src": "",
+            "pos": "center 30%",
+            "source": "unsplash",
+            "search": "parent child holding hands close up",
+            "shows": "A small hand holding an adult's hand, close up. No faces.",
+            "frame": "Hands in the upper third; copy underneath."
+          }
+        },
+        {
+          "layout": "phone",
+          "cta": true,
+          "text": [
+            "I pace my days so there's something left *for them.*",
+            "The app I built is in my bio. 🩵"
+          ],
+          "img": {
+            "src": "img/c4s4.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "The Journal home: Outlook card with the score, the pacing strip (1h 21m left of 3h 35m) and key figures.",
+            "frame": "Full-height screenshot from the top; the pacing strip level with the copy."
+          },
+          "phoneSize": 0.82,
+          "phoneX": -86
+        }
+      ],
+      "music": {
+        "mood": "Tender piano, hopeful by the end",
+        "notes": "Sparse and slow under the first slide, a little warmer with each one. It should land as kind rather than sad: the last slide is about having something left, so let it lift there. Instrumental only.",
+        "bpm": "60-72",
+        "search": [
+          "tender piano",
+          "emotional hopeful piano",
+          "soft cinematic strings"
+        ]
+      }
+    },
+    {
+      "id": "c5",
+      "name": "Tip 2: legs up the wall",
+      "title": "POTS tip #2: put your legs up the wall for 10 minutes",
+      "goal": "Second single tip. Something people can do tonight.",
+      "caption": "POTS tip #2. Ten minutes, zero equipment 🩵 Not medical advice, ask your doctor what's right for you. #pots #potstips #dysautonomia #pacing #spoonie",
+      "stats": {
+        "likes": "33.9K",
+        "comments": "742",
+        "saves": "18.2K",
+        "shares": "3,415"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "text": [
+            "POTS tip #2:",
+            "*Legs up the wall.* 10 minutes. That's the whole tip."
+          ],
+          "img": {
+            "src": "",
+            "pos": "center",
+            "source": "unsplash",
+            "search": "legs up the wall pose",
+            "shows": "Someone lying on the floor with their legs up a plain wall, shot from the side or showing legs only. No face.",
+            "frame": "Legs and wall fill the frame; the tip sits over the darkened middle."
+          }
+        },
+        {
+          "layout": "photo",
+          "text": [
+            "Gravity pulls blood into my legs all day.",
+            "For ten minutes, *I make it work for me.*"
+          ],
+          "fine": "Not medical advice. Ask your doctor what's right for you.",
+          "img": {
+            "src": "",
+            "pos": "center 30%",
+            "source": "unsplash",
+            "search": "feet up resting wall socks",
+            "shows": "Feet in socks resting high on a wall, soft indoor light. No face.",
+            "frame": "Feet in the top third; copy across the lower half."
+          }
+        },
+        {
+          "layout": "phone",
+          "cta": true,
+          "text": [
+            "In the app I built, resting like this *buys back time* on my pacing budget.",
+            "Link in bio. 🩵"
+          ],
+          "img": {
+            "src": "img/c5s3.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "The Journal home with the pacing strip (1h 21m left of 3h 35m). Better: a day with a legs-up entry logged, so the strip shows minutes bought back.",
+            "frame": "Pacing strip level with the copy."
+          },
+          "phoneSize": 0.82,
+          "phoneX": -86
+        }
+      ],
+      "music": {
+        "mood": "Calm morning, light and clean",
+        "notes": "Same sound family as tip #1 so the series is recognisable. Slow and restful: this one is about lying down.",
+        "bpm": "70-85",
+        "search": [
+          "soft morning lofi",
+          "calm ambient rest",
+          "gentle piano light"
+        ]
+      }
+    },
+    {
+      "id": "c6",
+      "name": "Harder than cardio",
+      "title": "Things that spike my heart rate more than a workout",
+      "goal": "Funny list that doubles as awareness. Ends on proof.",
+      "caption": "I am not out of shape, my nervous system is just dramatic 😅🩵 #pots #dysautonomia #chronicillnesshumor #longcovid #spoonie",
+      "stats": {
+        "likes": "71.3K",
+        "comments": "3,960",
+        "saves": "8,117",
+        "shares": "9,480"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "text": [
+            "Things that spike my heart rate *more than a workout.*"
+          ],
+          "img": {
+            "src": "",
+            "pos": "center 65%",
+            "source": "unsplash",
+            "search": "laundry basket folded clothes",
+            "shows": "A laundry basket half folded, sitting on a bed or couch. No people.",
+            "frame": "Basket in the lower half, hook above it."
+          },
+          "copyAt": "top"
+        },
+        {
+          "layout": "list",
+          "kicker": "Harder than cardio",
+          "text": [
+            "1. Standing in line",
+            "2. A hot shower",
+            "3. Folding laundry",
+            "4. Tying a tiny shoe",
+            "5. The stairs. Just the stairs."
+          ],
+          "img": {
+            "src": "",
+            "pos": "center",
+            "source": "unsplash",
+            "search": "staircase minimal",
+            "shows": "A plain indoor staircase, looking up.",
+            "frame": "Darkened about 85% under the list."
+          }
+        },
+        {
+          "layout": "phone",
+          "cta": true,
+          "text": [
+            "I'm not out of shape. *I have the receipts.*",
+            "Free app in bio to record yours. 🩵"
+          ],
+          "img": {
+            "src": "img/c6s3.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "A POTS Test result: sustained HR rise +45 bpm (bad), the heart rate trace jumping at the stand, baseline 66, peak 118.",
+            "frame": "The +45 and the trace beside the copy."
+          },
+          "phoneX": -109,
+          "phoneSize": 0.92
+        }
+      ],
+      "music": {
+        "mood": "Fake-epic workout energy",
+        "notes": "The joke is the mismatch: gym-montage intensity over folding laundry. An over-the-top motivational or training beat, played straight. Drop to something softer on the last slide if the sound allows.",
+        "bpm": "120-140",
+        "search": [
+          "epic workout motivation",
+          "training montage",
+          "dramatic sports"
+        ]
+      }
+    },
+    {
+      "id": "c7",
+      "name": "But you look fine",
+      "title": "\"But you look fine\" 🙃",
+      "goal": "Two slides, almost all words. Quick, quotable, shareable.",
+      "caption": "Looking fine is a full-time job 🙃🩵 #pots #dysautonomia #chronicillness #longcovid #spoonie",
+      "stats": {
+        "likes": "58.6K",
+        "comments": "2,744",
+        "saves": "5,930",
+        "shares": "12.2K"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "text": [
+            "\"But you look fine.\"",
+            "Thanks. It took *2 liters of water, a lot of salt and a nap.*"
+          ],
+          "img": {
+            "src": "",
+            "pos": "center 25%",
+            "source": "mine",
+            "shows": "You looking perfectly fine: a polite, slightly tired smile straight at the camera.",
+            "frame": "Face in the upper third. The deadpan is the joke, so don't oversell it."
+          }
+        },
+        {
+          "layout": "phone",
+          "cta": true,
+          "text": [
+            "What I look like and what my body is doing are *two different things.*",
+            "I track the second one. Free app in bio. 🩵"
+          ],
+          "img": {
+            "src": "img/c7s2.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "The Journal home: Outlook card with the score, pacing strip, HRV / resting HR / sleep tiles.",
+            "frame": "Full-height screenshot from the top."
+          },
+          "phoneSize": 0.82,
+          "phoneX": -86
+        }
+      ],
+      "music": {
+        "mood": "Dry, deadpan, short",
+        "notes": "Two slides, so the sound does a lot of the work. A deadpan trending sound or a short awkward-pause comedy sting fits best.",
+        "bpm": "90-105",
+        "search": [
+          "awkward comedy",
+          "deadpan funny",
+          "sarcastic lofi"
+        ]
+      }
+    },
+    {
+      "id": "c8",
+      "name": "What counts as a win now",
+      "title": "What counts as a win when you're chronically ill",
+      "goal": "Heart strings through a list. Gentle, a little proud.",
+      "caption": "Old me would not understand this list. Current me is proud of every line 🩵 What was your win today? #pots #dysautonomia #chronicillness #longcovid #smallwins",
+      "stats": {
+        "likes": "104K",
+        "comments": "8,331",
+        "saves": "16.4K",
+        "shares": "13.7K"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "text": [
+            "The old me wouldn't believe *what I count as a win now.*"
+          ],
+          "img": {
+            "src": "",
+            "pos": "center 30%",
+            "source": "mine",
+            "shows": "You doing something small and ordinary: stirring a pot, tying a kid's shoe, standing at the door with a backpack.",
+            "frame": "Candid, not posed. You in the upper half; the hook across the darkened middle."
+          }
+        },
+        {
+          "layout": "list",
+          "kicker": "This week's wins",
+          "text": [
+            "1. Showered standing up",
+            "2. Made dinner, and ate it too",
+            "3. Stood through school pickup",
+            "4. Read the bedtime story sitting up",
+            "5. Still had something left at 7pm"
+          ],
+          "img": {
+            "src": "",
+            "pos": "center",
+            "source": "unsplash",
+            "search": "warm evening window light wall",
+            "shows": "Warm evening light falling on a plain wall or curtain.",
+            "frame": "Darkened about 85% under the list."
+          }
+        },
+        {
+          "layout": "phone",
+          "cta": true,
+          "text": [
+            "I write them down so the bad days *can't erase them.*",
+            "Free app I built, link in bio. 🩵"
+          ],
+          "img": {
+            "src": "",
+            "pos": "center top",
+            "source": "app",
+            "shows": "The Milestones sheet with a run of achieved milestones (47 of 75).",
+            "frame": "Raw full-height screenshot, achieved rows in the top two thirds."
+          },
+          "phoneSize": 0.82,
+          "phoneX": -86
+        }
+      ],
+      "music": {
+        "mood": "Soft, proud, a little bittersweet",
+        "notes": "Warm acoustic guitar or felt piano. It should feel like a quiet pat on the back, not a sad montage. Steady through the list.",
+        "bpm": "70-85",
+        "search": [
+          "warm acoustic hopeful",
+          "felt piano gentle",
+          "soft indie folk instrumental"
+        ]
+      }
+    },
+    {
+      "id": "c9",
+      "name": "Tip 3: on a good day, do half",
+      "title": "POTS tip #3: on a good day, do half",
+      "goal": "Third single tip. The pacing one, and the most natural lead into the app.",
+      "caption": "POTS tip #3, and the one that took me longest to learn 🩵 Good days are where crashes are made. #pots #pacing #mecfs #longcovid #dysautonomia",
+      "stats": {
+        "likes": "45.2K",
+        "comments": "1,930",
+        "saves": "24.7K",
+        "shares": "6,208"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "text": [
+            "POTS tip #3:",
+            "On a good day, *do half* of what you think you can."
+          ],
+          "img": {
+            "src": "",
+            "pos": "center",
+            "source": "unsplash",
+            "search": "to do list notebook half crossed off",
+            "shows": "A handwritten to-do list with only the first few items crossed off.",
+            "frame": "List in the lower half; the tip in the space above."
+          },
+          "copyAt": "top"
+        },
+        {
+          "layout": "photo",
+          "text": [
+            "A good day feels like a chance to catch up.",
+            "*That's the trap.* The bill shows up two days later."
+          ],
+          "img": {
+            "src": "",
+            "pos": "center 30%",
+            "source": "unsplash",
+            "search": "messy garage boxes project",
+            "shows": "A half-finished chore: boxes in a garage, a mower on a half-cut lawn. No people.",
+            "frame": "The unfinished job in the top half; copy over the lower half."
+          }
+        },
+        {
+          "layout": "phone",
+          "cta": true,
+          "text": [
+            "So I let my numbers set the limit, *not my mood.*",
+            "The app I built gives me a daily pacing budget. Link in bio. 🩵"
+          ],
+          "img": {
+            "src": "img/c9s3.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "The Journal home: Outlook card and the pacing strip, 1h 21m left of 3h 35m, ahead of pace.",
+            "frame": "Pacing strip level with the copy."
+          },
+          "phoneSize": 0.82,
+          "phoneX": -86
+        }
+      ],
+      "music": {
+        "mood": "Calm morning, light and clean",
+        "notes": "Same sound family as tips #1 and #2. A touch more thoughtful on slide 2, where the trap lands.",
+        "bpm": "80-95",
+        "search": [
+          "soft morning lofi",
+          "thoughtful lofi piano",
+          "calm acoustic"
+        ]
+      }
+    },
+    {
+      "id": "c10",
+      "name": "My morning routine, as a dad with POTS",
+      "title": "My morning routine as a dad with POTS ☀️",
+      "goal": "Routine format with a punchline, and the app shown doing its actual job.",
+      "caption": "Step 5 is not optional and not up to me 😂🩵 #pots #potsdad #morningroutine #dysautonomia #hrv",
+      "stats": {
+        "likes": "52.8K",
+        "comments": "2,105",
+        "saves": "11.9K",
+        "shares": "5,774"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "text": [
+            "My morning routine as *a dad with POTS.*"
+          ],
+          "img": {
+            "src": "",
+            "pos": "center 30%",
+            "source": "mine",
+            "shows": "You in bed, just awake, hair a mess, squinting at the camera.",
+            "frame": "Face in the upper third, pillow and blanket in frame. Morning light."
+          }
+        },
+        {
+          "layout": "list",
+          "kicker": "Every single morning",
+          "text": [
+            "1. Wake up. Do not stand up.",
+            "2. Water and salt, still in bed",
+            "3. HRV reading before anything else",
+            "4. Stand up like I'm defusing a bomb",
+            "5. Kids have been up for an hour"
+          ],
+          "img": {
+            "src": "",
+            "pos": "center",
+            "source": "unsplash",
+            "search": "rumpled bed sheets morning light",
+            "shows": "Rumpled sheets in morning light. No people.",
+            "frame": "Darkened about 85% under the list."
+          }
+        },
+        {
+          "layout": "phone",
+          "text": [
+            "Step 3 takes a few minutes and tells me *what kind of day it's going to be.*"
+          ],
+          "img": {
+            "src": "img/c10s3.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "Progress, HRV section: the daily RMSSD line with the 'Healthy 38 year old men' range under it.",
+            "frame": "HRV chart beside the copy."
+          },
+          "phoneX": -67,
+          "phoneY": -119
+        },
+        {
+          "layout": "phone",
+          "cta": true,
+          "text": [
+            "Then I know how much dad *I've got today.*",
+            "Free app I built, link in bio. 🩵"
+          ],
+          "img": {
+            "src": "img/c10s4.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "The Journal home: Outlook card with the score, pacing strip, HRV / resting HR / sleep tiles.",
+            "frame": "Full-height screenshot from the top."
+          },
+          "phoneSize": 0.82,
+          "phoneX": -86
+        }
+      ],
+      "music": {
+        "mood": "Bright morning-routine pop, slightly ironic",
+        "notes": "The classic upbeat 'that girl' morning routine sound, played against a routine where step one is not standing up. Keep it bouncy all the way through.",
+        "bpm": "105-120",
+        "search": [
+          "morning routine aesthetic",
+          "upbeat happy pop instrumental",
+          "sunny vlog"
+        ]
+      }
+    }
+  ]
+}
