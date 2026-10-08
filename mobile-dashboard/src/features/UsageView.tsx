@@ -18,9 +18,10 @@ import { Chips, WeekdayChart, BarChart } from '../components/charts';
 import { Lines, OverlayBars, StackedBars, type Key } from '../components/series';
 import { MetricTiles, type Change, type Comparison, type MetricSpec } from '../components/MetricTiles';
 import { Card, Divider, Segmented } from '../components/ui';
+import { PaceGauge } from '../components/PaceGauge';
 import { useData } from '../lib/data';
-import { addDays, shortDate } from '../lib/dates';
-import { int } from '../lib/format';
+import { addDays, easternDayFraction, shortDate } from '../lib/dates';
+import { int, one } from '../lib/format';
 import type { PingKind } from '../lib/types';
 import {
   activation,
@@ -286,8 +287,15 @@ function rangeChange(ctx: Ctx, f: (d: string) => number | null): Change {
 }
 
 const series = (days: string[], f: (d: string) => number | null) => days.map((d) => ({ day: d, value: f(d) ?? 0 }));
+/* Lists read most to least; a bucket that names nothing (unknown, no store,
+   not stated) stays last whatever its size. */
+const UNNAMED = new Set(['?', 'U']);
+const byTotal = (a: { total: number }, b: { total: number }) => b.total - a.total;
 const parts = (keys: Key[], counts: Record<string, number>) =>
-  keys.filter((k) => counts[k.key]).map((k) => ({ key: k.key, label: k.label, value: counts[k.key], color: k.color }));
+  keys
+    .filter((k) => counts[k.key])
+    .map((k) => ({ key: k.key, label: k.label, value: counts[k.key], color: k.color }))
+    .sort((a, b) => Number(UNNAMED.has(a.key)) - Number(UNNAMED.has(b.key)) || b.value - a.value);
 
 /* ============================================================ ON <DAY> */
 
@@ -312,6 +320,15 @@ function TodaySection({ ix, ctx, isToday }: { ix: UsageIndex; ctx: Ctx; isToday:
       format: int,
       color,
     });
+    /* Today only: is the day so far keeping up with the range's average day?
+       The average leaves today out, since it is the thing being judged. */
+    const fraction = easternDayFraction();
+    const pace = (fn: (d: string) => number | null) => {
+      if (!isToday) return undefined;
+      const vals = ctx.days.filter((d) => d !== day).map(fn).filter((v): v is number => v !== null);
+      const avg = vals.length ? vals.reduce((a, b) => a + b, 0) / vals.length : null;
+      return <PaceGauge now={fn(day) ?? 0} avg={avg} fraction={fraction} format={(n) => (Number.isInteger(n) ? int(n) : one(n))} />;
+    };
     const V = sub?.evidence.V ?? 0;
     const S = sub?.evidence.S ?? 0;
     return [
@@ -322,6 +339,7 @@ function TodaySection({ ix, ctx, isToday }: { ix: UsageIndex; ctx: Ctx; isToday:
         change: headline((d) => activeOn(ix, d)),
         wide: true,
         comparisons: d7((d) => activeOn(ix, d)),
+        extra: pace((d) => activeOn(ix, d)),
         splits: [
           { title: 'Who', parts: parts(WHO, { back: Math.max(0, active - fresh), fresh }), format: int },
           { title: 'Store', parts: parts(STORES, entry(ix, 'open', day)?.platforms ?? {}), format: int },
@@ -335,6 +353,7 @@ function TodaySection({ ix, ctx, isToday }: { ix: UsageIndex; ctx: Ctx; isToday:
         change: headline((d) => newOn(ix, d)),
         note: 'First runs: installs the counter had never seen before.',
         comparisons: d7((d) => newOn(ix, d)),
+        extra: pace((d) => newOn(ix, d)),
         splits: [{ title: 'Store', parts: parts(STORES, entry(ix, 'open', day)?.fresh ?? {}), format: int }],
         chart: chart('Over the range', (d) => newOn(ix, d), '#199e70'),
       },
@@ -615,7 +634,9 @@ function RangeSection({
         const act = ds.reduce((t, d) => t + activeOn(ix, d), 0);
         return { label: ln.label, value: int(total), sub: act ? `${pct((total / act) * 100, 1)} of active install-days` : undefined, total };
       })
-      .filter((r) => r.total > 0);
+      .filter((r) => r.total > 0)
+      .sort(byTotal);
+  const firstFailures = days.reduce((t, d) => t + (knownTotal(ix, 'err', d) ?? 0), 0);
   const plat = platformsOver(ix, 'open', days);
 
   // Weekday pattern: Monday-first averages, with the most recent of each.
@@ -823,13 +844,14 @@ function RangeSection({
             ...(['A', 'F'] as const)
               .map((L) => ({ L, f: offerFunnel(ix, days, L) }))
               .filter((x) => x.f.shown > 0)
+              .sort((a, b) => b.f.shown - a.f.shown)
               .map(({ L, f }) => ({ label: L === 'A' ? 'Half-off annual' : 'Founding member', value: `${pct(f.acceptPct)} accepted`, sub: `${int(f.shown)} shown · ${int(f.dismissed)} dismissed` })),
           ]}
         />
       </Card>
 
       <Card title="What people do in there">
-        <Rows rows={[...lineRows(DO_LINES), { label: 'Installs reporting a first failure', value: int(days.reduce((t, d) => t + (knownTotal(ix, 'err', d) ?? 0), 0)) }]} />
+        <Rows rows={[...lineRows(DO_LINES), { label: 'Installs reporting a first failure', value: int(firstFailures), total: firstFailures }].sort(byTotal)} />
         <Note>Each line is a headcount for that one thing; somebody who did two of them is in both.</Note>
       </Card>
 

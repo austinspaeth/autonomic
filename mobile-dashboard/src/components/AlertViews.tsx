@@ -20,7 +20,7 @@ import { BlurView } from 'expo-blur';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PLAN_CHIP, SENSOR_CHIP, STORE_CHIP, TIER, type AlertEvent, type AlertRow } from '../lib/alerts';
+import { deckOrder, PLAN_CHIP, SENSOR_CHIP, STORE_CHIP, TIER, type AlertEvent, type AlertRow } from '../lib/alerts';
 import { useAlerts } from '../lib/alertsStore';
 import { longDate } from '../lib/dates';
 import { C, num } from '../theme';
@@ -103,13 +103,6 @@ export function InstallRows({ event }: { event: AlertEvent }) {
    one comes forward; the details are in the bell's history. Nothing bounces:
    a card DESCENDS onto the deck (it fades in while settling down from
    slightly larger and higher to its place) and the others ease into theirs. */
-
-/** Front to back. A kind not listed goes behind all of these. */
-const TOAST_PRIORITY: AlertEvent['kind'][] = ['crash', 'sale', 'record', 'download', 'visitor', 'reading'];
-const rank = (k: AlertEvent['kind']) => {
-  const i = TOAST_PRIORITY.indexOf(k);
-  return i < 0 ? TOAST_PRIORITY.length : i;
-};
 
 const TOAST_H = 86;
 /** How much of each card behind shows above the one in front of it. */
@@ -259,13 +252,7 @@ export function ToastStack({ raisedBy = 0 }: { raisedBy?: number }) {
   const insets = useSafeAreaInsets();
   const { history, live, dismiss, dismissAll } = useAlerts();
   const [frontH, setFrontH] = useState(TOAST_H);
-  // Most important first, newest first within a kind (`live` is in arrival
-  // order, and the sort is stable).
-  const shown = [...live]
-    .reverse()
-    .map((id) => history.find((e) => e.id === id))
-    .filter((e): e is AlertEvent => !!e)
-    .sort((a, b) => rank(a.kind) - rank(b.kind));
+  const shown = deckOrder(live, history);
   if (!shown.length) return null;
   const bottom = insets.bottom + BOTTOM_CHROME + raisedBy + 10;
   const behind = Math.min(shown.length - 1, MAX_DEPTH - 1);

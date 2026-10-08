@@ -1,7 +1,19 @@
 /* Form pieces for the sheets that WRITE (adding store data, a sale, churn, a
  * campaign link). Plain and big: these are filled in one-handed on a phone. */
-import { useState, type ReactNode } from 'react';
-import { ActivityIndicator, Pressable, StyleSheet, Text, TextInput, View, type KeyboardTypeOptions } from 'react-native';
+import { createContext, useCallback, useContext, useEffect, useRef, useState, type ReactNode } from 'react';
+import {
+  ActivityIndicator,
+  Keyboard,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+  type KeyboardTypeOptions,
+  type TextInputProps,
+  type ScrollViewProps,
+} from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -9,6 +21,107 @@ import { addDays, easternDay, longDate } from '../lib/dates';
 import { C } from '../theme';
 import { Calendar } from './Calendar';
 import { Segmented } from './ui';
+
+/* ------------------------------------------------------- keyboard-aware scroll */
+
+/* A focused input scrolls itself clear of the keyboard, and dragging the form
+   puts the keyboard away. Inputs find the scroll through context, so a form
+   needs no wiring beyond living inside a FormScroll (every Sheet provides
+   one). The input is measured in WINDOW coordinates against the keyboard's
+   top edge, which holds whether or not the platform resized the window. */
+type Reveal = (node: View | TextInput | null) => void;
+const RevealCtx = createContext<Reveal | null>(null);
+
+/** Gap kept between a focused input and the top of the keyboard. */
+const KEYBOARD_GAP = 24;
+
+export function FormScroll({ children, adjustInsets = true, ...rest }: ScrollViewProps & { adjustInsets?: boolean }) {
+  const ref = useRef<ScrollView>(null);
+  const offset = useRef(0);
+  const kbTop = useRef<number | null>(null);
+  const pending = useRef<View | TextInput | null>(null);
+
+  const run = useCallback(() => {
+    const node = pending.current;
+    if (!node || kbTop.current === null) return;
+    pending.current = null;
+    // A beat for the inset (or the lifted card) to settle before measuring.
+    setTimeout(() => {
+      node.measureInWindow((_x, y, _w, h) => {
+        const top = kbTop.current;
+        if (top === null) return;
+        const over = y + h + KEYBOARD_GAP - top;
+        if (over > 0) ref.current?.scrollTo({ y: offset.current + over, animated: true });
+      });
+    }, 60);
+  }, []);
+
+  useEffect(() => {
+    const show = Keyboard.addListener('keyboardDidShow', (e) => {
+      kbTop.current = e.endCoordinates.screenY;
+      run();
+    });
+    const hide = Keyboard.addListener('keyboardDidHide', () => {
+      kbTop.current = null;
+    });
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, [run]);
+
+  const reveal = useCallback<Reveal>(
+    (node) => {
+      pending.current = node;
+      // Already up (moving between fields): measure now. Otherwise the
+      // keyboard's arrival runs it.
+      if (kbTop.current !== null) run();
+    },
+    [run],
+  );
+
+  return (
+    <RevealCtx.Provider value={reveal}>
+      <ScrollView
+        ref={ref}
+        keyboardShouldPersistTaps="handled"
+        keyboardDismissMode="on-drag"
+        automaticallyAdjustKeyboardInsets={adjustInsets}
+        showsVerticalScrollIndicator={false}
+        scrollEventThrottle={16}
+        {...rest}
+        onScroll={(e) => {
+          offset.current = e.nativeEvent.contentOffset.y;
+          rest.onScroll?.(e);
+        }}
+      >
+        {children}
+      </ScrollView>
+    </RevealCtx.Provider>
+  );
+}
+
+/** For an input outside Field/NumberField: call the result from its onFocus. */
+export function useRevealOnFocus() {
+  const reveal = useContext(RevealCtx);
+  const ref = useRef<TextInput>(null);
+  return { ref, onFocus: () => reveal?.(ref.current) };
+}
+
+/** A bare TextInput that scrolls itself clear of the keyboard when focused. */
+export function RevealInput(props: TextInputProps) {
+  const focus = useRevealOnFocus();
+  return (
+    <TextInput
+      {...props}
+      ref={focus.ref}
+      onFocus={(e) => {
+        focus.onFocus();
+        props.onFocus?.(e);
+      }}
+    />
+  );
+}
 
 export function Field({
   label,
@@ -29,10 +142,13 @@ export function Field({
   multiline?: boolean;
   autoCapitalize?: 'none' | 'sentences' | 'words';
 }) {
+  const focus = useRevealOnFocus();
   return (
     <View style={st.field}>
       <Text style={st.label}>{label}</Text>
       <TextInput
+        ref={focus.ref}
+        onFocus={focus.onFocus}
         value={value}
         onChangeText={onChange}
         placeholder={placeholder}
@@ -65,12 +181,15 @@ export function NumberField({
   hint?: string;
   decimal?: boolean;
 }) {
+  const focus = useRevealOnFocus();
   return (
     <View style={st.field}>
       <Text style={st.label}>{label}</Text>
       <View style={st.numRow}>
         {prefix ? <Text style={st.prefix}>{prefix}</Text> : null}
         <TextInput
+          ref={focus.ref}
+          onFocus={focus.onFocus}
           value={value}
           onChangeText={(t) => onChange(t.replace(decimal ? /[^0-9.]/g : /[^0-9]/g, ''))}
           placeholder="0"
