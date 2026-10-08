@@ -53,3 +53,9 @@ export function ago(ms: number): string {
   if (h < 24) return `${h}h ago`;
   return `${Math.round(h / 24)}d ago`;
 }
+
+/** How much of the current US Eastern day has passed, 0..1. */
+export function easternDayFraction(ms = Date.now()): number {
+  const offsetMs = (isEasternDst(ms) ? 4 : 5) * 3600 * 1000;
+  return (((ms - offsetMs) % 864e5) + 864e5) % 864e5 / 864e5;
+}

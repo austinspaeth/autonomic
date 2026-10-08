@@ -44,6 +44,8 @@ export type MetricSpec = {
   note?: string;
   comparisons?: Comparison[];
   splits?: { title: string; parts: Part[]; format?: (n: number) => string }[];
+  /** Anything else the opened card should hold, after its comparisons. */
+  extra?: ReactNode;
   chart?: { title: string; series: Series; format?: (n: number) => string; color?: string; unknownBefore?: string | null; unknownAfter?: string | null };
 };
 
@@ -165,6 +167,8 @@ export function MetricTiles({ specs }: { specs: MetricSpec[] }) {
                       ))}
                     </View>
                   ) : null}
+
+                  {m.extra}
 
                   {m.splits?.map((sp) => (
                     <View key={sp.title} style={{ gap: 8 }}>

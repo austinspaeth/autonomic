@@ -43,7 +43,20 @@ export default function Main() {
   const dk = picked && picked < today ? picked : today;
   const isToday = dk === today;
 
-  const earliest = snap?.pings?.since ?? null;
+  /* How far back the calendar goes. Usage and errors live in the ping report,
+     which starts at its own `since`; sales and the store funnel read the
+     ledger and the store imports, which go back further, so those views open
+     the calendar to the first day either holds. */
+  const pingsSince = snap?.pings?.since ?? null;
+  const ledgerSince = useMemo(() => {
+    let first: string | null = null;
+    for (const r of [...(snap?.load?.sales ?? []), ...(snap?.load?.entries ?? [])]) if (r.date && (!first || r.date < first)) first = r.date;
+    return first;
+  }, [snap]);
+  const earliest =
+    view === 'sales' || view === 'glance'
+      ? [pingsSince, ledgerSince].filter((d): d is string => !!d).sort()[0] ?? null
+      : pingsSince;
   const opensByDay = useMemo(() => pingRows(snap?.pings, 'open'), [snap]);
   const maxOpens = useMemo(() => Math.max(1, ...[...opensByDay.values()].map((r) => r.total)), [opensByDay]);
   const intensity = useCallback((d: string) => (opensByDay.get(d)?.total ?? 0) / maxOpens, [opensByDay, maxOpens]);

@@ -4,12 +4,12 @@
  * date+store record, so store data is merged over what is already recorded
  * for that day rather than wiping the fields left blank here. */
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { Alert, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import Animated, { FadeIn } from 'react-native-reanimated';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { Sheet } from '../components/Sheet';
-import { Choice, DangerButton, DateField, Field, newId, num, NumberField, SaveButton } from '../components/forms';
+import { Choice, DangerButton, DateField, Field, FormScroll, newId, num, NumberField, RevealInput, SaveButton } from '../components/forms';
 import { Segmented } from '../components/ui';
 import { api } from '../lib/api';
 import { useData } from '../lib/data';
@@ -123,13 +123,7 @@ function EntrySheet({ kind, onClose }: { kind: Kind | null; onClose: () => void 
                 }
               }}
             />
-            <ScrollView
-              style={{ flex: 1 }}
-              contentContainerStyle={{ paddingBottom: 40 }}
-              keyboardShouldPersistTaps="handled"
-              automaticallyAdjustKeyboardInsets
-              showsVerticalScrollIndicator={false}
-            >
+            <FormScroll style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 40 }}>
               <Animated.View key={`${mode}|${prefill?.ping ?? ''}|${churnSale?.id ?? ''}`} entering={FadeIn.duration(180)}>
                 {kind === 'store' ? (
                   mode === 'batch' ? <StoreBatch done={close} /> : <StoreForm done={close} />
@@ -155,7 +149,7 @@ function EntrySheet({ kind, onClose }: { kind: Kind | null; onClose: () => void 
                   <SaleForm prefill={prefill ?? undefined} done={close} />
                 )}
               </Animated.View>
-            </ScrollView>
+            </FormScroll>
           </View>
         ) : null
       }
@@ -618,7 +612,7 @@ function StoreBatch({ done }: { done: () => void }) {
             <View key={p} style={st.batchRow}>
               <Text style={[st.batchPlat, { color: p === 'ios' ? C.ios : C.android }]}>{p === 'ios' ? 'iOS' : 'And'}</Text>
               {fieldKeys.map((f) => (
-                <TextInput
+                <RevealInput
                   key={f}
                   value={valueOf(d, p, f)}
                   onChangeText={(t) => setCells((c) => ({ ...c, [cellKey(d, p, f)]: t.replace(/[^0-9]/g, '') }))}

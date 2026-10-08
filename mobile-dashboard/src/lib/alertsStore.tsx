@@ -3,8 +3,9 @@
  * While the app is in front it asks for the last 45 days of pings every
  * POLL_MS, diffs them against the baseline it last saw, and announces what
  * rose: a toast per event (they stack until dismissed) and an entry in the
- * history the bell opens. The celebration for a kind runs for as long as a
- * toast of that kind is up, and stops when the last one is cleared. The baseline is
+ * history the bell opens. Confetti follows the FRONT toast only: one effect
+ * at a time, the one for the card being read, and dismissing it hands the sky
+ * to the next card's kind (or clears it). The baseline is
  * remembered on disk, so what arrived while the app was closed is announced
  * when it opens, up to MAX_CATCHUP_MS; a first launch seeds in silence.
  *
@@ -19,7 +20,7 @@ import { api } from './api';
 import { mergeReport, useData } from './data';
 import { onPush, registerForPush } from './push';
 import { addDays, easternDay, shortDate } from './dates';
-import { diff, MAX_CATCHUP_MS, records, snapshot, type AlertEvent, type Snapshot } from './alerts';
+import { deckOrder, diff, MAX_CATCHUP_MS, records, snapshot, type AlertEvent, type Snapshot } from './alerts';
 import { setCelebrations, whenCelebrationReady, type CelebrationKind } from '../components/Celebration';
 
 const BASE_KEY = 'master.alerts.baseline.v1';
@@ -181,15 +182,13 @@ export function AlertsProvider({ children }: { children: ReactNode }) {
 
   const all = [...previews, ...history];
 
-  /* Each live toast keeps its kind's effect running; clearing the last toast
-     of a kind stops that effect and leaves the others alone. */
-  const running = [
-    ...new Set(live.map((id) => CELEBRATION[all.find((e) => e.id === id)?.kind as AlertEvent['kind']]).filter(Boolean)),
-  ]
-    .sort()
-    .join();
+  /* One celebration at a time: the front card's. A front card with no
+     confetti of its own (a crash, a reading) leaves the sky clear rather than
+     borrowing the effect of a card behind it. */
+  const front = deckOrder(live, all)[0];
+  const running = (front && CELEBRATION[front.kind]) || null;
   useEffect(() => {
-    setCelebrations(running ? (running.split(',') as CelebrationKind[]) : []);
+    setCelebrations(running ? [running] : []);
   }, [running]);
   useEffect(() => () => setCelebrations([]), []);
 

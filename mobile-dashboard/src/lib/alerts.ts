@@ -304,3 +304,23 @@ export function records(report: PingReport | null | undefined, day: string, at =
   });
   return out;
 }
+
+/* The live toasts are a deck: the most important in front (TOAST_PRIORITY,
+   newest first within a kind). One order for the deck that draws them and
+   the store that picks the confetti, which follows the FRONT card only. */
+export const TOAST_PRIORITY: AlertEvent['kind'][] = ['crash', 'sale', 'record', 'download', 'visitor', 'reading'];
+const toastRank = (k: AlertEvent['kind']) => {
+  const i = TOAST_PRIORITY.indexOf(k);
+  return i < 0 ? TOAST_PRIORITY.length : i;
+};
+
+/** Live toast ids (arrival order) to events, front to back. */
+export function deckOrder(live: string[], history: AlertEvent[]): AlertEvent[] {
+  // `live` is in arrival order and the sort is stable, so reversing first
+  // puts the newest first within a kind.
+  return [...live]
+    .reverse()
+    .map((id) => history.find((e) => e.id === id))
+    .filter((e): e is AlertEvent => !!e)
+    .sort((a, b) => toastRank(a.kind) - toastRank(b.kind));
+}
