@@ -17,7 +17,9 @@
 import { useSyncExternalStore } from 'react';
 import { AppState as RNAppState } from 'react-native';
 import { MMKV } from 'react-native-mmkv';
-import { deriveTier, trialMsLeft, type Tier } from '../lib/tier';
+import {
+  accessMsLeft as accessLeft, deriveTier, extendAccess, grantMsLeft, type Tier,
+} from '../lib/tier';
 import { getIapState, subscribeIap } from './iap';
 
 export type { Tier };
@@ -30,6 +32,7 @@ const FORCE_TIER: Tier | null = null;
 const FLAGS_ID = 'autonomic.flags';
 const KEY_TRIAL_STARTED = 'trialStartedAt';   // ISO timestamp
 const KEY_WAS_PRO = 'wasPro';                 // '1' | '0' — last store answer
+const KEY_GRANT_UNTIL = 'accessGrantUntil';   // ISO timestamp — end of an access-code grant
 
 /* MMKV can be unavailable (jest, web); degrade to an in-memory map so the
  * derivation still works for one session rather than throwing at import. */
@@ -63,6 +66,16 @@ function trialStartedAtMs(): number | null {
   return Number.isFinite(t) ? t : null;
 }
 
+/** End of the access-code grant, epoch ms, or null when no code was ever
+ *  redeemed here. Lives beside the trial stamp for the same reasons: it is
+ *  about the person, never rides an export, and survives "Clear all data". */
+function grantUntilMs(): number | null {
+  const raw = readFlag(KEY_GRANT_UNTIL);
+  if (!raw) return null;
+  const t = Date.parse(raw);
+  return Number.isFinite(t) ? t : null;
+}
+
 /** The entitlement to derive from. Until the store connection has answered
  *  (`ready`), fall back to the last persisted answer so a subscriber's cold
  *  start doesn't flash the free-tier locks for the first second. */
@@ -73,12 +86,13 @@ function effectiveIsPro(): boolean {
 }
 
 /**
- * Milliseconds of full access left, which is the 14-day install trial and
- * nothing else. The half-off annual offer used to layer a 24-hour unlock in
- * here; it no longer grants access of any kind (src/lib/upsell/annual).
+ * Milliseconds of full access left: the 14-day install trial, or an
+ * access-code grant, whichever runs longer. The half-off annual offer used to
+ * layer a 24-hour unlock in here; it no longer grants access of any kind
+ * (src/lib/upsell/annual).
  */
 function accessMsLeft(now: number): number {
-  return trialMsLeft(now, trialStartedAtMs());
+  return accessLeft(now, trialStartedAtMs(), grantUntilMs());
 }
 
 function armExpiryTimer(tier: Tier) {
@@ -99,7 +113,7 @@ function recheck(): Tier {
   // FORCE_TIER pins the tier outright. The only configuration in which the
   // annual offer card appears at all is FORCE_TIER = 'free' — the dev bypass
   // otherwise reports 'pro'.
-  const next = (__DEV__ && FORCE_TIER) || deriveTier(now, trialStartedAtMs(), effectiveIsPro());
+  const next = (__DEV__ && FORCE_TIER) || deriveTier(now, trialStartedAtMs(), effectiveIsPro(), grantUntilMs());
   armExpiryTimer(next);
   if (next !== current) { current = next; emit(); }
   return current;
@@ -143,11 +157,47 @@ export function getInstalledAtMs(): number | null {
   return trialStartedAtMs();
 }
 
-/** Whole days of the install trial remaining (0 once it has lapsed) — Settings
- *  copy. The annual offer used to extend this with its 24h unlock; it grants no
- *  access at all now, so the trial is the only window left. */
+/**
+ * An access code was honoured for `days`: push the grant's end out by that
+ * much (on top of whatever access is still running) and re-derive, so Pro
+ * lights up in the same frame. Returns the whole days of access now left.
+ * Only ../store/accessCode calls this, once the server has answered.
+ */
+export function grantAccessDays(days: number): number {
+  if (!started) initTier();
+  const now = Date.now();
+  const until = extendAccess(now, trialStartedAtMs(), grantUntilMs(), days);
+  writeFlag(KEY_GRANT_UNTIL, new Date(until).toISOString());
+  recheck();
+  // Told separately: a code entered inside the install trial leaves the tier
+  // at 'trial', so the tier's own listeners hear nothing.
+  grantListeners.forEach((l) => l());
+  return getTrialDaysLeft();
+}
+
+const grantListeners = new Set<() => void>();
+
+/** Is an access-code grant what is holding full access open right now? The
+ *  app does not sell to somebody it was told to let in: the founder offer
+ *  defers and the plan tab under the nav bar stays away while this is true. */
+export function hasAccessGrant(): boolean {
+  return grantMsLeft(Date.now(), grantUntilMs()) > 0;
+}
+
+/** Whole days of full access remaining without a subscription (0 once it has
+ *  lapsed) — Settings copy. The install trial, or an access-code grant. */
 export function getTrialDaysLeft(): number {
   return Math.ceil(accessMsLeft(Date.now()) / 86_400_000);
+}
+
+/** `hasAccessGrant`, re-rendering when a code is redeemed. Expiry is picked up
+ *  through the tier flipping to 'free', which re-renders the same callers. */
+export function useAccessGrant(): boolean {
+  return useSyncExternalStore(
+    (cb) => { grantListeners.add(cb); return () => grantListeners.delete(cb); },
+    hasAccessGrant,
+    hasAccessGrant,
+  );
 }
 
 export function useTier(): Tier {

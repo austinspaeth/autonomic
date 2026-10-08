@@ -20,7 +20,9 @@ import { deleteAllBackups } from '../lib/backup';
 import { ageFromBirthday, keyOf } from '../lib/dates';
 import { DATE_KEY_RE, assertImportVersion, isPlainObject } from '../lib/migrate';
 import { useIap, manageSubscription, restore, priceOf, storeName, MONTHLY_SKU, YEARLY_SKU } from '../store/iap';
-import { getTrialDaysLeft, useTier } from '../store/tier';
+import { getTrialDaysLeft, useAccessGrant, useTier } from '../store/tier';
+import { AccessCodeSheet } from './AccessCode';
+import { grantStatusText } from '../lib/accessCode';
 import { StoreError, StoreOkNotice, usePaywall } from './Paywall';
 import { healthAppName } from '../lib/health';
 import { DevicesScreen } from './Devices';
@@ -97,14 +99,14 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
   const pressure = usePressureStatus();
   // Row badge: `true` keeps the green "Connected" pill; a {text, color} pair
   // renders the same pill in any tint (e.g. the accent "Trial" state).
-  const item = (icon: IconName, title: string, sub: string, onPress: () => void, badge?: boolean | { text: string; color: string }) => {
+  const item = (icon: IconName, title: string, sub: string, onPress: () => void, badge?: boolean | { text: string; color: string }, onLongPress?: () => void) => {
     const b = badge === true ? { text: 'Connected', color: '#22c55e' } : badge || null;
     const soft = (hex: string) => {
       const n = parseInt(hex.slice(1), 16);
       return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0.15)`;
     };
     return (
-      <Pressable onPress={onPress} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderTopWidth: 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
+      <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={ROW_HOLD_MS} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderTopWidth: 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
         <Icon name={icon} size={22} color={p.textDim} />
         <View style={{ flex: 1 }}><Text style={{ color: p.text, fontSize: 17 }}>{title}</Text><Text style={{ color: p.textDim, fontSize: 13 }}>{sub}</Text></View>
         {b ? (
@@ -140,8 +142,12 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
         ? item('gauge', 'Barometric pressure', 'See if weather changes affect you', () => openSheet((c) => <PressureSettingsSheet controls={c} />, { fitContent: true }),
           pressure.on ? { text: 'On', color: '#22c55e' } : undefined)
         : null}
+      {/* HOLDING the row opens the access-code card instead of the sheet: a
+          code is handed to one person along with where to type it, so it is
+          unlabelled, like the support dump above. */}
       {item('star', 'Subscription', 'Manage plan or restore', () => openSheet((c) => <SubscriptionSheet controls={c} />),
-        tier === 'trial' ? { text: 'Trial', color: p.accent } : tier === 'pro' ? { text: 'Pro', color: '#22c55e' } : undefined)}
+        tier === 'trial' ? { text: 'Trial', color: p.accent } : tier === 'pro' ? { text: 'Pro', color: '#22c55e' } : undefined,
+        () => openSheet((c) => <AccessCodeSheet controls={c} />, { fitContent: true }))}
       {item('download', 'Export data', 'Download everything as JSON', () => exportData())}
       {item('upload', 'Import data', 'Replace everything from a JSON file', () => importData(controls, toast))}
       {item('trash', 'Clear all data', 'Erase everything on this device', () => openSheet((c) => <ClearDataSheet controls={c} />, { fitContent: true }))}
@@ -266,6 +272,11 @@ function ProfileSheet({ controls }: { controls: SheetControls }) {
   );
 }
 
+/** How long the Subscription row is held before the access-code card opens.
+ *  Longer than a slow tap, far shorter than the 8s diagnostics hold: this one
+ *  is meant to be found by somebody told to "long-press Subscription". */
+const ROW_HOLD_MS = 700;
+
 function SubscriptionSheet({ controls }: { controls: SheetControls }) {
   const p = usePalette();
   const { isPro, products, activeSku } = useIap();
@@ -276,6 +287,8 @@ function SubscriptionSheet({ controls }: { controls: SheetControls }) {
   const price = active ? priceOf(active, activeSku ?? YEARLY_SKU) : undefined;
   const period = activeSku === MONTHLY_SKU ? 'month' : 'year';
   const daysLeft = getTrialDaysLeft();
+  // Access held open by a code is not a trial that is about to be sold to.
+  const gifted = useAccessGrant();
   // Reported INSIDE the sheet, never by toast: the sheet stack is one RN Modal
   // painted above the ToastProvider, so a toast raised from here is invisible
   // and Restore reads as a dead button (see CLAUDE.md). It is the one control
@@ -291,10 +304,13 @@ function SubscriptionSheet({ controls }: { controls: SheetControls }) {
     setRestored(ok ? 'ok' : 'none');
   };
   const status = isPro ? 'Subscription active'
+    : tier === 'trial' && gifted ? grantStatusText(daysLeft)
     : tier === 'trial' ? `Free trial · ${daysLeft} day${daysLeft === 1 ? '' : 's'} left`
     : 'Free plan';
   const blurb = isPro
     ? `${price ? `Your plan renews ${period}ly at ${price}. ` : ''}Change your plan or cancel anytime in ${storeName()}. Cancelling keeps access until the period ends.`
+    : tier === 'trial' && gifted
+      ? 'You have full access from an access code. Nothing to pay and nothing to cancel.'
     : tier === 'trial'
       ? 'You have full access while your trial lasts. After it ends you keep journaling and unlimited HRV and POTS capture free forever; Pro unlocks your pacing budget and the deep-analysis tools.'
       : `You're on the free plan. Journaling, HRV and POTS captures stay free forever. Upgrade for your daily pacing budget, full history, Insights, POTS results and AI reports, or restore a previous purchase from ${storeName()}.`;

@@ -41,7 +41,7 @@ import { useSheets } from '../components/Sheet';
 import { ACCENT, fonts, usePalette } from '../theme';
 import { hexA, mixHex } from '../lib/color';
 import { useAppState } from '../store/store';
-import { useTier } from '../store/tier';
+import { hasAccessGrant, useAccessGrant, useTier } from '../store/tier';
 import { FOUNDER_SKU, YEARLY_SKU, priceOf, subscribe, useIap } from '../store/iap';
 import { StoreBlockedNotice } from './Paywall';
 import { todayKey } from '../lib/dates';
@@ -99,6 +99,8 @@ export function FounderOfferCard() {
 
   // Ask once per mount, then hold. Re-entering would re-evaluate a decision
   // this very card just persisted.
+  // An access code entered on a day this card had already claimed takes it down.
+  const gifted = useAccessGrant();
   const settled = useRef(false);
   useEffect(() => {
     if (settled.current || dismissed) return;
@@ -123,6 +125,7 @@ export function FounderOfferCard() {
       // only on the claim path — a day already claimed is handled above, by the
       // memory.
       offerCooldown: !offerPacingClear(),
+      codeAccess: hasAccessGrant(),
       annualOfferLive,
     });
     // Asked twice, deliberately: this effect re-runs on every journal change,
@@ -174,7 +177,7 @@ export function FounderOfferCard() {
   // trial, so a subscription bought (or a trial expiring) later the same day
   // retires the card rather than leaving it selling into a state it doesn't
   // apply to.
-  if (!live || dismissed || tier !== 'trial' || annualOfferLive) return null;
+  if (!live || dismissed || tier !== 'trial' || annualOfferLive || gifted) return null;
 
   return (
     <View

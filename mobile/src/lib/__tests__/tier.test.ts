@@ -1,4 +1,4 @@
-import { deriveTier, trialMsLeft, TRIAL_MS } from '../tier';
+import { accessMsLeft, deriveTier, extendAccess, grantMsLeft, trialMsLeft, TRIAL_MS } from '../tier';
 
 const NOW = 1_750_000_000_000;
 const HOUR = 3_600_000;
@@ -43,5 +43,39 @@ describe('trialMsLeft', () => {
   it('is 0 without a stamp and full for a future stamp', () => {
     expect(trialMsLeft(NOW, null)).toBe(0);
     expect(trialMsLeft(NOW, NOW + DAY)).toBe(TRIAL_MS);
+  });
+});
+
+describe('access-code grant', () => {
+  it('holds the trial tier open past the install window, and never beats an entitlement', () => {
+    expect(deriveTier(NOW, NOW - 30 * DAY, false, NOW + DAY)).toBe('trial');
+    expect(deriveTier(NOW, NOW - 30 * DAY, false, NOW)).toBe('free');       // ends exactly now
+    expect(deriveTier(NOW, NOW - 30 * DAY, false, NOW - DAY)).toBe('free');
+    expect(deriveTier(NOW, null, true, NOW + DAY)).toBe('pro');
+  });
+
+  it('reads no grant as no time', () => {
+    expect(grantMsLeft(NOW, null)).toBe(0);
+    expect(grantMsLeft(NOW, undefined)).toBe(0);
+    expect(grantMsLeft(NOW, NaN)).toBe(0);
+    expect(accessMsLeft(NOW, NOW - DAY)).toBe(TRIAL_MS - DAY);
+  });
+
+  it('access is whichever window runs longer', () => {
+    expect(accessMsLeft(NOW, NOW, NOW + DAY)).toBe(TRIAL_MS);
+    expect(accessMsLeft(NOW, NOW, NOW + 60 * DAY)).toBe(60 * DAY);
+  });
+
+  it('a code counts from now once the trial has lapsed', () => {
+    expect(extendAccess(NOW, NOW - 30 * DAY, null, 30)).toBe(NOW + 30 * DAY);
+  });
+
+  it('a code adds to the trial days still left rather than swallowing them', () => {
+    expect(extendAccess(NOW, NOW - 4 * DAY, null, 30)).toBe(NOW + 40 * DAY);
+  });
+
+  it('a second code stacks on the first, and a lapsed grant adds nothing', () => {
+    expect(extendAccess(NOW, null, NOW + 10 * DAY, 60)).toBe(NOW + 70 * DAY);
+    expect(extendAccess(NOW, null, NOW - 10 * DAY, 60)).toBe(NOW + 60 * DAY);
   });
 });

@@ -37,6 +37,8 @@
  *
  * and one route that shares the plumbing and NOT the promises: POST /ping/gvw,
  * the giveaway sign-up, which carries an email address. See ./giveaway.js.
+ * POST /ping/cde is the other: an access code the user typed, answered with
+ * its length in days. See ./codes.js.
  *
  * The last four are all capped per install per day PER LETTER, like `see`.
  *
@@ -187,6 +189,7 @@
 const { DynamoDBClient } = require('@aws-sdk/client-dynamodb');
 const { DynamoDBDocumentClient, UpdateCommand, QueryCommand } = require('@aws-sdk/lib-dynamodb');
 const { readGiveaway, writeGiveaway } = require('./giveaway');
+const { readRedeem, redeemCode } = require('./codes');
 
 /* Instant pushes to the owner's phone for new installs, sales and crashes. */
 const expoPush = require('../push/expo');
@@ -529,10 +532,29 @@ const isIsoDate = (s) => typeof s === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(s);
  *  under, `~`, the letter — `092426AY-P~V` — so a reader can join the two. */
 const evidenceKey = (cKey, evidence) => `${cKey}~${evidence}`;
 
-const bump = async (kind, day, cohortIso, platform, slot, tier, version, evidence) => {
+/**
+ * The key an OPEN is counted under in the day row's `hours` map: the US Eastern
+ * hour it arrived in, the store letter, and `N` when it is a first run (an
+ * install born that day) — `14I`, `09AN`. An open lands in exactly one key, so
+ * the map sums to the day's total and its `N` keys to the day's installs.
+ *
+ * It exists for one question the day total cannot answer: "where had yesterday
+ * got to by this time". An open is capped once per install per Eastern day, so
+ * the hour is when that install FIRST showed up, and a running sum over the
+ * hours is the day's headcount as it stood at any moment. Bounded at
+ * 24 x 3 stores x 2, and only on this route: no other counter is read
+ * mid-day against a whole one.
+ */
+const hourKey = (nowMs, platform, fresh) => (
+  `${String(new Date(nowMs - (isEasternDst(nowMs) ? 4 : 5) * 3600000).getUTCHours()).padStart(2, '0')}`
+  + `${platform || 'U'}${fresh ? 'N' : ''}`
+);
+
+const bump = async (kind, day, cohortIso, platform, slot, tier, version, evidence, nowMs) => {
   const cKey = cohortKey(cohortIso, platform, slot, tier);
   const bKey = buildKey(platform, tier, version);
   const withEvidence = kind === 'SUB' && !!EVIDENCE[evidence];
+  const withHours = kind === 'OPEN' && Number.isFinite(nowMs);
   const add = new UpdateCommand({
     TableName: TABLE,
     Key: { PK: `PING#${kind}`, SK: day },
@@ -540,6 +562,7 @@ const bump = async (kind, day, cohortIso, platform, slot, tier, version, evidenc
       'SET #cohorts.#c = if_not_exists(#cohorts.#c, :zero) + :one',
       '#builds.#b = if_not_exists(#builds.#b, :zero) + :one',
       ...(withEvidence ? ['#evidence.#e = if_not_exists(#evidence.#e, :zero) + :one'] : []),
+      ...(withHours ? ['#hours.#h = if_not_exists(#hours.#h, :zero) + :one'] : []),
       '#total = if_not_exists(#total, :zero) + :one',
       '#day = :day',
       'entityType = :t',
@@ -548,6 +571,7 @@ const bump = async (kind, day, cohortIso, platform, slot, tier, version, evidenc
       '#cohorts': 'cohorts', '#c': cKey, '#builds': 'builds', '#b': bKey,
       '#total': 'total', '#day': 'day',
       ...(withEvidence ? { '#evidence': 'evidence', '#e': evidenceKey(cKey, evidence) } : {}),
+      ...(withHours ? { '#hours': 'hours', '#h': hourKey(nowMs, platform, cohortIso === day) } : {}),
     },
     ExpressionAttributeValues: { ':zero': 0, ':one': 1, ':day': day, ':t': 'PING_DAY' },
   });
@@ -557,7 +581,8 @@ const bump = async (kind, day, cohortIso, platform, slot, tier, version, evidenc
   } catch (err) {
     // Writing into a nested path fails while the parent map doesn't exist yet,
     // i.e. on the first ping of the day — and, for rows that predate it, on
-    // every ping until `builds` is created. Create both maps, then redo the
+    // every ping until `builds` (or, on the day `hours` shipped, `hours`) is
+    // created. Create both maps, then redo the
     // bump. `if_not_exists` keeps that safe against another Lambda racing us
     // here — whoever loses the race leaves the winner's counts alone.
     if (err?.name !== 'ValidationException') throw err;
@@ -565,9 +590,11 @@ const bump = async (kind, day, cohortIso, platform, slot, tier, version, evidenc
       TableName: TABLE,
       Key: { PK: `PING#${kind}`, SK: day },
       UpdateExpression: 'SET #cohorts = if_not_exists(#cohorts, :empty), #builds = if_not_exists(#builds, :empty)'
-        + (withEvidence ? ', #evidence = if_not_exists(#evidence, :empty)' : ''),
+        + (withEvidence ? ', #evidence = if_not_exists(#evidence, :empty)' : '')
+        + (withHours ? ', #hours = if_not_exists(#hours, :empty)' : ''),
       ExpressionAttributeNames: {
         '#cohorts': 'cohorts', '#builds': 'builds', ...(withEvidence ? { '#evidence': 'evidence' } : {}),
+        ...(withHours ? { '#hours': 'hours' } : {}),
       },
       ExpressionAttributeValues: { ':empty': {} },
     }));
@@ -588,7 +615,8 @@ const bump = async (kind, day, cohortIso, platform, slot, tier, version, evidenc
  * difference.
  */
 /* COMPACT rows (`report(since, { compact: true })`): the stored maps as they
-   are, `{ day, total, c: { cohortKey: n }, b?: { buildKey: n }, e?: { "key~V": n } }`.
+   are, `{ day, total, c: { cohortKey: n }, b?: { buildKey: n }, e?: { "key~V": n },
+   h?: { hourKey: n } }`.
    Every field the expanded row spells out is decoded from the keys, so the
    expanded form repeats each one per entry; for the phone dashboard, which
    decodes the keys itself, that was most of a multi-megabyte report. The
@@ -601,6 +629,7 @@ const compactRow = (item) => {
   const row = { day: item.SK, total: Number(item.total) || 0, c: num(item.cohorts) };
   if (item.builds && Object.keys(item.builds).length) row.b = num(item.builds);
   if (item.evidence && Object.keys(item.evidence).length) row.e = num(item.evidence);
+  if (item.hours && Object.keys(item.hours).length) row.h = num(item.hours);
   return row;
 };
 
@@ -691,6 +720,15 @@ const readDays = async (kind, since, compact = false) => {
             })
             .filter(Boolean)
             .sort((a, b) => a.key.localeCompare(b.key) || a.evidence.localeCompare(b.evidence)),
+        } : {}),
+        // When each open arrived (OPEN rows only; see `hourKey`). Handed back
+        // as stored. Absent on days before it was counted, which is unknown
+        // and not an empty day.
+        ...(item.hours && Object.keys(item.hours).length ? {
+          hours: Object.keys(item.hours).reduce((acc, k) => {
+            acc[k] = Number(item.hours[k]) || 0;
+            return acc;
+          }, {}),
         } : {}),
       });
     });
@@ -1312,8 +1350,37 @@ const handleGiveaway = async (event) => {
   return json(200, { ok: true, entries: g.entries.length });
 };
 
+/* ------------------------------------------------------- access codes */
+
+/**
+ * `POST /ping/cde/{code}`: an access code typed into the app. NOT a ping — it
+ * answers with the code's length in days, 409 once it is spent, or 404 — so, like the giveaway, its
+ * rules live in their own file. See ./codes.js.
+ */
+const handleCode = async (event) => {
+  if (event?.requestContext?.http?.method !== 'POST') return json(405, { ok: false });
+  const install = decodeCohort(event?.pathParameters?.cohort);
+  if (!install) return json(400, { ok: false });
+  const r = readRedeem(event);
+  if (!r) return json(400, { ok: false });
+  const res = await redeemCode(ddb, TABLE, r, install, Date.now());
+  if (res.status === 'ok') return json(200, { ok: true, days: res.days });
+  // A code is single-use: 409 is "that one is spent", 404 "there is no such code".
+  return res.status === 'used' ? json(409, { ok: false, used: true }) : json(404, { ok: false });
+};
+
 const handler = async (event) => {
   const path = event?.requestContext?.http?.path || '';
+
+  if (path.startsWith('/ping/cde/')) {
+    try {
+      return await handleCode(event);
+    } catch (err) {
+      // Without the body: it holds the code.
+      console.error('code redeem failed', err?.name || err);
+      return json(500, { ok: false });
+    }
+  }
 
   if (path.startsWith('/ping/gvw/')) {
     try {
@@ -1379,7 +1446,7 @@ const handler = async (event) => {
   const slotFor = alphabet && alphabet[slot] ? slot : null;
 
   try {
-    await bump(kind, easternDay(now), cohort, platform, slotFor, tier, version, evidence);
+    await bump(kind, easternDay(now), cohort, platform, slotFor, tier, version, evidence, now);
   } catch (err) {
     // Nothing downstream cares and the client is already gone, but log the
     // failure so a flatlined chart has an explanation other than "nobody
@@ -1401,7 +1468,7 @@ const handler = async (event) => {
 };
 
 module.exports = {
-  handler, decodeCohort, cohortKey, buildKey, easternDay, report, ALPHABET, KINDS,
+  handler, decodeCohort, cohortKey, buildKey, hourKey, easternDay, report, ALPHABET, KINDS,
   LOGS, FEATURES, FINDINGS, REPORTS, PLANS, READING_TYPES, MORNING_PROMPT,
   redactFault, safeTag, faultKey, hash8, FAULT_MSG_MAX, FAULT_TTL_DAYS, FAULT_MAX_N,
   readOfferFailure, offerFailKey, OUTCOMES, OFFER_FAIL_TTL_DAYS,

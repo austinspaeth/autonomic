@@ -104,6 +104,13 @@ export interface FounderInput {
    */
   offerCooldown?: boolean;
   /**
+   * Full access is being held open by an access code (store/tier
+   * `hasAccessGrant`). That reads as 'trial', the state this card waits for,
+   * and the app does not sell to somebody it was told to let in. A deferral:
+   * the offer stays due for when the code runs out.
+   */
+  codeAccess?: boolean;
+  /**
    * The half-off annual card is standing on the Journal right now (./annual).
    * Suppresses this card outright — INCLUDING on a day it had already claimed,
    * which is the one thing the cool-down can't reach, because a claimed day
@@ -161,6 +168,7 @@ export function founderRules(input: FounderInput): FounderVerdict {
   if (input.crashAlertFiredToday) return { ok: false, reason: 'crash-alert-today' };
   if (input.downturn) return { ok: false, reason: 'downturn' };
   if (input.offerCooldown) return { ok: false, reason: 'offer-cooldown' };
+  if (input.codeAccess) return { ok: false, reason: 'code-access' };
 
   return { ok: true, claim: true };
 }

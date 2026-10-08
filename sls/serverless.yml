@@ -253,6 +253,15 @@ functions:
       - httpApi:
           method: POST
           path: /ping/gvw/{cohort}
+      # An access code typed into the app (Settings, long-press Subscription).
+      # NOT a counter either: it answers 200 with the code's length in days, 409
+      # once the code is spent (single-use) or 404, and the app extends its own
+      # full-access window by that much. Codes
+      # are created only through the authenticated /master API (CODE_CREATE).
+      # See lambdas/ping/codes.js.
+      - httpApi:
+          method: POST
+          path: /ping/cde/{cohort}
       # What people do in the journal and around it. All four capped once per
       # install per Eastern day PER LETTER, like /ping/see:
       #   log  logged by hand (S sleep / A activity / M med / Y symptom /

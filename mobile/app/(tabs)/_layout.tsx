@@ -15,7 +15,7 @@ import { GRADE_COLORS, usePalette } from '../../src/theme';
 import { useInsightsUnseen } from '../../src/store/insightsBadge';
 import { usePaywall } from '../../src/features/Paywall';
 import { MONTHLY_SKU, priceOf, useIap } from '../../src/store/iap';
-import { getTrialDaysLeft, useTier } from '../../src/store/tier';
+import { getTrialDaysLeft, useAccessGrant, useTier } from '../../src/store/tier';
 
 /**
  * The Journal is where the app opens, always.
@@ -210,7 +210,10 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
   // over, so no screen's bottom padding moves. Only a phone with too little
   // inset for it to clear the edge lifts the bar, and only by the shortfall.
   const tier = useTier();
-  const showPlan = tier !== 'pro';
+  // Nor does anyone let in with an access code: the tab is a footnote that
+  // sells, and a "Keep it" link under a gift of 999 days is a nag.
+  const gifted = useAccessGrant();
+  const showPlan = tier !== 'pro' && !gifted;
   const [rowH, setRowH] = useState(0);
   const lift = showPlan ? Math.max(0, PLAN_TAB_H + PLAN_EDGE_GAP - 12 - insets.bottom) : 0;
 

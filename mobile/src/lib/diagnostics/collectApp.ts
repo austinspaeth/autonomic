@@ -25,7 +25,7 @@ import { getErrorLog } from './errorLog';
 import type { AppDiagnostics, Rows } from './appReport';
 import { getState, loadIssue, storageStats } from '../../store/store';
 import { getIapState } from '../../store/iap';
-import { getTier, getTrialDaysLeft } from '../../store/tier';
+import { getTier, getTrialDaysLeft, hasAccessGrant } from '../../store/tier';
 import { isPingExcluded } from '../../store/ping';
 import { reviewMemory } from '../review';
 import { liveOffer } from '../upsell/annual';
@@ -206,6 +206,7 @@ function subscriptionRows(): Rows {
     'active plan': iap.activeSku ?? null,
     'products loaded': iap.products.map((p) => p.productId).join(', ') || 'none',
     'trial days left': tier === 'trial' ? getTrialDaysLeft() : null,
+    'access code': hasAccessGrant(),
     'purchase in flight': iap.purchasing ?? false,
   };
 }

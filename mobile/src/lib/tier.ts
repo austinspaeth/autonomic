@@ -26,8 +26,41 @@ export function trialMsLeft(nowMs: number, trialStartedAtMs: number | null): num
   return Math.max(0, started + TRIAL_MS - nowMs);
 }
 
-/** The user's current tier. Entitlement always wins over the local clock. */
-export function deriveTier(nowMs: number, trialStartedAtMs: number | null, isPro: boolean): Tier {
+/**
+ * Milliseconds left on an access-code grant (0 when there is none or it has
+ * passed). A grant is an absolute end time: an access code extends the
+ * full-access window to it, see `extendAccess`.
+ */
+export function grantMsLeft(nowMs: number, grantUntilMs: number | null | undefined): number {
+  if (grantUntilMs == null || !Number.isFinite(grantUntilMs)) return 0;
+  return Math.max(0, grantUntilMs - nowMs);
+}
+
+/** Milliseconds of full access left without a subscription: whichever of the
+ *  install trial and an access-code grant runs longer. */
+export function accessMsLeft(
+  nowMs: number, trialStartedAtMs: number | null, grantUntilMs?: number | null,
+): number {
+  return Math.max(trialMsLeft(nowMs, trialStartedAtMs), grantMsLeft(nowMs, grantUntilMs));
+}
+
+/**
+ * The new grant end after redeeming a code worth `days`. The days are added to
+ * whatever access is still running, so a code entered on day 4 of the trial
+ * does not swallow the ten days that were left, and a second code stacks on the
+ * first. With nothing running they count from now.
+ */
+export function extendAccess(
+  nowMs: number, trialStartedAtMs: number | null, grantUntilMs: number | null | undefined, days: number,
+): number {
+  return nowMs + accessMsLeft(nowMs, trialStartedAtMs, grantUntilMs) + Math.max(0, days) * 86_400_000;
+}
+
+/** The user's current tier. Entitlement always wins over the local clock. An
+ *  access-code grant reads as 'trial': it IS the trial, extended. */
+export function deriveTier(
+  nowMs: number, trialStartedAtMs: number | null, isPro: boolean, grantUntilMs?: number | null,
+): Tier {
   if (isPro) return 'pro';
-  return trialMsLeft(nowMs, trialStartedAtMs) > 0 ? 'trial' : 'free';
+  return accessMsLeft(nowMs, trialStartedAtMs, grantUntilMs) > 0 ? 'trial' : 'free';
 }

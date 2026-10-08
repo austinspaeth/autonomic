@@ -102,7 +102,8 @@ export type PingKind =
   | 'rdg'                           // an HRV reading completed, by KIND
   | 'mbp'                           // the morning baseline prompt card
   | 'rvw'                           // the store review prompt was REQUESTED
-  | 'gvw';                          // the giveaway sign-up (POST, carries an email; NOT a counter)
+  | 'gvw'                           // the giveaway sign-up (POST, carries an email; NOT a counter)
+  | 'cde';                          // an access code redeemed (POST, answers with its days; NOT a counter)
 
 /**
  * The platform marker carried by a ping: one letter, appended to the cohort

@@ -13,6 +13,8 @@
  *   REPLACE_ALL    { entries, sales, churn, settings } -> wipes and rewrites all three
  *   PINGS          { since } -> the mobile app's cohort-ping counters
  *   GIVEAWAY       {} -> every giveaway sign-up (email, entries, install)
+ *   CODES          {} -> every access code and whether it has been used
+ *   CODE_CREATE    { days, code?, note? } -> a new access code (never edited or deleted)
  *   STORE_VERSIONS { force } -> what is live in the App Store and on Play
  *   PUSH_KEY       -> { configured, publicKey } for background alerts
  *   PUSH_SUBSCRIBE { subscription, ua } -> registers this device
@@ -39,6 +41,7 @@ const {
 /* One implementation of the ping read, shared with the public keyed route. */
 const { report: pingReport } = require('../ping/main');
 const { readGiveaways } = require('../ping/giveaway');
+const { listCodes, createCode } = require('../ping/codes');
 /* The push half: registering a device here, sending to it from the hourly
    schedule. Both halves share one definition of a subscription's key so the
    job can find what this handler wrote. */
@@ -822,6 +825,13 @@ const handler = async (event) => {
          behind the token and the allowlist — never on the shared-key report. */
       case 'GIVEAWAY':
         return json(200, await readGiveaways(ddb, TABLE));
+      /* Access codes: days of full access the owner hands out. Created here and
+         nowhere else; the app redeems them on the public /ping/cde route. There
+         is deliberately no delete — see lambdas/ping/codes.js. */
+      case 'CODES':
+        return json(200, await listCodes(ddb, TABLE));
+      case 'CODE_CREATE':
+        return json(200, await createCode(ddb, TABLE, payload));
       /* Read from Apple and Google rather than from us, cached in a row of
          its own (PK STORE#VERSIONS) that belongs to no dashboard user — there
          is one answer and it is the same for everybody who can see it. */

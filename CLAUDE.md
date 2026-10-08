@@ -6,7 +6,8 @@ lives in **`mobile/`**. **All state is on-device** — no accounts, no sync, no
 health data ever leaves the phone. The app makes exactly one network call of
 its own, the anonymous cohort ping in `src/store/ping.ts` (one date, one
 platform letter, no identifier), plus the opt-in giveaway sign-up (below), the
-one request that carries anything personal; everything else in `sls/` belongs to the
+one request that carries anything personal, and the access-code check, sent only
+when somebody types a code in; everything else in `sls/` belongs to the
 private store-analytics dashboard at `/master`, not to the product. (A
 previous pure-static-HTML PWA under `docs/` has been removed; the mobile app is
 the app.) Platform split: the Apple Watch companion, HealthKit and ECG are
@@ -1671,6 +1672,13 @@ old web app so old `export.json` files import directly.
   `PING#HRV`,
   `SK 2026-08-21`, `cohorts: { '082126I': 12 }`, readings `'082126IB'`) — a map, not a list, because the nested bump is
   atomic and appending to a list would lose concurrent pings.
+  **The OPEN row also keeps an `hours` map** (`hourKey` in the ping lambda:
+  Eastern hour + store letter + `N` for a first run, `14I` / `09AN`), one key
+  per open, so it sums to the day. It exists for the phone dashboard's PACE
+  block (`mobile-dashboard/src/lib/pace.ts`): a day still filling is held up
+  to yesterday and to the range average cut off at the SAME clock time, never
+  to their finished totals. A day from before the map existed has no hours and
+  is placed by the pooled shape of the days that do, and says so.
   Read it back with `GET /ping/report?key=`
   (shared key, `PING_REPORT_KEY`, injected by CodeBuild from SSM) or the `PINGS`
   action on the authenticated `/master` API; both return
@@ -2004,6 +2012,36 @@ old web app so old `export.json` files import directly.
   (`PK GIVEAWAY`), read ONLY through the authenticated `/master` API
   (`GIVEAWAY`, the dashboard's Giveaway tab), never the shared-key report. The
   lambda must be deployed before a build carrying the card ships.
+- **An access code extends the trial, and it is the developer's to hand out.**
+  Holding the Subscription row in Settings (`ROW_HOLD_MS`, unlabelled like the
+  support dump) opens `<AccessCodeSheet/>` (`features/AccessCode.tsx`) instead
+  of the subscription sheet. `redeemAccessCode` (`store/accessCode.ts`) POSTs
+  `/ping/cde/{install code}` with the code and nothing else; like the giveaway
+  it ANSWERS (200 `{ days }` / 409 already used / 404 no such code) and ignores
+  `__DEV__` (a dev build is told what a code is worth without spending it). On a yes, `grantAccessDays`
+  (`store/tier.ts`) pushes `accessGrantUntil` (flags MMKV, so it survives Clear
+  all data and never rides an export) out by that many days ON TOP of whatever
+  access is still running (`extendAccess` in `lib/tier.ts`, pure + tested), and
+  the tier reads `'trial'` until it passes: nothing else in the app had to learn
+  a new tier. While a grant is what holds access open (`hasAccessGrant` /
+  `useAccessGrant`) the app does not sell: the founder offer defers
+  (`codeAccess`), the plan tab under the nav bar is hidden, and the Subscription
+  sheet says "Full access" rather than "Free trial". 999 days is the dashboard's
+  "forever" and the copy stops counting at it (`lib/accessCode.ts`). **A code works ONCE,
+  and that is the SERVER's rule**: the first redemption stamps the row in one
+  conditional write and every later attempt, from any phone, is answered "used",
+  so a reinstall or a new phone needs a new code. `accessCodesUsed` on the phone
+  only saves the request when a spent code is re-typed. With no install
+  identifier the server cannot recognise the same phone asking again, so a
+  redemption whose answer is lost in transit has spent the code and granted
+  nothing; the remedy is another code. Codes are rows under `PK CODE`
+  (`sls/lambdas/ping/codes.js`), created only through the authenticated
+  `/master` API (`CODES` / `CODE_CREATE`; the web dashboard's Codes tab and the
+  phone dashboard's Access codes view), and there is **no edit and no delete**:
+  the grant lives on the phone once redeemed, so a revoke could only ever look
+  like it did more than it does. `normalizeCode` and the lambda's `normCode`
+  are the same rule; move both. JS only, so it ships OTA, but the lambda must
+  be deployed first.
 - **Types come in two layers.** Built-ins live in the `*_TYPES` maps in
   `src/lib/registry.ts` (add an icon in `src/components/Icon.tsx` when adding one).
   Users can also create their own activities, meds/supplements, symptoms and

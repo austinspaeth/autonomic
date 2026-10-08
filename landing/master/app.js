@@ -9928,7 +9928,7 @@
   var VIEW_TITLES = {
     overview: 'Overview', ping: 'App usage', timeline: 'Timeline', trial: 'Trial & conversion', cohorts: 'Cohorts',
     platforms: 'iOS vs Android', sales: 'Sales', costs: 'Costs', forecast: 'Forecast',
-    faults: 'Failures', pings: 'Pings', links: 'Links', giveaway: 'Giveaway', data: 'Edit data'
+    faults: 'Failures', pings: 'Pings', links: 'Links', giveaway: 'Giveaway', codes: 'Codes', data: 'Edit data'
   };
 
   function renderAll() {
@@ -9945,7 +9945,8 @@
        forms, the other is a list of URLs. A filter bar over either is a control
        that changes nothing. */
     document.getElementById('filterbar').classList.toggle('hidden',
-      state.view === 'data' || state.view === 'links' || state.view === 'giveaway');
+      state.view === 'data' || state.view === 'links' || state.view === 'giveaway' ||
+      state.view === 'codes');
     // the forecast is driven by its own assumptions — only the platform filter applies
     ['fgRange', 'fgGrain'].forEach(function (id) {
       var g = document.getElementById(id);
@@ -10007,7 +10008,7 @@
     var empty = !db.entries.length && !salesList().length && state.view !== 'data' &&
       state.view !== 'ping' && state.view !== 'timeline' && state.view !== 'costs' &&
       state.view !== 'sales' && state.view !== 'pings' && state.view !== 'faults' &&
-      state.view !== 'links' && state.view !== 'giveaway';
+      state.view !== 'links' && state.view !== 'giveaway' && state.view !== 'codes';
     document.getElementById('emptyState').classList.toggle('hidden', !empty);
     if (empty) {
       document.getElementById('view-' + state.view).classList.add('hidden');
@@ -10028,6 +10029,7 @@
     else if (state.view === 'pings') { pingLoad(); renderPings(); }
     else if (state.view === 'links') renderLinks();
     else if (state.view === 'giveaway') { giveawayLoad(); renderGiveaway(); }
+    else if (state.view === 'codes') { codesLoad(); renderCodes(); }
     else if (state.view === 'data') renderData();
 
     layoutTiles();
@@ -10757,6 +10759,111 @@
       ].map(q).join(','));
     });
     return lines.join('\n');
+  }
+
+  /* --------------------------------------------------- view: codes --------
+   *
+   * Access codes: days of full access handed to one person at a time. The list
+   * is fetched on opening the view and after a create, never by the five-minute
+   * tick. A code works once. There is a create and no edit or delete, on
+   * purpose: the grant lives on the phone once a code is redeemed (see sls/lambdas/ping/codes.js).
+   */
+  var codes = { data: null, status: 'idle', error: '' };
+  var CD_FOREVER = 999;
+
+  function codeLength(days) {
+    return days >= CD_FOREVER ? 'Forever' : days + (days === 1 ? ' day' : ' days');
+  }
+
+  function codesLoad(force) {
+    if (codes.status === 'loading') return Promise.resolve();
+    if (codes.data && !force) return Promise.resolve();
+    codes.status = 'loading';
+    if (state.view === 'codes') renderCodes();
+    return window.Api.call('CODES').then(function (res) {
+      codes.data = res || { rows: [] };
+      codes.status = 'ready';
+      codes.error = '';
+    }).catch(function (err) {
+      codes.status = 'error';
+      codes.error = (err && err.message) || 'Could not load the codes.';
+    }).then(function () {
+      if (state.view === 'codes') renderCodes();
+    });
+  }
+
+  function renderCodes() {
+    var host = document.getElementById('cdTable');
+    var tiles = document.getElementById('cdTiles');
+    if (!host || !tiles) return;
+    var d = codes.data;
+    if (!d) {
+      tiles.innerHTML = '';
+      host.innerHTML = '<div class="empty">' + (codes.status === 'error'
+        ? esc(codes.error) : 'Loading codes…') + '</div>';
+      return;
+    }
+    var rows = d.rows || [];
+    var used = rows.filter(function (r) { return r.used; }).length;
+    var forever = rows.filter(function (r) { return r.days >= CD_FOREVER; }).length;
+    tiles.innerHTML = [
+      tile({ label: 'Codes', value: fmtInt(rows.length), meta: forever + ' forever · ' + (rows.length - forever) + ' timed' }),
+      tile({ label: 'Used', value: fmtInt(used), meta: 'redeemed, cannot be entered again' }),
+      tile({ label: 'Unused', value: fmtInt(rows.length - used), meta: 'still waiting to be entered' })
+    ].join('');
+
+    if (!rows.length) {
+      host.innerHTML = '<div class="empty">No codes yet. Create one above.</div>';
+      return;
+    }
+    host.innerHTML = '<table><thead><tr><th>Code</th><th>Length</th><th>For</th><th>Status</th>' +
+      '<th>Redeemed</th><th>Created</th><th></th></tr></thead><tbody>' +
+      rows.map(function (r) {
+        var last = r.redeemedAt
+          ? relTime(Date.parse(r.redeemedAt)) + ' · ' + (GV_PLATFORMS[r.redeemedPlatform] || '–') +
+            (r.redeemedVersion ? ' ' + r.redeemedVersion : '')
+          : '';
+        return '<tr><td><code>' + esc(r.code) + '</code></td>' +
+          '<td>' + esc(codeLength(r.days)) + '</td>' +
+          '<td>' + (r.note ? esc(r.note) : '<span class="na">–</span>') + '</td>' +
+          '<td>' + (r.used ? '<b>Used</b>' : '<span class="na">Unused</span>') + '</td>' +
+          '<td>' + (last ? esc(last) : '<span class="na">–</span>') + '</td>' +
+          '<td>' + esc(r.createdAt ? relTime(Date.parse(r.createdAt)) : '–') + '</td>' +
+          '<td><button class="btn sm" data-copy-code="' + esc(r.code) + '">Copy</button></td></tr>';
+      }).join('') + '</tbody></table>';
+  }
+
+  function codeCreate() {
+    var status = document.getElementById('cdStatus');
+    var btn = document.getElementById('cdCreate');
+    var days = Math.round(Number(document.getElementById('cdDays').value));
+    if (!(days >= 1 && days <= CD_FOREVER)) {
+      status.textContent = 'Days must be a whole number from 1 to ' + CD_FOREVER + '.';
+      return;
+    }
+    btn.disabled = true;
+    status.textContent = 'Creating…';
+    window.Api.call('CODE_CREATE', {
+      days: days,
+      code: document.getElementById('cdCode').value,
+      note: document.getElementById('cdNote').value
+    }).then(function (res) {
+      if (!res || !res.ok) {
+        status.textContent = (res && res.error) || 'Could not create the code.';
+        return;
+      }
+      var made = res.code;
+      if (codes.data) codes.data.rows = [made].concat(codes.data.rows || []);
+      document.getElementById('cdCode').value = '';
+      document.getElementById('cdNote').value = '';
+      status.textContent = 'Created ' + made.code + ' · ' + codeLength(made.days).toLowerCase();
+      copyText(made.code).then(function () {
+        status.textContent += ' · copied to the clipboard';
+      }).catch(function () { /* the code is on screen either way */ });
+      renderCodes();
+    }).catch(function (err) {
+      status.textContent = (err && err.message) || 'Could not create the code.';
+    }).then(function () { btn.disabled = false; });
   }
 
   function renderLinks() {
@@ -11571,6 +11678,24 @@
     var gvExport = document.getElementById('gvExport');
     if (gvExport) gvExport.addEventListener('click', function () {
       download('giveaway-' + today() + '.csv', giveawayCsv(), 'text/csv');
+    });
+
+    var cdCreate = document.getElementById('cdCreate');
+    if (cdCreate) cdCreate.addEventListener('click', codeCreate);
+    var cdRefresh = document.getElementById('cdRefresh');
+    if (cdRefresh) cdRefresh.addEventListener('click', function () { codesLoad(true); });
+    var cdPresets = document.getElementById('cdPresets');
+    if (cdPresets) cdPresets.addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-days]');
+      if (b) document.getElementById('cdDays').value = b.dataset.days;
+    });
+    var cdTable = document.getElementById('cdTable');
+    if (cdTable) cdTable.addEventListener('click', function (ev) {
+      var b = ev.target.closest('[data-copy-code]');
+      if (!b) return;
+      copyText(b.dataset.copyCode)
+        .then(function () { toast('Copied ' + b.dataset.copyCode + '.'); })
+        .catch(function () { toast('Could not reach the clipboard — check the browser permission.'); });
     });
 
     document.querySelector('.tabs').addEventListener('click', function (ev) {

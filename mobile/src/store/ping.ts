@@ -933,6 +933,50 @@ export function postGiveaway(body: unknown): Promise<boolean> {
   return post(url, body);
 }
 
+/* ---------------------------------------------------------- access code */
+
+export type AccessCodeAnswer =
+  | { status: 'ok'; days: number }
+  | { status: 'used' }
+  | { status: 'invalid' }
+  | { status: 'unreachable' };
+
+/**
+ * `POST /ping/cde/{code}`: ask the server what an access code is worth. The
+ * body is the code the user typed and nothing else.
+ *
+ * Four answers and they must stay four: a 409 is a code somebody has already
+ * redeemed (a code works once, anywhere), a 404 is no such code, and both are
+ * different sentences on the card from a request that never got an answer. Like the giveaway it is exempt from `__DEV__` and the
+ * exclusion switch (the user asked for it; a dev build is marked instead and
+ * does not move the code's count).
+ */
+export async function postAccessCode(code: string): Promise<AccessCodeAnswer> {
+  const url = pingUrl(
+    'cde', cohortDate(Date.now()), platformCode(Platform.OS), undefined, tierCode(getTier()), appVersion(),
+  );
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    const res = await fetch(url, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ code, dev: __DEV__ }),
+      signal: controller.signal,
+    });
+    if (res.status === 409) return { status: 'used' };
+    if (res.status === 404 || res.status === 400) return { status: 'invalid' };
+    if (!res.ok) return { status: 'unreachable' };
+    const body = await res.json();
+    const days = Math.round(Number(body?.days));
+    return body?.ok === true && days > 0 ? { status: 'ok', days } : { status: 'unreachable' };
+  } catch {
+    return { status: 'unreachable' };
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
 let started = false;
 
 /**
