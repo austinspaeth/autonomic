@@ -8,8 +8,7 @@ keywords: "electrolyte drinks for POTS, best electrolyte drink POTS, sodium for 
 date: 2026-10-09
 updated: 2026-10-09
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1523362628745-0c100150b504?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Ethan Sykes / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1744209375191-889d9fdef3f7?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 tldr: "For POTS, the useful number on an electrolyte drink is milligrams of sodium per serving, not the brand or flavor. Most sports drinks (Gatorade, Powerade) carry only 150 to 160 mg of sodium per cup, which is far below what most POTS protocols aim for. Higher-sodium options like LMNT (~1000 mg) or an oral rehydration mix get you there faster, and a pinch of salt plus a splash of juice in a liter of water does the same job for pennies. A little glucose actually helps your gut absorb the sodium and water. None of this replaces medical advice, and anyone with high blood pressure, kidney or heart conditions should set a sodium target with their clinician first."
 categories:
   - food
