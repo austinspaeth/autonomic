@@ -1,5 +1,6 @@
 /** Data model — identical shape to the PWA (`autonomic.journal.v1`). */
 import type { PressureMap } from './pressure';
+import type { UnitSystem } from './units';
 
 export type ThemeSetting = 'light' | 'dark' | 'system';
 
@@ -153,10 +154,20 @@ export interface Movement {
   note?: string;
 }
 
+/** Triggers logged together in one tap, with the time and note that belong to
+ *  the group. An annotation over `FoodRecord.triggers`; see lib/triggerLogs. */
+export interface TriggerLog {
+  id: string;
+  time?: string;
+  note?: string;
+  types: string[];
+}
+
 export interface FoodRecord {
   water: number;
   calories: number;
   triggers: Record<string, number>;
+  triggerLogs?: TriggerLog[];
   meals: Meal[];
 }
 
@@ -291,6 +302,9 @@ export interface AppState {
   version: number;
   settings: {
     theme: ThemeSetting;
+    /** Imperial or metric, for DISPLAY only: stored values never change unit
+     *  (lib/units.ts). Undefined is imperial, the default. */
+    units?: UnitSystem;
     lastBleDeviceId?: string;
     lastBleDeviceName?: string;
     healthEnabled?: boolean;

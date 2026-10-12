@@ -6,7 +6,7 @@ import React, { useState } from 'react';
 import { ActivityIndicator, Pressable, Text, TextInput, View } from 'react-native';
 import { AddDashButton, Button, Card, DaySaveButton, Muted, PastDayNotice, Pill, ProgressBar, Row, RowValue, SectionHeader, Segmented } from '../components/ui';
 import { Icon } from '../components/Icon';
-import { TimeField } from '../components/Field';
+import { TextField, TimeField } from '../components/Field';
 import { useSheets, SheetFooter, type SheetControls } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { CAUTION_GOLD, WATER_BLUE, fonts, radius, usePalette } from '../theme';
@@ -15,7 +15,9 @@ import {
   bmLabel, readingLabel, readingRowValue, summarizeFields,
 } from '../lib/registry';
 import { typesFor } from '../lib/typeCatalog';
+import { sortedTriggerLogs, ungroupedTriggers } from '../lib/triggerLogs';
 import { orthoDeltaCat, orthoMaxDelta, rowScoreCategory, SCORE_COLORS, GRADE_LABEL, profileCtx } from '../lib/scoring';
+import { fmtWater, getUnits, waterNum } from '../lib/units';
 import { sleepGrade, sleepHours, stagesForWindow, waterGoalL, type DaysMap } from '../lib/scoring/day';
 import type { SleepRecord, SleepStages } from '../lib/types';
 import { ensureDay, getState, getWaveform, save, storeSleepSeries, useAppState, useStore } from '../store/store';
@@ -94,7 +96,7 @@ export function JournalSections({ dk }: { dk: string }) {
       {/* Symptoms */}
       <LoggedSection title="Symptoms" dk={dk} arr="symptoms" typeMap={typesFor(state, 'symptoms')} onAdd={forms.pickSymptom} addLabel="+ Add symptom" onOpen={forms.openSymptom} showValue showTime />
       {/* Triggers */}
-      <TriggerSection dk={dk} onAdd={drawers.triggers} />
+      <TriggerSection dk={dk} onAdd={drawers.triggers} onOpen={drawers.triggerGroup} />
       {/* Hydration */}
       <HydrationSection water={+(day.food?.water || 0)} onPress={drawers.water} />
       {/* Digestion */}
@@ -130,14 +132,14 @@ function HydrationSection({ water, onPress }: { water: number; onPress: () => vo
               (Manrope ExtraBold), the " Liters" unit stays regular in text color. */}
           <Text style={{ color: p.text, fontSize: 16, flex: 1 }}>Water</Text>
           <Text style={{ fontSize: 14, color: WATER_BLUE, fontVariant: ['tabular-nums'] }}>
-            <Text style={{ fontFamily: fonts.numHeavy, fontSize: 20 }}>{water}</Text>
-            <Text style={{ color: p.text }}>{` Liter${water === 1 ? '' : 's'}`}</Text>
+            <Text style={{ fontFamily: fonts.numHeavy, fontSize: 20 }}>{waterNum(water)}</Text>
+            <Text style={{ color: p.text }}>{getUnits() === 'metric' ? ` Liter${water === 1 ? '' : 's'}` : ' oz'}</Text>
           </Text>
         </View>
         <ProgressBar pct={pct} color={WATER_BLUE} track={p.surface2} style={{ marginTop: 12 }} />
         <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 }}>
-          <Text style={{ color: p.textDim, fontSize: 13 }}>{`${water} L logged`}</Text>
-          <Text style={{ color: p.textDim, fontSize: 13 }}>{`Goal ${goal} L`}</Text>
+          <Text style={{ color: p.textDim, fontSize: 13 }}>{`${fmtWater(water)} logged`}</Text>
+          <Text style={{ color: p.textDim, fontSize: 13 }}>{`Goal ${fmtWater(goal)}`}</Text>
         </View>
       </Pressable>
     </Card>
@@ -402,9 +404,15 @@ function SleepGrade({ dk, sleep }: { dk: string; sleep: { bed: string; wake: str
 
 type SleepShape = { bed: string; wake: string; quality?: string; hrLow?: string | number; hrHigh?: string | number };
 
+/** An overnight heart rate, written through when the field is left (these
+ *  fields have no Save). */
+function SleepHrField({ label, initial, onCommit }: { label: string; initial: unknown; onCommit: (v: string) => void }) {
+  const [text, setText] = useState(initial != null ? String(initial) : '');
+  return <TextField label={label} unit="bpm" value={text} onChange={setText} onBlur={() => onCommit(text)} keyboardType="decimal-pad" />;
+}
+
 /** Bed/wake/quality/HR inputs — shared by the inline manual editor and the edit sheet. */
 function SleepEditFields({ dk, sleep }: { dk: string; sleep: SleepShape }) {
-  const p = usePalette();
   const setField = (field: string, v: string) => {
     const s = ensureDay(dk).sleep;
     (s as never as Record<string, string>)[field] = v;
@@ -425,20 +433,14 @@ function SleepEditFields({ dk, sleep }: { dk: string; sleep: SleepShape }) {
   };
   return (
     <>
-      <View style={{ flexDirection: 'row', gap: 14 }}>
+      <View style={{ flexDirection: 'row', gap: 10 }}>
         <View style={{ flex: 1 }}><TimeField label="Bed (last night)" value={sleep.bed} onChange={(v) => setField('bed', v)} /></View>
         <View style={{ flex: 1 }}><TimeField label="Woke (this morning)" value={sleep.wake} onChange={(v) => setField('wake', v)} /></View>
       </View>
       <Segmented options={[{ val: 'good', label: 'Good sleep' }, { val: 'interrupted', label: 'Interrupted' }]} value={(sleep.quality as 'good' | 'interrupted') || 'good'} onChange={(v) => setField('quality', v)} style={{ marginBottom: 12 }} />
-      <View style={{ flexDirection: 'row', gap: 14 }}>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 12, color: p.textDim, marginBottom: 4, fontWeight: '600' }}>HR low</Text>
-          <TextInput keyboardType="decimal-pad" defaultValue={sleep.hrLow != null ? String(sleep.hrLow) : ''} onEndEditing={(e) => setField('hrLow', e.nativeEvent.text)} style={inp(p)} placeholderTextColor={p.textDim} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <Text style={{ fontSize: 12, color: p.textDim, marginBottom: 4, fontWeight: '600' }}>HR high</Text>
-          <TextInput keyboardType="decimal-pad" defaultValue={sleep.hrHigh != null ? String(sleep.hrHigh) : ''} onEndEditing={(e) => setField('hrHigh', e.nativeEvent.text)} style={inp(p)} placeholderTextColor={p.textDim} />
-        </View>
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        <SleepHrField label="HR low" initial={sleep.hrLow} onCommit={(v) => setField('hrLow', v)} />
+        <SleepHrField label="HR high" initial={sleep.hrHigh} onCommit={(v) => setField('hrHigh', v)} />
       </View>
     </>
   );
@@ -468,7 +470,6 @@ function SleepEditSheet({ dk, controls, add }: { dk: string; controls: SheetCont
     </View>
   );
 }
-const inp = (p: ReturnType<typeof usePalette>) => ({ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 11, fontSize: 16, color: p.text, minHeight: 44 });
 
 function LoggedSection({ title, dk, arr, typeMap, onAdd, addLabel, onOpen, showValue, showTime, showPeriod }: {
   title: string; dk: string; arr: 'meds' | 'symptoms'; typeMap: Record<string, { label: string; icon: string; summary?: (r: never) => string }>;
@@ -506,17 +507,28 @@ function LoggedSection({ title, dk, arr, typeMap, onAdd, addLabel, onOpen, showV
   );
 }
 
-function TriggerSection({ dk, onAdd }: { dk: string; onAdd: () => void }) {
+/** Each logged trigger is its own row: its time, and a tap that reopens its
+ *  card (the note is read there, not under the row). Triggers from before they carried either sit in no log and keep the
+ *  plain row with its own remove. */
+function TriggerSection({ dk, onAdd, onOpen }: { dk: string; onAdd: () => void; onOpen: (logId: string, count: number) => void }) {
   const p = usePalette();
   const state = useAppState();
   const trigTypes = typesFor(state, 'triggers');
-  const trigs = state.days[dk]?.food?.triggers || {};
-  const keys = Object.keys(trigs).filter((k) => trigs[k] > 0 && trigTypes[k]);
+  const food = state.days[dk]?.food;
+  const groups = sortedTriggerLogs(food)
+    .map((l) => ({ log: l, labels: l.types.filter((t) => trigTypes[t]).map((t) => trigTypes[t].label) }))
+    .filter((g) => g.labels.length);
+  const loose = ungroupedTriggers(food).filter((k) => trigTypes[k]);
   return (
     <Card>
       <SectionHeader title="Triggers" />
       <View style={{ paddingHorizontal: 14, paddingBottom: 12 }}>
-        {keys.map((k) => (
+        {groups.map(({ log, labels }) => (
+          <Row key={log.id} icon="alert" title={labels.join(', ')}
+            right={log.time ? <Pill text={fmtTime12(log.time)} /> : undefined}
+            onPress={() => onOpen(log.id, labels.length)} />
+        ))}
+        {loose.map((k) => (
           <Row key={k} icon="alert" title={trigTypes[k].label} right={<Pressable onPress={() => { delete ensureDay(dk).food.triggers[k]; save(); }} hitSlop={8}><Icon name="x" size={18} color={p.textDim} /></Pressable>} />
         ))}
         <View style={{ marginTop: 6 }}><AddDashButton onPress={onAdd} label="+ Add trigger" /></View>

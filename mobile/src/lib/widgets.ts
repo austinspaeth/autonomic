@@ -29,6 +29,7 @@ import { detectDownturn } from './scoring/downturn';
 import { detectStrain } from './scoring/strain';
 import { WIDGET_WINDOW_DAYS, trendDirection, type TrendMetricId } from './trends';
 import type { AppState, DayRecord } from './types';
+import { waterNum, waterUnit } from './units';
 
 /* ---------- payload shape (decoded verbatim by the Swift widgets) ---------- */
 
@@ -505,7 +506,7 @@ export function buildWidgetPayload(state: AppState, dk = todayKey(), opts: Widge
     { name: 'pNN50', value: fmt(pnn50), unit: '%' },
     { name: 'Resting HR', value: fmt(rhr?.value ?? null), unit: 'bpm' },
     { name: 'Sleep', value: fmt(sleep, 1), unit: 'h' },
-    { name: 'Water', value: water != null ? String(round1(water)) : '–', unit: 'L' },
+    { name: 'Water', value: water != null ? String(waterNum(water, undefined, 1)) : '–', unit: waterUnit() },
   ];
 
   // Today's clean-day checklist — the same criteria the Progress streak card

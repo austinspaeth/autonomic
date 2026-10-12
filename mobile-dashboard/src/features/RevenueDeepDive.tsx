@@ -8,8 +8,9 @@ import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { StackedBars, type Key } from '../components/series';
-import { shortDate } from '../lib/dates';
+import { dayDate, shortDate } from '../lib/dates';
 import { setView } from '../lib/views';
+import { useWide } from '../lib/wide';
 import { C, num } from '../theme';
 
 export type RevenueDay = { day: string; fresh: number; renew: number; purchases: number; charges: number };
@@ -27,6 +28,7 @@ export function RevenueBody({
   monthly,
   days,
   format,
+  link = true,
 }: {
   /** One per bar: a day, or a month on a long range. */
   buckets: { x: string; fresh: number; renew: number }[];
@@ -34,8 +36,12 @@ export function RevenueBody({
   /** Days that took any money, newest first. */
   days: RevenueDay[];
   format: (n: number) => string;
+  /** The button out to the sales view; off when this is already drawn there. */
+  link?: boolean;
 }) {
   const [all, setAll] = useState(false);
+  // On a wide screen the sales section is already on the board beside this.
+  const wide = useWide();
   const shown = all ? days : days.slice(0, FOLD);
   const month = (iso: string) => new Date(`${iso}T12:00:00Z`).toLocaleDateString('en-US', { month: 'short', year: '2-digit', timeZone: 'UTC' });
   return (
@@ -44,7 +50,7 @@ export function RevenueBody({
         title={monthly ? 'By month' : 'By day'}
         keys={KEYS}
         rows={buckets.map((b) => ({ x: b.x, values: { fresh: b.fresh, renew: b.renew } }))}
-        xLabel={monthly ? month : shortDate}
+        xLabel={monthly ? month : dayDate}
         format={format}
         height={110}
         summary={`${format(buckets.reduce((t, b) => t + b.fresh + b.renew, 0))} in the range`}
@@ -83,6 +89,7 @@ export function RevenueBody({
         ) : null}
       </View>
 
+      {wide || !link ? null : (
       <Pressable
         onPress={() => {
           Haptics.selectionAsync();
@@ -96,6 +103,7 @@ export function RevenueBody({
         <Text style={st.linkText}>All sales data</Text>
         <SymbolView name="chevron.right" size={14} weight="semibold" tintColor={C.muted} />
       </Pressable>
+      )}
     </>
   );
 }

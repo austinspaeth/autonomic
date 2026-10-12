@@ -45,6 +45,11 @@ export function shortDate(iso: string): string {
   return `${MONTHS[Number(iso.slice(5, 7)) - 1]} ${Number(iso.slice(8, 10))}`;
 }
 
+/** A date as the charts print it, led by its weekday: "Sun Aug 21". */
+export function dayDate(iso: string): string {
+  return `${WEEKDAYS[new Date(`${iso}T12:00:00Z`).getUTCDay()]} ${shortDate(iso)}`;
+}
+
 export function longDate(iso: string): string {
   const wd = WEEKDAYS[new Date(`${iso}T12:00:00Z`).getUTCDay()];
   return `${wd}, ${shortDate(iso)}`;

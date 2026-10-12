@@ -4,18 +4,31 @@ import { BlurView } from 'expo-blur';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
-import { topOf, usePicks, useView } from '../lib/views';
-import { BOARD_GUTTER, NAV_H, useWide } from '../lib/wide';
+import { useView } from '../lib/views';
+import { BOARD_GUTTER, BoardWidth, NAV_H, useBoardWidth, useWide } from '../lib/wide';
 import { C, R, num } from '../theme';
 
 /* Every vertical scroller takes these: dragging the list puts the keyboard
-   away, a tap on a control still lands while it is up, and the list insets
-   itself by the keyboard and scrolls the focused field clear of it. */
+   away, and a tap on a control still lands while it is up.
+
+   It does NOT inset itself by the keyboard. React Native works that inset out
+   as "my bottom edge minus the keyboard's top", for every scroller that asks,
+   whether or not the field is inside it, and only undoes it on the next
+   keyboard notification. A keyboard frame that arrives empty (a hardware
+   keyboard, the Mac window) reads as a keyboard as tall as the scroller, and
+   a card closed with the keyboard up never sends the undo, so the page was
+   left with a screen of nothing under its last card. Only a scroller that
+   HOLDS a form asks for it (`FORM_SCROLL`), and those are unmounted with
+   their card. */
 export const KEYBOARD_SCROLL = {
   keyboardDismissMode: 'on-drag',
   keyboardShouldPersistTaps: 'handled',
-  automaticallyAdjustKeyboardInsets: true,
 } as const;
+
+/** A scroller with fields in it: also clears the focused field of the keyboard. */
+export const FORM_SCROLL = { ...KEYBOARD_SCROLL, automaticallyAdjustKeyboardInsets: true } as const;
+
+const NO_INSET = { top: 0, left: 0, bottom: 0, right: 0 };
 
 /* The bottom chrome: the logo + view picker band, frosted, pinned above the
    home indicator. Screens pad their content by it. */
@@ -55,18 +68,9 @@ export function Screen({
   /* The scroll view outlives a change of view, so a new view would open
      wherever the last one was left. Every view starts at its top. */
   const view = useView();
-  const picks = usePicks();
-  const first = useRef(true);
   useEffect(() => {
-    /* Wide: every view is on the one board, so picking one scrolls to its
-       section (and not on mount, which is not a pick). */
-    if (wide) {
-      const y = topOf(view);
-      if (!first.current && y !== null) scroll.current?.scrollTo({ y: Math.max(0, y - top - 12), animated: true });
-    } else scroll.current?.scrollTo({ y: 0, animated: false });
-    first.current = false;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [view, picks]);
+    scroll.current?.scrollTo({ y: 0, animated: false });
+  }, [view]);
   return (
     <View style={{ flex: 1, backgroundColor: C.bg }}>
       {/* Plain top padding (never contentInset): iOS resets an inset scroll to
@@ -75,6 +79,8 @@ export function Screen({
       <ScrollView
         ref={scroll}
         {...KEYBOARD_SCROLL}
+        automaticallyAdjustKeyboardInsets={false}
+        contentInset={NO_INSET}
         style={{ flex: 1, backgroundColor: C.bg }}
         automaticallyAdjustContentInsets={false}
         contentInsetAdjustmentBehavior="never"
@@ -124,15 +130,17 @@ export function Screen({
 }
 
 export function Card({ title, right, children, style }: { title?: string; right?: ReactNode; children: ReactNode; style?: ViewStyle }) {
+  const boardW = useBoardWidth();
   return (
-    <View style={[s.card, style]}>
+    <View style={[s.card, boardW ? { width: boardW } : null, style]}>
       {title ? (
         <View style={s.cardHead}>
           <Text style={s.cardTitle}>{title}</Text>
           {right}
         </View>
       ) : null}
-      {children}
+      {/* Whatever is inside is laid out by this card, not by the board. */}
+      {boardW ? <BoardWidth.Provider value={null}>{children}</BoardWidth.Provider> : children}
     </View>
   );
 }

@@ -17,16 +17,16 @@ const { decodeCohort, cohortKey, buildKey, ALPHABET, KINDS } = require('../lambd
 test('decodes the shapes every build that ever shipped can send', () => {
   // The original: cohort only.
   assert.deepEqual(decodeCohort('D082126'),
-    { iso: '2026-08-21', platform: 'U', slot: null, tier: null, version: null, evidence: null });
+    { iso: '2026-08-21', platform: 'U', slot: null, tier: null, version: null, evidence: null, door: null });
   // With the platform letter.
   assert.deepEqual(decodeCohort('D082126I'),
-    { iso: '2026-08-21', platform: 'I', slot: null, tier: null, version: null, evidence: null });
+    { iso: '2026-08-21', platform: 'I', slot: null, tier: null, version: null, evidence: null, door: null });
   // With the sensor letter.
   assert.deepEqual(decodeCohort('D082126IG'),
-    { iso: '2026-08-21', platform: 'I', slot: 'G', tier: null, version: null, evidence: null });
+    { iso: '2026-08-21', platform: 'I', slot: 'G', tier: null, version: null, evidence: null, door: null });
   // And today's, with the tagged tail.
   assert.deepEqual(decodeCohort('D082126IG-TP-V1.26.0'),
-    { iso: '2026-08-21', platform: 'I', slot: 'G', tier: 'P', version: '1.26.0', evidence: null });
+    { iso: '2026-08-21', platform: 'I', slot: 'G', tier: 'P', version: '1.26.0', evidence: null, door: null });
 });
 
 test('a tagged token is independent of every other one', () => {
@@ -135,7 +135,7 @@ test('each route validates the slot against ITS OWN alphabet', () => {
 test('every route name the client can send has a storage kind', () => {
   // The handler resolves a route by name, so a route added to serverless.yml
   // but not here answers 204 and counts nothing — silently.
-  ['open', 'sub', 'rst', 'lap', 'act', 'cap', 'hrv', 'pay', 'not', 'pot', 'see', 'err', 'osh', 'odm', 'oac', 'ofl',
+  ['open', 'sub', 'rst', 'lap', 'act', 'cap', 'hrv', 'sav', 'pay', 'not', 'pot', 'see', 'err', 'osh', 'odm', 'oac', 'ofl',
     'log', 'use', 'fnd', 'rpt', 'rdg', 'mbp', 'rvw']
     .forEach((k) => assert.ok(KINDS[k], `no storage kind for /ping/${k}`));
 });

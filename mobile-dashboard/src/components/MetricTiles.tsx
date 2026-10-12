@@ -10,15 +10,18 @@
  * neighbours slide out of the way, and nothing ever jumps. The detail fades in
  * after the card has mostly arrived, so the motion reads as the card making
  * room and then filling it. */
-import { useEffect, useState, type ReactNode } from 'react';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { useContext, useEffect, useState, type ReactNode } from 'react';
+import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { C, num } from '../theme';
+import { BoardTitle, useBoardWidth } from '../lib/wide';
 import { BarChart, SplitBar, type Part } from './charts';
 import type { Series } from '../lib/metrics';
 import type { PaceModel } from '../lib/pace';
 import { Pace } from './Pace';
+import { Sheet } from './Sheet';
 
 export type Change = {
   value: number;
@@ -38,8 +41,23 @@ export type Comparison = {
   value?: string;
 };
 
+export type ChartSpec = {
+  title: string;
+  series: Series;
+  format?: (n: number) => string;
+  color?: string;
+  unknownBefore?: string | null;
+  unknownAfter?: string | null;
+  /** How an x key reads, when it is not a day (a weekday, a month, an age band). */
+  xLabel?: (key: string) => string;
+  /** What the chart comes to, at the right of its title. */
+  summary?: string;
+};
+
 export type MetricSpec = {
   key: string;
+  /** The card takes the whole row at rest, for the one number a view leads with. */
+  wide?: boolean;
   label: string;
   value: string;
   /** A second, quieter figure on the number's own line ("/ 55%"). */
@@ -53,7 +71,9 @@ export type MetricSpec = {
   splits?: { title: string; parts: Part[]; format?: (n: number) => string }[];
   /** Anything the deep dive holds beyond numbers (a list), drawn above the chart. */
   body?: ReactNode;
-  chart?: { title: string; series: Series; format?: (n: number) => string; color?: string; unknownBefore?: string | null; unknownAfter?: string | null };
+  chart?: ChartSpec;
+  /** More charts, under the first. */
+  charts?: ChartSpec[];
 };
 
 /* One spring for everything that moves when a card opens, so the card's
@@ -141,9 +161,112 @@ function ChangePill({ change }: { change?: Change }) {
   );
 }
 
+/* What an opened card holds under its number: the note, the pace, the
+   comparisons, the breakdowns, anything bespoke, and the chart. */
+function Detail({ m }: { m: MetricSpec }) {
+  return (
+    <>
+      {m.note ? <Text style={st.note}>{m.note}</Text> : null}
+
+      {m.pace ? <Pace pace={m.pace.model} color={m.pace.color} /> : null}
+
+      {m.comparisons?.length ? (
+        <View style={st.rows}>
+          {m.comparisons.map((c) => (
+            <View key={c.label} style={st.row}>
+              <Text style={st.rowLabel}>
+                {c.label}
+                {c.change && typeof c.change.base === 'number' ? <Text style={[st.rowBase, num]}> ({(c.format ?? plain)(c.change.base)})</Text> : null}
+              </Text>
+              {c.change !== undefined ? <ChangePill change={c.change} /> : <Text style={[st.rowValue, num]}>{c.value}</Text>}
+            </View>
+          ))}
+        </View>
+      ) : null}
+
+      {m.splits?.map((sp) => (
+        <View key={sp.title} style={{ gap: 8 }}>
+          <Text style={st.section}>{sp.title}</Text>
+          <SplitBar parts={sp.parts} format={sp.format} />
+        </View>
+      ))}
+
+      {m.body}
+
+      {[...(m.chart ? [m.chart] : []), ...(m.charts ?? [])].map((c) => (
+        <View key={c.title} style={{ marginTop: 2 }}>
+          <BarChart
+            title={c.title}
+            series={c.series}
+            summary={c.summary ?? ''}
+            format={c.format}
+            color={c.color}
+            height={84}
+            unknownBefore={c.unknownBefore}
+            unknownAfter={c.unknownAfter}
+            xLabel={c.xLabel}
+            compact
+          />
+        </View>
+      ))}
+    </>
+  );
+}
+
 export function MetricTiles({ specs }: { specs: MetricSpec[] }) {
   const [open, setOpen] = useState<string | null>(null);
   const [gridW, setGridW] = useState(0);
+  const boardW = useBoardWidth();
+  const insets = useSafeAreaInsets();
+  const boardTitle = useContext(BoardTitle);
+
+  /* On the wide board a card does NOT grow in place. The board is a wrapping
+     flow sized to the window, so a card that grew pushed everything after it
+     into other columns, and every tile's layout spring chased it there. It
+     opens as a side panel instead, like every other long read on that
+     screen, and the board under it does not move. */
+  if (boardW) {
+    const m = specs.find((x) => x.key === open) ?? null;
+    return (
+      <View style={{ width: boardW, gap: 10 }}>
+        {boardTitle ? <Text style={st.boardTitle}>{boardTitle}</Text> : null}
+        <View style={st.grid} onLayout={(e) => setGridW(e.nativeEvent.layout.width)}>
+        {specs.map((x) => (
+          <View key={x.key} style={[st.tile, x.wide ? st.full : gridW >= WIDE_GRID ? st.quarter : st.half]}>
+            <Pressable
+              style={({ pressed }) => [st.press, gridW >= WIDE_GRID && st.pressWide, pressed && { opacity: 0.7 }]}
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+                setOpen(x.key);
+              }}
+            >
+              <View style={st.head}>
+                <Text style={st.label} numberOfLines={1}>
+                  {x.label}
+                </Text>
+              </View>
+              <GrowingValue text={x.value} aside={x.aside} big={false} />
+              <GrowingChange change={x.change} big={false} />
+            </Pressable>
+          </View>
+        ))}
+        </View>
+        <Sheet visible={!!m} onClose={() => setOpen(null)} title={m?.label} full bleed>
+          {() =>
+            m ? (
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 + insets.bottom }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+                <GrowingValue text={m.value} aside={m.aside} big />
+                <GrowingChange change={m.change} big />
+                <View style={st.detail}>
+                  <Detail m={m} />
+                </View>
+              </ScrollView>
+            ) : null
+          }
+        </Sheet>
+      </View>
+    );
+  }
 
   return (
     <View style={st.grid} onLayout={(e) => setGridW(e.nativeEvent.layout.width)}>
@@ -155,7 +278,7 @@ export function MetricTiles({ specs }: { specs: MetricSpec[] }) {
             layout={SPRING}
             style={[
               st.tile,
-              isOpen ? st.full : gridW >= WIDE_GRID ? st.quarter : st.half,
+              isOpen || m.wide ? st.full : gridW >= WIDE_GRID ? st.quarter : st.half,
               isOpen && gridW ? { minHeight: Math.min(gridW, 420) } : null,
               isOpen && st.open,
             ]}
@@ -177,48 +300,7 @@ export function MetricTiles({ specs }: { specs: MetricSpec[] }) {
 
               {isOpen ? (
                 <Animated.View entering={FadeIn.delay(140).duration(240)} exiting={FadeOut.duration(90)} style={st.detail}>
-                  {m.note ? <Text style={st.note}>{m.note}</Text> : null}
-
-                  {m.pace ? <Pace pace={m.pace.model} color={m.pace.color} /> : null}
-
-                  {m.comparisons?.length ? (
-                    <View style={st.rows}>
-                      {m.comparisons.map((c) => (
-                        <View key={c.label} style={st.row}>
-                          <Text style={st.rowLabel}>
-                            {c.label}
-                            {c.change && typeof c.change.base === 'number' ? <Text style={[st.rowBase, num]}> ({(c.format ?? plain)(c.change.base)})</Text> : null}
-                          </Text>
-                          {c.change !== undefined ? <ChangePill change={c.change} /> : <Text style={[st.rowValue, num]}>{c.value}</Text>}
-                        </View>
-                      ))}
-                    </View>
-                  ) : null}
-
-                  {m.splits?.map((sp) => (
-                    <View key={sp.title} style={{ gap: 8 }}>
-                      <Text style={st.section}>{sp.title}</Text>
-                      <SplitBar parts={sp.parts} format={sp.format} />
-                    </View>
-                  ))}
-
-                  {m.body}
-
-                  {m.chart ? (
-                    <View style={{ marginTop: 2 }}>
-                      <BarChart
-                        title={m.chart.title}
-                        series={m.chart.series}
-                        summary=""
-                        format={m.chart.format}
-                        color={m.chart.color}
-                        height={84}
-                        unknownBefore={m.chart.unknownBefore}
-                        unknownAfter={m.chart.unknownAfter}
-                        compact
-                      />
-                    </View>
-                  ) : null}
+                  <Detail m={m} />
                 </Animated.View>
               ) : null}
             </Pressable>
@@ -232,6 +314,10 @@ export function MetricTiles({ specs }: { specs: MetricSpec[] }) {
 /** A small wrapper for anything that should ride the same layout spring as
  *  the tiles (cards below a grid, so they glide down when a card opens). */
 export function Glide({ children }: { children: ReactNode }) {
+  // On the board the cards are placed by the wrap, and a layout spring would
+  // send one gliding across columns every time the flow re-settles.
+  const boardW = useBoardWidth();
+  if (boardW) return <>{children}</>;
   return <Animated.View layout={SPRING}>{children}</Animated.View>;
 }
 
@@ -240,6 +326,7 @@ const TILE_BORDER = 'rgba(255,255,255,0.10)';
 
 const st = StyleSheet.create({
   grid: { flexDirection: 'row', flexWrap: 'wrap', gap: 12 },
+  boardTitle: { color: C.dim, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, paddingTop: 4 },
   tile: { backgroundColor: C.surface, borderRadius: 14, overflow: 'hidden', borderWidth: 1, borderColor: TILE_BORDER },
   half: { width: '47.5%', flexGrow: 1 },
   quarter: { width: '23%', flexGrow: 1 },

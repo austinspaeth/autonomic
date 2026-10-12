@@ -133,15 +133,66 @@ function refinePeak(ts: number[], f: number[], i: number): number {
 }
 
 /**
+ * How irregular a window may be and still read as a steady pulse, measured two
+ * ways, and why there are two.
+ *
+ * `STEADY_MAX_CV` is spread around the window's MEAN. It is the original
+ * criterion and it is still the first one asked.
+ *
+ * `STEADY_MAX_NEIGHBOUR_DEV` is each interval's distance from the midpoint of
+ * the two either side of it, as a share of the mean. It exists because spread
+ * around the mean cannot tell noise from a TREND, and a trend is exactly what
+ * paced breathing produces: at a 4/6 pace the heart speeds up for four seconds
+ * and slows for six, so a five-second window catches it mid-sweep. Somebody
+ * with strong respiratory sinus arrhythmia — the thing the training reading
+ * exists to exercise — swings far enough that the sweep alone crosses 0.18
+ * once per breath. The gate then closed once per breath, every stretch of
+ * pulse came out under ten seconds, segment triage threw all of them away, and
+ * a perfect signal ended as a refusal holding minutes of collected pulse and no
+ * kept beats. Measured on a synthetic clean signal that is what happens from
+ * a swing of about ±25% in rate, and with ordinary sensor noise from lower.
+ *
+ * A smooth sweep sits almost exactly on its neighbours' midpoint, so it passes
+ * this measure however steep it is; jitter, a missed beat and a doubled beat
+ * all land far off it. The bar is set well INSIDE what the first criterion
+ * already tolerates: noise that just passes a CV of 0.18 scores about 0.22
+ * here, so 0.10 admits no window for being noisy that was not admitted before
+ * — only ones that were being refused for having a direction.
+ */
+export const STEADY_MAX_CV = 0.18;
+export const STEADY_MAX_NEIGHBOUR_DEV = 0.10;
+/** Intervals the neighbour measure needs: four gives it two interior points.
+ *  Not three, which the mean criterion accepts — one interior point is one
+ *  number, and one number is not a pattern. A slow heart mid-sweep fits only
+ *  four intervals in the window, which is why it is not five. */
+const NEIGHBOUR_MIN_INTERVALS = 4;
+
+/** RMS distance of each interior interval from the midpoint of its two
+ *  neighbours, over the mean interval. Zero for a perfectly even ramp. */
+export function neighbourDeviation(rr: number[]): number {
+  if (rr.length < 3) return Infinity;
+  let ss = 0;
+  for (let i = 1; i < rr.length - 1; i++) {
+    const d = rr[i] - (rr[i - 1] + rr[i + 1]) / 2;
+    ss += d * d;
+  }
+  return Math.sqrt(ss / (rr.length - 2)) / mean(rr);
+}
+
+/**
  * Grade the pulse in a (~5 s) trailing window: 'good' needs several beats at a
  * consistent rhythm — this is the pre-start finger-lock criterion — while
  * scattered/irregular peaks read as 'weak' and no periodicity as 'none'.
+ *
+ * "Consistent" is either steady around its mean, or sweeping smoothly; see the
+ * two constants above.
  */
 export function assessPulse(ts: number[], vs: number[]): PulseQuality {
   const { rr } = detectBeats(ts, vs);
   if (rr.length < 2) return 'none';
   const cv = std(rr) / mean(rr);
-  if (rr.length >= 3 && cv < 0.18) return 'good';
+  if (rr.length >= 3 && cv < STEADY_MAX_CV) return 'good';
+  if (rr.length >= NEIGHBOUR_MIN_INTERVALS && neighbourDeviation(rr) < STEADY_MAX_NEIGHBOUR_DEV) return 'good';
   return 'weak';
 }
 

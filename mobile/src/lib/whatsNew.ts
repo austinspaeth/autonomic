@@ -50,6 +50,19 @@ export function fmtReleaseDate(iso: string): string {
 
 export const RELEASES: Release[] = [
   {
+    version: '1.33',
+    date: '2026-10-11',
+    notes: [
+      'NEW: Enter a POTS stand test or episode by hand, with a guided walkthrough. No strap or watch needed.',
+      'Choose imperial or metric units in your Profile.',
+      'Insights now compares your best weeks with your hardest ones.',
+      'Triggers can carry a time and a note.',
+      'Easier input fields throughout the app.',
+      'Camera reading improvements.',
+      'And many smaller changes based on your feedback. Thank you!',
+    ],
+  },
+  {
     version: '1.32',
     date: '2026-10-01',
     notes: [

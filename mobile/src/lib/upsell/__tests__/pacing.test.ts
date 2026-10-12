@@ -71,20 +71,20 @@ describe('the two offers can never be raised together', () => {
   });
 
   it('leaves the annual milestone due when the founder card holds the clock', () => {
-    const installedAt = NOW - 40 * DAY;
+    const installedAt = NOW - 60 * DAY;
     const annual = emptyAnnualMemory();
-    // Day 40: milestone 30 is reached, so the only thing keeping the card away
+    // Day 60: milestone 50 is reached, so the only thing keeping the card away
     // is the clock the founder card stamped.
-    expect(dueMilestone(installedAt, NOW, annual)).toBe(30);
+    expect(dueMilestone(installedAt, NOW, annual)).toBe(50);
     const clock = noteOffer(emptyOfferPacing(), 'founder', NOW);
     expect(offerAllowed(NOW, clock)).toBe(false);
     // Nothing was consumed, so it opens on a later launch.
-    expect(dueMilestone(installedAt, NOW + OFFER_COOLDOWN_MS, annual)).toBe(30);
+    expect(dueMilestone(installedAt, NOW + OFFER_COOLDOWN_MS, annual)).toBe(50);
     expect(offerAllowed(NOW + OFFER_COOLDOWN_MS, clock)).toBe(true);
   });
 
   it('a spent annual window still blocks nothing once the week is out', () => {
-    const annual = startOffer(emptyAnnualMemory(), 30, NOW);
-    expect(dueMilestone(NOW - 40 * DAY, NOW + 10 * DAY, annual)).toBeNull();
+    const annual = startOffer(emptyAnnualMemory(), 50, NOW);
+    expect(dueMilestone(NOW - 60 * DAY, NOW + 10 * DAY, annual)).toBeNull();
   });
 });

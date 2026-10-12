@@ -142,7 +142,9 @@ const BORDER = 1;
 
 export function HealthUpdatePill() {
   const p = usePalette();
-  const { openSheet } = useSheets();
+  const { openSheet, depth } = useSheets();
+  const depthRef = useRef(depth);
+  depthRef.current = depth;
   const toast = useToast();
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<PillPhase>('hidden');
@@ -232,7 +234,7 @@ export function HealthUpdatePill() {
         // before the pill has said anything — the pill is the receipt for it.
         // Only the readings the app declines to file (poor-quality HRV) wait.
         const { auto, review } = splitForReview(fresh);
-        const { added } = importUpdates(auto, null);
+        const { added, workouts } = importUpdates(auto, null);
         // Both lanes are marked seen: a receipt the user dismisses without
         // reading is still a thing they were told, and a review row they
         // ignored is an answer. Settings → Apple Health is the way back.
@@ -241,6 +243,13 @@ export function HealthUpdatePill() {
           settle(() => {
             setFound({ dk: fresh.dk, imported: auto, importedCount: added, review });
             setPhase('found');
+            // Exactly ONE workout lands on its report, the same as importing
+            // one from the card. Never over a sheet that is already up: a
+            // reading in progress is not interrupted for a receipt, and the
+            // pill is still there to say what was filed.
+            if (workouts.length === 1 && workoutCurveFor(workouts[0]) && depthRef.current === 0 && AppState.currentState === 'active') {
+              openWorkoutReport(openSheet, workouts[0], fresh.dk, true);
+            }
           });
         } else {
           settle(hide);

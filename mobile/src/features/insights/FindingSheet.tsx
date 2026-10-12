@@ -36,7 +36,8 @@ import { acBandZones, acScoreZones, onDay } from '../../lib/analysis/buckets';
 import { TREND_METRICS } from '../../lib/trends';
 import { markColumn, type BiggestChange, type Correlation, type DetailSeries, type PressureInsight, type WatchItem } from '../../lib/insights';
 import { pressureHeadline } from '../../lib/insights/pressureCopy';
-import { LOW_BELOW_INHG } from '../../lib/pressure';
+import { LOW_BELOW_HPA } from '../../lib/pressure';
+import { fmtPressureGap } from '../../lib/units';
 import { CorrelationsAiButton, FindingCard, type FindingTile } from './Card';
 import * as S from './style';
 import { pingFinding } from '../../store/ping';
@@ -319,8 +320,9 @@ export function ChangeSheet({ change, series }: { change: BiggestChange; series:
           { value: change.afterValue, unit: change.unit, label: change.afterLabel, color },
           { value: change.changeValue, unit: change.changeUnit, label: 'Change', color },
         ],
-        pips: change.pips,
-        confidence: change.confidence,
+        pips: change.coverage ? undefined : change.pips,
+        confidence: change.coverage ? undefined : change.confidence,
+        ...(change.coverage ? { note: change.coverage } : {}),
         good: change.good,
         series,
       }]}
@@ -399,7 +401,7 @@ export function WatchSheet({ item }: { item: WatchItem }) {
  */
 export function PressureSheet({ pressure, detail }: { pressure: PressureInsight; detail: Record<string, DetailSeries> }) {
   const p = usePalette();
-  const shaded = `Shaded: low pressure days, ${LOW_BELOW_INHG.toFixed(2)} inHg or more below your usual. ${pressure.lowDays} of ${pressure.knownDays} days.`;
+  const shaded = `Shaded: low pressure days, ${fmtPressureGap(LOW_BELOW_HPA)} or more below your usual. ${pressure.lowDays} of ${pressure.knownDays} days.`;
   const stale = pressure.findings.some((f) => f.stale);
   return (
     <Body

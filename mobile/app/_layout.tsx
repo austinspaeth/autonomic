@@ -10,6 +10,7 @@ import { Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold } from '@exp
 import { IBMPlexMono_400Regular } from '@expo-google-fonts/ibm-plex-mono';
 import { SheetProvider } from '../src/components/Sheet';
 import { ToastProvider } from '../src/components/Toast';
+import { tapAwayBlur } from '../src/components/tapAway';
 import { OnboardingGate } from '../src/features/Onboarding';
 import { WatchArrivalCards } from '../src/features/WatchArrivals';
 import { GarminSyncPill } from '../src/features/hrv/GarminSyncPill';
@@ -43,7 +44,7 @@ import { usePalette } from '../src/theme';
 function Themed({ children }: { children: React.ReactNode }) {
   const p = usePalette();
   return (
-    <View style={{ flex: 1, backgroundColor: p.bg }}>
+    <View style={{ flex: 1, backgroundColor: p.bg }} {...tapAwayBlur}>
       <StatusBar style={p.dark ? 'light' : 'dark'} />
       {children}
     </View>

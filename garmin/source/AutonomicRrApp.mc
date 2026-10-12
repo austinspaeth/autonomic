@@ -42,9 +42,27 @@ class AutonomicRrApp extends Application.AppBase {
         _collector.stop();
         _collector.release();
         _monitor.stop();
-        // The one place the recording is torn down. Releasing it between
-        // readings puts the sensor back to ambient and the next reading never
-        // locks (see HighRate).
+        // Belt to the braces above: whichever mode was running has already
+        // discarded its session, and this catches one that did not get the
+        // chance. A session left open blocks every later reading.
+        Recording.end();
+    }
+
+    // The ONE way a reading ends — the five-minute clock, the button, back, or
+    // the collector giving up on the sensor. A reading with enough beats goes
+    // to the journal. One without goes nowhere as a reading, because the phone
+    // would refuse it, but a failed attempt the sensor was given a fair chance
+    // at is REPORTED in its place, so a watch that cannot get a signal shows
+    // up on the dashboard instead of in a support email months later.
+    function finishReading(reason) {
+        if (!_collector.isRunning()) { return; }
+        _collector.stop();
+        if (_collector.worthSending()) {
+            submit(_collector.payload());
+        } else if (_collector.worthReporting()) {
+            submit(_collector.diagPayload(reason));
+        }
+        WatchUi.requestUpdate();
     }
 
     // The phone acks by sending a message back. Registered unconditionally: it

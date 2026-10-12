@@ -4,11 +4,13 @@
  * this" button opens the score-explanation sheet (openScoreExplain).
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { type LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import { type LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, type TextStyle, View } from 'react-native';
 import Svg, { Defs, LinearGradient as SvgGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
 import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
 import { ScoreGauge } from '../components/charts';
 import { BrandMark, Icon } from '../components/Icon';
+import { CornerWeb } from '../components/Halloween';
+import { useHalloween } from '../store/seasonal';
 import { useSheets } from '../components/Sheet';
 import { SumCard, MetricRow } from '../components/summary';
 import { Button, useAccordion } from '../components/ui';
@@ -65,6 +67,18 @@ const WARN_BASE = '#0d0d0f';
  *  tap target, so the two sit on one baseline and the row's height never moves. */
 const GRADE_PILL_H = 26;
 
+/* The score inside the gauge, on Android. The ring centres the Text's LINE BOX,
+ * and the two platforms seat a glyph differently inside one: the scored card's
+ * `marginTop: 13` is tuned to iOS and dropped the number 7.5dp below the ring's
+ * centre on Android (measured on a Galaxy S25 Edge), and the unscored 0, with no
+ * nudge at all, still sat 5.7dp low under Android's font padding. Both cards
+ * therefore take ONE line box and one offset here. Tabular figures go too: a 1
+ * sits in the middle of a cell as wide as a 9, so "91" carried blank space on
+ * its right edge and leaned 3.5dp left of centre. Nothing in a ring is a column. */
+const GAUGE_NUM_ANDROID: TextStyle | null = Platform.OS === 'android'
+  ? { lineHeight: 62, marginTop: -2, fontVariant: undefined }
+  : null;
+
 /** Grades whose gauge burns. Compromised and below: the point at which the
  *  card stops describing a day and starts flagging one. */
 
@@ -85,6 +99,7 @@ function GradientBorderCard({ color, trigger, corner = 'topLeft', glow: wash, fl
   const p = usePalette();
   const [size, setSize] = useState({ w: 0, h: 0 });
   const [gid] = useState(() => `ob${obId++}`);
+  const halloween = useHalloween();
   const r = radius.card;
   // Glow "explosion": on mount and whenever `trigger`/`color` changes, the whole
   // border flashes full status color (thick + opaque), then eases down to reveal
@@ -191,6 +206,7 @@ function GradientBorderCard({ color, trigger, corner = 'topLeft', glow: wash, fl
           </Svg>
         </Animated.View>
       )}
+      {halloween ? <CornerWeb /> : null}
       {children}
       {color && size.w > 0 && (
         <View style={StyleSheet.absoluteFill} pointerEvents="none">
@@ -334,7 +350,8 @@ export function DaySummary({ dk }: { dk: string }) {
           )}
         </GradientBorderCard>
       )}
-      {/* The awareness-month giveaway: today only, until the window closes. */}
+      {/* The awareness-month giveaway: today only. The live card until the window
+          closes, then a "has ended" row through November 10th. */}
       <GiveawayCard dk={dk} />
       {/* Directly under the Outlook: the half-off year, time-boxed to 24h. */}
       <AnnualOfferCard />
@@ -486,7 +503,7 @@ function UnscoredHero({ dk, all, hasReadings, budget, pulse }: { dk: string; all
       <Text style={[T.section, { color: p.textDim }]}>Autonomic Outlook</Text>
       <View style={{ alignItems: 'center', marginVertical: 8 }}>
         <ScoreGauge score={0} color={grey} track={hexA(grey, 0.16)}>
-          <Text style={{ fontSize: 57, fontFamily: fonts.numHeavy, color: hexA(grey, 0.5), fontVariant: ['tabular-nums'], letterSpacing: -1 }}>0</Text>
+          <Text style={[{ fontSize: 57, fontFamily: fonts.numHeavy, color: hexA(grey, 0.5), fontVariant: ['tabular-nums'], letterSpacing: -1 }, GAUGE_NUM_ANDROID]}>0</Text>
         </ScoreGauge>
       </View>
       <Text style={{ textAlign: 'center', fontSize: 17, fontWeight: '700', color: p.text }}>{future ? 'Future day' : 'Awaiting data'}</Text>
@@ -812,7 +829,7 @@ function ScoredHero({ dk, readings, d, all, ctx, trend, budget, pulse, onExplain
       </View>
       <View style={{ alignItems: 'center', marginVertical: 8 }}>
         <ScoreGauge score={all.score!} color={cat.color}>
-          <Text style={{ fontSize: 57, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 62, marginTop: 13 }}>{all.score}</Text>
+          <Text style={[{ fontSize: 57, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 62, marginTop: 13 }, GAUGE_NUM_ANDROID]}>{all.score}</Text>
           <GaugeDeltas trend={trend} amDelta={delta} />
         </ScoreGauge>
       </View>
@@ -1259,7 +1276,7 @@ function ScoreExplain({ all, dk }: { all: ScoreSetResult; dk: string }) {
         </View>
         <View style={{ alignItems: 'center', marginVertical: 8 }}>
           <ScoreGauge score={all.score!} color={cat.color}>
-            <Text style={{ fontSize: 57, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 62, marginTop: 13 }}>{all.score}</Text>
+            <Text style={[{ fontSize: 57, fontFamily: fonts.numHeavy, color: p.text, fontVariant: ['tabular-nums'], letterSpacing: -1, lineHeight: 62, marginTop: 13 }, GAUGE_NUM_ANDROID]}>{all.score}</Text>
           </ScoreGauge>
         </View>
         <Text style={{ textAlign: 'center', fontSize: 13, color: p.textDim, fontWeight: '600' }}>{`Confidence ${all.confidence}%, the share of the full input set available to score today.`}</Text>

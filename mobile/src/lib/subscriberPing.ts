@@ -108,6 +108,9 @@ export type SubscriberMemory = {
     /** StoreKit's ORIGINAL transaction id: one per subscription, the same for
      *  every renewal, plan change and replay inside it. iOS only. */
     original?: string;
+    /** The door the purchase came through (`DoorCode` in ./ping): the wall
+     *  behind the paywall, or an offer card. Absent when not known. */
+    door?: string;
   };
   /** Purchases already reported as `sub`, newest last, by the same id. A
    *  purchase delivered again — StoreKit replaying an unfinished transaction on
@@ -159,7 +162,7 @@ export type SubscriberInput = {
 };
 
 export type SubscriberStep =
-  | { kind: 'sub'; plan?: PlanCode; evidence?: PurchaseEvidence }
+  | { kind: 'sub'; plan?: PlanCode; evidence?: PurchaseEvidence; door?: string }
   | { kind: 'rst' | 'lap'; plan?: PlanCode }
   | { kind: 'lapse-seen'; day: string }
   | { kind: 'lapse-clear' }
@@ -179,7 +182,7 @@ export function subscriberStep(m: SubscriberMemory, s: SubscriberInput): Subscri
   if (m.pending) {
     if ((m.pending.acked || s.activeAcked) && s.isPro) {
       if (m.lastSubDay === s.today) return { kind: 'drop-duplicate' };
-      return { kind: 'sub', plan: m.pending.plan ?? s.plan, evidence: m.pending.evidence };
+      return { kind: 'sub', plan: m.pending.plan ?? s.plan, evidence: m.pending.evidence, door: m.pending.door };
     }
     // The store now says there is no subscription behind it: the purchase was
     // refunded (Play does that to one left unacknowledged for three days) or
@@ -266,6 +269,7 @@ export function notePurchase(
   evidence?: PurchaseEvidence,
   txn?: string,
   original?: string,
+  door?: string,
 ): SubscriberMemory {
   if (duplicateOf(m, txn, original)) return m;
   // An install that already reported its sale, under a build that kept less
@@ -292,6 +296,9 @@ export function notePurchase(
       evidence: evidence === 'V' || prev?.evidence === 'V' ? 'V' : (evidence ?? prev?.evidence),
       txn: txn ?? prev?.txn,
       original: original ?? prev?.original,
+      // The first report to name a door keeps it: the listener and the
+      // entitlement query both describe the one purchase.
+      door: prev?.door ?? door,
     },
   };
 }

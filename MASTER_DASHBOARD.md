@@ -414,7 +414,7 @@ dismissed was **ignored**, and the card counts it rather than leaving it implied
 
 The card leads with **two tiles, not one with a rate on it**. *Offers raised* is
 a fact about the app's own pacing — the shared 7-day cool-down, the annual
-milestones at 30/90/180/365 days, the founding-member card's single day — and
+milestones at 50/90/365 days, the founding-member card's single day — and
 *Offers accepted* is a fact about the people; the rate between them lives in the
 funnel rows below, per offer, where it is over enough cards to carry a decimal
 point. Raised carries **two split rows**, outcome and platform, because they are

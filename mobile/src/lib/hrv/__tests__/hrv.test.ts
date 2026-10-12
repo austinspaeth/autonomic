@@ -7,7 +7,7 @@
  */
 import {
   SALVAGE_MAX_ARTIFACT_PCT, SALVAGE_MIN_COVERAGE_SEC, TROUBLE_GRACE_SEC,
-  computeHrv, correctArtifacts, fft, frequencyDomain, hopelessCoverage,
+  computeHrv, correctArtifacts, fft, frequencyDomain, hopelessCoverage, isRecovering, liveCoverage,
   parseHeartRateMeasurement, readingCompleteness, repairBeats, resampleTachogram, splitSegments, std,
   timeDomain, timeDomainSegments,
 } from '../index';
@@ -587,5 +587,136 @@ describe('stopping a reading that cannot get there', () => {
 
   it('is inert without a duration to judge against', () => {
     expect(hopelessCoverage({ usableSec: 0, elapsedSec: 300, durationSec: 0 })).toBe(false);
+  });
+});
+
+/**
+ * The stop rule against whole sessions, at the real five-minute duration.
+ *
+ * The unit tests above pin `hopelessCoverage`'s arithmetic. These pin what it
+ * is FED, which is where it failed: handed the raw sum of collected intervals,
+ * it let a session with minutes of pulse and no kept beats run to the end.
+ */
+describe('the stop rule on what triage will actually keep', () => {
+  const D = 300;
+
+  /** Walk a session second by second the way the store's clock does: `locks`
+   *  beats of pulse, `gapSec` of nothing, repeated, with `leadGap` seconds of
+   *  nothing first. Returns when the rule stopped it (or null) and the series. */
+  function session(lockBeats: number, gapSec: number, opts: { leadGap?: number; firstLock?: number } = {}) {
+    const rr: number[] = [];
+    const starts: number[] = [];
+    let t = opts.leadGap ?? 0;
+    let lastBeatAt = -Infinity;
+    let stoppedAt: number | null = null;
+    let next = 1;
+    let seed = 7;
+    const jitter = () => { seed = (seed * 16807) % 2147483647; return (seed / 2147483647 - 0.5) * 40; };
+    const tick = () => {
+      while (next <= t && next < D && stoppedAt === null) {
+        const live = liveCoverage(rr, { source: 'camera', segmentStarts: starts });
+        if (hopelessCoverage({
+          usableSec: live.keptSec + live.openSec, elapsedSec: next, durationSec: D,
+          growing: isRecovering({ sinceBeatSec: next - lastBeatAt, discarded: live.discarded }),
+        })) stoppedAt = next;
+        next += 1;
+      }
+    };
+    let first = true;
+    while (t < D && stoppedAt === null) {
+      if (rr.length) starts.push(rr.length);
+      const n = first && opts.firstLock ? opts.firstLock : lockBeats;
+      first = false;
+      for (let i = 0; i < n && t < D && stoppedAt === null; i++) {
+        const v = 850 + jitter();
+        rr.push(v); t += v / 1000; lastBeatAt = t; tick();
+      }
+      t += gapSec; tick();
+    }
+    return { stoppedAt, rr, starts };
+  }
+
+  it('counts nothing for stretches triage throws away', () => {
+    // Three closed 15-beat stretches and no open one: all under the 20-beat
+    // floor, so nothing is kept however much pulse was collected.
+    const rr = Array.from({ length: 45 }, () => 850);
+    const closed = liveCoverage([...rr, ...Array.from({ length: 25 }, () => 850)], { source: 'camera', segmentStarts: [15, 30, 45] });
+    expect(closed.keptSec).toBeCloseTo(25 * 0.85, 1);
+    expect(closed.openSec).toBe(0);
+    expect(closed.discarded).toBe(3);
+  });
+
+  it('counts the stretch still being collected as undecided, not lost', () => {
+    const live = liveCoverage(Array.from({ length: 27 }, () => 850), { source: 'camera', segmentStarts: [15] });
+    expect(live.keptSec).toBe(0);
+    expect(live.openSec).toBeCloseTo(12 * 0.85, 1);
+    expect(live.discarded).toBe(1);
+  });
+
+  it('reads a third broken stretch as a pattern, not a recovery', () => {
+    expect(isRecovering({ sinceBeatSec: 1, discarded: 2 })).toBe(true);
+    expect(isRecovering({ sinceBeatSec: 1, discarded: 3 })).toBe(false);
+    expect(isRecovering({ sinceBeatSec: 4, discarded: 0 })).toBe(false);
+  });
+
+  it('is empty on an empty series', () => {
+    expect(liveCoverage([], { source: 'camera' })).toEqual({ keptSec: 0, openSec: 0, discarded: 0 });
+  });
+
+  // The session the fault log is full of: the lock holds ten to fifteen
+  // seconds, breaks, and comes back. Raw pulse climbs past the salvage floor
+  // and every stretch is discarded.
+  it.each([[15, 4], [19, 2], [10, 10], [8, 25]])(
+    'stops a finger that keeps losing the lock (%i beats on, %is off)',
+    (beats, gap) => {
+      const s = session(beats, gap);
+      expect(s.stoppedAt).not.toBeNull();
+      expect(s.stoppedAt!).toBeLessThanOrEqual(90);
+    },
+  );
+
+  it('would have refused every one of those at the end, with nothing kept', () => {
+    // The verdict the old rule let them run five minutes to reach.
+    const rr: number[] = []; const starts: number[] = [];
+    for (let k = 0; k < 20; k++) { if (rr.length) starts.push(rr.length); for (let i = 0; i < 15; i++) rr.push(850); }
+    const r = computeHrv(rr, { source: 'camera', durationSec: D, segmentStarts: starts });
+    expect(r.ok).toBe(false);
+    expect(r.salvageable).toBe(false);
+    expect(r.rrClean.length).toBe(0);
+  });
+
+  it('never stops a clean reading', () => {
+    expect(session(400, 0).stoppedAt).toBeNull();
+  });
+
+  it('never stops a reading with one dropout in it', () => {
+    expect(session(150, 6).stoppedAt).toBeNull();
+  });
+
+  // A fumbled first half minute and then a steady finger. Judged on the rate at
+  // 0:45 this is hopeless; it goes on to be a perfectly good reading.
+  it('does not stop a reading that has just recovered', () => {
+    const s = session(400, 0, { leadGap: 38 });
+    expect(s.stoppedAt).toBeNull();
+    const r = computeHrv(s.rr, { source: 'camera', durationSec: D, segmentStarts: s.starts });
+    expect(r.ok).toBe(true);
+  });
+
+  it('still stops a recovery that breaks again', () => {
+    // Settles at 0:38, loses the lock ten beats later, and keeps doing that.
+    const s = session(10, 6, { leadGap: 38 });
+    expect(s.stoppedAt).not.toBeNull();
+    expect(s.stoppedAt!).toBeLessThanOrEqual(75);
+  });
+
+  it('stops a session with no pulse at all at the end of the grace period', () => {
+    expect(hopelessCoverage({ usableSec: 0, elapsedSec: TROUBLE_GRACE_SEC, durationSec: D })).toBe(true);
+  });
+
+  it('defers the judgement, never the proof, while pulse is arriving', () => {
+    // 20 s kept at 4:00: the best case is 80 s of a 150 s bar. Finished.
+    expect(hopelessCoverage({ usableSec: 20, elapsedSec: 240, durationSec: D, growing: true })).toBe(true);
+    expect(hopelessCoverage({ usableSec: 5, elapsedSec: 50, durationSec: D, growing: true })).toBe(false);
+    expect(hopelessCoverage({ usableSec: 5, elapsedSec: 50, durationSec: D })).toBe(true);
   });
 });

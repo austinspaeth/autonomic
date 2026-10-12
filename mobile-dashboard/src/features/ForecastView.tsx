@@ -18,6 +18,7 @@ import { Card } from '../components/ui';
 import { useData } from '../lib/data';
 import { addDays, easternDay } from '../lib/dates';
 import { actuals, paceLevers, scenarios, type Levers } from '../lib/forecast';
+import { clearLeverOverrides, setLeverOverride, useLeverOverrides } from '../lib/forecastLevers';
 import { int, money } from '../lib/format';
 import { ledger } from '../lib/sales';
 import { buildBase, type StoreFilter } from '../lib/store';
@@ -75,12 +76,13 @@ export function ForecastView({ platform, horizon }: { platform: StoreFilter; hor
     return actuals(base, l, end);
   }, [snap, platform, base]);
   const pace = useMemo(() => paceLevers(a), [a]);
-  const [levers, setLevers] = useState<Levers>(pace);
-  const [live, setLive] = useState<Levers>(pace);
-  useEffect(() => {
-    setLevers(pace);
-    setLive(pace);
-  }, [pace]);
+  /* The levers are the measured pace with whatever was set by hand laid over
+     it, and what was set by hand is kept (lib/forecastLevers), so nothing here
+     goes back on its own. `drag` is a slider mid-move, not yet let go. */
+  const held = useLeverOverrides();
+  const levers = useMemo<Levers>(() => ({ ...pace, ...held }), [pace, held]);
+  const [drag, setDrag] = useState<Partial<Levers>>({});
+  const live = useMemo<Levers>(() => ({ ...levers, ...drag }), [levers, drag]);
 
   const result = useMemo(() => scenarios(base, a, live, Number(horizon)), [base, a, live, horizon]);
   const e = result.expected;
@@ -206,8 +208,8 @@ export function ForecastView({ platform, horizon }: { platform: StoreFilter; hor
               hitSlop={8}
               onPress={() => {
                 Haptics.selectionAsync();
-                setLevers(pace);
-                setLive(pace);
+                clearLeverOverrides();
+                setDrag({});
               }}
               style={({ pressed }) => [s.reset, (!changed || pressed) && { opacity: 0.45 }]}
             >
@@ -245,14 +247,14 @@ export function ForecastView({ platform, horizon }: { platform: StoreFilter; hor
                 c={c}
                 value={valueOf(live, c.key)}
                 base={baseOf(c.key)}
-                onLive={(v) => setLive((l) => ({ ...l, [c.key]: v }))}
+                onLive={(v) => setDrag((d) => ({ ...d, [c.key]: v }))}
                 onDone={(v) => {
-                  setLevers((l) => ({ ...l, [c.key]: v }));
-                  setLive((l) => ({ ...l, [c.key]: v }));
+                  setLeverOverride(c.key, v);
+                  setDrag({});
                 }}
                 onReset={() => {
-                  setLevers((l) => ({ ...l, [c.key]: pace[c.key] }));
-                  setLive((l) => ({ ...l, [c.key]: pace[c.key] }));
+                  setLeverOverride(c.key, undefined);
+                  setDrag({});
                 }}
               />
             ))}

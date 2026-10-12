@@ -13,7 +13,9 @@
  *    even for types with journal history — the Journal skips orphaned rows);
  *    edit/add open a small card for the name (+ default dose for meds).
  *
- * Meds and symptoms log day-array entries; triggers set day.food.triggers[k].
+ * Meds and symptoms log day-array entries; triggers set day.food.triggers[k]
+ * and one log per trigger (lib/triggerLogs). Triggers and symptoms then open
+ * `LogGroupCard` for the group's time and note.
  */
 import React, { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
@@ -30,6 +32,8 @@ import { loadOf, type LoadWeight } from '../lib/budget/load';
 import { ensureDay, getState, save, upsertEntry, useAppState } from '../store/store';
 import { pingLogged } from '../store/ping';
 import { defaultTimeFor, isPastDay, uid } from '../lib/dates';
+import { logTriggers } from '../lib/triggerLogs';
+import { LogGroupCard, logGroupSheetOptions, type LogGroup } from './LogGroupCard';
 
 export type LogKind = 'meds' | 'symptoms' | 'triggers';
 
@@ -196,18 +200,28 @@ export function LogPickerSheet({ kind, dk, controls }: { kind: LogKind; dk: stri
   const logSelected = () => {
     if (!count) return;
     const picked = keys.filter((k) => sel[k]);
+    // Triggers and symptoms are followed by the group card: what went in
+    // together, over a time and a note for all of it. It stacks on this picker
+    // and takes the whole stack with it when it closes, since the picker
+    // underneath is finished with.
+    const openGroup = (group: LogGroup) => openSheet(
+      (c) => <LogGroupCard dk={dk} group={group} fresh controls={c} />,
+      { ...logGroupSheetOptions(picked.length), dismissAll: true },
+    );
     if (kind === 'triggers') {
-      const trigs = ensureDay(dk).food.triggers;
-      picked.forEach((k) => { trigs[k] = 1; });
+      const logs = logTriggers(ensureDay(dk).food, picked, defaultTimeFor(dk));
       save();
-    } else {
-      picked.forEach((k) => {
-        const entry: Entry = { id: uid(), type: k, time: defaultTimeFor(dk), note: '' };
-        if (kind === 'meds' && typeMap[k].dosage) entry.amount = typeMap[k].dosage;
-        upsertEntry(dk, kind, entry);
-      });
-      pingLogged(kind);
+      openGroup({ kind, logIds: logs.map((l) => l.id) });
+      return;
     }
+    const ids = picked.map((k) => {
+      const entry: Entry = { id: uid(), type: k, time: defaultTimeFor(dk), note: '' };
+      if (kind === 'meds' && typeMap[k].dosage) entry.amount = typeMap[k].dosage;
+      upsertEntry(dk, kind, entry);
+      return entry.id;
+    });
+    pingLogged(kind);
+    if (kind === 'symptoms') { openGroup({ kind, ids }); return; }
     toast(count === 1 ? 'Logged 1 item' : `Logged ${count} items`);
     controls.closeAll();
   };

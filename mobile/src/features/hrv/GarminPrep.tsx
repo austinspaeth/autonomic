@@ -27,7 +27,7 @@ import type { SessionConfig } from './sessionStore';
 const STEPS = [
   {
     title: 'Open Autonomic on your watch',
-    sub: 'It is in the Activities & Apps list. The button below can open it for you.',
+    sub: 'It is in the Activities & Apps list on the watch.',
   },
   {
     title: 'Choose HRV Reading, then Start on the watch',

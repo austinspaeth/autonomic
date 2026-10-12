@@ -233,6 +233,7 @@ export function AiReportsSheet(_props: { controls?: SheetControls }) {
           rangeText={rangeText}
           prompt={buildDataExport(state, ctx, range, todayKey())}
           controls={c}
+          closeAllOnCopy
           subtitle="Structured data only, no analysis prompt. Paste it into an AI to get specific reports or data back."
         />
       ));
@@ -240,12 +241,12 @@ export function AiReportsSheet(_props: { controls?: SheetControls }) {
     }
 
     if (kind === 'doctor') {
-      openSheet((c) => <PromptSheet title="Medical summary for doctor" rangeText={rangeText} prompt={buildDoctorPrompt(state, ctx, range, todayKey())} controls={c} />);
+      openSheet((c) => <PromptSheet title="Medical summary for doctor" rangeText={rangeText} prompt={buildDoctorPrompt(state, ctx, range, todayKey())} controls={c} closeAllOnCopy />);
       return;
     }
 
     const card = REPORT_CARDS.find((x) => x.id === 'overall')!;
-    openSheet((c) => <PromptSheet title="Full health report" rangeText={rangeText} prompt={buildPrompt(state, ctx, [card], range, todayKey())} controls={c} />);
+    openSheet((c) => <PromptSheet title="Full health report" rangeText={rangeText} prompt={buildPrompt(state, ctx, [card], range, todayKey())} controls={c} closeAllOnCopy />);
   };
 
   return (

@@ -20,11 +20,13 @@ import { BlurView } from 'expo-blur';
 import { SymbolView, type SFSymbol } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { PLAN_CHIP, SENSOR_CHIP, STORE_CHIP, TIER, type AlertEvent, type AlertRow } from '../lib/alerts';
+import { PLAN_CHIP, SENSOR_CHIP, singleCohort, STORE_CHIP, TIER, type AlertEvent, type AlertRow } from '../lib/alerts';
 import { toastRank, useAlerts } from '../lib/alertsStore';
+import { useData } from '../lib/data';
+import { ConvertButton, SaleFromPingSheet, subscribePings, type SubPing } from '../features/AddSheet';
 import { setView } from '../lib/views';
-import { longDate } from '../lib/dates';
-import { useWide } from '../lib/wide';
+import { addDays, longDate, shortDate } from '../lib/dates';
+import { BOARD_GUTTER, useWide, WIDE_FILTER_MARGIN } from '../lib/wide';
 import { C, num } from '../theme';
 import { BOTTOM_CHROME, Segmented } from './ui';
 
@@ -73,25 +75,41 @@ function Chip({ label, tone }: { label: string; tone?: string }) {
   );
 }
 
-export function InstallRows({ event }: { event: AlertEvent }) {
+/** The subscribe ping a sale alert's row was raised from, when the report still holds it. */
+function pingOf(pings: SubPing[], r: AlertRow): SubPing | undefined {
+  const day = addDays(r.cohort, r.age);
+  const plan = PLAN_CHIP[r.slot] ? r.slot : null;
+  return pings.find((p) => p.date === day && p.cohort === r.cohort && p.store === r.platform && p.tier === r.tier && p.planLetter === plan);
+}
+
+/* `onConvert` puts a Convert button on each row of a SALE, the one App usage
+   has on a reported subscription; a row already in the ledger reads Converted.
+   A row whose ping has left the report gets neither. */
+export function InstallRows({ event, onConvert }: { event: AlertEvent; onConvert?: (p: SubPing) => void }) {
+  const { snap } = useData();
+  const pings = useMemo(() => (onConvert && event.kind === 'sale' ? subscribePings(snap) : []), [snap, onConvert, event.kind]);
   if (!event.rows.length) return null;
   const slotName = (r: AlertRow) =>
     event.kind === 'reading' ? SENSOR_CHIP[r.slot] : event.kind === 'sale' || event.kind === 'restore' || event.kind === 'lapse' ? PLAN_CHIP[r.slot] || 'Plan unknown' : null;
   return (
     <View style={st.rows}>
-      {event.rows.map((r, i) => (
-        <View key={i} style={st.row}>
-          <Text style={[st.rowN, num]}>{r.n}×</Text>
-          <View style={st.chips}>
-            <Chip label={STORE_CHIP[r.platform] || 'Unknown store'} tone={r.platform === 'I' ? C.ios : r.platform === 'A' ? C.android : undefined} />
-            <Chip label={TIER[r.tier] || 'Tier unknown'} tone={r.tier === 'P' ? '#c98500' : r.tier === 'T' ? '#199e70' : undefined} />
-            {slotName(r) ? <Chip label={slotName(r)!} /> : null}
-            {r.version ? <Chip label={`v${r.version}`} /> : null}
-            <Chip label={r.age === 0 ? 'Installed today' : `Day ${r.age}`} />
-            {r.first ? <Chip label="First ever" tone="#ff375f" /> : null}
+      {event.rows.map((r, i) => {
+        const ping = pings.length ? pingOf(pings, r) : undefined;
+        return (
+          <View key={i} style={st.row}>
+            <Text style={[st.rowN, num]}>{r.n}×</Text>
+            <View style={st.chips}>
+              <Chip label={STORE_CHIP[r.platform] || 'Unknown store'} tone={r.platform === 'I' ? C.ios : r.platform === 'A' ? C.android : undefined} />
+              <Chip label={TIER[r.tier] || 'Tier unknown'} tone={r.tier === 'P' ? '#c98500' : r.tier === 'T' ? '#199e70' : undefined} />
+              {slotName(r) ? <Chip label={slotName(r)!} /> : null}
+              {r.version ? <Chip label={`v${r.version}`} /> : null}
+              <Chip label={r.age === 0 ? 'Installed today' : `Day ${r.age}`} />
+              {r.first ? <Chip label="First ever" tone="#ff375f" /> : null}
+            </View>
+            {ping && onConvert ? <ConvertButton converted={!ping.remaining} onConvert={() => onConvert(ping)} /> : null}
           </View>
-        </View>
-      ))}
+        );
+      })}
     </View>
   );
 }
@@ -127,6 +145,24 @@ const BLUR = 95;
 const APPEAR = { duration: 420, easing: Easing.out(Easing.cubic) };
 const APPEAR_SCALE = 0.08;
 const APPEAR_LIFT = 18;
+/* Once the entrance is over the card's resting look is ALSO written as plain
+   React style, after the animated one. Reanimated keeps React's copy of an
+   animated style at its INITIAL values (here: transparent, intensity 0) and
+   holds the live values in a registry it clears two seconds after they stop
+   changing, handing them back to React from a 500ms JS timer first. When that
+   timer does not run in the window (the app left the foreground, the Mac copy
+   napping behind other windows, a long parse on the JS thread) the values are
+   dropped unsynced, and the next render puts the card back at its initial
+   style: a deck with a "Close all" pill and nothing in it, or an outline
+   around nothing when only the wrapper had been synced. */
+const ENTERED_MS = APPEAR.duration + 120;
+const BORDER = 'rgba(255,255,255,0.16)';
+
+/** The wide column: how wide a toast is, and how many stand in it (the count says how many there are). */
+const COLUMN_W = 360;
+const COLUMN_MAX = 5;
+/** Roughly how much of the window's middle the wide filter bar takes. */
+const WIDE_FILTER_SPAN = 680;
 
 const AnimatedBlur = Animated.createAnimatedComponent(BlurView);
 
@@ -143,6 +179,16 @@ function liftOut() {
 
 /** The toast's one line: the first two facts of the sentence, nothing more. */
 const short = (body: string) => body.split(' · ').slice(0, 2).join(' · ');
+/** That line, led by the install day when everybody in the event shares one. */
+const toastLine = (e: AlertEvent) => {
+  const cohort = singleCohort(e);
+  if (!cohort) return short(e.body);
+  // How old that install was when it pinged: one age, or the span when the event covers more than one day.
+  const ages = e.rows.map((r) => r.age);
+  const lo = Math.min(...ages);
+  const hi = Math.max(...ages);
+  return [`Installed ${shortDate(cohort)} D${lo === hi ? lo : `${lo}–${hi}`}`, short(e.body)].filter(Boolean).join(' · ');
+};
 
 const SWIPE_OUT = 90;
 
@@ -151,11 +197,14 @@ function Toast({
   depth,
   onClose,
   onHeight,
+  column,
 }: {
   event: AlertEvent;
   depth: number;
   onClose: () => void;
   onHeight?: (h: number) => void;
+  /** Wide screens: one of a column of whole toasts, not a card in a deck. */
+  column?: boolean;
 }) {
   const [swiped, setSwiped] = useState(false);
   const d = useSharedValue(depth);
@@ -164,8 +213,11 @@ function Toast({
   useEffect(() => {
     d.value = withTiming(depth, EASE);
   }, [depth, d]);
+  const [entered, setEntered] = useState(false);
   useEffect(() => {
     appear.value = withTiming(1, APPEAR);
+    const t = setTimeout(() => setEntered(true), ENTERED_MS);
+    return () => clearTimeout(t);
   }, [appear]);
 
   const gone = (dir: number) => {
@@ -207,31 +259,45 @@ function Toast({
      the jagged entrance this replaced. The wrapper's border, the content and
      the blur's own intensity fade instead. */
   const style = useAnimatedStyle(() => ({
-    opacity: (d.value > MAX_DEPTH - 0.01 ? 0 : 1) * (1 - Math.min(1, Math.abs(tx.value) / 360)),
+    opacity: (!column && d.value > MAX_DEPTH - 0.01 ? 0 : 1) * (1 - Math.min(1, Math.abs(tx.value) / 360)),
     borderColor: `rgba(255,255,255,${0.16 * appear.value})`,
+    // In a column every toast stands in its own place, so only the entrance moves it.
     transform: [
-      { translateY: -PEEK * d.value - APPEAR_LIFT * (1 - appear.value) },
+      { translateY: (column ? 0 : -PEEK * d.value) - APPEAR_LIFT * (1 - appear.value) },
       { translateX: tx.value },
-      { scale: (1 - SHRINK * d.value) * (1 + APPEAR_SCALE * (1 - appear.value)) },
+      { scale: (column ? 1 : 1 - SHRINK * d.value) * (1 + APPEAR_SCALE * (1 - appear.value)) },
     ],
   }));
   const fade = useAnimatedStyle(() => ({ opacity: appear.value }));
   const blur = useAnimatedProps(() => ({ intensity: BLUR * appear.value }));
+  /* Where the card rests, as React knows it (see ENTERED_MS). The animated
+     style still draws every move; this is what is left if its values are lost. */
+  const resting = entered
+    ? {
+        opacity: column || depth < MAX_DEPTH ? 1 : 0,
+        borderColor: BORDER,
+        transform: [{ translateY: column ? 0 : -PEEK * depth }, { translateX: 0 }, { scale: column ? 1 : 1 - SHRINK * depth }],
+      }
+    : null;
+  const shown = entered ? st.shown : null;
   const k = KIND_STYLE[event.kind];
-  const front = depth === 0;
+  // Every toast in a column can be read, swiped and closed; in a deck only the front one.
+  const front = column || depth === 0;
   return (
     <Animated.View
       exiting={swiped ? undefined : liftOut}
+      layout={column ? ROW_EASE : undefined}
       pointerEvents={front ? 'auto' : 'none'}
-      onLayout={front ? (e) => onHeight?.(e.nativeEvent.layout.height) : undefined}
-      style={[st.toastWrap, { zIndex: 100 - depth, transformOrigin: 'bottom' }, style]}
+      onLayout={!column && front ? (e) => onHeight?.(e.nativeEvent.layout.height) : undefined}
+      style={[column ? st.toastCol : st.toastWrap, column ? null : { zIndex: 100 - depth, transformOrigin: 'bottom' }, style, resting]}
       {...(front ? pan.panHandlers : {})}
     >
-      <AnimatedBlur tint="systemChromeMaterialDark" animatedProps={blur} style={StyleSheet.absoluteFill} />
-      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: `${k.color}12` }, fade]} />
+      {/* animatedProps always outrank an inline prop, so the settled blur drops them. */}
+      <AnimatedBlur tint="systemChromeMaterialDark" animatedProps={entered ? undefined : blur} intensity={entered ? BLUR : 0} style={StyleSheet.absoluteFill} />
+      <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: `${k.color}12` }, fade, shown]} />
       {/* Tapping a toast closes it and goes to App usage. The ✕ and a swipe
           only close it. */}
-      <Animated.View style={[st.toastFill, fade]}>
+      <Animated.View style={[st.toastFill, fade, shown]}>
         <Pressable
           onPress={() => {
             setView('usage');
@@ -246,7 +312,7 @@ function Toast({
                 {event.title}
               </Text>
               <Text style={st.body} numberOfLines={1}>
-                {short(event.body)}
+                {toastLine(event)}
               </Text>
             </View>
           </View>
@@ -277,7 +343,36 @@ export function ToastStack({ raisedBy = 0 }: { raisedBy?: number }) {
     .filter((e): e is AlertEvent => !!e)
     .sort((a, b) => rank(a.kind) - rank(b.kind));
   if (!shown.length) return null;
-  const bottom = insets.bottom + (wide ? 0 : BOTTOM_CHROME) + raisedBy + 10;
+  /* Wide: the web dashboard's toasts. A column in the bottom right corner,
+     most important at the bottom, each one whole. It sits level with the
+     filter bar when the window has room beside that bar, and above it when
+     it does not. */
+  if (wide) {
+    const beside = (winW - WIDE_FILTER_SPAN) / 2 >= COLUMN_W + BOARD_GUTTER + 16;
+    return (
+      <View pointerEvents="box-none" style={[st.column, { right: BOARD_GUTTER, bottom: insets.bottom + (beside ? WIDE_FILTER_MARGIN : raisedBy + 10) }]}>
+        {shown.slice(0, COLUMN_MAX).map((e, i) => (
+          <Toast key={e.id} column event={e} depth={i} onClose={() => dismiss(e.id)} />
+        ))}
+        {shown.length > 1 ? (
+          <Animated.View layout={ROW_EASE} entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={{ alignSelf: 'flex-end' }}>
+            <Pressable
+              onPress={() => {
+                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+                dismissAll();
+              }}
+              style={({ pressed }) => [st.closeAll, pressed && { opacity: 0.7 }]}
+            >
+              <BlurView tint="systemChromeMaterialDark" intensity={90} style={StyleSheet.absoluteFill} />
+              <SymbolView name="xmark" size={10} weight="bold" tintColor={C.text} />
+              <Text style={st.closeAllText}>Close all · {shown.length}</Text>
+            </Pressable>
+          </Animated.View>
+        ) : null}
+      </View>
+    );
+  }
+  const bottom = insets.bottom + BOTTOM_CHROME + raisedBy + 10;
   const behind = Math.min(shown.length - 1, MAX_DEPTH - 1);
   const front = Math.max(TOAST_H, frontH);
   return (
@@ -318,6 +413,7 @@ export function AlertHistory() {
   const { history, clearHistory } = useAlerts();
   const [open, setOpen] = useState<string | null>(null);
   const [tab, setTab] = useState<HistoryTab>('all');
+  const [draft, setDraft] = useState<SubPing | null>(null);
   const shown = tab === 'all' ? history : history.filter((e) => e.kind === tab);
   const groups = new Map<string, AlertEvent[]>();
   shown.forEach((e) => {
@@ -379,7 +475,7 @@ export function AlertHistory() {
                           </View>
                           {isOpen ? (
                             <Animated.View entering={FadeIn.duration(200)}>
-                              <InstallRows event={e} />
+                              <InstallRows event={e} onConvert={setDraft} />
                             </Animated.View>
                           ) : null}
                         </Pressable>
@@ -394,6 +490,8 @@ export function AlertHistory() {
             </Pressable>
         </Animated.View>
       </ScrollView>
+      {/* Inside the history, so the sale form rises over it. */}
+      <SaleFromPingSheet ping={draft} onClose={() => setDraft(null)} />
     </View>
   );
 }
@@ -424,7 +522,16 @@ const st = StyleSheet.create({
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: 'rgba(255,255,255,0.16)',
   },
+  column: { position: 'absolute', width: COLUMN_W, flexDirection: 'column-reverse', gap: 10 },
+  toastCol: {
+    height: TOAST_H,
+    borderRadius: 22,
+    overflow: 'hidden',
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: 'rgba(255,255,255,0.16)',
+  },
   toastFill: { flex: 1 },
+  shown: { opacity: 1 },
   toast: { flex: 1, justifyContent: 'center', paddingHorizontal: 14, paddingVertical: 12 },
   timeCorner: { position: 'absolute', right: 14, bottom: 10, color: C.muted, fontSize: 11 },
   toastHead: { flexDirection: 'row', alignItems: 'center', gap: 12 },

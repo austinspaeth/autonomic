@@ -5,7 +5,7 @@
  * must (a) recover the mean RR / HR within tolerance, (b) beat frame-clock
  * quantization via sub-frame refinement, and (c) reject junk.
  */
-import { assessPulse, bandpass, detectBeats, fingerPresent } from '../detect';
+import { assessPulse, bandpass, detectBeats, fingerPresent, neighbourDeviation, STEADY_MAX_NEIGHBOUR_DEV } from '../detect';
 
 /** Brightness series at `fps` for `seconds`, pulsing at `bpm`. */
 function makeSeries(opts: {
@@ -151,5 +151,68 @@ describe('assessPulse as the emission gate', () => {
     const ts = Array.from({ length: 150 }, (_, i) => (i / 30) * 1000);
     const vs = ts.map((_, i) => 150 + 18 * Math.sin(12.9898 * i) * Math.cos(78.233 * i));
     expect(assessPulse(ts, vs)).not.toBe('good');
+  });
+});
+
+/**
+ * A pulse that is SWEEPING is not a pulse that is noisy.
+ *
+ * Paced breathing drives the heart rate up and down once per breath, so a
+ * five-second window catches it mid-sweep. Graded on spread around the mean,
+ * deep breathing lost the lock once a breath and the whole reading was thrown
+ * away in pieces too short to keep.
+ */
+describe('a steady pulse may have a direction', () => {
+  /** Brightness for a heart whose rate swings +-`rsa` once per `breathSec`. */
+  function breathing(rsa: number, opts: { seconds?: number; breathSec?: number; noise?: number } = {}) {
+    const { seconds = 60, breathSec = 10, noise = 0 } = opts;
+    const fps = 30;
+    const ts: number[] = []; const vs: number[] = [];
+    let phase = 0;
+    for (let i = 0; i < seconds * fps; i++) {
+      const t = i / fps;
+      phase += ((68 / 60) * (1 + rsa * Math.sin((2 * Math.PI * t) / breathSec))) / fps;
+      let v = 150 + 10 * Math.cos(2 * Math.PI * phase) + 2.5 * Math.cos(4 * Math.PI * phase + 1);
+      if (noise) v += noise * Math.sin(12.9898 * i) * Math.cos(78.233 * i);
+      ts.push(t * 1000); vs.push(v);
+    }
+    return { ts, vs };
+  }
+  /** Share of 5 s windows across the series the gate calls 'good'. */
+  function lockedShare(sig: { ts: number[]; vs: number[] }) {
+    let good = 0; let n = 0;
+    for (let end = 10000; end <= sig.ts[sig.ts.length - 1]; end += 250) {
+      const lo = sig.ts.findIndex((t) => t >= end - 5000);
+      const hi = sig.ts.findIndex((t) => t >= end);
+      if (assessPulse(sig.ts.slice(lo, hi), sig.vs.slice(lo, hi)) === 'good') good += 1;
+      n += 1;
+    }
+    return good / n;
+  }
+
+  it('scores an even ramp as perfectly steady and a jittery one as not', () => {
+    expect(neighbourDeviation([700, 800, 900, 1000, 1100])).toBeCloseTo(0, 6);
+    expect(neighbourDeviation([900, 600, 1100, 650, 1000])).toBeGreaterThan(STEADY_MAX_NEIGHBOUR_DEV);
+    expect(neighbourDeviation([800, 820])).toBe(Infinity);
+  });
+
+  it('holds the lock through deep paced breathing', () => {
+    // A rate swinging +-28% at a 10 s breath: about 50 to 87 bpm and back. The
+    // mean criterion alone drops this once per breath.
+    expect(lockedShare(breathing(0.28))).toBe(1);
+    expect(lockedShare(breathing(0.24, { noise: 4 }))).toBeGreaterThan(0.97);
+  });
+
+  it('still refuses a missed beat and a doubled one', () => {
+    // One interval twice its neighbours, and one split in two.
+    expect(neighbourDeviation([850, 860, 1700, 850, 845])).toBeGreaterThan(STEADY_MAX_NEIGHBOUR_DEV);
+    expect(neighbourDeviation([850, 860, 420, 430, 850])).toBeGreaterThan(STEADY_MAX_NEIGHBOUR_DEV);
+  });
+
+  it('admits nothing for being noisy that the mean criterion refused', () => {
+    // Intervals scattered around a mean with no direction: far enough to fail
+    // a CV of 0.18, and nowhere near their neighbours' midpoints either.
+    const scattered = [900, 640, 1130, 700, 1090, 660];
+    expect(neighbourDeviation(scattered)).toBeGreaterThan(2 * STEADY_MAX_NEIGHBOUR_DEV);
   });
 });

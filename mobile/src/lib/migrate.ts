@@ -26,6 +26,7 @@ import type {
   Protocol,
   SleepRecord,
   ThemeSetting,
+  TriggerLog,
   TypeDef,
 } from './types';
 
@@ -149,10 +150,26 @@ function cleanFood(v: unknown): FoodRecord {
       if (n > 0 && k !== '__proto__') triggers[k] = n;
     }
   }
+  // Groups are an annotation over the counts, so a type a group names is
+  // present in the counts whatever the file said.
+  const triggerLogs: TriggerLog[] = [];
+  if (Array.isArray(f.triggerLogs)) {
+    for (const l of f.triggerLogs) {
+      if (!isPlainObject(l) || !Array.isArray(l.types)) continue;
+      const types = l.types.filter((t): t is string => typeof t === 'string' && !!t && t !== '__proto__');
+      if (!types.length) continue;
+      const log: TriggerLog = { id: typeof l.id === 'string' && l.id ? l.id : uid(), types };
+      if (typeof l.time === 'string') log.time = l.time;
+      if (typeof l.note === 'string') log.note = l.note;
+      types.forEach((t) => { if (!(triggers[t] > 0)) triggers[t] = 1; });
+      triggerLogs.push(log);
+    }
+  }
   return {
     water: num(f.water),
     calories: num(f.calories),
     triggers,
+    ...(triggerLogs.length ? { triggerLogs } : null),
     meals: cleanEntries(f.meals) as Meal[],
   };
 }
@@ -315,6 +332,7 @@ export function migrate(s: unknown): AppState {
   if (settings.lastBleDeviceId !== undefined && typeof settings.lastBleDeviceId !== 'string') delete settings.lastBleDeviceId;
   if (settings.lastBleDeviceName !== undefined && typeof settings.lastBleDeviceName !== 'string') delete settings.lastBleDeviceName;
   if (settings.healthEnabled !== undefined) settings.healthEnabled = !!settings.healthEnabled;
+  if (settings.units !== undefined && settings.units !== 'imperial' && settings.units !== 'metric') delete settings.units;
   if (settings.lastHrvSource !== undefined && !['polar', 'watch', 'garmin', 'camera'].includes(settings.lastHrvSource as string)) delete settings.lastHrvSource;
   // A reminder only ever schedules from a real HH:MM; anything else is dropped
   // rather than defaulted, so an odd import can't silently arm a notification.

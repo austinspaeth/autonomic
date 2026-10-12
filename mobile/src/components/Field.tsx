@@ -5,13 +5,16 @@
  * form-state hook collects values keyed by field key.
  */
 import React, { useRef, useState } from 'react';
-import { Platform, Pressable, Switch, Text, TextInput, View } from 'react-native';
+import { Platform, Pressable, StyleProp, Text, TextInput, View, ViewStyle } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
+import Reanimated, { Easing, interpolate, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import { radius, usePalette } from '../theme';
-import { Button } from './ui';
+import { Button, Toggle } from './ui';
+import { keepsFocus } from './tapAway';
 import { SheetControls, useSheets } from './Sheet';
 import type { Entry, FieldDef } from '../lib/types';
 import { fieldLabel, isDivider, isNumberField } from '../lib/registry';
+import { fieldShown, fieldUnit, fmtHeight as fmtHeightIn } from '../lib/units';
 import { dateFromKey, fmtDateFull, fmtTime12, keyOf, nowTime } from '../lib/dates';
 
 
@@ -34,7 +37,9 @@ export function useFormState(fields: FieldDef[], initial: Entry): [FormState, (k
       // An optional time (a symptom's end) stays empty until the user sets one;
       // every other time field defaults to now.
       else if (f.type === 'time') s[f.key] = (initial[f.key] as string) || (f.optional ? '' : nowTime());
-      else s[f.key] = initial[f.key] != null ? String(initial[f.key]) : '';
+      // A field stored in another unit (distance, in miles) opens in the
+      // user's own; EntryForm converts it back on save.
+      else s[f.key] = initial[f.key] != null ? fieldShown(f.unit, initial[f.key]) : '';
     });
     return s;
   });
@@ -47,41 +52,147 @@ export function FieldLabel({ children }: { children: React.ReactNode }) {
   return <Text style={{ fontSize: 14, fontWeight: '600', color: p.textDim, marginBottom: 6 }}>{children}</Text>;
 }
 
-export function TextField({ label, value, onChange, onBlur, keyboardType, placeholder, multiline, signed, onToggleSign, inputRef }: {
-  label: string; value: string; onChange: (v: string) => void; onBlur?: () => void;
-  keyboardType?: 'default' | 'numeric' | 'decimal-pad'; placeholder?: string; multiline?: boolean;
-  signed?: boolean; onToggleSign?: () => void; inputRef?: React.Ref<TextInput>;
+/* ---------- the field shell ----------
+ * Every input in the app is one box: the label rests in the middle of an empty
+ * field like a placeholder, and travels to the top-left corner when the field
+ * is focused or holds a value, leaving the line below it for the value. A unit
+ * sits right-aligned on the value's line. */
+export const FIELD_H = 64;
+const LABEL_REST = { top: 21, size: 18 };
+const LABEL_UP = { top: 10, size: 12.5 };
+/** How far the value line sits below the box's centre. */
+const VALUE_DROP = 9;
+const VALUE_SIZE = 18;
+const FOCUS_LABEL = '#e8807c';
+const FOCUS_GLOW = 'rgba(224,49,39,0.12)';
+
+/** 0 = label resting in the middle, 1 = label up in the corner. */
+function useFloat(up: boolean) {
+  const t = useSharedValue(up ? 1 : 0);
+  React.useEffect(() => { t.value = withTiming(up ? 1 : 0, { duration: 180, easing: Easing.out(Easing.cubic) }); }, [up, t]);
+  return t;
+}
+
+function FloatLabel({ label, t, focused }: { label: string; t: SharedValue<number>; focused?: boolean }) {
+  const p = usePalette();
+  const style = useAnimatedStyle(() => ({
+    top: interpolate(t.value, [0, 1], [LABEL_REST.top, LABEL_UP.top]),
+    fontSize: interpolate(t.value, [0, 1], [LABEL_REST.size, LABEL_UP.size]),
+  }));
+  return (
+    <Reanimated.Text
+      numberOfLines={1}
+      pointerEvents="none"
+      style={[{ position: 'absolute', left: 16, right: 16, fontWeight: '600', color: focused ? FOCUS_LABEL : p.textFaint }, style]}
+    >
+      {label}
+    </Reanimated.Text>
+  );
+}
+
+/** The unit, or whatever else trails the value. It never moves: always
+ *  vertically centred in the box, whatever the label is doing. */
+function FieldTail({ children, tight }: { children: React.ReactNode; tight?: boolean }) {
+  return <View pointerEvents="none" style={{ marginRight: tight ? 10 : 16 }}>{children}</View>;
+}
+
+function FieldBox({ focused, tall, children }: { focused?: boolean; tall?: boolean; children: React.ReactNode }) {
+  const p = usePalette();
+  return (
+    <View>
+      {focused ? <View pointerEvents="none" style={{ position: 'absolute', top: -4, left: -4, right: -4, bottom: -4, borderRadius: radius.field + 4, backgroundColor: FOCUS_GLOW }} /> : null}
+      <View style={[{ flexDirection: 'row', alignItems: 'center', backgroundColor: p.sunk, borderColor: p.hairline, borderWidth: 1, borderRadius: radius.field }, tall ? { minHeight: 112, alignItems: 'flex-start' } : { height: FIELD_H }]}>
+        {children}
+        {/* Drawn over the hairline rather than replacing it, so focusing a
+            field never moves what is inside it by half a point. */}
+        {focused ? <View pointerEvents="none" style={{ position: 'absolute', top: -1, left: -1, right: -1, bottom: -1, borderRadius: radius.field, borderWidth: 1.5, borderColor: p.accent }} /> : null}
+      </View>
+    </View>
+  );
+}
+
+/** A button that acts on a field, drawn INSIDE it: smaller than the box and a
+ *  step lighter, so it reads as part of the input. A tap on one is not a tap
+ *  away, so the field keeps its focus and the keyboard stays up. */
+export function FieldButton({ glyph, label, onPress, last = true }: {
+  glyph: string; label: string; onPress?: () => void; last?: boolean;
 }) {
   const p = usePalette();
-  const input = (
-    <TextInput
-      ref={inputRef}
-      value={value}
-      onChangeText={onChange}
-      onBlur={onBlur}
-      keyboardType={keyboardType || 'default'}
-      keyboardAppearance="dark"
-      placeholder={placeholder || '-'}
-      placeholderTextColor={p.textDim}
-      multiline={multiline}
-      style={[
-        { flex: 1, backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 12, fontSize: 17, color: p.text },
-        multiline && { minHeight: 80, textAlignVertical: 'top' },
-      ]}
-    />
-  );
   return (
-    <View style={{ marginBottom: 14, flex: 1 }}>
-      <FieldLabel>{label}</FieldLabel>
-      {signed ? (
-        <View style={{ flexDirection: 'row', gap: 6 }}>
-          {input}
-          <Pressable onPress={onToggleSign} style={{ width: 42, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2, borderRadius: radius.control, alignItems: 'center', justifyContent: 'center' }}>
-            <Text style={{ color: p.text, fontSize: 19, fontWeight: '700' }}>±</Text>
-          </Pressable>
-        </View>
-      ) : input}
-    </View>
+    <Pressable
+      onPress={onPress}
+      {...keepsFocus}
+      hitSlop={4}
+      accessibilityRole="button"
+      accessibilityLabel={label}
+      style={({ pressed }) => [{ width: 42, height: 42, marginRight: last ? 10 : 6, borderRadius: 12, backgroundColor: p.surface2, borderWidth: 1, borderColor: p.hairline, alignItems: 'center', justifyContent: 'center' }, pressed && { opacity: 0.6 }]}
+    >
+      <Text style={{ color: p.text, fontSize: 20, fontWeight: '700', lineHeight: 24 }}>{glyph}</Text>
+    </Pressable>
+  );
+}
+
+const FIELD_GAP = 10;
+
+export function TextField({ label, value, onChange, onBlur, keyboardType, placeholder, multiline, signed, onToggleSign, inputRef, unit, trailing, style }: {
+  /** Omit for a self-explanatory field: the value then sits vertically centred. */
+  label?: string; value: string; onChange: (v: string) => void; onBlur?: () => void;
+  keyboardType?: 'default' | 'numeric' | 'decimal-pad'; placeholder?: string; multiline?: boolean;
+  signed?: boolean; onToggleSign?: () => void; inputRef?: React.Ref<TextInput>;
+  /** Shown right-aligned on the value's line ("lb", "bpm"). Never part of the label. */
+  unit?: string; style?: StyleProp<ViewStyle>;
+  /** `FieldButton`s that act on this field, inside it, right of the unit. */
+  trailing?: React.ReactNode;
+}) {
+  const p = usePalette();
+  const [focused, setFocused] = useState(false);
+  const t = useFloat(focused || !!value);
+  const box = (
+    <FieldBox focused={focused} tall={multiline}>
+      {label ? <FloatLabel label={label} t={t} focused={focused} /> : null}
+      <TextInput
+        ref={inputRef}
+        value={value}
+        onChangeText={onChange}
+        onFocus={() => setFocused(true)}
+        onBlur={() => { setFocused(false); onBlur?.(); }}
+        keyboardType={keyboardType || 'default'}
+        keyboardAppearance="dark"
+        // Only once the label has moved out of the way: at rest the label IS
+        // the placeholder, and two greys on one line read as a filled field.
+        placeholder={focused || !label ? placeholder : undefined}
+        placeholderTextColor={p.textFaint}
+        multiline={multiline}
+        style={[
+          { flex: 1, alignSelf: 'stretch', paddingLeft: 16, paddingRight: unit || signed || trailing ? 8 : 16, paddingTop: 28, paddingBottom: 10, fontSize: VALUE_SIZE, color: p.text },
+          multiline && { paddingTop: 31, paddingBottom: 12, textAlignVertical: 'top' },
+          !label && { paddingTop: multiline ? 14 : 0, paddingBottom: multiline ? 12 : 0 },
+        ]}
+      />
+      {unit ? <FieldTail tight={signed || !!trailing}><Text style={{ fontSize: 15, color: p.textFaint }}>{unit}</Text></FieldTail> : null}
+      {/* The sign flip lives INSIDE the field it acts on. */}
+      {signed ? <FieldButton glyph="±" label="Change sign" onPress={onToggleSign} last={!trailing} /> : null}
+      {trailing}
+    </FieldBox>
+  );
+  return <View style={[{ marginBottom: FIELD_GAP, flex: 1 }, style]}>{box}</View>;
+}
+
+/** A field that opens a picker instead of the keyboard, in the text field's
+ *  own skin: `shown` is the formatted value, empty while nothing is set. */
+function PickField({ label, shown, onPress, trailing, style }: {
+  label: string; shown: string; onPress: () => void; trailing?: React.ReactNode; style?: StyleProp<ViewStyle>;
+}) {
+  const p = usePalette();
+  const t = useFloat(!!shown);
+  return (
+    <Pressable onPress={onPress} style={[{ marginBottom: FIELD_GAP }, style]}>
+      <FieldBox>
+        <FloatLabel label={label} t={t} />
+        <Text numberOfLines={1} style={{ flex: 1, marginTop: VALUE_DROP * 2, paddingLeft: 16, paddingRight: 8, fontSize: VALUE_SIZE, color: p.text }}>{shown}</Text>
+        {trailing ? <FieldTail>{trailing}</FieldTail> : null}
+      </FieldBox>
+    </Pressable>
   );
 }
 
@@ -180,30 +291,16 @@ export function TimePickerSheet({ label, note, value, onChange, onClear, control
 /** `optional` marks a time that may be left unset (a symptom's end time): the
  *  field reads "Not set" while empty and the picker offers Clear once one is. */
 export function TimeField({ label, value, onChange, optional }: { label: string; value: string; onChange: (v: string) => void; optional?: boolean }) {
-  const p = usePalette();
   const { openSheet } = useSheets();
   const open = () => openSheet(
     (c) => <TimePickerSheet label={label} value={value} onChange={onChange} onClear={optional && value ? () => onChange('') : undefined} controls={c} />,
     { fitContent: true },
   );
-  return (
-    <View style={{ marginBottom: 14, flex: 1 }}>
-      <FieldLabel>{label}</FieldLabel>
-      <Pressable onPress={open} style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 13, minHeight: 47 }}>
-        <Text style={{ color: value ? p.text : p.textDim, fontSize: 17 }}>{value ? fmtTime12(value) : optional ? 'Not set' : 'Set time'}</Text>
-      </Pressable>
-    </View>
-  );
+  return <PickField label={label} shown={value ? fmtTime12(value) : ''} onPress={open} style={{ flex: 1 }} />;
 }
 
 /** "68" (inches) -> `5' 8"` for display; '' when unparseable. */
-export function fmtHeight(value?: string): string {
-  const n = Number(value);
-  if (!value || !Number.isFinite(n) || n <= 0) return '';
-  const ft = Math.floor(n / 12);
-  const inch = Math.round(n % 12);
-  return `${ft}′ ${inch}″`;
-}
+export const fmtHeight = (value?: string): string => fmtHeightIn(value, 'imperial');
 
 const FEET = [3, 4, 5, 6, 7];
 const INCHES = [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11];
@@ -213,8 +310,11 @@ export function HeightPickerSheet({ label, value, onChange, controls }: { label:
   const p = usePalette();
   const start = Number(value);
   const startOk = Number.isFinite(start) && start > 0;
-  const [ft, setFt] = useState(startOk ? Math.floor(start / 12) : 5);
-  const [inch, setInch] = useState(startOk ? Math.round(start % 12) % 12 : 8);
+  // Rounded before the split: a height set in centimetres is stored as decimal
+  // inches, and 71.6 has to open on 6′ 0″ rather than 5′ 0″.
+  const whole = Math.round(start);
+  const [ft, setFt] = useState(startOk ? Math.floor(whole / 12) : 5);
+  const [inch, setInch] = useState(startOk ? whole % 12 : 8);
   const pill = (active: boolean) => ({
     minWidth: 44, alignItems: 'center' as const, paddingHorizontal: 12, paddingVertical: 10,
     borderRadius: radius.control, borderWidth: 1,
@@ -244,22 +344,13 @@ export function HeightPickerSheet({ label, value, onChange, controls }: { label:
   );
 }
 
-export function HeightField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
-  const p = usePalette();
+export function HeightField({ label, value, onChange }: { label: string; value: string; onChange: (v: string) => void }) {
   const { openSheet } = useSheets();
   const open = () => openSheet(
     (c) => <HeightPickerSheet label={label} value={value} onChange={onChange} controls={c} />,
     { fitContent: true },
   );
-  const shown = fmtHeight(value);
-  return (
-    <View style={{ marginBottom: 14, flex: 1 }}>
-      <FieldLabel>{label}</FieldLabel>
-      <Pressable onPress={open} style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 13, minHeight: 47 }}>
-        <Text style={{ color: shown ? p.text : p.textDim, fontSize: 17 }}>{shown || (placeholder || 'Set height')}</Text>
-      </Pressable>
-    </View>
-  );
+  return <PickField label={label} shown={fmtHeight(value)} onPress={open} style={{ flex: 1 }} />;
 }
 
 /** Contents of the date-picker sheet: spinner (iOS) / system dialog (Android)
@@ -322,30 +413,28 @@ export function DatePickerSheet({ label, value, onChange, controls }: { label: s
   );
 }
 
-export function DateField({ label, value, onChange, placeholder }: { label: string; value: string; onChange: (v: string) => void; placeholder?: string }) {
-  const p = usePalette();
+/** `trailing` rides the value's line on the right (the profile's age pill). */
+export function DateField({ label, value, onChange, trailing }: { label: string; value: string; onChange: (v: string) => void; trailing?: React.ReactNode }) {
   const { openSheet } = useSheets();
   const open = () => openSheet(
     (c) => <DatePickerSheet label={label} value={value} onChange={onChange} controls={c} />,
     { fitContent: true },
   );
-  return (
-    <View style={{ marginBottom: 14 }}>
-      <FieldLabel>{label}</FieldLabel>
-      <Pressable onPress={open} style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.control, padding: 13, minHeight: 47 }}>
-        <Text style={{ color: value ? p.text : p.textDim, fontSize: 17 }}>{value ? fmtDateFull(value) : (placeholder || 'Set date')}</Text>
-      </Pressable>
-    </View>
-  );
+  return <PickField label={label} shown={value ? fmtDateFull(value) : ''} onPress={open} trailing={trailing} />;
 }
 
 export function CheckField({ label, value, onChange }: { label: string; value: boolean; onChange: (v: boolean) => void }) {
   const p = usePalette();
   return (
-    <View style={{ marginBottom: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' }}>
-      <Text style={{ color: p.text, fontSize: 16 }}>{label}</Text>
-      <Switch value={value} onValueChange={onChange} trackColor={{ true: p.accent }} />
-    </View>
+    <Pressable
+      onPress={() => onChange(!value)}
+      accessibilityRole="switch"
+      accessibilityState={{ checked: value }}
+      style={{ marginBottom: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}
+    >
+      <Text style={{ flex: 1, color: p.text, fontSize: 16 }}>{label}</Text>
+      <Toggle on={value} />
+    </Pressable>
   );
 }
 
@@ -367,9 +456,19 @@ export function FieldInputs({ fields, form, set }: { fields: FieldDef[]; form: F
     // Chunk consecutive number fields into rows of at most 2.
     for (let i = 0; i < run.length; i += 2) {
       const pair = run.slice(i, i + 2);
-      if (pair.length === 1) {
+      if (pair.length === 1 && run.length === 1) {
         const f = pair[0];
         out.push(<NumField key={f.key} f={f} form={form} set={set} numInputs={numInputs} advanceFrom={advanceFrom} />);
+      } else if (pair.length === 1) {
+        // The odd one out of a longer run keeps its column: half width, so it
+        // reads as one more of the fields above it rather than as a headline.
+        const f = pair[0];
+        out.push(
+          <View key={`grid-${f.key}`} style={{ flexDirection: 'row', gap: 10 }}>
+            <NumField f={f} form={form} set={set} numInputs={numInputs} advanceFrom={advanceFrom} />
+            <View style={{ flex: 1 }} />
+          </View>,
+        );
       } else {
         out.push(
           <View key={`grid-${pair[0].key}`} style={{ flexDirection: 'row', gap: 10 }}>
@@ -406,7 +505,8 @@ function NumField({ f, form, set, numInputs, advanceFrom }: {
   const dose = f.key === 'amount';
   return (
     <TextField
-      label={fieldLabel(f)}
+      label={f.label || ''}
+      unit={fieldUnit(f.unit)}
       value={v}
       inputRef={(el) => { numInputs.current[f.key!] = el; }}
       onChange={(nv) => {

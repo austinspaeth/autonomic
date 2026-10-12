@@ -122,6 +122,7 @@ const PILL_SPRING = { stiffness: 427, damping: 27.6, mass: 1 };
  *  and the pill's own geometry are unchanged by its presence. */
 const SEG_TRAILING_W = 42;
 
+
 export function Segmented<T extends string>({ options, value, onChange, onLockedPress, onSettled, style, compact, trailing }: {
   options: { val: T; label: string; locked?: boolean }[]; value: T; onChange: (v: T) => void;
   onLockedPress?: (v: T) => void; onSettled?: () => void; style?: StyleProp<ViewStyle>; compact?: boolean;
@@ -136,7 +137,10 @@ export function Segmented<T extends string>({ options, value, onChange, onLocked
   // (an animated width) instead of sliding across uniform cells.
   const [cells, setCells] = React.useState<{ x: number; w: number }[]>([]);
   const n = options.length;
-  const idx = Math.max(0, options.findIndex((o) => o.val === value));
+  // A value matching no option is "nothing chosen yet": no pill, every label dim.
+  const found = options.findIndex((o) => o.val === value);
+  const none = found < 0;
+  const idx = Math.max(0, found);
   const sel = useSharedValue(idx);
   const target = React.useRef(idx);
   // `onSettled` fires when the pill spring actually comes to rest (an
@@ -155,10 +159,14 @@ export function Segmented<T extends string>({ options, value, onChange, onLocked
   }, [idx, springTo]);
   // Compact variant (used inline beside a section title): tighter padding + type,
   // small enough to sit right-aligned next to a 20pt title without overflowing.
-  const pad = compact ? 2 : 4;
-  const padV = compact ? 6 : 9;
+  // The pill floats inside its container with this much room all round. Pad
+  // and cell padding trade off so the control's height is what it always was
+  // (the Progress header band is sized to it).
+  const pad = compact ? 2 : 5;
+  const padV = compact ? 6 : 8;
   const font = compact ? 12 : 15;
-  const cell = w > 0 ? (w - pad * 2 - (trailing ? SEG_TRAILING_W : 0)) / n : 0;
+  // `w` is the border box; the cells live inside the 1px border as well as the pad.
+  const cell = w > 0 ? (w - 2 - pad * 2 - (trailing ? SEG_TRAILING_W : 0)) / n : 0;
   const measured = compact && n > 1 && cells.filter(Boolean).length === n;
   // Interpolation inputs for the compact pill. Padded to the stop list (and to
   // at least two stops) so the worklet stays valid before the cells are
@@ -175,9 +183,9 @@ export function Segmented<T extends string>({ options, value, onChange, onLocked
   return (
     <View
       onLayout={(e) => setW(e.nativeEvent.layout.width)}
-      style={[{ position: 'relative', flexDirection: 'row', backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.pill, padding: pad }, style]}
+      style={[{ position: 'relative', flexDirection: 'row', backgroundColor: p.sunk, borderColor: p.hairline, borderWidth: 1, borderRadius: radius.pill, padding: pad }, style]}
     >
-      {compact ? (
+      {none ? null : compact ? (
         measured && (
           <Reanimated.View
             style={[{ position: 'absolute', top: pad, bottom: pad, left: 0, borderRadius: radius.pill, backgroundColor: p.accent }, compactPill]}
@@ -195,7 +203,9 @@ export function Segmented<T extends string>({ options, value, onChange, onLocked
           key={o.val}
           onPress={() => {
             if (o.locked) { onLockedPress?.(o.val); return; }
-            springTo(i);
+            // Out of "nothing chosen" the pill appears in place rather than
+            // sliding in from the first cell.
+            if (none) { target.current = i; sel.value = i; } else springTo(i);
             onChange(o.val);
           }}
           onLayout={compact ? (e) => {
@@ -215,7 +225,7 @@ export function Segmented<T extends string>({ options, value, onChange, onLocked
               <Text style={{ color: p.textDim, fontSize: font, fontWeight: '600' }}>{o.label}</Text>
             </View>
           ) : (
-            <SegLabel label={o.label} index={i} sel={sel} font={font} dim={p.textDim} />
+            <SegLabel label={o.label} index={i} sel={sel} font={font} dim={p.textDim} none={none} />
           )}
         </Pressable>
       ))}
@@ -235,13 +245,34 @@ export function Segmented<T extends string>({ options, value, onChange, onLocked
 
 /** One segment's label, cross-fading between dim and white as the pill passes
  *  under it — on the UI thread, so it tracks the pill exactly. */
-function SegLabel({ label, index, sel, font, dim }: {
-  label: string; index: number; sel: SharedValue<number>; font: number; dim: string;
+function SegLabel({ label, index, sel, font, dim, none }: {
+  label: string; index: number; sel: SharedValue<number>; font: number; dim: string; none?: boolean;
 }) {
   const style = useAnimatedStyle(() => ({
-    color: interpolateColor(sel.value, [index - 1, index, index + 1], [dim, '#fff', dim]),
+    color: none ? dim : interpolateColor(sel.value, [index - 1, index, index + 1], [dim, '#fff', dim]),
   }));
-  return <Reanimated.Text style={[{ fontSize: font, fontWeight: '600' }, style]}>{label}</Reanimated.Text>;
+  return <Reanimated.Text style={[{ fontSize: font, fontWeight: '700' }, style]}>{label}</Reanimated.Text>;
+}
+
+/* ---------- Switch ---------- */
+/** The app's own on/off switch: a track with a thumb that slides across it,
+ *  red when on. Purely visual — the row that holds it owns the press, so the
+ *  whole line is the target. (The system Switch picks its own thumb colour per
+ *  platform, which is why this exists.) */
+export function Toggle({ on }: { on: boolean }) {
+  const p = usePalette();
+  const t = useSharedValue(on ? 1 : 0);
+  React.useEffect(() => { t.value = withTiming(on ? 1 : 0, { duration: 220, easing: REasing.out(REasing.cubic) }); }, [on, t]);
+  const track = useAnimatedStyle(() => ({ backgroundColor: interpolateColor(t.value, [0, 1], ['#2a2a2e', p.accent]) }));
+  const thumb = useAnimatedStyle(() => ({
+    backgroundColor: interpolateColor(t.value, [0, 1], ['#e4e4e8', '#ffffff']),
+    transform: [{ translateX: t.value * 20 }],
+  }));
+  return (
+    <Reanimated.View style={[{ width: 50, height: 30, borderRadius: radius.pill, padding: 3 }, track]}>
+      <Reanimated.View style={[{ width: 24, height: 24, borderRadius: radius.pill }, thumb]} />
+    </Reanimated.View>
+  );
 }
 
 /* ---------- Progress bar ---------- */
@@ -347,9 +378,9 @@ export function Button({ title, onPress, variant = 'default', icon, style, disab
   // Disabled is not a shade of the variant, it REPLACES it — one grey skin for
   // every button in the app, whatever it looks like when it is live.
   const bg = disabled ? DISABLED_BG
-    : variant === 'primary' ? p.accent : variant === 'danger' ? '#d63b3b' : variant === 'caution' ? CAUTION_GOLD : variant === 'ghost' || variant === 'dashed' ? 'transparent' : p.surface2;
+    : variant === 'primary' ? p.accent : variant === 'danger' ? p.accent : variant === 'caution' ? CAUTION_GOLD : variant === 'ghost' || variant === 'dashed' ? 'transparent' : p.surface2;
   const border = disabled ? DISABLED_BORDER
-    : variant === 'primary' ? p.accent : variant === 'danger' ? '#d63b3b' : variant === 'caution' ? CAUTION_GOLD : p.border;
+    : variant === 'primary' ? p.accent : variant === 'danger' ? p.accent : variant === 'caution' ? CAUTION_GOLD : p.border;
   const color = disabled ? DISABLED_TEXT
     : variant === 'primary' || variant === 'danger' ? '#fff' : variant === 'caution' ? CAUTION_INK : variant === 'dashed' ? p.accent : p.text;
   return (

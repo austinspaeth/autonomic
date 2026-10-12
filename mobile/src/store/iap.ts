@@ -50,36 +50,36 @@ import { purchaseEvidence, TAP_WINDOW_MS, type PurchaseEvidence } from '../lib/s
 export const YEARLY_SKU = 'com.autonomic.journal.yearly';
 export const MONTHLY_SKU = 'com.autonomic.journal.monthly';
 /**
- * The half-off year behind the annual offer card (src/lib/upsell/annual). A
+ * RETIRED from sale: the half-off year the annual offer card used to sell. The
+ * card now sells FOUNDER_YEARLY_SKU, so nothing in the app offers this any
+ * more. It stays in PRO_SKUS, and must, so a subscriber already on it is still
+ * recognised as Pro and keeps renewing at the price they were promised.
+ *
+ * What it was: a
  * SEPARATE product rather than a discount on YEARLY_SKU: Apple can only target
  * a price cut on an existing product through server-signed promotional offers,
  * and the app has no signing endpoint. The consequence to remember is that this
  * plan RENEWS at its own price — it is "half off, locked in", not "half off the
  * first year". Same Apple subscription group as the other two, so a user can
  * only ever hold one; its own Play subscription with a `yearly-promo` base plan.
- * Never listed on the paywall — the offer card is its only door.
+ * Never listed on the paywall, and no longer on any card.
  */
 export const PROMO_YEARLY_SKU = 'com.autonomic.journal.yearly.promo';
 /**
  * The founding-member year (src/lib/upsell/founder), Play base plan
- * `yearly-founder`. Its OWN product, deliberately not PROMO_YEARLY_SKU.
+ * `yearly-founder`. The ONE discounted year the app sells, and it renews at
+ * its own price.
  *
- * The two discounted years are aimed at different people and are priced
- * differently on purpose: this one is sold INSIDE the install trial, to someone
- * who has logged five days and is still deciding, and it renews at its own
- * price. PROMO_YEARLY_SKU is the deeper cut the annual card offers at the far
- * milestones (30/90/180/365 days), to someone whose access lapsed months ago.
- * Sharing one product made the two cards the same offer at two moments; they
- * are not, so they are two products.
+ * Two cards sell it at two moments: the founder card INSIDE the install trial,
+ * to someone who has logged five days and is still deciding, and the annual
+ * card at the far milestones (50/90/365 days), to someone whose access lapsed.
+ * The annual card used to sell a deeper cut of its own (PROMO_YEARLY_SKU); it
+ * no longer does, so the discount a user is offered does not depend on how
+ * long they held out.
  *
- * Note it is DEARER than the promo year, which is intended — a lapsed user is
- * harder to win back than one mid-trial — but it means the founder card is not
- * the cheapest door into Pro. Nothing in its copy may claim that it is.
- *
- * Never listed on the paywall: the founder card is its only door, the same way
- * the promo year's only door is the annual card. Both are in PRO_SKUS purely so
- * `fetchProducts` returns their localized prices and an existing subscriber on
- * one is recognised as Pro.
+ * Never listed on the paywall: those two cards are its only doors. It is in
+ * PRO_SKUS so `fetchProducts` returns its localized price and a subscriber on
+ * it is recognised as Pro.
  */
 export const FOUNDER_YEARLY_SKU = 'com.autonomic.journal.yearly.founder';
 export const PRO_SKUS = [YEARLY_SKU, MONTHLY_SKU, PROMO_YEARLY_SKU, FOUNDER_YEARLY_SKU];
@@ -752,10 +752,17 @@ let attempt: { sku: string; origin?: PurchaseOrigin } | undefined;
  * inside the window is what makes a sale VERIFIED (see `purchaseEvidence`).
  * Memory only: a relaunch forgets it, which is the conservative direction.
  */
-let lastTap: { sku: string; at: number } | undefined;
+let lastTap: { sku: string; at: number; origin?: PurchaseOrigin } | undefined;
 const recentTap = () => (lastTap && Date.now() - lastTap.at < TAP_WINDOW_MS ? lastTap : undefined);
 /** Did this session tap buy inside the tap window? The restore ping waits. */
 export const hasRecentTap = () => !!recentTap();
+/** Where the buy tap behind a purchase of `sku` was made, when this session
+ *  made one inside the tap window. The same tap that makes a sale VERIFIED is
+ *  the only thing that can say which door it came through. */
+export const tapOriginFor = (sku: string): PurchaseOrigin | undefined => {
+  const t = recentTap();
+  return t && t.sku === sku ? t.origin : undefined;
+};
 
 /* ---------- new purchases ----------
  * A purchase THIS install made, told to whoever asked. The cohort ping is the
@@ -883,7 +890,7 @@ const outcomeOf = (e: unknown): PurchaseOutcome => (PENDING_CODES.has(codeOf(e))
 export async function subscribe(sku: string = YEARLY_SKU, origin?: PurchaseOrigin): Promise<boolean> {
   if (state.purchasing) return false;
   attempt = { sku, origin };
-  lastTap = { sku, at: Date.now() };
+  lastTap = { sku, at: Date.now(), origin };
   // Already known impossible on this device. Say so without touching the store,
   // so the answer is the remedy rather than another failed round trip.
   if (state.blocked) {

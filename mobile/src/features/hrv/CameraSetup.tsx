@@ -40,14 +40,15 @@ import { Linking, Platform, Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { useKeepAwake } from 'expo-keep-awake';
 import Animated, {
-  Easing, FadeIn, cancelAnimation, interpolateColor,
+  Easing, FadeIn, cancelAnimation,
   useAnimatedStyle, useSharedValue, withDelay, withRepeat, withTiming,
 } from 'react-native-reanimated';
-import { SheetControls, SheetFooter, SheetPill, SheetPillButton, useSheets } from '../../components/Sheet';
+import { SheetControls, SheetFooter, useSheets } from '../../components/Sheet';
+import { WizardBar } from '../../components/WizardBar';
 import { Icon } from '../../components/Icon';
 import { useToast } from '../../components/Toast';
 import { Button } from '../../components/ui';
-import { ACCENT, radius, usePalette } from '../../theme';
+import { radius, usePalette } from '../../theme';
 import { getState, save } from '../../store/store';
 import { ppg, type PpgSignal } from '../../lib/ppg/camera';
 import { PpgCameraView, probePpgModules } from '../../lib/ppg/CameraView';
@@ -59,16 +60,6 @@ import { CAMERA_PREP_TIPS, TROUBLE_WAIT_SEC } from '../../lib/ppg/tips';
 import { HrvSession, type SessionConfig } from './Session';
 import { TroubleSheet } from './Trouble';
 import { StrapCard } from './StrapCard';
-
-/** Sheet content is inset 18/24 (padding/topPad); its floating ✕ pill sits at
- *  14/10 on the sheet itself. These pull the back pill out to the same spot so
- *  the two pills share a centerline. Keep in sync with Sheet.tsx's headerPill. */
-const BAR_INSET = 18 - 14;
-const BAR_LIFT = 24 - 10;
-/** Pill height: 36px button + 6px padding + 1px border, both sides. */
-const BAR_H = 36 + (6 + 1) * 2;
-/** Opacity of the back arrow on step 1, where there's nothing to go back to. */
-const BACK_GHOST = 0.22;
 
 /** Hold "Start over" this long to collect a camera diagnostics dump. Matches
  *  the Bluetooth scan button's hold, so there is one gesture to remember. */
@@ -394,23 +385,8 @@ export function CameraSetup({ config, controls: _controls }: { config: SessionCo
     // height so the module centers vertically and the wait-step squircle
     // bottom-pins above the footer.
     <View style={{ flexGrow: 1 }}>
-      {/* Wizard bar: back arrow + the welcome wizard's progress pills. The back
-          arrow wears the same tinted-glass pill as the sheet's floating ✕ — the
-          negative margins pull the bar out of the content box onto the sheet's
-          own 14/10 inset so the two circles sit on one line. The bar therefore
-          spans pill-to-pill, and the dots ride an absolute layer across its full
-          width so they center on the card, not in the gap left over between the
-          two buttons. */}
-      <View style={{ height: BAR_H, marginTop: -BAR_LIFT, marginHorizontal: -BAR_INSET, marginBottom: 12, justifyContent: 'center' }}>
-        <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, flexDirection: 'row', justifyContent: 'center', alignItems: 'center', gap: 7 }}>
-          {ORDER.map((_, i) => <StepDot key={i} i={i} step={idx} />)}
-        </View>
-        {/* Ghosted rather than hidden on step 1 — nothing to go back to, but the
-            bar keeps its shape. */}
-        <SheetPill lone style={{ alignSelf: 'flex-start', opacity: idx <= 0 ? BACK_GHOST : 1 }}>
-          <SheetPillButton icon="chevronLeft" size={18} onPress={back} label="Back" disabled={idx <= 0} />
-        </SheetPill>
-      </View>
+      {/* Wizard bar: back arrow + the welcome wizard's progress pills. */}
+      <WizardBar count={ORDER.length} index={idx} onBack={back} />
 
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 6 }}>{title}</Text>
 
@@ -487,19 +463,6 @@ export function CameraSetup({ config, controls: _controls }: { config: SessionCo
       ) : null}
     </View>
   );
-}
-
-/** Progress pill, same treatment as the welcome wizard's: the active step
- *  stretches from a dot into a pill, completed steps stay dots tinted red. */
-function StepDot({ i, step }: { i: number; step: number }) {
-  const target = i === step ? 1 : i < step ? 0.5 : 0;
-  const t = useSharedValue(target);
-  useEffect(() => { t.value = withTiming(target, { duration: 300, easing: Easing.out(Easing.cubic) }); }, [target, t]);
-  const style = useAnimatedStyle(() => ({
-    width: 6 + 28 * Math.max(0, t.value - 0.5),
-    backgroundColor: interpolateColor(t.value, [0, 0.5, 1], ['rgba(255,255,255,0.12)', 'rgba(224,49,39,0.40)', ACCENT]),
-  }));
-  return <Animated.View style={[{ height: 6, borderRadius: 999 }, style]} />;
 }
 
 /** Step 1 — what a camera reading can and can't do, before any setup effort is

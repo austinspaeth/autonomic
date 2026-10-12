@@ -36,6 +36,7 @@ import { OUTCOME_FAMILY, TREND_METRICS, TREND_WINDOW_DAYS, compareWindows, type 
 import { CORRELATION_OUTCOMES, MIN_EFFECT, REGIME_MIN_DENSITY, midSentence, shortMetric } from './correlate';
 import type { FactorDef } from './factors';
 import type { DayMatrix } from './matrix';
+import { fmtMonthDay } from '../dates';
 import { benjaminiHochberg, confidenceLabel, confidencePips, mannWhitney, type ConfidenceLabel } from './stats';
 import { RETAIN_P } from './stability';
 
@@ -63,6 +64,40 @@ export const CO_START_DAYS = 2;
  * to be true.
  */
 export const MIN_EVENT_DAYS = 7;
+/**
+ * Share of the days AFTER a first dose on which the thing was taken, before the
+ * card may say "since you started".
+ *
+ * An onset used to be the first day a factor appeared and nothing more, so a
+ * supplement tried on 15 scattered days out of 49 headlined as something the
+ * user had "started", with every one of the other 34 days credited to it. A
+ * start is a decision that was kept up. It is deliberately lower than
+ * REGIME_MIN_DENSITY: that bar says "a block of days is one episode", this one
+ * only "most days", and people skip.
+ */
+export const ONSET_MIN_DENSITY = 0.6;
+/**
+ * How much of a claimed change may already have happened BEFORE the event.
+ *
+ * A before/after is honest only when the before was level. On a real journal
+ * RMSSD had been sliding for two months when a supplement was first taken, and
+ * the comparison handed the whole slide to the supplement: "RMSSD is down since
+ * you started MCT oil", about a fall that began seven weeks earlier. So the
+ * outcome is checked for the same movement ahead of the event — across the
+ * before window's own two halves, and from the window before that into it — and
+ * a drift worth this share of the claimed change, in the same direction, means
+ * the event did not start it. It moves to the shift candidates, which name no
+ * cause and are the right home for a change that was already under way.
+ */
+export const PRETREND_SHARE = 0.5;
+/** Values each piece of a pre-trend comparison needs before it may speak. */
+const PRETREND_MIN = 5;
+/** The longer shift window: two months against the two before them. */
+export const LONG_SHIFT_DAYS = TREND_WINDOW_DAYS * 2;
+/** Other starts and stops inside the compared stretch at which the headline
+ *  stops naming one of them. Three things changing around a fourth is not a
+ *  before and after of the fourth. */
+export const CROWDED_EVENTS = 3;
 /** How far back the "was it a regimen" density is read before a stop. */
 export const STOP_REGIMEN_DAYS = 28;
 /**
@@ -92,6 +127,18 @@ export interface BiggestChange {
   context: string | null;
   /** Index into the matrix's key range where the before/after split sits. */
   onsetIndex: number | null;
+  /**
+   * What a SHIFT shows where a link shows its confidence: "58 logged days vs 57
+   * the two months before". Null on an onset or a stop.
+   *
+   * A shift claims no link. "RMSSD has fallen over the last two months" is a
+   * fact about two medians the reader can see on the card, so a confidence bar
+   * under it grades nothing, and since a shift only reaches the card by clearing
+   * the bar it always read "Very strong". Confidence belongs to a claim that
+   * could be wrong about a CONNECTION; this one states its coverage instead,
+   * which is the rule Trend watch already follows.
+   */
+  coverage: string | null;
   /** "SDNN is up since you started magnesium glycinate" */
   headline: string;
   /** "In the 24 days since, SDNN averaged 12 ms higher than the 24 days before." */
@@ -153,6 +200,9 @@ interface Cand {
   before: number;
   after: number;
   n: number;
+  /** Shifts only: logged days in the prior and the recent window. */
+  priorN?: number;
+  recentN?: number;
   spanDays: number;
   r: number;
   p: number;
@@ -175,6 +225,36 @@ function firstKnownIndex(col: (number | null)[]): number {
  * Onset candidates: for each binary factor's first appearance, every outcome
  * compared before against after.
  */
+const medianOf = (v: number[]): number => {
+  const s = v.slice().sort((a, b) => a - b);
+  const m = s.length >> 1;
+  return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+};
+
+/** Present values of `series` in [from, to), clamped to the series. */
+function windowOf(series: (number | null)[], from: number, to: number): number[] {
+  const out: number[] = [];
+  for (let i = Math.max(0, from); i < Math.min(series.length, to); i++) { const v = series[i]; if (v != null) out.push(v); }
+  return out;
+}
+
+/**
+ * Was the outcome already moving this way before the event? See PRETREND_SHARE.
+ * Unknown (too few values to compare) is never reported as "yes".
+ */
+export function alreadyMoving(series: (number | null)[], at: number, span: number, before: number, after: number): boolean {
+  const change = after - before;
+  if (!change) return false;
+  const drifted = (a: number[], b: number[]) => {
+    if (a.length < PRETREND_MIN || b.length < PRETREND_MIN) return false;
+    const drift = medianOf(b) - medianOf(a);
+    return Math.sign(drift) === Math.sign(change) && Math.abs(drift) >= PRETREND_SHARE * Math.abs(change);
+  };
+  const mid = at - Math.floor(span / 2);
+  return drifted(windowOf(series, at - span, mid), windowOf(series, mid, at))
+    || drifted(windowOf(series, at - span * 2, at - span), windowOf(series, at - span, at));
+}
+
 function onsetCandidates(matrix: DayMatrix): Cand[] {
   const out: Cand[] = [];
   const total = matrix.keys.length;
@@ -212,6 +292,10 @@ function onsetCandidates(matrix: DayMatrix): Cand[] {
       // on day 12 of 180 would compare 12 days against 168 and report whatever
       // the year happened to do.
       const span = Math.min(at - known, total - at);
+      // Started means kept up: see ONSET_MIN_DENSITY.
+      let on = 0, knownAfter = 0;
+      for (let i = at; i < at + span; i++) { if (col[i] != null) { knownAfter++; if (col[i] === 1) on++; } }
+      if (!knownAfter || on / knownAfter < ONSET_MIN_DENSITY) return;
       const before: number[] = [], after: number[] = [];
       for (let i = at - span; i < at; i++) { const v = series[i]; if (v != null) before.push(v); }
       for (let i = at; i < at + span; i++) { const v = series[i]; if (v != null) after.push(v); }
@@ -220,6 +304,7 @@ function onsetCandidates(matrix: DayMatrix): Cand[] {
       const g = mannWhitney(after, before);
       if (!Number.isFinite(g.median1) || !Number.isFinite(g.median2)) return;
       if (g.median1 === g.median2) return;
+      if (alreadyMoving(series, at, span, g.median2, g.median1)) return;
       out.push({
         kind: 'onset', id: `onset:${factor.id}|${id}`, def, driver: factor.onsetNoun as string,
         outcome: id, factorId: factor.id, onsetAt: at,
@@ -329,6 +414,7 @@ function stopCandidates(matrix: DayMatrix): Cand[] {
       if (before.length < MIN_SIDE || after.length < MIN_SIDE) return;
       const g = mannWhitney(after, before);
       if (!Number.isFinite(g.median1) || !Number.isFinite(g.median2) || g.median1 === g.median2) return;
+      if (alreadyMoving(series, e.at, span, g.median2, g.median1)) return;
       out.push({
         kind: 'stop', id: `stop:${e.factor.id}|${id}`, def: TREND_METRICS[id], driver: e.noun,
         outcome: id, factorId: e.factor.id, onsetAt: e.at,
@@ -350,23 +436,30 @@ function stopCandidates(matrix: DayMatrix): Cand[] {
  */
 function shiftCandidates(matrix: DayMatrix): Cand[] {
   const out: Cand[] = [];
-  const W = TREND_WINDOW_DAYS;
 
-  CORRELATION_OUTCOMES.forEach((id) => {
-    const series = matrix.outcomes[id];
-    if (!series || series.length < W * 2) return;
-    const def = TREND_METRICS[id];
-    const delta = compareWindows(series, W, W, def);
-    if (!delta.significant) return;
+  // A month against the month before, and two months against the two before
+  // them. The longer window exists for the slow slide: a metric that lost a
+  // little every month never moves enough inside any one pair of months to be
+  // called a shift, and was left to be "explained" by whatever started nearby.
+  [TREND_WINDOW_DAYS, LONG_SHIFT_DAYS].forEach((W) => {
+    CORRELATION_OUTCOMES.forEach((id) => {
+      const series = matrix.outcomes[id];
+      if (!series || series.length < W * 2) return;
+      const def = TREND_METRICS[id];
+      const delta = compareWindows(series, W, W, def);
+      if (!delta.significant) return;
 
-    const recent = series.slice(series.length - W).filter((v): v is number => v != null);
-    const prior = series.slice(series.length - W * 2, series.length - W).filter((v): v is number => v != null);
-    const g = mannWhitney(recent, prior);
-    out.push({
-      kind: 'shift', id: `shift:${id}`, def, driver: null,
-      outcome: id, factorId: null, onsetAt: null,
-      before: delta.prior, after: delta.recent, n: delta.recentN + delta.priorN,
-      spanDays: W, r: g.r, p: g.p,
+      const recent = series.slice(series.length - W).filter((v): v is number => v != null);
+      const prior = series.slice(series.length - W * 2, series.length - W).filter((v): v is number => v != null);
+      if (recent.length < MIN_SIDE || prior.length < MIN_SIDE) return;
+      const g = mannWhitney(recent, prior);
+      out.push({
+        kind: 'shift', id: `${W === TREND_WINDOW_DAYS ? 'shift' : 'shift2'}:${id}`, def, driver: null,
+        outcome: id, factorId: null, onsetAt: null,
+        before: delta.prior, after: delta.recent, n: delta.recentN + delta.priorN,
+        priorN: delta.priorN, recentN: delta.recentN,
+        spanDays: W, r: g.r, p: g.p,
+      });
     });
   });
   return out;
@@ -440,9 +533,15 @@ export function findBiggestChange(matrix: DayMatrix, opts: { retain?: string | n
   const verb = c.kind === 'stop' ? 'stopped' : 'started';
   const story = describeEvents(matrix, c);
   const nouns = [c.driver as string, ...story.together.map((e) => e.noun)];
+  const long = c.kind === 'shift' && c.spanDays > TREND_WINDOW_DAYS;
+  // Too much else changed in the stretch to put one name on it: the card keeps
+  // its date and its numbers and drops the attribution. See CROWDED_EVENTS.
+  const crowded = c.kind !== 'shift' && story.during.length >= CROWDED_EVENTS;
   const headline = c.kind === 'shift'
-    ? `${metric} ${plural ? 'have' : 'has'} ${up ? 'risen' : 'fallen'} over the last month`
-    : `${metric} ${plural ? 'are' : 'is'} ${up ? 'up' : 'down'} since you ${verb} ${listOf(nouns)}`;
+    ? `${metric} ${plural ? 'have' : 'has'} ${up ? 'risen' : 'fallen'} over the last ${long ? 'two months' : 'month'}`
+    : crowded
+      ? `${metric} ${plural ? 'have' : 'has'} been ${up ? 'higher' : 'lower'} since ${fmtMonthDay(matrix.keys[c.onsetAt as number])}`
+      : `${metric} ${plural ? 'are' : 'is'} ${up ? 'up' : 'down'} since you ${verb} ${listOf(nouns)}`;
 
   const said = midSentence(metric);
   const apart = nouns.length === 2
@@ -477,7 +576,11 @@ export function findBiggestChange(matrix: DayMatrix, opts: { retain?: string | n
     factorId: c.factorId,
     drivers,
     context: story.context ? `${story.context}${doctor}` : doctor.trim() || null,
-    onsetIndex: c.onsetAt,
+    // A shift has no event, but it does have a split: where the recent window begins.
+    onsetIndex: c.kind === 'shift' ? matrix.keys.length - c.spanDays : c.onsetAt,
+    coverage: c.kind === 'shift'
+      ? `${c.recentN} logged ${c.recentN === 1 ? 'day' : 'days'} vs ${c.priorN} the ${long ? 'two months' : 'month'} before`
+      : null,
     headline,
     body,
     beforeValue: def.fmt(c.before),
@@ -511,6 +614,7 @@ export const WELCOME_CHANGE: BiggestChange = {
   // reads this as "nothing to chart" and the card stays untappable.
   outcome: null,
   factorId: null,
+  coverage: null,
   drivers: [],
   context: null,
   onsetIndex: null,
@@ -582,7 +686,7 @@ function describeEvents(matrix: DayMatrix, c: Cand): {
     stopped.length ? `stopped ${listOf(stopped)}` : '',
   ].filter(Boolean);
   const context = c.kind === 'shift'
-    ? `In these two months you ${parts.join(' and ')}.`
+    ? `In these ${c.spanDays > TREND_WINDOW_DAYS ? 'four' : 'two'} months you ${parts.join(' and ')}.`
     : `You also ${parts.join(' and ')} in this stretch, so the change cannot be pinned on any one of them.`;
   return { self, together, during, context };
 }

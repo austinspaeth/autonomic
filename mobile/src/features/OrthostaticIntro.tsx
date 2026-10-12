@@ -61,10 +61,11 @@ function WatchStandTest({ height = 172 }: { height?: number }) {
   );
 }
 
-export function OrthostaticIntroSheet({ title, subtitle, onManual, onStrap }: {
+export function OrthostaticIntroSheet({ title, subtitle, onManual, manualLabel, onStrap }: {
   title: string; subtitle: string;
   /** Offer a manual form behind the watch pointer; omitted for watch-only types. */
   onManual?: () => void;
+  manualLabel?: string;
   /** Run the capture right here with a Bluetooth chest strap (pairs first if
    *  none is saved) — the phone twin of the watch flow. */
   onStrap?: () => void;
@@ -101,7 +102,7 @@ export function OrthostaticIntroSheet({ title, subtitle, onManual, onStrap }: {
       ) : null}
       {onManual ? (
         <SheetFooter>
-          <Button title="Enter manually" variant="default" onPress={onManual} />
+          <Button title={manualLabel || 'Enter manually'} variant="default" onPress={onManual} />
         </SheetFooter>
       ) : null}
     </View>

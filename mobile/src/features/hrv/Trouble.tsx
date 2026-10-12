@@ -59,7 +59,7 @@ export function TroubleSheet({ config, stopped, onRetry, controls }: {
    * is the difference between the app explaining itself and the app just
    * giving up on somebody.
    */
-  stopped?: { elapsedSec: number; usableSec: number } | null;
+  stopped?: { elapsedSec: number; usableSec: number; reason?: 'signal' | 'early' } | null;
   /**
    * What "Try again" does, supplied by whoever raised the card.
    *
@@ -89,10 +89,15 @@ export function TroubleSheet({ config, stopped, onRetry, controls }: {
   return (
     <View>
       <Text style={{ fontSize: 23, fontWeight: '800', color: p.text, marginBottom: 6 }}>
-        {stopped ? 'We stopped the reading' : 'Getting a cleaner reading'}
+        {stopped?.reason === 'early' ? 'That reading was too short' : stopped ? 'We stopped the reading' : 'Getting a cleaner reading'}
       </Text>
       <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 20, marginBottom: 18 }}>
-        {stopped
+        {stopped?.reason === 'early'
+          // Finished by hand before there was anything to measure. Said as what
+          // happened rather than as a fault: nothing went wrong with the finger,
+          // there simply was not a reading yet.
+          ? `Finished at ${mmss(stopped.elapsedSec)}. A camera reading needs longer than that before there is anything to measure, and the full 5 minutes for every metric. Nothing was saved.`
+          : stopped
           ? `Stopped at ${mmss(stopped.elapsedSec)}. Only ${mmss(stopped.usableSec)} of your pulse was coming through clearly, so the rest of the time would not have produced a reading. Nothing was saved.`
           : source === 'camera'
             ? 'A fingertip reading is the fussiest thing this app does. These are the things that actually change it, in the order they are usually the problem.'

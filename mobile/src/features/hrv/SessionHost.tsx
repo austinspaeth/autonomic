@@ -93,8 +93,10 @@ export function HrvSessionHost() {
     // since the session card is not the thing that ends a reading.
     if (s.stopReason) {
       const cfg = s.config;
-      const stopped = s.stopReason === 'signal'
-        ? { elapsedSec: s.elapsed, usableSec: s.usableSec }
+      // The app's own two endings carry what it saw; a reading the user gave up
+      // on from `Having issues?` needs no account of itself.
+      const stopped = s.stopReason === 'signal' || s.stopReason === 'early'
+        ? { elapsedSec: s.elapsed, usableSec: s.usableSec, reason: s.stopReason }
         : null;
       // No `fitContent`: that path renders the card as a plain View capped at
       // 92% of the screen with NO scroll view, so a six-tip list would simply

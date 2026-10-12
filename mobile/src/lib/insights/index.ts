@@ -44,10 +44,12 @@ import { EARLY_MIN_FACTOR_DAYS, MIN_GROUP, MIN_PAIRS, findEarlySignals, sweepCor
 import { PRESSURE_FACTOR_ID, buildFactors, factorProgress, type FactorProgress } from './factors';
 import { lowPressureValue } from '../pressure';
 import { buildDayMatrix } from './matrix';
+import { findWeeks, type WeeksReport } from './weeks';
 import { findObservations, type Observation } from './observations';
 import { changeSinceStart, findWatchItems, overallDirection, type Overall, type SinceStart, type WatchItem } from './watch';
 
 export type { BiggestChange } from './change';
+export type { WeekBlock, WeekRow, WeeksReport } from './weeks';
 export type { DetailSeries } from './detail';
 export { factorPeak, markColumn } from './detail';
 export type { Correlation, NoImpactItem } from './correlate';
@@ -167,6 +169,9 @@ export interface InsightReport {
    * that moved nothing — the null results worth stating. See findNoImpact.
    */
   noImpact: NoImpactItem[];
+  /** Best weeks against the hardest ones, described. Null when the weeks were
+   *  much alike or the journal is too short to have both. See ./weeks. */
+  weeks: WeeksReport | null;
   /**
    * The evidence behind each finding, keyed by `Correlation.id` /
    * `BiggestChange.id`: the outcome and factor columns it was computed from.
@@ -357,7 +362,7 @@ export function buildInsights(state: AppState, dk: string, opts: {
   // ("RMSSD has fallen" over 29.4 → 23.7, then "RMSSD, down 5.7 ms" over the same
   // two windows). The row goes; the card says it once, with its evidence.
   const watch = findWatchItems(matrix, downturn)
-    .filter((w) => !(change && change.kind === 'shift' && w.metric === change.outcome));
+    .filter((w) => !(change && change.id === `shift:${w.metric}`));
   // NOT gated on the downturn. Trend Watch hides its five red rows during one, but
   // the header saying "Trending down" in a single calm line is the honest headline
   // for exactly that situation, and suppressing it would leave the screen mute at
@@ -384,6 +389,8 @@ export function buildInsights(state: AppState, dk: string, opts: {
     early,
     progress,
     noImpact,
+    // The sample month is a welcome, not a history worth ranking weeks of.
+    weeks: opts.demo ? null : findWeeks(matrix),
     detail,
     observations,
     watch,
@@ -409,7 +416,7 @@ export function buildInsights(state: AppState, dk: string, opts: {
  */
 export function emptyReport(dk: string, failed = false): InsightReport {
   return {
-    dk, demo: false, change: null, correlations: [], early: [], progress: [], noImpact: [], detail: {}, observations: [], watch: [], pressure: null,
+    dk, demo: false, change: null, correlations: [], early: [], progress: [], noImpact: [], weeks: null, detail: {}, observations: [], watch: [], pressure: null,
     overall: { direction: 'unknown', label: null, detail: 'not enough to compare yet' },
     since: null,
     confidence: { pct: 0, parts: [], topFix: null, daysLogged: 0 },

@@ -13,8 +13,9 @@ import { NoteDraftCard, ReadingSummary } from '../../components/summary';
 import { Button, CautionNote } from '../../components/ui';
 import { usePalette } from '../../theme';
 import { computeHrv } from '../../lib/hrv';
-import { refusalSignature } from '../../lib/hrv/refusal';
-import { reportFault } from '../../store/errorReport';
+import { CAPTURE_TAGS, filedSignature, refusalSignature } from '../../lib/hrv/refusal';
+import { reportEvent, reportFault } from '../../store/errorReport';
+import { pingReadingSaved } from '../../store/ping';
 import { troubleSourceFor } from '../../lib/ppg/tips';
 import { TroubleSheet } from './Trouble';
 import { computeScores, profileCtx } from '../../lib/scoring';
@@ -206,8 +207,19 @@ export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, 
     saved.current = entry;
     upsertEntry(dk, 'readings', entry);
     setSavedAt(Date.now());
-    // No ping here on purpose. Capture is counted in the ENGINE, at the two
-    // moments that can differ — started and completed (sessionStore.ts).
+    // The CAPTURE is counted in the engine, at the two moments that can differ
+    // — started and completed (sessionStore.ts) — and deliberately not here.
+    // What is counted here is the third fact, which is this function's own: an
+    // entry now exists. `hrv` fires before anything has judged the beats, so
+    // it cannot tell a reading that was filed from one that was refused; this
+    // can. Today only, the rule the wrist receivers follow: a watch reading
+    // synced this morning from last night was not saved today.
+    if (dk === todayKey()) pingReadingSaved(config.source);
+    // And per attempt, beside the refusals and abandons it is read against. A
+    // reading kept from a refusal reports `hrv.salvaged` instead (saveAnyway).
+    if (!degraded && troubleSourceFor(config.source)) {
+      reportEvent(CAPTURE_TAGS.filed, filedSignature(config.source, result.confidence, config.kind));
+    }
     //
     // Publish to the health store on the same terms a manually logged reading
     // is published (EntryForm.save): only with Health connected, and never for
@@ -240,6 +252,14 @@ export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, 
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // What was COLLECTED, as opposed to what was kept: the half of a refusal the
+  // signature could not previously say. See `rawBand` in lib/hrv/refusal.
+  const shape = {
+    rawSec: rr.reduce((t, v) => t + v, 0) / 1000,
+    segments: rr.length ? (segmentStarts?.length ?? 0) + 1 : 0,
+    kind: config.kind,
+  };
+
   /**
    * Tell the fault log about a refusal, once per reading.
    *
@@ -252,13 +272,14 @@ export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, 
   useEffect(() => {
     if (enoughData || reported.current) return;
     reported.current = true;
-    reportFault('hrv.refused', refusalSignature({
+    reportFault(CAPTURE_TAGS.refused, refusalSignature({
       source: config.source,
       artifactPct: result.artifactPct,
       coverageSec: result.coverageSec,
       durationSec,
       hasFields: Object.keys(result.fields).length > 0,
       beats: result.rrClean.length,
+      ...shape,
     }));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -295,13 +316,14 @@ export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, 
     // Recorded on the same route as the refusal, under its own tag, so the two
     // can be read against each other: how often the escape hatch is reached
     // for, and at what quality, is the only evidence that it is working.
-    reportFault('hrv.salvaged', refusalSignature({
+    reportFault(CAPTURE_TAGS.salvaged, refusalSignature({
       source: config.source,
       artifactPct: result.artifactPct,
       coverageSec: result.coverageSec,
       durationSec,
       hasFields: true,
       beats: result.rrClean.length,
+      ...shape,
     }));
   };
 

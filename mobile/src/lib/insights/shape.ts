@@ -36,6 +36,10 @@ export interface InsightsShape {
   observations: number;
   noImpact: number;
   watch: number;
+  /** The best-vs-hardest-weeks card: whether it rendered, and how tall. Optional
+   *  so a shape stored before the card existed still reads as a shape. */
+  weeks?: boolean;
+  weeksHeight?: number;
   /**
    * What each card actually MEASURED last time it rendered.
    *
@@ -122,6 +126,8 @@ export function normalizeShape(raw: unknown): InsightsShape | null {
     observations: clamp(o.observations, MAX_ROWS.observations),
     noImpact: clamp(o.noImpact, MAX_ROWS.noImpact),
     watch: clamp(o.watch, MAX_ROWS.watch),
+    weeks: !!o.weeks,
+    weeksHeight: clamp(o.weeksHeight, MAX_CARD_H),
     heights: {
       change: clamp(h.change, MAX_CARD_H),
       correlations: clamp(h.correlations, MAX_CARD_H),
@@ -148,6 +154,7 @@ export function normalizeShape(raw: unknown): InsightsShape | null {
 export const sameShape = (a: InsightsShape, b: InsightsShape) =>
   a.change === b.change && a.correlations === b.correlations
   && a.observations === b.observations && a.noImpact === b.noImpact && a.watch === b.watch
+  && !!a.weeks === !!b.weeks && Math.round(a.weeksHeight || 0) === Math.round(b.weeksHeight || 0)
   && HEIGHT_KEYS.every((k) => Math.round(a.heights[k]) === Math.round(b.heights[k]))
   && ROW_KEYS.every((k) => sameRows(a.rows[k], b.rows[k]));
 

@@ -19,6 +19,7 @@ import {
   makeAgg, type BucketView, type ScoreContext,
 } from './buckets';
 import type { Series, Zone } from '../../components/charts';
+import { fmtWater, getUnits, waterNum } from '../units';
 
 export interface Chart { label: string; series: Series[]; zones?: Zone[] | null; target?: { from: number; to: number; color: string }; integer?: boolean; legend?: [string, string][]; dumbbell?: { sys: (number | null)[]; dia: (number | null)[] };
   /** Hide the chart's own readout and instead drive the card's first stat:
@@ -544,17 +545,20 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext, cu
     });
     // Readout follows the latest bucket with water logged, like the other cards.
     const waterLi = acLatestIdx(water);
-    const waterCur = waterLi >= 0 && water[waterLi] != null ? Math.round(water[waterLi]! * 10) / 10 : null;
+    const waterCur = waterLi >= 0 && water[waterLi] != null ? waterNum(water[waterLi]!, undefined, 1) : null;
+    // Charted in the unit it is read in, so the axis and the readout agree.
+    const waterShown = water.map((v) => (v == null ? null : waterNum(v)));
+    const metricWater = getUnits() === 'metric';
     if (acPresent(water).length) cards.push({
       title: 'Hydration', sub: range,
       desc: 'Daily water intake over the range.',
       help: {
-        what: 'Litres of water logged per day across the range. For orthostatic conditions, 2.5–3.5 L a day alongside electrolytes is the range commonly recommended. Tap any point to read that day.',
+        what: `${metricWater ? 'Litres' : 'Ounces'} of water logged per day across the range. For orthostatic conditions, ${waterNum(2.5)}–${fmtWater(3.5)} a day alongside electrolytes is the range commonly recommended. Tap any point to read that day.`,
         why: 'Blood volume is one of the few things you can change the same morning, and low days here often sit under a poor score. Fluid only holds where salt allows, so volume alone can dilute you; discuss electrolyte targets with your doctor rather than raising water on its own.',
         learnMore: '/insights/research/science-of-salt-and-fluids-for-pots/',
       },
-      charts: [{ label: '', series: [series(water, '#38bdf8')], selectStat: true }],
-      stats: [{ label: 'Water', value: waterCur, sub: 'litres', when: bucketWhen(mode, buckets[waterLi]) }],
+      charts: [{ label: '', series: [series(waterShown, '#38bdf8')], integer: !metricWater, selectStat: true }],
+      stats: [{ label: 'Water', value: waterCur, sub: metricWater ? 'litres' : 'oz', when: bucketWhen(mode, buckets[waterLi]) }],
     });
     return cards;
   };

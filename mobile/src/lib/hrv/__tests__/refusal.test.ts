@@ -1,4 +1,8 @@
-import { artifactBand, coverageBand, refusalSignature } from '../refusal';
+import {
+  abandonSignature, artifactBand, attemptSignature, CAPTURE_EVENT_TAGS, CAPTURE_TAGS, coverageBand,
+  durationBand, filedSignature, rawBand, refusalSignature, segmentBand,
+} from '../refusal';
+import { redactMessage } from '../../errorReport';
 
 describe('describing a refused reading', () => {
   it('bands artifacts on the decisions the app actually made', () => {
@@ -64,5 +68,66 @@ describe('describing a refused reading', () => {
   it('never reports an absent source as a real one', () => {
     expect(refusalSignature({ artifactPct: 20, coverageSec: 100, durationSec: 180, hasFields: true, beats: 200 }))
       .toMatch(/^unknown /);
+  });
+});
+
+describe('telling the three no-data refusals apart', () => {
+  const base = { source: 'camera', artifactPct: 0, coverageSec: 0, hasFields: false, beats: 0 };
+
+  it('bands collected pulse, stretches and length', () => {
+    expect(rawBand(20, 300)).toBe('raw<25');
+    expect(rawBand(100, 300)).toBe('raw25-50');
+    expect(rawBand(230, 300)).toBe('raw50+');
+    expect(rawBand(10, 0)).toBe('raw?');
+    expect(segmentBand(0)).toBe('seg0');
+    expect(segmentBand(1)).toBe('seg1');
+    expect(segmentBand(4)).toBe('seg2-4');
+    expect(segmentBand(18)).toBe('seg5+');
+    expect(durationBand(12)).toBe('dur<1m');
+    expect(durationBand(120)).toBe('dur1-4m');
+    expect(durationBand(300)).toBe('dur4m+');
+  });
+
+  // All three used to be `camera nodata art? cov<25`, one row.
+  it('separates a lock that would not hold from a pulse that never came and a reading ended early', () => {
+    const flapping = refusalSignature({ ...base, durationSec: 300, rawSec: 230, segments: 18, kind: 'breath' });
+    const silent = refusalSignature({ ...base, durationSec: 300, rawSec: 6, segments: 1, kind: 'breath' });
+    const early = refusalSignature({ ...base, durationSec: 70, rawSec: 12, segments: 1, kind: 'unstructured' });
+    expect(flapping).toBe('camera nodata art? cov<25 raw50+ seg5+ dur4m+ paced');
+    expect(silent).toBe('camera nodata art? cov<25 raw<25 seg1 dur4m+ paced');
+    expect(early).toBe('camera nodata art? cov<25 raw<25 seg1 dur1-4m free');
+    expect(new Set([flapping, silent, early]).size).toBe(3);
+  });
+
+  it('keeps the old line when a caller knows no more than it used to', () => {
+    expect(refusalSignature({ ...base, durationSec: 180 })).toBe('camera nodata art? cov<25');
+  });
+
+  it('describes an abandoned reading against the time it actually ran', () => {
+    expect(abandonSignature({ source: 'camera', reason: 'signal', keptSec: 0, rawSec: 40, segments: 4, elapsedSec: 52, kind: 'breath' }))
+      .toBe('camera signal cov<25 raw50+ seg2-4 dur<1m paced');
+    expect(abandonSignature({ source: 'camera', reason: 'early', keptSec: 18, rawSec: 18, segments: 1, elapsedSec: 20 }))
+      .toBe('camera early cov75+ raw50+ seg1 dur<1m');
+  });
+
+  it('names an attempt and a filed reading', () => {
+    expect(attemptSignature('camera', 'breath')).toBe('camera paced');
+    expect(attemptSignature('polar', 'unstructured')).toBe('polar free');
+    expect(filedSignature('camera', 'fair', 'breath')).toBe('camera fair paced');
+  });
+
+  it('survives the fault redaction untouched, every shape', () => {
+    [
+      refusalSignature({ ...base, durationSec: 300, rawSec: 230, segments: 18, kind: 'breath' }),
+      abandonSignature({ source: 'camera', reason: 'signal', keptSec: 0, rawSec: 40, segments: 4, elapsedSec: 52, kind: 'breath' }),
+      attemptSignature('camera', 'breath'),
+      filedSignature('camera', 'high', 'unstructured'),
+    ].forEach((sig) => expect(redactMessage(sig)).toBe(sig));
+  });
+
+  it('lists the tags that are not failures', () => {
+    expect(CAPTURE_EVENT_TAGS).toEqual([CAPTURE_TAGS.attempt, CAPTURE_TAGS.filed, CAPTURE_TAGS.salvaged]);
+    expect(CAPTURE_EVENT_TAGS).not.toContain(CAPTURE_TAGS.refused);
+    expect(CAPTURE_EVENT_TAGS).not.toContain(CAPTURE_TAGS.abandoned);
   });
 });

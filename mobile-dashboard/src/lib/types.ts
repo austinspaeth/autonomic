@@ -93,9 +93,16 @@ export type PingRow = {
   builds?: PingBuild[];
   /** sub rows only: how each purchase was known, V verified / S store-only. */
   evidence?: { key: string; evidence: 'V' | 'S'; count: number }[];
+  /** sub rows only: the door each sale came through, a wall letter (the `pay`
+   *  route's) or an offer card (A annual, F founder), joinable on the cohort
+   *  key. A sale with no door here is not known, never a door of its own. */
+  doors?: { key: string; door: string; count: number }[];
   /** open rows only: when each open arrived, `{ "14I": n, "09AN": n }` (Eastern
    *  hour, store, `N` for a first run). Absent before the server counted it. */
   hours?: Record<string, number>;
+  /** sub rows only: when the latest sale under each cohort key arrived (ISO).
+   *  Absent before the server kept it. */
+  times?: Record<string, string>;
 };
 
 export type Fault = {
@@ -115,7 +122,7 @@ export type Fault = {
 };
 
 export type PingKind =
-  | 'open' | 'sub' | 'rst' | 'lap' | 'act' | 'cap' | 'hrv' | 'pay'
+  | 'open' | 'sub' | 'rst' | 'lap' | 'act' | 'cap' | 'hrv' | 'sav' | 'pay'
   | 'not' | 'pot' | 'see' | 'err' | 'osh' | 'odm' | 'oac' | 'ofl'
   | 'log' | 'use' | 'fnd' | 'rpt' | 'rdg' | 'mbp' | 'rvw';
 

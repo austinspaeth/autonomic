@@ -78,9 +78,10 @@ export function noteAnnualOfferStarted(milestone: number, nowMs = Date.now()): A
   return next;
 }
 
-/** The ✕. Permanent for this milestone: the card comes back at the next one. */
-export function noteAnnualOfferDismissed(): void {
-  write(dismissOffer(annualMemory()));
+/** The ✕. Permanent for every milestone reached so far: the card comes back at
+ *  the next one still ahead. */
+export function noteAnnualOfferDismissed(installedAtMs: number | null, nowMs = Date.now()): void {
+  write(dismissOffer(annualMemory(), installedAtMs, nowMs));
 }
 
 /* Dev time machine — see FORCE_OFFER_AGE_DAYS. Runs once at import, moving both

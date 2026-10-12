@@ -3,7 +3,7 @@ import { Animated, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePalette } from '../theme';
 
-const Ctx = createContext<(msg: string) => void>(() => {});
+const Ctx = createContext<(msg: string, ms?: number) => void>(() => {});
 export const useToast = () => useContext(Ctx);
 
 export function ToastProvider({ children }: { children: React.ReactNode }) {
@@ -13,13 +13,13 @@ export function ToastProvider({ children }: { children: React.ReactNode }) {
   const opacity = useRef(new Animated.Value(0)).current;
   const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  const show = useCallback((m: string) => {
+  const show = useCallback((m: string, ms = 1900) => {
     setMsg(m);
     Animated.timing(opacity, { toValue: 1, duration: 150, useNativeDriver: true }).start();
     if (timer.current) clearTimeout(timer.current);
     timer.current = setTimeout(() => {
       Animated.timing(opacity, { toValue: 0, duration: 200, useNativeDriver: true }).start(() => setMsg(null));
-    }, 1900);
+    }, ms);
   }, [opacity]);
 
   return (

@@ -14,7 +14,7 @@
  *  - A change against a base under 5 is not reported (`pctChange`).
  */
 import { addDays } from './dates';
-import type { PingKind, PingReport, PingRow } from './types';
+import type { Fault, PingKind, PingReport, PingRow } from './types';
 
 export type PlatformKey = 'all' | 'ios' | 'android';
 type Letter = 'I' | 'A' | 'U';
@@ -31,11 +31,15 @@ export type DayEntry = {
   /** Slot letter (sensor / surface / plan / event letter) -> count, filtered. */
   slots: Counts;
   tiers: Counts;
+  /** Cohort -> tier letter -> count (who is in the app by install age and status). */
+  cohortTiers: Record<string, Counts>;
   builds: Counts;
   /** Cohort -> slot -> count (sensor mix by install age). */
   cohortSlots: Record<string, Counts>;
   /** sub only: purchase evidence, V verified / S store-only. */
   evidence: { V: number; S: number };
+  /** sub only: sales by the door they came through (wall or offer letter), filtered. */
+  doors: Counts;
   unattributed: number;
   /** open only: arrivals per Eastern hour (24 slots), everyone and first runs,
    *  inside the filter. Null on a day the server was not counting hours. */
@@ -55,7 +59,7 @@ export type UsageIndex = {
 };
 
 export const KINDS: PingKind[] = [
-  'open', 'sub', 'rst', 'lap', 'act', 'cap', 'hrv', 'pay', 'not', 'pot', 'see', 'err',
+  'open', 'sub', 'rst', 'lap', 'act', 'cap', 'hrv', 'sav', 'pay', 'not', 'pot', 'see', 'err',
   'osh', 'odm', 'oac', 'ofl', 'log', 'use', 'fnd', 'rpt', 'rdg', 'mbp', 'rvw',
 ];
 
@@ -80,9 +84,11 @@ function entryOf(row: PingRow, letter: Letter | null): DayEntry {
     fresh: zero(),
     slots: {},
     tiers: {},
+    cohortTiers: {},
     builds: {},
     cohortSlots: {},
     evidence: { V: 0, S: 0 },
+    doors: {},
     unattributed: 0,
     hours: null,
   };
@@ -113,6 +119,7 @@ function entryOf(row: PingRow, letter: Letter | null): DayEntry {
       bump((e.cohortSlots[c.cohort] ||= {}), c.slot || '?', c.count);
     }
     bump(e.tiers, c.tier || '?', c.count);
+    bump((e.cohortTiers[c.cohort] ||= {}), c.tier || '?', c.count);
   });
   e.total = letter ? kept : row.total;
   (row.builds || []).forEach((b) => {
@@ -123,6 +130,10 @@ function entryOf(row: PingRow, letter: Letter | null): DayEntry {
     if (letter && String(ev.key).charAt(6) !== letter) return;
     if (ev.evidence === 'V') e.evidence.V += ev.count;
     else if (ev.evidence === 'S') e.evidence.S += ev.count;
+  });
+  (row.doors || []).forEach((w) => {
+    if (letter && String(w.key).charAt(6) !== letter) return;
+    bump(e.doors, w.door, w.count);
   });
   return e;
 }
@@ -173,14 +184,13 @@ export const returningOn = (ix: UsageIndex, d: string) => Math.max(0, activeOn(i
 export const cohortSize = (ix: UsageIndex, c: string) => countOn(ix, c, c);
 export const isMature = (ix: UsageIndex, c: string, n: number) => !!ix.last && ageDays(c, ix.last) >= n;
 
-/** One day as the pace maths wants it: its count, and when it arrived. The
- *  hours are dropped unless they account for the whole day (the day the
- *  server began counting them is only part-covered, and would read early). */
+/** One day as the pace maths wants it: its count, and when it arrived. On the
+ *  day the server began counting hours they cover only part of it; they are
+ *  handed over as they are, and the pace maths places the rest. */
 export function paceDay(ix: UsageIndex, d: string, who: 'all' | 'fresh'): { total: number; hours: number[] | null } {
   const total = who === 'fresh' ? newOn(ix, d) : activeOn(ix, d);
   const hours = entry(ix, 'open', d)?.hours?.[who] ?? null;
-  const seen = hours ? hours.reduce((a, b) => a + b, 0) : 0;
-  return { total, hours: hours && total > 0 && seen >= total * 0.98 ? hours : null };
+  return { total, hours: hours && total > 0 && hours.some((n) => n > 0) ? hours : null };
 }
 
 export function rangeDays(from: string, to: string): string[] {
@@ -283,6 +293,49 @@ export function captureFunnel(ix: UsageIndex, days: string[], L?: string) {
   return { started, completed, abandoned: Math.max(0, started - completed), pct: started ? (completed / started) * 100 : null, blind };
 }
 
+/**
+ * Readings completed vs SAVED, on days both counters existed; optionally one
+ * sensor. `hrv` fires when a reading finishes, before anything has judged its
+ * beats; `sav` only when an entry was written. The gap is readings the app
+ * declined. Both are capped once per install per day and each names the day's
+ * FIRST such reading, so per sensor the two can name different sensors on one
+ * day and `saved` may exceed `completed` for one of them.
+ */
+export function saveFunnel(ix: UsageIndex, days: string[], L?: string) {
+  let completed = 0;
+  let saved = 0;
+  let blind = 0;
+  days.forEach((d) => {
+    if (!known(ix, 'sav', d) || !known(ix, 'hrv', d)) {
+      blind += 1;
+      return;
+    }
+    completed += L ? slotOn(ix, 'hrv', d, L) : totalOn(ix, 'hrv', d);
+    saved += L ? slotOn(ix, 'sav', d, L) : totalOn(ix, 'sav', d);
+  });
+  return { completed, saved, lost: Math.max(0, completed - saved), pct: completed ? Math.min(100, (saved / completed) * 100) : null, blind };
+}
+
+/**
+ * Sales by the door they came through, over the days the door was being sent.
+ * `known` is sales carrying one; `sales` is every sale on those days, so the
+ * difference is purchases with no buy tap behind them or from an older build.
+ */
+export function doorsOver(ix: UsageIndex, days: string[]) {
+  const first = [...(ix.routes.sub?.entries() ?? [])].filter(([, e]) => Object.keys(e.doors).length).map(([d]) => d).sort()[0] ?? null;
+  const doors: Counts = {};
+  let sales = 0;
+  days.forEach((d) => {
+    if (!first || d < first) return;
+    const e = entry(ix, 'sub', d);
+    if (!e) return;
+    sales += e.total;
+    Object.entries(e.doors).forEach(([L, n]) => bump(doors, L, n));
+  });
+  const named = Object.values(doors).reduce((a, b) => a + b, 0);
+  return { doors, sales, known: named, unknown: Math.max(0, sales - named), first };
+}
+
 /** Offers raised, and what became of them. "Accepted" is the buy button, not a purchase. */
 export function offerFunnel(ix: UsageIndex, days: string[], L?: string) {
   const get = (k: PingKind, d: string) => (!known(ix, k, d) ? 0 : L ? slotOn(ix, k, d, L) : totalOn(ix, k, d));
@@ -311,12 +364,12 @@ export function lifecycleActive(ix: UsageIndex, d: string, inTrial: boolean): nu
   return t;
 }
 
-/** Actives on `d` by install age, youngest first. */
-export function activeByCohort(ix: UsageIndex, d: string): { age: number; cohort: string; count: number }[] {
+/** Actives on `d` by install age, youngest first, each with its split by status. */
+export function activeByCohort(ix: UsageIndex, d: string): { age: number; cohort: string; count: number; tiers: Counts }[] {
   const e = entry(ix, 'open', d);
   if (!e) return [];
   return Object.entries(e.cohorts)
-    .map(([c, n]) => ({ age: ageDays(c, d), cohort: c, count: n }))
+    .map(([c, n]) => ({ age: ageDays(c, d), cohort: c, count: n, tiers: e.cohortTiers[c] ?? {} }))
     .filter((x) => x.age >= 0)
     .sort((a, b) => a.age - b.age);
 }
@@ -460,6 +513,58 @@ function cohortEventBy(ix: UsageIndex, cohorts: string[], w: number, k: PingKind
 }
 export const activation = (ix: UsageIndex, cohorts: string[], w: number) => cohortEventBy(ix, cohorts, w, 'act');
 export const conversion = (ix: UsageIndex, cohorts: string[], w: number) => cohortEventBy(ix, cohorts, w, 'sub');
+
+/** The cohorts that turned exactly `w` days old inside [from, to]. */
+export const cohortsReaching = (ix: UsageIndex, from: string, to: string, w: number) => {
+  const lo = addDays(from, -w);
+  const hi = addDays(to, -w);
+  return ix.cohorts.filter((c) => c >= lo && c <= hi);
+};
+/**
+ * Conversion by day `w` for a WINDOW: of the installs that turned `w` days old
+ * inside it, the share with a subscription reported by then. Every cohort in
+ * it has had its whole `w` days, so no range is too short to have an answer
+ * and a burst of new installs cannot dilute it.
+ */
+export const conversionReached = (ix: UsageIndex, from: string, to: string, w: number) => conversion(ix, cohortsReaching(ix, from, to, w), w);
+
+/**
+ * The same question answered from the SALES LEDGER: installs are still the
+ * pings' cohort sizes, but a conversion is a recorded sale carrying that
+ * install day, bought within `w` days of it. The subscribe pings cannot be
+ * de-duplicated (no identifier) and one replaying install once reported 39
+ * sales against 3 real ones, so they overstate the rate; the ledger is one row
+ * per purchase. A refunded sale is not a conversion, and a sale with no
+ * install date cannot be placed and is left out. `sales` is already filtered
+ * to the store `ix` is.
+ */
+export function ledgerConversionReached(
+  ix: UsageIndex,
+  sales: { date: string; cohort?: string; qty: number; refunded?: boolean }[],
+  from: string,
+  to: string,
+  w: number,
+): Rate {
+  const sizes = new Map<string, number>();
+  let immature = 0;
+  cohortsReaching(ix, from, to, w).forEach((c) => {
+    if (!isMature(ix, c, w)) {
+      immature += 1;
+      return;
+    }
+    const size = cohortSize(ix, c);
+    if (size) sizes.set(c, size);
+  });
+  let kept = 0;
+  sales.forEach((s) => {
+    if (s.refunded || !s.cohort || !sizes.has(s.cohort)) return;
+    const age = ageDays(s.cohort, s.date);
+    if (age >= 0 && age <= w) kept += Math.max(1, s.qty || 1);
+  });
+  let of = 0;
+  sizes.forEach((n) => (of += n));
+  return rate(kept, of, immature);
+}
 
 /** Of each cohort, how many MEASURED on exactly day n (before the counter shipped is blind). */
 export function measuringCurve(ix: UsageIndex, cohorts: string[], max = 60): { n: number; pct: number | null; of: number }[] {
@@ -650,11 +755,152 @@ export function splitFor(cohorts: string[], releases: { date: string; label: str
 
 /* ----------------------------------------------------------- faults */
 
+/**
+ * The capture funnel rides the fault route (it is the only one that counts
+ * every occurrence, by store), and three of its tags are NOT failures: a
+ * reading that began, one the app filed, and one the user kept from a refusal.
+ * Anything that counts things going wrong must leave them out. Mirrors
+ * `CAPTURE_EVENT_TAGS` in the app's lib/hrv/refusal.ts.
+ */
+export const CAPTURE_TAG = { attempt: 'hrv.attempt', filed: 'hrv.filed', refused: 'hrv.refused', salvaged: 'hrv.salvaged', abandoned: 'hrv.abandoned' } as const;
+const EVENT_TAGS = new Set<string>([CAPTURE_TAG.attempt, CAPTURE_TAG.filed, CAPTURE_TAG.salvaged]);
+export const isFailure = (f: Pick<Fault, 'tag'>) => !EVENT_TAGS.has(f.tag);
+
+type Split = { n: number; I: number; A: number; U: number };
+const split = (): Split => ({ n: 0, I: 0, A: 0, U: 0 });
+
+export type CaptureOutcomes = {
+  /** Readings begun. Every attempt, not one per install per day. */
+  attempts: Split;
+  /** Filed by the app with no question asked. */
+  filed: Split;
+  /** Declined by the results card. */
+  refused: Split;
+  /** ...of which the user chose to keep anyway. */
+  salvaged: Split;
+  /** Ended with no result: stopped by the app, given up on, or finished too early. */
+  abandoned: Split;
+  abandonedBy: { signal: number; user: number; early: number };
+  /** Began and reported nothing more: the app was closed or killed mid-reading. */
+  vanished: Split;
+  /** attempts - filed - salvaged: every attempt that did not become an entry. */
+  failed: Split;
+  failPct: number | null;
+  /** The refusals and abandons, grouped by what they looked like, most first. */
+  shapes: { tag: string; msg: string; n: number; I: number; A: number; installs: number }[];
+  /** Per day, for a chart: attempts and how many of them landed. */
+  byDay: { day: string; attempts: number; landed: number }[];
+  /** The first day any attempt was reported for this sensor; null = never. */
+  first: string | null;
+  /** Refusals from builds that reported no attempts, install-days. Outside the rate. */
+  legacyRefusedInstalls: number;
+};
+
+/**
+ * How one sensor's readings went, PER ATTEMPT, from the capture funnel.
+ *
+ * The pings cannot answer this: `cap` and `hrv` are capped once per install per
+ * day, so somebody who fails on the camera six times and then gets one reads as
+ * one start and one completion. Here every attempt is one count, so the rate is
+ * "of the readings that began, how many did not become an entry".
+ *
+ * Only builds that report ATTEMPTS are in the rate. An older build reports its
+ * refusals and nothing to divide them by; those are recognisable (their message
+ * carries no `dur` token) and are set aside as `legacyRefusedInstalls` rather
+ * than counted as failures with no attempt behind them.
+ */
+export function captureOutcomes(report: PingReport | null | undefined, days: string[], platform: PlatformKey, source: string): CaptureOutcomes {
+  const L = platform === 'ios' ? 'I' : platform === 'android' ? 'A' : null;
+  const want = new Set(days);
+  const faults = (report?.faults || []).filter((f) => f.tag.startsWith('hrv.') && f.msg.split(' ')[0] === source);
+  const first = faults.filter((f) => f.tag === CAPTURE_TAG.attempt).reduce<string | null>((m, f) => (!m || f.day < m ? f.day : m), null);
+  const out: CaptureOutcomes = {
+    attempts: split(), filed: split(), refused: split(), salvaged: split(), abandoned: split(), vanished: split(), failed: split(),
+    abandonedBy: { signal: 0, user: 0, early: 0 }, failPct: null, shapes: [], byDay: [], first, legacyRefusedInstalls: 0,
+  };
+  const shapes = new Map<string, CaptureOutcomes['shapes'][number]>();
+  const perDay = new Map<string, { attempts: number; landed: number }>();
+  const add = (s: Split, f: Fault): number => {
+    const o = f.occPlatforms || {};
+    const I = o.I || 0;
+    const A = o.A || 0;
+    // A row from before the per-store occurrence split has only a total.
+    const U = Math.max(0, f.occurrences - I - A);
+    const n = L ? (L === 'I' ? I : A) : f.occurrences;
+    s.n += n;
+    if (!L || L === 'I') s.I += I;
+    if (!L || L === 'A') s.A += A;
+    if (!L) s.U += U;
+    return n;
+  };
+  faults.forEach((f) => {
+    if (!want.has(f.day)) return;
+    const modern = / dur/.test(f.msg);
+    if (f.tag === CAPTURE_TAG.refused && !modern) {
+      out.legacyRefusedInstalls += L ? f.platforms?.[L] || 0 : f.installs;
+      return;
+    }
+    if (f.tag === CAPTURE_TAG.salvaged && !modern) return;
+    const day = perDay.get(f.day) || { attempts: 0, landed: 0 };
+    if (f.tag === CAPTURE_TAG.attempt) day.attempts += add(out.attempts, f);
+    else if (f.tag === CAPTURE_TAG.filed) day.landed += add(out.filed, f);
+    else if (f.tag === CAPTURE_TAG.salvaged) day.landed += add(out.salvaged, f);
+    else if (f.tag === CAPTURE_TAG.refused || f.tag === CAPTURE_TAG.abandoned) {
+      const n = add(f.tag === CAPTURE_TAG.refused ? out.refused : out.abandoned, f);
+      if (f.tag === CAPTURE_TAG.abandoned) {
+        const why = f.msg.split(' ')[1] as keyof CaptureOutcomes['abandonedBy'];
+        if (why in out.abandonedBy) out.abandonedBy[why] += n;
+      }
+      if (n) {
+        const k = `${f.tag}|${f.msg}`;
+        const g = shapes.get(k) || { tag: f.tag, msg: f.msg, n: 0, I: 0, A: 0, installs: 0 };
+        g.n += n;
+        g.I += f.occPlatforms?.I || 0;
+        g.A += f.occPlatforms?.A || 0;
+        g.installs += L ? f.platforms?.[L] || 0 : f.installs;
+        shapes.set(k, g);
+      }
+    }
+    perDay.set(f.day, day);
+  });
+  (['n', 'I', 'A', 'U'] as const).forEach((k) => {
+    out.failed[k] = Math.max(0, out.attempts[k] - out.filed[k] - out.salvaged[k]);
+    out.vanished[k] = Math.max(0, out.attempts[k] - out.filed[k] - out.refused[k] - out.abandoned[k]);
+  });
+  out.failPct = out.attempts.n ? (out.failed.n / out.attempts.n) * 100 : null;
+  out.shapes = [...shapes.values()].sort((a, b) => b.n - a.n);
+  out.byDay = days.map((d) => ({ day: d, attempts: perDay.get(d)?.attempts ?? 0, landed: Math.min(perDay.get(d)?.attempts ?? 0, perDay.get(d)?.landed ?? 0) }));
+  return out;
+}
+
+/**
+ * A refusal or an abandon in words. The message is banded tokens
+ * (`camera nodata art? cov<25 raw50+ seg5+ dur4m+ paced`); this reads the three
+ * that decide what happened and leaves the rest to the raw line beside it.
+ */
+export function shapeLabel(tag: string, msg: string): string {
+  const t = msg.split(' ');
+  const has = (x: string) => t.includes(x);
+  const how = has('raw50+') && has('seg5+') ? 'lock kept breaking'
+    : has('raw<25') ? 'pulse barely arrived'
+      : has('seg5+') ? 'many dropouts' : '';
+  let what: string;
+  if (tag === CAPTURE_TAG.abandoned) {
+    what = t[1] === 'signal' ? 'Stopped by the app' : t[1] === 'early' ? 'Finished too early' : t[1] === 'user' ? 'Gave up (Having issues?)' : 'Abandoned';
+  } else {
+    what = t[1] === 'nodata' ? 'Refused, nothing usable' : t[1] === 'thin' ? 'Refused, too little pulse' : t[1] === 'noisy' ? 'Refused, too noisy' : 'Refused';
+  }
+  return how ? `${what}: ${how}` : what;
+}
+
+/** A sensor's failure rate for one store, or null with no attempts there. */
+export const failPctFor = (o: CaptureOutcomes, k: 'I' | 'A') => (o.attempts[k] ? (o.failed[k] / o.attempts[k]) * 100 : null);
+
 export function faultDay(ix: UsageIndex, d: string) {
   const L = ix.platform === 'ios' ? 'I' : ix.platform === 'android' ? 'A' : null;
   const out = { installs: 0, occurrences: 0, signatures: 0, crashInstalls: 0, crashOccurrences: 0, platforms: zero(), crashPlatforms: zero() };
   (ix.report?.faults || []).forEach((f) => {
-    if (f.day !== d) return;
+    if (f.day !== d || !isFailure(f)) return;
     const inst = L ? f.platforms?.[L] || 0 : f.installs;
     const occ = L ? f.occPlatforms?.[L] || 0 : f.occurrences;
     if (L && !inst && !occ) return;

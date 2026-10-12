@@ -70,9 +70,24 @@ class HrMonitor {
         if (_running) { return; }
         reset();
         _running = true;
+        // The session is what keeps the screen on for a long monitor (the
+        // activity display timeout, not the watch face's) and puts the sensor
+        // in its activity-rate mode. Discarded on stop; nothing is logged.
+        Recording.begin("HR Monitor");
         // Onboard (wrist), not SENSOR_HEARTRATE which is the remote strap type.
-        Sensor.setEnabledSensors([Sensor.SENSOR_ONBOARD_HEARTRATE]);
-
+        // enableSensorType ADDS the sensor without touching whatever else is
+        // enabled, so opening the monitor after an HRV reading cannot reset
+        // the collector's armed listener the way a second setEnabledSensors
+        // could.
+        try {
+            if (Sensor has :enableSensorType) {
+                Sensor.enableSensorType(Sensor.SENSOR_ONBOARD_HEARTRATE);
+            } else {
+                Sensor.setEnabledSensors([Sensor.SENSOR_ONBOARD_HEARTRATE]);
+            }
+        } catch (ex) {
+            // The watch keeps its ambient heart rate either way.
+        }
 
         _timer = new Timer.Timer();
         _timer.start(method(:onTick), 1000, true);
@@ -82,6 +97,7 @@ class HrMonitor {
         if (!_running) { return; }
         _running = false;
         if (_timer != null) { _timer.stop(); _timer = null; }
+        Recording.end();
     }
 
     function onTick() as Void {

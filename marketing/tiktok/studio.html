@@ -7,12 +7,13 @@
   Content lives in the repo, one folder per set:
     sets/<YYYY-MM-DD-name>/set.json   name, created date, notes, creatives (copy, captions, image briefs)
     sets/<YYYY-MM-DD-name>/img/       photos placed in the studio
+    sets/<YYYY-MM-DD-name>/video/     clips imported in the Composer (composer.js + composer.css: the video view)
   The studio lists every set (newest first) in the picker at the top left. Dropping a photo
   onto a phone writes it into the set's img/ folder; editing slide text or the Position
   slider writes set.json. Git is the history.
 
   set.json shape: see sets/2026-10-06-awareness-launch/set.json. Per slide:
-    layout  hook | photo | list | phone | logo        text  one string per paragraph, *asterisks* = teal, :ribbon: and :awesome: = inline icons
+    layout  hook | photo | list | phone (mock: "watch" swaps the phone for an Apple Watch) | logo        text  one string per paragraph, *asterisks* = teal, :ribbon: and :awesome: = inline icons
     cta     adds the Autonomic lockup                 fine  optional small print
     img     { src, pos, source: unsplash|mine|app, search, shows, frame }
 
@@ -29,6 +30,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=Grand+Hotel&family=Fraunces:ital,opsz,wght@0,9..144,400..700;1,9..144,400..700&family=Caveat:wght@500..700&family=Bricolage+Grotesque:opsz,wght@12..96,400..800&family=Manrope:wght@200..800&family=Instrument+Serif:ital@0;1&display=block" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+<link rel="stylesheet" href="composer.css">
 
 
 <style>
@@ -172,6 +174,9 @@ body:not(.ui-on) .content > .slide{transform:scale(.363889) !important}
 body.view-shots #app{display:none}
 body.view-shots #shots{display:block}
 body.view-shots .only-slides{display:none}
+#composer{display:none;padding:40px 40px 80px}
+body.view-composer #app,body.view-composer #shots,body.view-composer .only-slides,body.view-composer #saveAll{display:none}
+body.view-composer #composer{display:block}
 .card.flash .dev-box{animation:flash 1.4s ease-out}
 @keyframes flash{0%,40%{filter:drop-shadow(0 0 0 rgba(48,197,176,0))}20%{filter:drop-shadow(0 0 24px rgba(48,197,176,.8))}}
 
@@ -445,6 +450,26 @@ body{--hand:"Caveat","Bradley Hand",cursive}
   box-shadow:0 0 0 3px rgba(255,255,255,.07),0 50px 140px rgba(0,0,0,.65)}
 .mock .img-slot{inset:22px;border-radius:116px;background-size:100% auto}
 .mock .isl{position:absolute;left:50%;top:46px;width:268px;height:78px;margin-left:-134px;border-radius:39px;background:#000}
+/* The watch: an aluminium 44mm case (368x448 screen) seen straight on, with its crown, side button and a black sport band
+   running out above and below. The case is deliberately lighter than the band and the slide, so it reads as a whole watch
+   with its own bottom edge at any size. */
+.mock-watch .copy{bottom:calc(1170px - var(--my,0px))}
+.mock.watch{left:240px;top:960px;width:600px;height:716px;border-radius:0;background:none;box-shadow:none}
+.mock.watch .shadow{position:absolute;inset:0;border-radius:168px;box-shadow:0 60px 150px rgba(0,0,0,.7)}
+.mock.watch .case{position:absolute;inset:0;border-radius:168px;
+  background:linear-gradient(145deg,#d3d7da 0%,#8b9195 16%,#565c60 40%,#3e4346 58%,#7d8387 82%,#c2c6c9 100%)}
+.mock.watch .glass{position:absolute;inset:15px;border-radius:154px;background:#050607;box-shadow:inset 0 0 0 2px rgba(255,255,255,.06)}
+.mock.watch .img-slot{inset:54px 50px;border-radius:86px;background-color:#000;background-size:100% auto}
+.mock.watch .band{position:absolute;left:92px;right:92px;height:250px;
+  background:linear-gradient(90deg,#050607 0%,#1d2224 9%,#15191b 30%,#121618 70%,#1d2224 91%,#050607 100%)}
+.mock.watch .band.t{bottom:calc(100% - 70px);border-radius:26px 26px 0 0}
+.mock.watch .band.b{top:calc(100% - 70px);border-radius:0 0 26px 26px}
+.mock.watch .band i{position:absolute;left:0;right:0;height:150px}
+.mock.watch .band.t i{top:0;border-radius:26px 26px 0 0;background:linear-gradient(180deg,rgba(11,15,16,1) 0%,rgba(11,15,16,0) 100%)}
+.mock.watch .band.b i{bottom:0;border-radius:0 0 26px 26px;background:linear-gradient(0deg,rgba(11,15,16,1) 0%,rgba(11,15,16,0) 100%)}
+.mock.watch .crown{position:absolute;right:-26px;top:148px;width:40px;height:116px;border-radius:13px;
+  background:linear-gradient(180deg,#5d6367 0%,#b4b9bc 14%,#70767a 30%,#a9aeb1 46%,#6a7074 62%,#a3a8ab 78%,#565c60 100%)}
+.mock.watch .side{position:absolute;right:-12px;top:326px;width:20px;height:160px;border-radius:10px;background:linear-gradient(90deg,#4a5054,#8f9599)}
 .l-logo .glow{top:-260px}
 .l-logo .copy{top:820px}
 .logo-wrap{position:absolute;left:370px;top:230px;width:340px;height:340px}
@@ -462,7 +487,7 @@ body{--hand:"Caveat","Bradley Hand",cursive}
 .store{display:block;flex:none;width:46px;height:46px;background-size:contain;background-repeat:no-repeat;background-position:center;opacity:.9}
 .store.apple{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 24 24'><path fill='%23e8eeed' d='M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701'/></svg>")}
 .store.play{background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='96' height='96' viewBox='0 0 24 24'><path fill='%23e8eeed' d='M22.018 13.298l-3.919 2.218-3.515-3.493 3.543-3.521 3.891 2.202a1.49 1.49 0 0 1 0 2.594zM1.337.924a1.486 1.486 0 0 0-.112.568v21.017c0 .217.045.419.124.6l11.155-11.087L1.337.924zm12.207 10.065l3.258-3.238L3.45.195a1.466 1.466 0 0 0-.946-.179l11.04 10.973zm0 2.067l-11 10.933c.298.036.612-.016.906-.183l13.324-7.54-3.23-3.21z'/></svg>");width:42px;height:42px}
-.lockup .avail{font-size:26px;font-weight:300;letter-spacing:.01em;color:rgba(232,238,237,.7);white-space:nowrap;margin-right:-4px}
+.lockup .avail{font-size:32px;font-weight:300;letter-spacing:.01em;color:rgba(232,238,237,.7);white-space:nowrap;margin-right:-4px}
 .lockup .stores{display:flex;align-items:center;gap:22px;margin-left:auto}
 
 /* safe-zone guides (studio only, never exported) */
@@ -494,6 +519,7 @@ body.guides-on .guides{display:block}
     <div class="pill"></div>
     <button data-v="slides">Slides</button>
     <button data-v="shots">Shot list</button>
+    <button data-v="composer">Composer</button>
   </div>
   <div class="seg only-slides" id="seg">
     <div class="pill"></div>
@@ -511,6 +537,7 @@ body.guides-on .guides{display:block}
 
 <main id="app"></main>
 <main id="shots"></main>
+<main id="composer"></main>
 <div id="stage" aria-hidden="true"></div>
 <div id="focus"><div class="fwrap"></div>
   <div class="hint"><kbd>←</kbd><kbd>→</kbd> slides &nbsp;·&nbsp; <kbd>1</kbd><kbd>2</kbd><kbd>3</kbd> platform &nbsp;·&nbsp; <kbd>C</kbd> clean canvas for screenshots &nbsp;·&nbsp; <kbd>Esc</kbd> close</div></div>
@@ -556,6 +583,7 @@ const I = {
   instagram: sv('<rect x="3" y="3" width="18" height="18" rx="5.2"/><circle cx="12" cy="12" r="4.2"/><circle cx="17.3" cy="6.7" r="1.1" fill="currentColor" stroke="none"/>', { w: 2 }),
   download: sv('<path d="M12 3.5v11.5"/><path d="m7 10.5 5 5 5-5"/><path d="M4 20.5h16"/>', { w: 2.1 }),
   image: sv('<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="1.8"/><path d="m4 18 5-5 4 4 3-3 4 4"/>', { w: 1.9 }),
+  link: sv('<path d="M10 14a4.5 4.5 0 0 0 6.4 0l3-3a4.5 4.5 0 0 0-6.4-6.4l-1.2 1.2"/><path d="M14 10a4.5 4.5 0 0 0-6.4 0l-3 3a4.5 4.5 0 0 0 6.4 6.4l1.2-1.2"/>', { w: 2 }),
   reset: sv('<path d="M3.5 12a8.5 8.5 0 1 0 2.6-6.1"/><path d="M3.5 3.5v4.8h4.8"/>', { w: 2 }),
   focus: sv('<path d="M8.5 3.5h-5v5M15.5 3.5h5v5M8.5 20.5h-5v-5M15.5 20.5h5v-5"/>', { w: 2 }),
   copy: sv('<rect x="8" y="8" width="13" height="13" rx="3"/><path d="M16 8V5.5A2.5 2.5 0 0 0 13.5 3h-8A2.5 2.5 0 0 0 3 5.5v8A2.5 2.5 0 0 0 5.5 16H8"/>', { w: 1.9 }),
@@ -575,7 +603,8 @@ const LS = {
 
 const esc = s => String(s).replace(/[&<>"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;' }[c]));
 // The number a creative wears: numbering continues across sets (set.json numberFrom), files keep their per-set index.
-const num = ci => String(ci + Math.max(1, +SET.numberFrom || 1)).padStart(2, '0');
+// A creative carrying its own `number` wears that instead (one moved from an earlier set keeps the number it was made with).
+const num = ci => String(+SET.creatives[ci]?.number || ci + Math.max(1, +SET.numberFrom || 1)).padStart(2, '0');
 const rich = s => esc(s).replace(/\*([^*]+)\*/g, '<em>$1</em>').replace(/:ribbon:/g, '<i class="rbn" contenteditable="false" data-tok=":ribbon:"></i>')
   .replace(/:awesome:/g, '<i class="awe" contenteditable="false" data-tok=":awesome:"></i>');
 const SOURCE = { unsplash: 'Unsplash', mine: 'Your photo', app: 'App screenshot', graphic: 'Graphic' };
@@ -602,7 +631,7 @@ const base = () => `sets/${SET_ID}/`;
 const resolve = src => !src ? '' : /^(https?:|data:|blob:|\/)/.test(src) ? src : base() + src;
 const saveState = document.getElementById('saveState');
 const showSave = (cls, text) => { saveState.className = 'saved ' + cls; saveState.lastChild.textContent = text; };
-let saveTimer = null, saving = Promise.resolve(), inflight = 0, SET_VERSION = '';
+let saveTimer = null, saving = Promise.resolve(), inflight = 0, SET_VERSION = '', CODE_VERSION = '';
 // Debounced write of the whole set back to sets/<id>/set.json; writes are serialised and carry
 // the version they were based on. If the file changed meanwhile (another tab, or Claude editing
 // it), the server refuses and this tab reloads the latest copy instead of overwriting it.
@@ -625,7 +654,10 @@ setInterval(async () => {
   if (!SET_ID || saveTimer || inflight || document.hidden) return;
   try {
     const r = await fetch(`/api/sets/${SET_ID}/version`); if (!r.ok) return;
-    const { version } = await r.json();
+    const { version, code } = await r.json();
+    // The studio's own files changed on disk: reload, or this tab keeps drawing with the old code.
+    if (code && CODE_VERSION && code !== CODE_VERSION) return location.reload();
+    if (code) CODE_VERSION = code;
     if (SET_VERSION && version !== SET_VERSION && !saveTimer && !inflight) { await openSet(SET_ID, true); toast('Updated from set.json'); }
   } catch {}
 }, 2500);
@@ -649,12 +681,15 @@ function copyHTML(sl) {
 }
 function slideHTML(sl, key) {
   const L = sl.layout; let body;
-  if (L === 'phone') body = `<div class="glow"></div>${copyHTML(sl)}<div class="mock">${slot()}<div class="isl"></div></div>`;
+  // A phone slide can wear a watch instead (sl.mock: "watch"): the same placement sliders move it.
+  if (L === 'phone') body = `<div class="glow"></div>${copyHTML(sl)}` + (sl.mock === 'watch'
+    ? `<div class="mock watch"><div class="band t"><i></i></div><div class="band b"><i></i></div><div class="shadow"></div><div class="crown"></div><div class="side"></div><div class="case"><div class="glass"></div>${slot()}</div></div>`
+    : `<div class="mock">${slot()}<div class="isl"></div></div>`);
   else if (L === 'logo') body = `<div class="glow"></div><div class="logo-wrap">${slot()}</div>`
     + (sl.ribbon ? `<div class="ribbon" style="background-image:url('${RIBBON}')"></div>` : '')
     + `<div class="wordmark">Autonomic<small>Free HRV &amp; symptom tracker</small></div>${copyHTML(sl)}`;
   else body = `${slot()}<div class="scrim"></div><div class="shade"></div>${copyHTML(sl)}${L === 'photo' && sl.cta ? lockup() : ''}`;
-  const opts = (sl.copyAt === 'top' ? ' copy-top' : '') + (sl.scrim === 'light' ? ' scrim-light' : '');
+  const opts = (sl.copyAt === 'top' ? ' copy-top' : '') + (sl.scrim === 'light' ? ' scrim-light' : '') + (L === 'phone' && sl.mock === 'watch' ? ' mock-watch' : '');
   return `<div class="slide l-${L}${sl.cta ? ' cta' : ''}${opts}" data-id="${key}">${body}
     <div class="guides"><div class="g-safe"></div></div></div>`;
 }
@@ -829,6 +864,7 @@ function build() {
         <div class="s-head"><span class="s-lbl">Slide ${si + 1} <span>· ${esc(kind)}${sl.cta ? ', call to action' : ''}</span></span>
           <button class="ib" data-act="png" title="Export PNG (1080×1920)">${I.download}</button>
           <button class="ib" data-act="pick" title="Choose image">${I.image}</button>
+          <button class="ib" data-act="link" title="Use Unsplash link (from the clipboard)">${I.link}</button>
           <button class="ib" data-act="clear" title="Remove image">${I.reset}</button>
           <button class="ib" data-act="focus" title="Focus (F)">${I.focus}</button></div>
         <div class="brief">
@@ -958,6 +994,27 @@ async function takeFile(entry, file) {
     toast(`Saved to <b>sets/${esc(SET_ID)}/${esc(entry.sl.img.src)}</b>`);
   } catch (e) { toast('Could not place image: ' + esc(e.message), 7000); }
 }
+// An Unsplash link (the photo's page, or its image address) placed as if the file had been dropped:
+// the studio server fetches it, so the picture lives in the set and exports never meet a CORS wall.
+const isLink = t => /^https:\/\/((images|plus|www)\.)?unsplash\.com\//i.test((t || '').trim());
+async function takeLink(entry, link) {
+  toast('Fetching image…', 20000);
+  try {
+    const r = await fetch('/api/remote?url=' + encodeURIComponent(link.trim()));
+    if (!r.ok) throw new Error((await r.json().catch(() => ({}))).error || 'server said ' + r.status);
+    const blob = await r.blob();
+    await takeFile(entry, new File([blob], 'unsplash.jpg', { type: blob.type || 'image/jpeg' }));
+  } catch (e) { toast('Could not use that link: ' + esc(e.message), 7000); }
+}
+// The button reads the clipboard, so the whole gesture is copy on Unsplash, click here.
+async function pasteLink(entry) {
+  let text = '';
+  try { text = await navigator.clipboard.readText(); } catch {}
+  if (!isLink(text)) text = prompt('Paste an Unsplash link (the photo page or the image address)') || '';
+  if (!text.trim()) return;
+  if (!isLink(text)) return toast('That is not an Unsplash link', 4000);
+  return takeLink(entry, text);
+}
 async function clearImage(entry) {
   const src = entry.sl.img.src;
   if (src && !/^(https?:|data:)/.test(src)) await fetch(`/api/sets/${SET_ID}/img/${entry.key}`, { method: 'DELETE' }).catch(() => {});
@@ -993,6 +1050,7 @@ function wire(entry) {
   const { card, box } = entry, input = card.querySelector('input[type=file]');
   card.querySelector('[data-act="pick"]').onclick = () => input.click();
   input.onchange = () => { takeFile(entry, input.files[0]); input.value = ''; };
+  card.querySelector('[data-act="link"]').onclick = () => pasteLink(entry);
   card.querySelector('[data-act="clear"]').onclick = () => clearImage(entry);
   card.querySelectorAll('[data-crop]').forEach(inp => inp.oninput = () => {
     const v = k => +card.querySelector(`[data-crop="${k}"]`).value, img = entry.sl.img;
@@ -1056,7 +1114,7 @@ async function render(entry) {
 const explain = e => e && e.name === 'SecurityError'
   ? 'Export blocked: an image comes from a host without CORS. Drop the photo onto the phone instead so it lives in the set.'
   : 'Export failed: ' + esc(e && e.message || String(e));
-// Exports go through the studio server into ~/Downloads/Slides Studio/<set>/<NN creative>/slide-N.png;
+// Exports go through the studio server into iCloud Drive/Slides Studio/<set>/<NN creative>/slide-N.png;
 // `reveal` asks it to open that folder in Finder once the batch is written.
 async function exportSlide(entry, reveal = '') {
   const r = await fetch(`/api/sets/${SET_ID}/export/${entry.key}${reveal ? '?reveal=' + reveal : ''}`, { method: 'POST', body: await render(entry) });
@@ -1064,7 +1122,7 @@ async function exportSlide(entry, reveal = '') {
   return (await r.json()).path;
 }
 async function saveOne(entry) {
-  try { toast('Rendering…', 20000); const path = await exportSlide(entry); toast(`Saved to <b>${esc(path.replace(/^.*\/Downloads\//, 'Downloads/'))}</b>`, 5000); }
+  try { toast('Rendering…', 20000); const path = await exportSlide(entry); toast(`Saved to <b>${esc(path.replace(/^.*\/com~apple~CloudDocs\//, 'iCloud Drive/'))}</b>`, 5000); }
   catch (e) { toast(explain(e), 9000); }
 }
 // How long a slide stays up in the MP4: long enough to read it, by word count.
@@ -1098,7 +1156,7 @@ async function saveMany(list, reveal) {
     } catch (e) { videoErr = e.message; }
   }
   if (videoErr && !videos) { if (reveal) exportSlide(list[list.length - 1], reveal).catch(() => {}); }
-  toast(`Exported ${list.length} slides` + (videos ? ` and ${videos} MP4${videos > 1 ? 's' : ''}` : '') + ' to Downloads/Slides Studio'
+  toast(`Exported ${list.length} slides` + (videos ? ` and ${videos} MP4${videos > 1 ? 's' : ''}` : '') + ' to iCloud Drive/Slides Studio'
     + (silent ? `. ${silent} without a song: drop one on the Sound card.` : '') + (videoErr ? `<br>Video: ${esc(videoErr)}` : ''), 9000);
 }
 
@@ -1193,9 +1251,11 @@ function renderShots() {
 }
 const viewSeg = document.getElementById('viewSeg');
 function setView(v) {
-  document.body.classList.toggle('view-shots', v === 'shots'); LS.set('view', v);
+  document.body.classList.toggle('view-shots', v === 'shots'); document.body.classList.toggle('view-composer', v === 'composer'); LS.set('view', v);
   choose(viewSeg, 'v', v);
-  if (v === 'shots') renderShots(); else setPlatform(document.body.dataset.p);
+  // The Composer lives in composer.js, which may still be loading when the boot gets here; it draws itself once it has.
+  if (v !== 'composer') window.pauseComposer?.();
+  if (v === 'shots') renderShots(); else if (v === 'composer') window.renderComposer?.(); else setPlatform(document.body.dataset.p);
   window.scrollTo({ top: 0 });
 }
 viewSeg.querySelectorAll('button').forEach(b => b.onclick = () => setView(b.dataset.v));
@@ -1223,7 +1283,7 @@ async function openSet(id, refresh = false) {
   SET_VERSION = r.headers.get('x-version') || '';
   SET = await r.json(); SET_ID = id; LS.set('set', id);
   history.replaceState(null, '', '?set=' + encodeURIComponent(id));
-  closeFocus(); build(); applyType((SET.style && SET.style.type) || 'bold'); renderPicker(); renderShots(); showSave('ok', 'Saved to set.json');
+  closeFocus(); build(); applyType((SET.style && SET.style.type) || 'bold'); renderPicker(); renderShots(); window.renderComposer?.(refresh); showSave('ok', 'Saved to set.json');
   if (refresh) { window.scrollTo({ top: y }); document.querySelectorAll('.row').forEach((r, i) => { r.scrollLeft = rows[i] || 0; }); }
   else window.scrollTo({ top: 0 });
 }
@@ -1260,8 +1320,17 @@ setZoom(zoom.value);
 zoom.oninput = () => { setZoom(zoom.value); LS.set('zoom2', +zoom.value); };
 document.getElementById('saveAll').onclick = () => saveMany(SLIDES, 'set');
 
+// Cmd+V over a slide places a copied Unsplash link (or a copied image) there. Typing into the copy is left alone.
+document.addEventListener('paste', e => {
+  if (!hovered || e.target.closest?.('[contenteditable], input, textarea')) return;
+  const file = [...(e.clipboardData?.files || [])].find(f => f.type.startsWith('image/'));
+  const text = e.clipboardData?.getData('text') || '';
+  if (file) { e.preventDefault(); takeFile(hovered, file); }
+  else if (isLink(text)) { e.preventDefault(); takeLink(hovered, text); }
+});
 document.addEventListener('keydown', e => {
-  if (e.target.isContentEditable || e.target.tagName === 'INPUT') return;
+  if (e.target.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(e.target.tagName)) return;
+  if (document.body.classList.contains('view-composer')) { window.composerKey?.(e); return; }
   const P = { '1': 'tt', '2': 'rl', '3': 'fd' };
   if (P[e.key]) { setPlatform(P[e.key]); return; }
   if (focusIdx < 0) { if ((e.key === 'f' || e.key === 'F') && hovered) openFocus(SLIDES.indexOf(hovered)); return; }
@@ -1291,5 +1360,6 @@ window.addEventListener('beforeunload', () => { if (saveTimer) fetch(`/api/sets/
   setView(LS.get('view', 'slides'));
 })();
 </script>
+<script src="composer.js"></script>
 </body>
 </html>

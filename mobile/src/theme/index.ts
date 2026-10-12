@@ -38,7 +38,11 @@ export interface Palette {
   sunk: string;
   text: string;
   textDim: string;
+  /** Field labels and units: a step quieter than `textDim`. */
+  textFaint: string;
   border: string;
+  /** The barely-there edge of a field or a toggle's container. */
+  hairline: string;
   accent: string;
   accentSoft: string;
   gaugeTrack: string;
@@ -53,7 +57,9 @@ const dark: Palette = {
   sunk: '#141416',
   text: '#f2f2f5',
   textDim: '#9a9aa0',
+  textFaint: '#6a6a72',
   border: '#303034',
+  hairline: 'rgba(255,255,255,0.07)',
   accent: ACCENT,
   accentSoft: ACCENT_SOFT,
   gaugeTrack: 'rgba(0,0,0,0.4)',
@@ -63,7 +69,7 @@ const dark: Palette = {
 /** One consistent spacing scale (4/8/12/16/20/24). No ad-hoc margins. */
 export const space = { xs: 4, sm: 8, md: 12, lg: 16, xl: 20, xxl: 24 } as const;
 
-export const radius = { card: 14, control: 10, pill: 999 } as const;
+export const radius = { card: 14, control: 10, field: 16, pill: 999 } as const;
 
 /**
  * Custom type faces (loaded in app/_layout.tsx via expo-font). Manrope gives the

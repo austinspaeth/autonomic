@@ -8,6 +8,7 @@
 import { addDays, dayRange } from './dates';
 import type { Fault, PingKind, PingPlatform, PingReport, PingRow, Sale } from './types';
 import type { Snapshot } from './data';
+import { isFailure } from './usage';
 
 export type Series = { day: string; value: number }[];
 
@@ -204,7 +205,9 @@ export function faultGroups(report: PingReport | null | undefined, days: string[
   const want = new Set(days);
   const by = new Map<string, FaultGroup>();
   (report?.faults || []).forEach((f: Fault) => {
-    if (!want.has(f.day)) return;
+    // The capture funnel's attempt / filed / kept rows ride the same route and
+    // are not failures (see `isFailure` in ./usage).
+    if (!want.has(f.day) || !isFailure(f)) return;
     const k = `${f.tag}|${f.msg}`;
     const g = by.get(k) || { tag: f.tag, msg: f.msg, fatal: f.fatal, installs: 0, occurrences: 0, lastDay: f.day };
     g.installs += f.installs;
@@ -225,6 +228,11 @@ export function windowDays(end: string, n: number) {
 export const SENSOR: Record<string, string> = { W: 'Apple Watch', B: 'Strap', F: 'Camera', G: 'Garmin', '?': 'Unknown' };
 export const TIER: Record<string, string> = { F: 'Free', T: 'Trial', P: 'Pro', '?': 'Unknown' };
 export const PLAN: Record<string, string> = { Y: 'Yearly', M: 'Monthly', P: 'Promo year', F: 'Founder', '?': 'Unknown' };
+/** The door a sale came through: a wall, or one of the two offer cards. */
+export const DOOR: Record<string, string> = {
+  R: 'Progress range', I: 'Insights', P: 'POTS', B: 'Pacing', O: 'Outlook AI', M: 'Metric AI', N: 'AI report',
+  S: 'Settings upgrade', A: 'Annual offer card', F: 'Founder offer card',
+};
 export const WALL: Record<string, string> = {
   R: 'Progress range', I: 'Insights', P: 'POTS', B: 'Pacing', O: 'Outlook AI', M: 'Metric AI', N: 'AI report',
   S: 'Settings upgrade', '?': 'Unknown',

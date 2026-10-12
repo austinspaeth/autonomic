@@ -34,6 +34,11 @@ export function computedMaxHr(age: number | null, sex?: string | null): number |
 export const potsThresholdFor = (age: number | null): number =>
   age != null && age >= 12 && age <= 19 ? 40 : 30;
 
+/** Whether a sustained rise meets the POTS-range criterion for this age. No
+ *  rise recorded is not a met threshold. */
+export const metThresholdFor = (sustained: number | null | undefined, age: number | null): boolean =>
+  (sustained ?? 0) >= potsThresholdFor(age);
+
 export interface StandTestInput {
   series: HrPoint[];
   baseline: number | null;
@@ -65,7 +70,7 @@ export function buildStandTestFields(input: StandTestInput): Record<string, numb
   }
 
   const out: Record<string, number | boolean> = {
-    metThreshold: (sustained ?? 0) >= potsThresholdFor(age),
+    metThreshold: metThresholdFor(sustained, age),
     standAt: standMark,
   };
   if (baseline != null) out.baselineHr = Math.round(baseline);

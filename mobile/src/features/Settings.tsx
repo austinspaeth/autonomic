@@ -10,7 +10,7 @@ import * as Sharing from 'expo-sharing';
 import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
 import { SheetControls, useSheets } from '../components/Sheet';
-import { Button } from '../components/ui';
+import { Button, Segmented, Toggle } from '../components/ui';
 import { CheckField, DateField, HeightField, TextField, onlyNumeric } from '../components/Field';
 import { BrandMark, Icon, IconName } from '../components/Icon';
 import { useToast } from '../components/Toast';
@@ -18,16 +18,17 @@ import { radius, usePalette } from '../theme';
 import { clearAllData, getState, replaceState, save, serializeState, useAppState, useStore } from '../store/store';
 import { deleteAllBackups } from '../lib/backup';
 import { ageFromBirthday, keyOf } from '../lib/dates';
+import { cmToInches, getUnits, heightCmText, weightText, weightToLb, weightUnit, type UnitSystem } from '../lib/units';
 import { DATE_KEY_RE, assertImportVersion, isPlainObject } from '../lib/migrate';
-import { useIap, manageSubscription, restore, priceOf, storeName, MONTHLY_SKU, YEARLY_SKU } from '../store/iap';
+import { useIap, paywallBypassed, manageSubscription, restore, priceOf, storeName, MONTHLY_SKU, YEARLY_SKU } from '../store/iap';
 import { getTrialDaysLeft, useAccessGrant, useTier } from '../store/tier';
 import { AccessCodeSheet } from './AccessCode';
-import { grantStatusText } from '../lib/accessCode';
+import { grantStatusText, showsAsPro } from '../lib/accessCode';
 import { StoreError, StoreOkNotice, usePaywall } from './Paywall';
 import { healthAppName } from '../lib/health';
 import { DevicesScreen } from './Devices';
 import { HealthScreen } from './Health';
-import { CheckBox, NotificationsRow } from './Reminders';
+import { NotificationsRow } from './Reminders';
 import { showWelcomeAgain } from './Onboarding';
 import { PromptSheet } from './PromptSheet';
 import { openWhatsNew } from './WhatsNew';
@@ -95,18 +96,22 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
   const { openSheet } = useSheets();
   const state = useAppState();
   const tier = useTier();
+  // A long access code (over 180 days left) reads as Pro on the row, the same rule the sheet
+  // it opens follows.
+  const gifted = useAccessGrant();
+  const proByCode = tier === 'trial' && gifted && showsAsPro(getTrialDaysLeft());
   const toast = useToast();
   const pressure = usePressureStatus();
   // Row badge: `true` keeps the green "Connected" pill; a {text, color} pair
   // renders the same pill in any tint (e.g. the accent "Trial" state).
-  const item = (icon: IconName, title: string, sub: string, onPress: () => void, badge?: boolean | { text: string; color: string }, onLongPress?: () => void) => {
+  const item = (icon: IconName, title: string, sub: string, onPress: () => void, badge?: boolean | { text: string; color: string }) => {
     const b = badge === true ? { text: 'Connected', color: '#22c55e' } : badge || null;
     const soft = (hex: string) => {
       const n = parseInt(hex.slice(1), 16);
       return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0.15)`;
     };
     return (
-      <Pressable onPress={onPress} onLongPress={onLongPress} delayLongPress={ROW_HOLD_MS} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderTopWidth: 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
+      <Pressable onPress={onPress} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderTopWidth: 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
         <Icon name={icon} size={22} color={p.textDim} />
         <View style={{ flex: 1 }}><Text style={{ color: p.text, fontSize: 17 }}>{title}</Text><Text style={{ color: p.textDim, fontSize: 13 }}>{sub}</Text></View>
         {b ? (
@@ -134,7 +139,7 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
         <BrandMark size={26} />
         <Text style={{ fontSize: 22, fontWeight: '800', color: p.text, letterSpacing: -0.3 }}>Autonomic</Text>
       </Pressable>
-      {item('user', 'Profile', 'Sex, birthday, height, weight, pacemaker', () => openSheet((c) => <ProfileSheet controls={c} />))}
+      {item('user', 'Profile', 'Units, sex, birthday, height, weight, pacemaker', () => openSheet((c) => <ProfileSheet controls={c} />))}
       <NotificationsRow />
       {item('bluetooth', 'Devices', 'Heart-rate straps', () => openSheet(() => <DevicesScreen />), !!state.settings.lastBleDeviceId)}
       {item('heart', healthAppName(), 'Read & write health data', () => openSheet(() => <HealthScreen />), !!state.settings.healthEnabled)}
@@ -142,12 +147,8 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
         ? item('gauge', 'Barometric pressure', 'See if weather changes affect you', () => openSheet((c) => <PressureSettingsSheet controls={c} />, { fitContent: true }),
           pressure.on ? { text: 'On', color: '#22c55e' } : undefined)
         : null}
-      {/* HOLDING the row opens the access-code card instead of the sheet: a
-          code is handed to one person along with where to type it, so it is
-          unlabelled, like the support dump above. */}
       {item('star', 'Subscription', 'Manage plan or restore', () => openSheet((c) => <SubscriptionSheet controls={c} />),
-        tier === 'trial' ? { text: 'Trial', color: p.accent } : tier === 'pro' ? { text: 'Pro', color: '#22c55e' } : undefined,
-        () => openSheet((c) => <AccessCodeSheet controls={c} />, { fitContent: true }))}
+        tier === 'pro' || proByCode ? { text: 'Pro', color: '#22c55e' } : tier === 'trial' ? { text: 'Trial', color: p.accent } : undefined)}
       {item('download', 'Export data', 'Download everything as JSON', () => exportData())}
       {item('upload', 'Import data', 'Replace everything from a JSON file', () => importData(controls, toast))}
       {item('trash', 'Clear all data', 'Erase everything on this device', () => openSheet((c) => <ClearDataSheet controls={c} />, { fitContent: true }))}
@@ -222,63 +223,116 @@ function PacemakerNoticeSheet({ controls }: { controls: SheetControls }) {
   );
 }
 
+/** A label on the left, its two-way toggle on the right. */
+const PROFILE_ROW = { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 8, paddingBottom: 12, paddingHorizontal: 4 } as const;
+const PROFILE_SEG_W = 184;
+
 function ProfileSheet({ controls }: { controls: SheetControls }) {
   const p = usePalette();
   const { openSheet } = useSheets();
   const prof = getState().profile;
   const [sex, setSex] = useState(prof.sex || '');
   const [birthday, setBirthday] = useState(prof.birthday || '');
+  // Height and weight stay in their STORED units (inches, pounds) for the life
+  // of the sheet; the metric fields are text over them. Flipping the units back
+  // and forth therefore never drifts a value nobody edited.
+  const [units, setUnitsDraft] = useState<UnitSystem>(getUnits());
   const [weight, setWeight] = useState(prof.weight || '');
   const [height, setHeight] = useState(prof.height || '');
+  const [weightShown, setWeightShown] = useState(() => weightText(prof.weight, units));
+  const [heightCm, setHeightCm] = useState(() => heightCmText(prof.height));
+  const pickUnits = (u: UnitSystem) => {
+    setUnitsDraft(u);
+    setWeightShown(weightText(weight, u));
+    setHeightCm(heightCmText(height));
+  };
   const [pacemaker, setPacemaker] = useState(!!prof.pacemaker);
   const age = ageFromBirthday(birthday);
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Profile</Text>
-      <Text style={{ fontSize: 14, fontWeight: '600', color: p.textDim, marginBottom: 6 }}>Sex</Text>
-      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 14 }}>
-        {['', 'Male', 'Female', 'Other'].map((o) => (
-          <Pressable key={o || 'none'} onPress={() => setSex(o)} style={{ paddingHorizontal: 14, paddingVertical: 10, borderRadius: radius.control, borderWidth: 1, borderColor: sex === o ? p.accent : p.border, backgroundColor: sex === o ? p.accentSoft : p.surface2 }}>
-            <Text style={{ color: sex === o ? p.accent : p.text }}>{o || 'Not set'}</Text>
-          </Pressable>
-        ))}
+      <View style={PROFILE_ROW}>
+        <Text style={{ color: p.text, fontSize: 15, fontWeight: '600' }}>Sex</Text>
+        {/* Tapping the chosen one again clears it: "not set" is a real answer,
+            and it is the one this control has no segment for. */}
+        <Segmented
+          options={[{ val: 'Male', label: 'Male' }, { val: 'Female', label: 'Female' }]}
+          value={sex}
+          onChange={(v) => setSex(sex === v ? '' : v)}
+          style={{ width: PROFILE_SEG_W }}
+        />
       </View>
-      <DateField label="Birthday" value={birthday} onChange={setBirthday} placeholder="Set birthday" />
-      {age != null ? <Text style={{ color: p.textDim, fontSize: 13, marginTop: -8, marginBottom: 10 }}>{`Age: ${age}`}</Text> : null}
-      <HeightField label="Height" value={height} onChange={setHeight} placeholder="Set height" />
-      <TextField label="Weight (lb)" value={weight} onChange={(t) => setWeight(onlyNumeric(t))} keyboardType="decimal-pad" />
-      <Text style={{ color: p.textDim, fontSize: 13, marginBottom: 12 }}>Age and sex set the healthy HRV ranges shown on your readings and your heart rate zones.</Text>
-      {/* A checkbox row, the Notifications sheet's own control, rather than a
-          Switch: the system switch picks its own thumb colour per platform. */}
+      <DateField
+        label="Birthday"
+        value={birthday}
+        onChange={setBirthday}
+        trailing={age != null ? (
+          <View style={{ backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: radius.pill, paddingHorizontal: 9, paddingVertical: 3 }}>
+            <Text style={{ fontSize: 13.5, fontWeight: '600', color: p.textDim }}>{`${age} yrs`}</Text>
+          </View>
+        ) : null}
+      />
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        {units === 'metric' ? (
+          <TextField
+            label="Height"
+            unit="cm"
+            value={heightCm}
+            onChange={(t) => { const v = onlyNumeric(t); setHeightCm(v); setHeight(cmToInches(v)); }}
+            keyboardType="decimal-pad"
+          />
+        ) : (
+          <HeightField label="Height" value={height} onChange={setHeight} />
+        )}
+        <TextField
+          label="Weight"
+          unit={weightUnit(units)}
+          value={weightShown}
+          onChange={(t) => { const v = onlyNumeric(t); setWeightShown(v); setWeight(weightToLb(v, units)); }}
+          keyboardType="decimal-pad"
+        />
+      </View>
+      <Text style={{ color: p.textFaint, fontSize: 12.5, lineHeight: 18, marginHorizontal: 4, marginTop: 2, marginBottom: 18 }}>Age and sex set your healthy HRV ranges and heart rate zones.</Text>
       <Pressable
         onPress={() => {
           const v = !pacemaker;
           setPacemaker(v);
           if (v) openSheet((c) => <PacemakerNoticeSheet controls={c} />, { fitContent: true });
         }}
-        accessibilityRole="checkbox"
+        accessibilityRole="switch"
         accessibilityState={{ checked: pacemaker }}
-        style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 16 }, pressed && { opacity: 0.5 }]}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 12, borderTopWidth: 1, borderBottomWidth: 1, borderColor: 'rgba(255,255,255,0.05)', paddingVertical: 14, paddingHorizontal: 4, marginBottom: 12 }}
       >
         <View style={{ flex: 1 }}>
-          <Text style={{ color: p.text, fontSize: 16 }}>I have a pacemaker</Text>
-          <Text style={{ color: p.textDim, fontSize: 13, marginTop: 2 }}>A pacemaker sets the lowest rate your heart can drop to, so your resting and overnight heart rate are shown but no longer graded or counted in your scores.</Text>
+          <Text style={{ color: p.text, fontSize: 15, fontWeight: '600' }}>I have a pacemaker</Text>
+          <Text style={{ color: p.textDim, fontSize: 12.5, marginTop: 2 }}>Resting heart rate stops counting toward scores</Text>
         </View>
-        <CheckBox on={pacemaker} tone={{ accent: p.accent, border: p.border }} />
+        <Toggle on={pacemaker} />
       </Pressable>
-      <Button title="Save" variant="primary" onPress={() => { getState().profile = { sex, birthday, weight: weight.trim(), height: height.trim(), ...(pacemaker ? { pacemaker: true } : {}) }; save(); controls.close(); }} />
+      <View style={[PROFILE_ROW, { paddingBottom: 20 }]}>
+        <Text style={{ color: p.text, fontSize: 15, fontWeight: '600' }}>Units</Text>
+        <Segmented
+          options={[{ val: 'imperial', label: 'Imperial' }, { val: 'metric', label: 'Metric' }]}
+          value={units}
+          onChange={pickUnits}
+          style={{ width: PROFILE_SEG_W }}
+        />
+      </View>
+      <Button title="Save" variant="primary" onPress={() => {
+        const s = getState();
+        s.profile = { sex, birthday, weight: weight.trim(), height: height.trim(), ...(pacemaker ? { pacemaker: true } : {}) };
+        s.settings.units = units;
+        save();
+        controls.close();
+      }} />
       <View style={{ height: 20 }} />
     </View>
   );
 }
 
-/** How long the Subscription row is held before the access-code card opens.
- *  Longer than a slow tap, far shorter than the 8s diagnostics hold: this one
- *  is meant to be found by somebody told to "long-press Subscription". */
-const ROW_HOLD_MS = 700;
-
 function SubscriptionSheet({ controls }: { controls: SheetControls }) {
   const p = usePalette();
+  const { openSheet } = useSheets();
   const { isPro, products, activeSku } = useIap();
   const tier = useTier();
   const openPaywall = usePaywall('settings');
@@ -289,6 +343,8 @@ function SubscriptionSheet({ controls }: { controls: SheetControls }) {
   const daysLeft = getTrialDaysLeft();
   // Access held open by a code is not a trial that is about to be sold to.
   const gifted = useAccessGrant();
+  // A long code reads as Pro: nothing to count down and nothing to sell.
+  const proByCode = tier === 'trial' && gifted && showsAsPro(daysLeft);
   // Reported INSIDE the sheet, never by toast: the sheet stack is one RN Modal
   // painted above the ToastProvider, so a toast raised from here is invisible
   // and Restore reads as a dead button (see CLAUDE.md). It is the one control
@@ -309,6 +365,8 @@ function SubscriptionSheet({ controls }: { controls: SheetControls }) {
     : 'Free plan';
   const blurb = isPro
     ? `${price ? `Your plan renews ${period}ly at ${price}. ` : ''}Change your plan or cancel anytime in ${storeName()}. Cancelling keeps access until the period ends.`
+    : proByCode
+      ? 'You have Pro from an access code. Nothing to pay and nothing to cancel.'
     : tier === 'trial' && gifted
       ? 'You have full access from an access code. Nothing to pay and nothing to cancel.'
     : tier === 'trial'
@@ -318,13 +376,20 @@ function SubscriptionSheet({ controls }: { controls: SheetControls }) {
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 14 }}>Subscription</Text>
       <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 14 }}>
-        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isPro ? '#22c55e' : tier === 'trial' ? p.accent : p.textDim }} />
+        <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: isPro || proByCode ? '#22c55e' : tier === 'trial' ? p.accent : p.textDim }} />
         <Text style={{ color: p.text, fontSize: 15, fontWeight: '600' }}>{status}</Text>
       </View>
       <Text style={{ color: p.textDim, fontSize: 14, lineHeight: 21, marginBottom: 16 }}>{blurb}</Text>
       <View style={{ gap: 10 }}>
-        {!isPro ? <Button title="Upgrade to Pro" variant="primary" onPress={() => { controls.close(); openPaywall(); }} /> : null}
+        {!isPro && !proByCode ? <Button title="Upgrade to Pro" variant="primary" onPress={() => { controls.close(); openPaywall(); }} /> : null}
         <Button title={`Manage in ${storeName()}`} variant={isPro ? 'primary' : 'default'} onPress={() => manageSubscription()} />
+        {/* Hidden from a subscriber, for whom a code
+            would be spent and change nothing. A bypassed build (dev,
+            TestFlight, sideload) reads as Pro with nobody having paid, and is
+            where a code gets tried, so it shows there too. */}
+        {!isPro || paywallBypassed() ? (
+          <Button title="Redeem a code" variant="default" onPress={() => openSheet((c) => <AccessCodeSheet controls={c} />, { fitContent: true })} />
+        ) : null}
         <Button title={busy ? 'Restoring…' : 'Restore purchase'} variant="default" disabled={busy} onPress={onRestore} />
         {restored === 'ok' ? <StoreOkNotice text="Subscription restored." /> : null}
         {restored === 'none' ? (

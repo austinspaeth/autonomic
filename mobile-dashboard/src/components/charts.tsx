@@ -13,7 +13,7 @@ import Svg, { G, Line, Path } from 'react-native-svg';
 import * as Haptics from 'expo-haptics';
 import { useWide } from '../lib/wide';
 import { C, num } from '../theme';
-import { shortDate } from '../lib/dates';
+import { dayDate, shortDate } from '../lib/dates';
 import type { Series } from '../lib/metrics';
 
 function barPath(x: number, y: number, w: number, h: number, r: number) {
@@ -32,7 +32,7 @@ export function BarChart({
   unknownBefore,
   unknownAfter,
   compact,
-  xLabel = shortDate,
+  xLabel = dayDate,
 }: {
   series: Series;
   color?: string;
@@ -50,7 +50,7 @@ export function BarChart({
   /** How an x key reads (defaults to a short date). */
   xLabel?: (key: string) => string;
 }) {
-  const height = heightProp ?? (useWide() ? 230 : 140);
+  const height = heightProp ?? (useWide() ? 150 : 140);
   const [width, setWidth] = useState(0);
   const [sel, setSel] = useState<number | null>(null);
 

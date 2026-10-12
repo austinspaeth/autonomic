@@ -9,7 +9,8 @@ import { Pressable, Text, View } from 'react-native';
 import { TextField } from '../components/Field';
 import { Icon } from '../components/Icon';
 import { Button, LinkToggle } from '../components/ui';
-import { SheetFooter, useSheets } from '../components/Sheet';
+import { SheetFooter, useSheets, type SheetControls } from '../components/Sheet';
+import { useDeleteButton } from './EntryForm';
 import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
 import { addCustomType, deleteType, editType, typeInUse, typesFor, type TypeKind } from '../lib/typeCatalog';
@@ -25,7 +26,7 @@ const COPY: Record<TypeKind, { title: string; nameLabel: string; noun: string }>
 
 /** Edit card stacked over the manage sheet: rename a type or (for meds) change
  *  its default dose. Deletes from here too, when the type has never been logged. */
-function EditTypeSheet({ kind, typeKey }: { kind: TypeKind; typeKey: string }) {
+function EditTypeSheet({ kind, typeKey, controls }: { kind: TypeKind; typeKey: string; controls: SheetControls }) {
   const p = usePalette();
   const toast = useToast();
   const state = useAppState();
@@ -35,8 +36,14 @@ function EditTypeSheet({ kind, typeKey }: { kind: TypeKind; typeKey: string }) {
   const [name, setName] = useState(def?.label || '');
   const [dosage, setDosage] = useState(def?.dosage || '');
   const [load, setLoad] = useState<LoadWeight>(() => loadOf(def, typeKey));
+  const used = !!def && typeInUse(state, kind, typeKey);
+  // Only the edit card goes: the manage list beneath is still a real list.
+  useDeleteButton(controls, def && !used ? {
+    title: `Delete ${def.label}?`,
+    message: `It will be removed from your ${copy.noun} list.`,
+    onConfirm: () => { deleteType(kind, typeKey); toast(`Deleted ${def.label}`); controls.close(); },
+  } : null);
   if (!def) return null;
-  const used = typeInUse(state, kind, typeKey);
 
   const save = () => {
     if (!editType(kind, typeKey, name, { dosage, load })) {
@@ -54,7 +61,6 @@ function EditTypeSheet({ kind, typeKey }: { kind: TypeKind; typeKey: string }) {
       {kind === 'meds' && <TextField label="Default dose" value={dosage} onChange={setDosage} placeholder="e.g. 400mg" />}
       {kind === 'activities' && def.userDefined ? <EffortField value={load} onChange={setLoad} /> : null}
       <SheetFooter>
-        {!used ? <Button title="Delete" variant="danger" onPress={() => { deleteType(kind, typeKey); toast(`Deleted ${def.label}`); closeSheet(); }} /> : null}
         <Button title="Save" variant="primary" onPress={save} />
       </SheetFooter>
     </View>
@@ -133,7 +139,7 @@ export function ManageTypesSheet({ kind }: { kind: TypeKind }) {
         return (
           <View key={k} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, borderTopWidth: 1, borderTopColor: p.border }}>
             <Pressable
-              onPress={() => openSheet(() => <EditTypeSheet kind={kind} typeKey={k} />)}
+              onPress={() => openSheet((c) => <EditTypeSheet kind={kind} typeKey={k} controls={c} />)}
               accessibilityLabel={`Edit ${def.label}`}
               style={({ pressed }) => [{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13 }, pressed && { opacity: 0.5 }]}
             >

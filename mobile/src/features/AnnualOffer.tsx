@@ -1,9 +1,11 @@
 /**
- * The half-off annual offer card — Claude Design "Longtime Free Offer".
+ * The annual offer card — Claude Design "Longtime Free Offer".
  *
  * Raised in the Journal under the Autonomic Outlook when a free user reaches
- * 30, 90, 180 or 365 days since install, and it STANDS there until they answer
- * it. The ✕ is the only thing that takes it down; the next milestone is what
+ * day 50, day 90 or one year since install, and it STANDS there until they
+ * answer it. It sells the founding-member year (`FOUNDER_YEARLY_SKU`), the same
+ * product and price the founder card sells inside the trial; it used to sell a
+ * deeper half-price year of its own (`PROMO_YEARLY_SKU`). The ✕ is the only thing that takes it down; the next milestone is what
  * brings it back.
  *
  * It is a NOTE, not a pitch. Everything a feature grid would say is already in
@@ -33,7 +35,7 @@ import { usePalette } from '../theme';
 import { hexA, mixHex } from '../lib/color';
 import { useAppState } from '../store/store';
 import { getInstalledAtMs, useTier } from '../store/tier';
-import { MONTHLY_SKU, PROMO_YEARLY_SKU, YEARLY_SKU, priceOf, subscribe, useIap } from '../store/iap';
+import { FOUNDER_YEARLY_SKU, MONTHLY_SKU, YEARLY_SKU, priceOf, subscribe, useIap } from '../store/iap';
 import { StoreBlockedNotice } from './Paywall';
 import { todayKey } from '../lib/dates';
 import { resolveProtocol } from '../lib/scoring/day';
@@ -48,10 +50,11 @@ import { pingOfferAccepted, pingOfferDismissed, pingOfferShown } from '../store/
 import { profileCtx } from '../lib/scoring';
 
 /**
- * "half off" only when the store's two prices really do come to about half.
- * PROMO_YEARLY_SKU is priced at half of YEARLY_SKU in every territory we set,
- * but the rounding is the store's, so the sentence asks rather than assumes —
- * and says the true percentage, or nothing at all, when it isn't.
+ * The discount as the store's two prices actually work out. FOUNDER_YEARLY_SKU
+ * sits a little under 30% below YEARLY_SKU, but the rounding and the regional
+ * matrix are the store's, so the sentence says the true percentage ("half off"
+ * only if a territory really does come to about half), or nothing at all when
+ * the prices do not parse.
  */
 function discountPhrase(pct: number | null): string {
   if (pct == null) return 'the app at the founding price';
@@ -75,7 +78,7 @@ export function AnnualOfferCard() {
   const [offer, setOffer] = useState<{ milestone: number } | null>(() => liveOffer(annualMemory()));
 
   const dismiss = () => {
-    noteAnnualOfferDismissed();
+    noteAnnualOfferDismissed(getInstalledAtMs());
     pingOfferDismissed('annual');
     setOffer(null);
   };
@@ -132,7 +135,7 @@ export function AnnualOfferCard() {
   // — so the milestone memory is left exactly as it is.
   if (!offer || tier === 'pro') return null;
 
-  const promo = priceOf(products.find((s) => s.productId === PROMO_YEARLY_SKU), PROMO_YEARLY_SKU);
+  const promo = priceOf(products.find((s) => s.productId === FOUNDER_YEARLY_SKU), FOUNDER_YEARLY_SKU);
   const full = priceOf(products.find((s) => s.productId === YEARLY_SKU), YEARLY_SKU);
   const month = priceOf(products.find((s) => s.productId === MONTHLY_SKU), MONTHLY_SKU);
   const pct = discountPct(promo, full);
@@ -226,7 +229,7 @@ export function AnnualOfferCard() {
         <Pressable
           onPress={() => {
             pingOfferAccepted('annual');
-            subscribe(plan === 'yearly' ? PROMO_YEARLY_SKU : MONTHLY_SKU, 'annual');
+            subscribe(plan === 'yearly' ? FOUNDER_YEARLY_SKU : MONTHLY_SKU, 'annual');
           }}
           disabled={purchasing}
           style={({ pressed }) => [

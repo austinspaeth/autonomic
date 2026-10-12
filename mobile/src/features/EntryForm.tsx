@@ -1,6 +1,6 @@
 /**
  * The generic add/edit form for a logged entry, and the one delete path for an
- * entry opened as a CARD.
+ * entry, whether it is opened as a CARD or as a form.
  *
  * These live apart from `./forms` — which re-exports them, so every existing
  * import still works — because `forms.tsx` reaches all the way up to the live
@@ -9,11 +9,11 @@
  * to arm their own edit + delete buttons. Importing them from `./forms` there
  * is a require cycle; importing them from here is not.
  */
-import React from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import { Text, View } from 'react-native';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { FieldInputs, useFormState } from '../components/Field';
-import { Button, ConfirmDeleteSheet, DaySaveButton } from '../components/ui';
+import { ConfirmDeleteSheet, DaySaveButton } from '../components/ui';
 import { useToast } from '../components/Toast';
 import { usePalette } from '../theme';
 import { entryFields, isDivider, isNumberField } from '../lib/registry';
@@ -22,9 +22,11 @@ import { health, healthAppName } from '../lib/health';
 import { deleteEntry, getState, storeWaveform, upsertEntry } from '../store/store';
 import { pingLogged } from '../store/ping';
 import { splitWaveform } from '../lib/waveforms';
-import { defaultTimeFor, uid } from '../lib/dates';
+import { ageFromBirthday, defaultTimeFor, uid } from '../lib/dates';
 import { defaultPeriod } from '../lib/period';
 import type { Entry, TypeDef } from '../lib/types';
+import { fieldStored } from '../lib/units';
+import { metThresholdFor } from '../lib/pots/live';
 
 export type ArrKey = 'readings' | 'activities' | 'meds' | 'symptoms';
 type OpenSheet = ReturnType<typeof useSheets>['openSheet'];
@@ -44,6 +46,12 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null,
   const toast = useToast();
   const def = typeMap[type];
   const fields = entryFields(def);
+  // An activity's time and notes sit under a rule, apart from its measurements.
+  // Done here rather than per type so user-created activities get it too.
+  if (arrKey === 'activities') {
+    const at = fields.findIndex((f) => f.type === 'time');
+    if (at > 0 && !isDivider(fields[at - 1])) fields.splice(at, 0, { divider: true });
+  }
   const initial = existing || prefill || { id: uid(), type, time: defaultTimeFor(dk), note: '' };
   // New entries with a Morning/Evening/Other tag auto-detect it the same way
   // live HRV capture does, based on the entry's default time.
@@ -52,6 +60,11 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null,
     initial.period = defaultPeriod(type, dk, Number.isFinite(h) ? h : undefined);
   }
   const [form, set] = useFormState(fields, initial);
+  // A custom type keeps the spelling its owner gave it ("Vitamin C").
+  useDeleteButton(controls, existing ? {
+    title: `Delete this ${def.userDefined ? def.label : def.label.toLowerCase()}?`,
+    onConfirm: () => { deleteEntry(dk, arrKey, existing.id); controls.closeAll(); onSaved(); },
+  } : null);
 
   const save = () => {
     const numFields = fields.filter(isNumberField);
@@ -66,8 +79,14 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null,
     fields.forEach((f) => {
       if (isDivider(f) || !f.key) return;
       if (f.type === 'check') r[f.key] = !!form[f.key];
-      else r[f.key] = String(form[f.key] ?? '').trim();
+      else r[f.key] = fieldStored(f.unit, String(form[f.key] ?? '').trim());
     });
+    // The stand test's flag follows its sustained rise; the form has no
+    // checkbox for it, so an edited rise can never disagree with the flag.
+    if (arrKey === 'readings' && type === 'standTest') {
+      const rise = String(r.sustainedDelta ?? '').trim();
+      r.metThreshold = metThresholdFor(rise === '' ? null : Number(rise), ageFromBirthday(getState().profile.birthday));
+    }
     r.scores = computeScores(r, scoreCtx());
     // A prefill may carry inline waveform arrays (an imported workout's HR
     // trace) — those go to the sidecar, never into the journal blob.
@@ -97,17 +116,56 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null,
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>{(existing ? 'Edit ' : '') + def.label}</Text>
       <FieldInputs fields={fields} form={form} set={set} />
       <SheetFooter>
-        {existing ? <Button title="Delete" variant="danger" onPress={() => { deleteEntry(dk, arrKey, existing.id); controls.closeAll(); onSaved(); }} /> : null}
-        <DaySaveButton dk={dk} title="Save" onPress={save} />
+        <DaySaveButton dk={dk} title={arrKey === 'activities' && !existing ? 'Save activity' : 'Save'} onPress={save} />
       </SheetFooter>
     </View>
   );
 }
 
 /**
+ * Arms the trash button in a FORM's own header pill, the same place an entry
+ * card carries it, and routes it through the same one-question confirm card.
+ * A form has no red Delete in its footer: the footer is for the save, and
+ * delete lives furthest from the ✕ on every sheet that can delete anything.
+ *
+ * Pass null while there is nothing to delete (a new entry). `onConfirm` decides
+ * what happens to the stack, since a form over a manage list closes only
+ * itself while a form for an entry takes the whole stack with it.
+ */
+export function useDeleteButton(
+  controls: SheetControls,
+  ask: { title: string; message?: string; onConfirm: () => void } | null,
+): void {
+  const { openSheet } = useSheets();
+  const latest = useRef(ask);
+  latest.current = ask;
+  const armed = !!ask;
+  // Layout effect, so the pill is drawn with its trash button on the first
+  // frame rather than growing one a frame after the form appears.
+  useLayoutEffect(() => {
+    if (!armed) return;
+    controls.setOptions({
+      destructive: { onPress: () => {
+        const a = latest.current;
+        if (!a) return;
+        openSheet((c) => (
+          <ConfirmDeleteSheet
+            title={a.title}
+            message={a.message ?? "It will be removed from your journal. This can't be undone."}
+            onConfirm={() => latest.current?.onConfirm()}
+            controls={c}
+          />
+        ), { fitContent: true });
+      } },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [armed]);
+}
+
+/**
  * The one delete path for an entry opened as a CARD (a reading summary, a
  * workout report) — the cards whose own header pill carries the trash button.
- * A form has its own Delete in the footer and doesn't come through here.
+ * A form arms the same button through `useDeleteButton` above.
  *
  * Asks first, in a small `fitContent` card, then deletes and closes the whole
  * stack: the card underneath is a view OF that entry, so leaving it up would

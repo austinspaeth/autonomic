@@ -88,6 +88,7 @@ export type PingKind =
   | 'open' | 'act'                  // install lifecycle
   | 'sub' | 'rst' | 'lap'           // a purchase MADE · an existing one FOUND · one LAPSED
   | 'cap' | 'hrv'                   // a reading started · completed
+  | 'sav'                           // a reading SAVED to the journal
   | 'pay'                           // met the paywall
   | 'not'                           // turned a notification on
   | 'pot'                           // finished a POTS capture
@@ -238,6 +239,32 @@ export type ViewCode = 'I' | 'P' | 'B';
  *  `P`'s denominator is the `pay` route, which has its own cap and shape, so
  *  the two must not simply be divided. */
 export type OfferCode = 'A' | 'F' | 'P';
+
+/**
+ * The DOOR a purchase came through: which wall raised the paywall it was bought
+ * from (a {@link SurfaceCode}), or which of the two offer cards (`A` the annual
+ * note, `F` the founding-member card). Sent on `sub` as a `-W` token.
+ *
+ * It exists because `pay` and `sub` were two counters with nothing between
+ * them: one said which locked thing people tapped, the other that somebody
+ * paid, and no row anywhere said which wall the buyer had been standing at. A
+ * wall that is met constantly and never bought from looks identical, in `pay`,
+ * to the one that sells the app.
+ *
+ * The two alphabets do not collide (walls R I P B O M N S, offers A F), so one
+ * letter says both which kind of door and which one. Undefined whenever the
+ * purchase had no buy tap behind it in this session (a payment that cleared
+ * after its sheet closed), or the paywall's wall is not known: an unknown door
+ * is left off, never guessed.
+ */
+export type DoorCode = SurfaceCode | 'A' | 'F';
+
+export function doorCode(origin: string | undefined, wall?: SurfaceCode): DoorCode | undefined {
+  if (origin === 'annual') return 'A';
+  if (origin === 'founder') return 'F';
+  if (origin === 'paywall') return wall;
+  return undefined;
+}
 
 /** Map a purchase origin onto its marker. */
 export function offerCode(offer: string | undefined): OfferCode | undefined {
@@ -546,6 +573,9 @@ export function easternDay(ms: number): string {
  * then confirmed, `S` the store's word alone — see `purchaseEvidence` in
  * ./subscriberPing). A lambda that predates it drops the token and still
  * counts the ping, so it cannot break delivery the way a new HEAD letter would.
+ *
+ * `-W` rides only on `sub` too: the door the purchase came through (see
+ * {@link DoorCode}). Dropped the same harmless way by an older lambda.
  */
 export function cohortCode(
   isoDate: string,
@@ -554,11 +584,12 @@ export function cohortCode(
   tier?: TierCode,
   version?: string,
   evidence?: 'V' | 'S',
+  door?: DoorCode,
 ): string {
   const [y, m, d] = isoDate.split('-');
   const head = `D${m}${d}${y.slice(2)}${platform}${slot || ''}`;
   const v = versionCode(version);
-  return `${head}${tier ? `-T${tier}` : ''}${v ? `-V${v}` : ''}${evidence ? `-E${evidence}` : ''}`;
+  return `${head}${tier ? `-T${tier}` : ''}${v ? `-V${v}` : ''}${evidence ? `-E${evidence}` : ''}${door ? `-W${door}` : ''}`;
 }
 
 /** The full URL for one ping. */
@@ -570,8 +601,9 @@ export function pingUrl(
   tier?: TierCode,
   version?: string,
   evidence?: 'V' | 'S',
+  door?: DoorCode,
 ): string {
-  return `${PING_BASE}/${kind}/${cohortCode(cohortIso, platform, slot, tier, version, evidence)}`;
+  return `${PING_BASE}/${kind}/${cohortCode(cohortIso, platform, slot, tier, version, evidence, door)}`;
 }
 
 /**

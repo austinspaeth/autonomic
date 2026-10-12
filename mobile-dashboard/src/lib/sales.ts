@@ -217,3 +217,60 @@ export function forecastBasis(l: Ledger, from: string, to: string) {
     units: s.units.monthly + s.units.annual,
   };
 }
+
+/** A history shorter than this cannot say how long a subscriber lasts. */
+export const LTV_MIN_DAYS = 30;
+
+/**
+ * What one subscriber is worth over their whole stay: the monthly rate they
+ * pay, times the months the observed churn says they last (1 / monthly churn).
+ * `monthly` is monthly plans alone; `mixed` is every recurring plan, an annual
+ * counting as a twelfth of its price a month.
+ *
+ * Read off the WHOLE ledger through `to`, never the range: a churn rate struck
+ * over a week is noise. The rate is churned MRR against the mean daily book,
+ * the forecast's rule. `value` is null, never zero and never infinite, when
+ * the ledger is too young or nothing has churned yet; `collected` (first
+ * payments plus estimated renewals so far, per subscriber) is known either way.
+ */
+export function ltv(l: Ledger, to: string, scope: 'monthly' | 'mixed') {
+  const rows = l.rows.filter((r) => !r.refunded && r.date <= to && (scope === 'mixed' ? isRecurring(r.plan) : r.plan === 'monthly'));
+  const units = rows.reduce((t, r) => t + r.qty, 0);
+  const perMonth = units ? rows.reduce((t, r) => t + mrrOf(r), 0) / units : null;
+  const from = l.rows.find((r) => isRecurring(r.plan))?.date ?? to;
+
+  let churned = 0;
+  rows.forEach((r) => {
+    if (r.cancelled && r.cancelled <= to) churned += mrrOf(r);
+  });
+  // Unattached churn with no plan lands on monthly, as it does in the book.
+  l.churn.forEach((c) => {
+    if (c.date <= to && (scope === 'mixed' || c.plan !== 'annual')) churned += c.mrr;
+  });
+
+  let atRisk = 0;
+  let days = 0;
+  for (let d = from; d <= to; d = addDays(d, 1)) {
+    const b = bookOn(l, d);
+    atRisk += scope === 'mixed' ? b.mrr : b.byPlan.monthly;
+    days += 1;
+  }
+  const meanBook = days ? atRisk / days : 0;
+  const young = days < LTV_MIN_DAYS;
+  const churnPct = !young && meanBook > 0 && churned > 0 ? Math.min(100, (churned / meanBook) * (30 / days) * 100) : null;
+  const months = churnPct ? 100 / churnPct : null;
+
+  const ids = new Set(rows.map((r) => r.id));
+  const cash = rows.reduce((t, r) => t + r.price * r.qty, 0) + renewals(l, from, to).reduce((t, r) => t + (ids.has(r.sale.id) ? r.amount : 0), 0);
+
+  return {
+    value: perMonth !== null && months !== null ? perMonth * months : null,
+    perMonth,
+    churnPct,
+    months,
+    units,
+    days,
+    young,
+    collected: units ? cash / units : null,
+  };
+}

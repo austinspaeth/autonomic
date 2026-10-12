@@ -25,6 +25,7 @@ import { hrRecovery, recoveryBaseline } from '../lib/hrRecovery';
 import { metricHistory, numEx, type DaysMap } from '../lib/scoring/day';
 import { onDay } from '../lib/analysis/buckets';
 import { entryFields, isDivider, READING_TYPES } from '../lib/registry';
+import { standReadingRows } from '../lib/pots/manual';
 import { healthAppName } from '../lib/health';
 import { ageFromBirthday, fmtNum, fmtShort, todayKey } from '../lib/dates';
 import { estimatedHrMax, hrZones, timeInZones } from '../lib/workoutZones';
@@ -41,6 +42,7 @@ import { BalanceChart, OrthoHrChart, PowerSpectrum, Sparkline, StandHrChart, Tac
 import { Icon } from './Icon';
 import { SheetFooter, useSheets, type SheetControls } from './Sheet';
 import { CautionNote, HelpDot, ScoreDot } from './ui';
+import { fmtDist, paceStr } from '../lib/units';
 
 const hexA = (hex: string, a: number) => {
   const m = /^#?([0-9a-f]{6})$/i.exec(hex);
@@ -1090,6 +1092,8 @@ export function StandTestSummary({ r, days, ctx: _ctx }: SummaryProps) {
     crash: 'Marked sustained rise of 40 bpm or more. Hydrate, sit or lie down, and log context.',
   };
   const susEx = (rr: Entry) => numOr(rr.sustainedDelta);
+  // A hand-entered test has no trace; it lists the readings it was built from.
+  const typed = standReadingRows(r);
   const hrCurve = hrCurveFor(r);
   const cols: { label: string; val: number | null; unit: string }[] = [
     { label: 'Baseline', val: baseline, unit: 'bpm · supine' },
@@ -1129,6 +1133,14 @@ export function StandTestSummary({ r, days, ctx: _ctx }: SummaryProps) {
           ))}
         </View>
       </Section>
+      {typed.length ? (
+        <Section>
+          <SectionHead title="Readings" desc="What you entered, lying down and at each standing mark." />
+          <View style={{ marginTop: 12 }}>
+            {typed.map((t) => <MetricRow key={t.label} label={t.label} value={t.value} cat={false} />)}
+          </View>
+        </Section>
+      ) : null}
       <Notes r={r} />
       <Section>
         <SectionHead title="Details" />
@@ -1173,14 +1185,6 @@ const fmtDur = (sec: number) => {
   const m = Math.floor(sec / 60);
   return m >= 60 ? `${Math.floor(m / 60)}h ${m % 60}m` : `${m}:${String(Math.round(sec % 60)).padStart(2, '0')}`;
 };
-
-/** "10:24 /mi" from duration (min) and distance (mi). */
-function paceStr(durationMin: number, distanceMi: number): string | null {
-  if (!(durationMin > 0) || !(distanceMi > 0)) return null;
-  const secPerMi = (durationMin * 60) / distanceMi;
-  if (secPerMi < 120 || secPerMi > 3600) return null; // implausible — bad field entry
-  return `${Math.floor(secPerMi / 60)}:${String(Math.round(secPerMi % 60)).padStart(2, '0')} /mi`;
-}
 
 /** Whether this activity opens as a workout report (it has a stored HR trace). */
 export function workoutCurveFor(r: Entry): { t: number; bpm: number }[] | null {
@@ -1230,7 +1234,7 @@ export function WorkoutSummary({ r, days, ctx: _ctx }: SummaryProps) {
   };
   const details: { label: string; value: string }[] = [];
   if (duration != null) details.push({ label: 'Duration', value: `${fmtNum(duration)} min` });
-  if (distance != null) details.push({ label: 'Distance', value: `${fmtNum(distance)} mi` });
+  if (distance != null) details.push({ label: 'Distance', value: fmtDist(distance) });
   if (pace) details.push({ label: 'Pace', value: pace });
   const sourceLabel = sourceLabelFor(r);
   if (sourceLabel) details.push({ label: 'Source', value: sourceLabel });

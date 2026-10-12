@@ -17,7 +17,7 @@ places repeat that boundary (paywall, Settings, Free-vs-Pro sheet,
 | Bundle ID / package | `com.autonomic.journal` |
 | Yearly SKU | `com.autonomic.journal.yearly` — $49.99 |
 | Monthly SKU | `com.autonomic.journal.monthly` — $7.99 |
-| Promo yearly SKU | `com.autonomic.journal.yearly.promo` — $24.99 (see Part 6) |
+| Promo yearly SKU | `com.autonomic.journal.yearly.promo` — $24.99, retired from sale, kept for existing subscribers (see Part 6) |
 | Founder yearly SKU | `com.autonomic.journal.yearly.founder` — $35.99, Play base plan `yearly-founder` (see Part 7) |
 | Subscription group (Apple) | one group, all four plans |
 | App version | 1.9.0 (freemium) |
@@ -321,11 +321,17 @@ the paywall works when you never actually tested it.
 
 ## Part 6 — The half-off annual offer (`com.autonomic.journal.yearly.promo`)
 
-The annual offer card (`src/features/AnnualOffer.tsx`) surfaces a year of Pro at
-half price to free users at 30 / 90 / 180 / 365 days since install, and unlocks
-Pro for 24 hours alongside it. The unlock is entirely app-side
-(`src/lib/upsell/annual.ts` + `src/store/tier.ts`) and needs **no** store
-configuration. The discounted plan does.
+> **RETIRED FROM SALE.** The annual offer card no longer sells this product. It
+> now sells Part 7's founding-member year (`com.autonomic.journal.yearly.founder`,
+> $35.99) to free users at 50 / 90 / 365 days since install, and stands until it
+> is dismissed. **Keep this product ACTIVE in both consoles anyway**: existing
+> subscribers renew on it at $24.99, and it stays in `PRO_SKUS` so they are
+> recognised as Pro. Removing it from sale to NEW subscribers is fine. The rest
+> of this part is the record of how it was set up.
+
+The annual offer card (`src/features/AnnualOffer.tsx`) used to surface a year of
+Pro at half price. The schedule is entirely app-side
+(`src/lib/upsell/annual.ts`) and needs **no** store configuration.
 
 **Create the product in both consoles BEFORE the build that references it
 ships.** A missing product means `fetchProducts` returns nothing for it, the
@@ -404,24 +410,18 @@ It is in `PRO_SKUS` purely so `fetchProducts` returns its localized price and so
 an existing subscriber on it is recognised as Pro. `FOUNDER_SKU` points at it
 with no platform branch.
 
-### It is its OWN product, not the promo year
+### Two cards sell it
 
-It used to be `com.autonomic.journal.yearly.promo` — the same product Part 6's
-annual card sells. That made the two cards the same offer at two different
-moments, which they are not:
+- **The founding-member card** sells it INSIDE the install trial, to someone
+  who has logged five days and is still deciding.
+- **The annual card** (`src/features/AnnualOffer.tsx`) sells it at the far
+  milestones (50/90/365 days), to someone whose access lapsed.
 
-- **This card** sells INSIDE the install trial, to someone who has logged five
-  days and is still deciding.
-- **The annual card** (Part 6) sells at the far milestones (30/90/180/365 days),
-  to someone whose access lapsed months ago.
-
-A lapsed user is harder to win back, so the promo year is the deeper cut. The
-consequence to keep in mind: **the founder year is DEARER than the promo year**
-($35.99 vs $24.99), so the founding-member card is not the cheapest door into
-Pro, and a user who declines it at day five can meet a lower price at day
-thirty. That is intended. Nothing in the card's copy may claim it is the best
-price available — it claims only that it is locked for as long as you stay
-subscribed, which is true.
+For a while the annual card sold a deeper cut of its own, Part 6's
+`com.autonomic.journal.yearly.promo` at $24.99, so a user who declined at day
+five could meet a lower price later. It no longer does: $35.99 is the one
+discounted year, whichever card offers it. Each card's copy claims only that the
+price is locked for as long as you stay subscribed, which is true.
 
 ### Why not an introductory offer on the yearly plan (the original design)
 
@@ -488,8 +488,8 @@ Before you call it done:
 - [ ] Paywall shows **real** localized prices, not $49.99/$7.99 fallbacks — fallbacks mean `getSubscriptions` returned nothing, i.e. a product ID typo or an inactive base plan
 - [ ] Both plans purchasable; purchase flips the app to Pro
 - [ ] "Restore purchase" works on a second device
-- [ ] Annual offer card shows a **real localized $24.99**, not the fallback, and "Claim half off" completes a purchase on both stores
+- [ ] Annual offer card shows a **real localized $35.99** on its Yearly row, not the fallback, reads "28% off", and "Continue with yearly" completes a purchase of `com.autonomic.journal.yearly.founder` on both stores
 - [ ] `FORCE_TIER` is `null`, `FORCE_ANNUAL_OFFER` is `null`, `FORCE_FOUNDER_OFFER` is `false` and `PREVIEW_PAYWALL` is `false` in the shipped commit
 - [ ] Founding-member card: five logged days, then the next day's launch shows it once, the price reads a **real** localized $35.99 (a `$35.99` fallback means the product or the `yearly-founder` base plan is not live), the strike-through and "Locked at 28% off" are both present, and the ✕ retires it permanently
-- [ ] The founder card and the annual card are never on screen together, and a user who dismisses the founder card can still reach the $24.99 annual card at a later milestone
+- [ ] The founder card and the annual card are never on screen together, and a user who dismisses the founder card can still reach the annual card, at the same $35.99, at a later milestone
 - [ ] Fresh install → 14 days full access with no store call and no account

@@ -18,7 +18,7 @@ import * as Haptics from 'expo-haptics';
 import { PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, { cancelAnimation, Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withRepeat, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { setView, useView, VIEWS, type ViewKey } from '../lib/views';
+import { openPanel, PANELS, setView, usePanel, useView, VIEWS, type ViewKey } from '../lib/views';
 import { NAV_H, useWide } from '../lib/wide';
 import { C } from '../theme';
 import { BrandMark } from './BrandMark';
@@ -27,6 +27,8 @@ import { AlertHistory } from './AlertViews';
 import { AddSheet } from '../features/AddSheet';
 import { useAlerts } from '../lib/alertsStore';
 import { useData } from '../lib/data';
+import { ago } from '../lib/dates';
+import { stepZoom, useZoom, ZOOM_MAX, ZOOM_MIN } from '../lib/zoom';
 import { BOTTOM_CHROME } from './ui';
 
 const PICKER_H = 44;
@@ -110,6 +112,62 @@ function RefreshButton() {
   );
 }
 
+/* A text link in the wide top bar: light grey, white under the pointer and
+   while its panel is open. */
+function NavLink({ view }: { view: ViewKey }) {
+  const [hover, setHover] = useState(false);
+  const on = usePanel() === view;
+  return (
+    <Pressable
+      hitSlop={{ top: 12, bottom: 12, left: 6, right: 6 }}
+      onHoverIn={() => setHover(true)}
+      onHoverOut={() => setHover(false)}
+      onPress={() => {
+        Haptics.selectionAsync();
+        openPanel(view);
+      }}
+    >
+      {({ pressed }) => <Text style={[s.navLink, (hover || on || pressed) && { color: '#ffffff' }]}>{VIEWS.find((v) => v.key === view)?.label}</Text>}
+    </Pressable>
+  );
+}
+
+/* Zoom the board out and in (the content only: this bar and the filter bar
+   are controls and keep their size). The percentage between the two is the
+   state, so the buttons are never guessed at. */
+function ZoomButtons() {
+  const zoom = useZoom();
+  const btn = (dir: 1 | -1, name: 'minus.magnifyingglass' | 'plus.magnifyingglass', off: boolean) => (
+    <Pressable
+      hitSlop={8}
+      disabled={off}
+      accessibilityLabel={dir > 0 ? 'Zoom in' : 'Zoom out'}
+      onPress={() => {
+        Haptics.selectionAsync();
+        stepZoom(dir);
+      }}
+      style={({ pressed }) => [s.icon, (pressed || off) && { opacity: off ? 0.3 : 0.6 }]}
+    >
+      <SymbolView name={name} size={20} weight="medium" tintColor="#ffffff" />
+    </Pressable>
+  );
+  return (
+    <View style={s.zoom}>
+      {btn(-1, 'minus.magnifyingglass', zoom <= ZOOM_MIN)}
+      <Text style={s.zoomText}>{Math.round(zoom * 100)}%</Text>
+      {btn(1, 'plus.magnifyingglass', zoom >= ZOOM_MAX)}
+    </View>
+  );
+}
+
+/* How fresh the numbers are, beside the refresh button it belongs to. On a
+   phone this is a row at the top of the page; here that row would cost the
+   board a line of height. */
+function Updated() {
+  const { snap, loading } = useData();
+  return <Text style={s.updated}>{loading ? 'Updating…' : snap ? `Updated ${ago(snap.at)}` : 'Loading…'}</Text>;
+}
+
 export function BottomBar() {
   const insets = useSafeAreaInsets();
   const wide = useWide();
@@ -121,10 +179,8 @@ export function BottomBar() {
   const [bellOpen, setBellOpen] = useState(false);
   const [addOpen, setAddOpen] = useState(false);
   const [pickerBox, setPickerBox] = useState({ x: 0, w: 0 });
-  const { unread, markRead } = useAlerts();
-  /* Wide: every view is on the board at once, so the picker does not choose
-     a page, it scrolls to a section, and has no "current" one to name. */
-  const label = wide ? 'Jump to section' : VIEWS.find((v) => v.key === current)?.label ?? '';
+  const { markRead } = useAlerts();
+  const label = VIEWS.find((v) => v.key === current)?.label ?? '';
 
   /* Gesture state lives in refs: the responder is created once. */
   const openRef = useRef(false);
@@ -246,12 +302,9 @@ export function BottomBar() {
       }}
       style={({ pressed }) => [s.icon, pressed && { opacity: 0.6 }]}
     >
+      {/* No count on it: the history behind it is the record, and a number
+          that only ever grows is not information. */}
       <SymbolView name="bell" size={22} weight="medium" tintColor="#ffffff" />
-      {unread ? (
-        <View style={s.badge}>
-          <Text style={s.badgeText}>{unread > 99 ? '99+' : unread}</Text>
-        </View>
-      ) : null}
     </Pressable>
   );
 
@@ -277,7 +330,7 @@ export function BottomBar() {
                 <View style={[StyleSheet.absoluteFill, { backgroundColor: 'rgba(24,24,27,0.98)' }]} />
               )}
               {VIEWS.map((v) => {
-                const on = !wide && v.key === current;
+                const on = v.key === current;
                 const hot = v.key === hover;
                 return (
                   <Pressable key={v.key} onPress={() => choose(v.key)} style={[s.option, on && s.optionOn, hot && s.optionHot]}>
@@ -308,13 +361,19 @@ export function BottomBar() {
         <View style={[s.hairline, wide ? { bottom: 0 } : { top: 0 }]} />
 
         {wide ? (
-          /* Wide: the mark and the section jump at the left, the actions at
+          /* Wide: the mark, then a text link for each view that opens as a
+             side panel (everything else is on the board), and the actions at
              the far right. The date lives in the filter bar at the bottom. */
           <View style={[s.bar, s.barWide]}>
             <BrandMark size={20} />
             <View style={s.navRule} />
-            {pickerEl}
+            {PANELS.map((key) => (
+              <NavLink key={key} view={key} />
+            ))}
             <View style={{ flex: 1 }} />
+            <Updated />
+            <ZoomButtons />
+            <View style={s.navRule} />
             {bellEl}
             <RefreshButton />
             {plusEl}
@@ -353,6 +412,10 @@ const s = StyleSheet.create({
     paddingHorizontal: 14,
   },
   barWide: { gap: 16, paddingHorizontal: 24 },
+  navLink: { color: C.dim, fontSize: 15, fontWeight: '600', marginHorizontal: 4 },
+  zoom: { flexDirection: 'row', alignItems: 'center', gap: 2 },
+  zoomText: { color: C.dim, fontSize: 12, fontWeight: '600', width: 40, textAlign: 'center', fontVariant: ['tabular-nums'] },
+  updated: { color: C.muted, fontSize: 12, marginRight: 4 },
   navRule: { width: StyleSheet.hairlineWidth, height: 24, backgroundColor: 'rgba(255,255,255,0.22)' },
   squircleWide: { flex: 0, width: 230 },
   squircleInner: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center' },
@@ -373,19 +436,6 @@ const s = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.10)',
     borderWidth: StyleSheet.hairlineWidth,
   },
-  badge: {
-    position: 'absolute',
-    top: 4,
-    right: -6,
-    minWidth: 18,
-    height: 18,
-    borderRadius: 9,
-    paddingHorizontal: 5,
-    backgroundColor: C.accent,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  badgeText: { color: '#fff', fontSize: 11, fontWeight: '700' },
   squircleText: { color: C.text, fontSize: 16, fontWeight: '600', textAlign: 'center', paddingHorizontal: 16 },
   option: {
     height: ROW_H,

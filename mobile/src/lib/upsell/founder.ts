@@ -42,7 +42,7 @@ import { priceAmount } from './price';
  * Nothing was SPENT while it was off. `founderVerdict` writes nothing on a
  * refusal, so no memory was stamped, no day was claimed and the shared offer
  * cool-down (./pacing) was never touched — the half-off annual card
- * (./annual, at 30/90/180/365 days) ran unaffected throughout.
+ * (./annual, at 50/90/365 days) ran unaffected throughout.
  *
  * One asymmetry that survives being switched back on: a user who claimed a day
  * BEFORE it was turned off still has `shownDk` set, so they read as
@@ -85,7 +85,7 @@ export interface FounderInput {
    * Only ever offered inside the install trial. 'pro' has nothing to sell and
    * 'free' means the trial already lapsed — at that point the user has met the
    * locks, and this is no longer the "you've seen it, keep it" moment the copy
-   * claims to be. They get the regular paywall and the 30/90/180-day annual
+   * claims to be. They get the regular paywall and the 50/90/365-day annual
    * offer instead.
    */
   tier: Tier;

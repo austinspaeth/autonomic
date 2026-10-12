@@ -16,15 +16,15 @@ import { useMemo, useState, type ReactNode } from 'react';
 import { Pressable, StyleSheet, Text, View, ScrollView } from 'react-native';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
-import { pingPlanName, SaleFromPingSheet, subscribePings, type SubPing } from './AddSheet';
+import { ConvertButton, pingPlanName, pingTime, SaleFromPingSheet, subscribePings, type SubPing } from './AddSheet';
 import { Chips, WeekdayChart, BarChart } from '../components/charts';
 import { Lines, OverlayBars, StackedBars, type Key } from '../components/series';
 import { MetricTiles, type Change, type Comparison, type MetricSpec } from '../components/MetricTiles';
 import { Card, Divider, Segmented } from '../components/ui';
 import { DeepDive, DeepDiveGrid } from '../components/DeepDive';
 import { useData } from '../lib/data';
-import { addDays, easternClock, easternDay, shortDate } from '../lib/dates';
-import { buildPace } from '../lib/pace';
+import { addDays, dayDate, easternClock, easternDay, shortDate } from '../lib/dates';
+import { buildPace, TYPICAL_DAY } from '../lib/pace';
 import { int } from '../lib/format';
 import type { PingKind } from '../lib/types';
 import {
@@ -37,17 +37,19 @@ import {
   buildIndex,
   buildsOver,
   captureFunnel,
+  captureOutcomes,
   cohortHeat,
   cohortSize,
   compareVersions,
   conversion,
   curve,
+  doorsOver,
   entry,
   eventAges,
+  failPctFor,
   faultDay,
   known,
   knownTotal,
-  lifecycleActive,
   measureRate,
   measuringCurve,
   MILESTONES,
@@ -62,6 +64,8 @@ import {
   presenceCurve,
   rangeDays,
   retentionAt,
+  saveFunnel,
+  shapeLabel,
   retentionByInstallWeekday,
   returningOn,
   sensorMixByAge,
@@ -70,9 +74,11 @@ import {
   splitFor,
   tiersOver,
   totalOn,
+  type CaptureOutcomes,
   type PlatformKey,
   type UsageIndex,
 } from '../lib/usage';
+import { DIG_LINES, DO_LINES, LOG_LINES } from '../lib/lines';
 import { C, num } from '../theme';
 
 /* ------------------------------------------------------------ labels */
@@ -95,6 +101,13 @@ const WALLS: Key[] = [
   { key: 'S', label: 'Settings (went looking)', color: '#8a8a90' },
   { key: '?', label: 'Unknown', color: C.unknown },
 ];
+/* The door a sale came through: the walls above, plus the two offer cards. */
+const DOORS: Key[] = [
+  ...WALLS.filter((w) => w.key !== '?').map((w) => (w.key === 'S' ? { ...w, label: 'Settings upgrade' } : w)),
+  { key: 'A', label: 'Annual offer card', color: '#5ac8fa' },
+  { key: 'F', label: 'Founder offer card', color: '#8b5cf6' },
+];
+const doorName = (L: string) => DOORS.find((d) => d.key === L)?.label ?? L;
 const TIERS: Key[] = [
   { key: 'P', label: 'Pro', color: '#c98500' },
   { key: 'T', label: 'Trial', color: '#199e70' },
@@ -139,47 +152,6 @@ const OUTCOMES: Key[] = [
 ];
 const VERSION_RING = ['#2563eb', '#199e70', '#c98500', '#d95926', '#d55181', '#8b5cf6', '#e66767', '#008300'];
 
-/** The per-letter counters, as lines of rows. Each LINE is a headcount; lines must not be summed. */
-const DO_LINES: { kind: PingKind; L?: string; label: string }[] = [
-  { kind: 'see', L: 'I', label: 'Opened Insights' },
-  { kind: 'see', L: 'P', label: 'Opened Progress' },
-  { kind: 'see', L: 'B', label: 'Tapped locked pacing' },
-  { kind: 'pot', L: 'T', label: 'POTS stand test' },
-  { kind: 'pot', L: 'E', label: 'POTS episode' },
-  { kind: 'not', L: 'M', label: 'Turned on morning reminder' },
-  { kind: 'not', L: 'C', label: 'Turned on crash warning' },
-  { kind: 'not', L: 'P', label: 'Turned on pacing alerts' },
-  { kind: 'rvw', label: 'Store review asked' },
-];
-const LOG_LINES: { kind: PingKind; L?: string; label: string }[] = [
-  { kind: 'log', L: 'S', label: 'Sleep' },
-  { kind: 'log', L: 'A', label: 'Activity' },
-  { kind: 'log', L: 'M', label: 'Med or supplement' },
-  { kind: 'log', L: 'Y', label: 'Symptom' },
-  { kind: 'log', L: 'W', label: 'Water' },
-  { kind: 'log', L: 'B', label: 'Bowel movement' },
-  { kind: 'log', L: 'P', label: 'Blood pressure' },
-  { kind: 'log', L: 'R', label: 'Resting HR' },
-  { kind: 'rdg', L: 'M', label: 'Morning baseline' },
-  { kind: 'rdg', L: 'B', label: 'Later baseline' },
-  { kind: 'rdg', L: 'T', label: 'Training reading' },
-];
-const DIG_LINES: { kind: PingKind; L?: string; label: string }[] = [
-  { kind: 'use', L: 'M', label: 'Milestones opened' },
-  { kind: 'use', L: 'P', label: 'Protocol saved' },
-  { kind: 'use', L: 'B', label: 'Pacing budget opened' },
-  { kind: 'fnd', L: 'E', label: 'Early signal opened' },
-  { kind: 'fnd', L: 'U', label: 'Unconfirmed pattern opened' },
-  { kind: 'fnd', L: 'C', label: 'Biggest change opened' },
-  { kind: 'fnd', L: 'R', label: 'Correlation opened' },
-  { kind: 'rpt', L: 'D', label: 'Data-for-prompt report' },
-  { kind: 'rpt', L: 'H', label: 'Full health report' },
-  { kind: 'rpt', L: 'C', label: 'Doctor summary' },
-  { kind: 'mbp', L: 'S', label: 'Morning card shown' },
-  { kind: 'mbp', L: 'T', label: 'Morning card: took reading' },
-  { kind: 'mbp', L: 'X', label: 'Morning card closed' },
-];
-
 const WD = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
 const WD_MON = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 const pct = (v: number | null | undefined, digits = 0) => (v === null || v === undefined ? '–' : `${v.toFixed(digits)}%`);
@@ -208,6 +180,82 @@ function Rows({ rows }: { rows: { label: string; value: string; sub?: string }[]
         </View>
       ))}
     </View>
+  );
+}
+
+/**
+ * One sensor's readings, per ATTEMPT: how many began, and what became of the
+ * ones that did not turn into an entry. The pings cannot say this (they count
+ * people, once a day); this counts every try.
+ */
+function CaptureCard({ title, o, other, days, xLabel }: { title: string; o: CaptureOutcomes; other?: { label: string; o: CaptureOutcomes }; days: string[]; xLabel: (d: string) => string }) {
+  const [all, setAll] = useState(false);
+  const of = (n: number) => (o.attempts.n ? `${pct((n / o.attempts.n) * 100, 1)} of attempts` : undefined);
+  const store = (k: 'I' | 'A', label: string) =>
+    o.attempts[k] ? [{ label, value: pct(failPctFor(o, k), 1), sub: `${int(o.failed[k])} of ${int(o.attempts[k])} attempts did not save` }] : [];
+  const shapes = all ? o.shapes : o.shapes.slice(0, 5);
+  if (!o.attempts.n) {
+    return (
+      <Card title={title}>
+        <Note>
+          {o.first ? 'No attempts in this range.' : 'No build that counts attempts has reported yet. It starts with the release that carries this.'}
+          {o.legacyRefusedInstalls ? ` Older builds reported a refused reading on ${int(o.legacyRefusedInstalls)} install-days here, with no attempt count to set it against.` : ''}
+        </Note>
+      </Card>
+    );
+  }
+  return (
+    <Card>
+      <OverlayBars
+        title={title}
+        back={{ key: 'try', label: 'Attempts', color: '#d95926' }}
+        front={{ key: 'ok', label: 'Saved', color: '#199e70' }}
+        rows={o.byDay.map((d) => ({ x: d.day, back: o.first && d.day >= o.first ? d.attempts : null, front: o.first && d.day >= o.first ? d.landed : null }))}
+        xLabel={xLabel}
+        summary={`${pct(o.failPct)} failed`}
+      />
+      <Rows
+        rows={[
+          { label: 'Did not become a reading', value: pct(o.failPct, 1), sub: `${int(o.failed.n)} of ${int(o.attempts.n)} attempts` },
+          ...store('I', 'iOS'),
+          ...store('A', 'Android'),
+          ...(other && other.o.attempts.n ? [{ label: other.label, value: pct(other.o.failPct, 1), sub: `${int(other.o.failed.n)} of ${int(other.o.attempts.n)} attempts` }] : []),
+        ]}
+      />
+      <Text style={s.subHead}>What became of the failures</Text>
+      <Rows
+        rows={[
+          { label: 'Refused at the end', value: int(Math.max(0, o.refused.n - o.salvaged.n)), sub: of(Math.max(0, o.refused.n - o.salvaged.n)) },
+          { label: 'Stopped early by the app', value: int(o.abandonedBy.signal), sub: of(o.abandonedBy.signal) },
+          { label: 'Gave up (Having issues?)', value: int(o.abandonedBy.user), sub: of(o.abandonedBy.user) },
+          { label: 'Finished in the first 45s', value: int(o.abandonedBy.early), sub: of(o.abandonedBy.early) },
+          { label: 'Closed mid-reading', value: int(o.vanished.n), sub: of(o.vanished.n) },
+        ].filter((r) => r.value !== '0')}
+      />
+      {o.salvaged.n ? <Note>{int(o.salvaged.n)} more were refused and then kept by the user (Save anyway). Those count as saved.</Note> : null}
+      {shapes.length ? (
+        <>
+          <Text style={s.subHead}>What they looked like</Text>
+          <Rows
+            rows={shapes.map((g) => ({
+              label: shapeLabel(g.tag, g.msg),
+              value: `${int(g.n)}×`,
+              sub: `${g.msg.split(' ').slice(1).join(' ')} · iOS ${int(g.I)} · Android ${int(g.A)}`,
+            }))}
+          />
+          {o.shapes.length > 5 ? (
+            <Pressable onPress={() => setAll(!all)} hitSlop={8}>
+              <Text style={[s.note, { color: C.text }]}>{all ? 'Show fewer' : `Show all ${o.shapes.length}`}</Text>
+            </Pressable>
+          ) : null}
+        </>
+      ) : null}
+      <Note>
+        Every attempt counts, not one per person per day, so someone who fails five times and then gets a reading is five failures and one save.
+        {o.first && days[0] < o.first ? ` Counted from ${shortDate(o.first)}, when builds began reporting attempts.` : ''}
+        {o.legacyRefusedInstalls ? ` Older builds also reported a refusal on ${int(o.legacyRefusedInstalls)} install-days, left out of the rate.` : ''}
+      </Note>
+    </Card>
   );
 }
 
@@ -361,6 +409,7 @@ function TodaySection({ ix, ctx, isToday, at }: { ix: UsageIndex; ctx: Ctx; isTo
     const hrvE = entry(ix, 'hrv', day);
     const share = (d: string) => (known(ix, 'hrv', d) && activeOn(ix, d) ? (totalOn(ix, 'hrv', d) / activeOn(ix, d)) * 100 : null);
     const firstRunReadings = hrvE?.cohorts[day] ?? 0;
+    const sameDayActs = known(ix, 'act', day) ? entry(ix, 'act', day)?.cohorts[day] ?? 0 : 0;
     const f = faultDay(ix, day);
     const chart = (title: string, fn: (d: string) => number | null, color?: string) => ({
       title,
@@ -384,6 +433,7 @@ function TodaySection({ ix, ctx, isToday, at }: { ix: UsageIndex; ctx: Ctx; isTo
         history: Array.from({ length: 28 }, (_, i) => addDays(day, -1 - i))
           .filter((d) => !!ix.first && d >= ix.first)
           .map((d) => paceDay(ix, d, who)),
+        prior: TYPICAL_DAY[who],
       });
       return model ? { model, color } : null;
     };
@@ -400,14 +450,7 @@ function TodaySection({ ix, ctx, isToday, at }: { ix: UsageIndex; ctx: Ctx; isTo
         splits: [
           { title: 'Who', parts: parts(WHO, { back: Math.max(0, active - fresh), fresh }), format: int },
           { title: 'Store', parts: parts(STORES, entry(ix, 'open', day)?.platforms ?? {}), format: int },
-          {
-            title: 'Trial',
-            parts: [
-              { key: 'trial', label: 'In trial (D0–14)', value: lifecycleActive(ix, day, true), color: '#199e70' },
-              { key: 'past', label: 'Past trial (D15+)', value: lifecycleActive(ix, day, false), color: '#c98500' },
-            ].filter((x) => x.value),
-            format: int,
-          },
+          { title: 'Status', parts: parts(TIERS, entry(ix, 'open', day)?.tiers ?? {}), format: int },
         ],
         chart: chart('Over the range', (d) => activeOn(ix, d)),
       },
@@ -454,7 +497,7 @@ function TodaySection({ ix, ctx, isToday, at }: { ix: UsageIndex; ctx: Ctx; isTo
               title="Over the range"
               keys={SUB_PLANS}
               rows={ctx.days.map((d) => ({ x: d, values: known(ix, 'sub', d) ? subPlans(entry(ix, 'sub', d)) : null }))}
-              xLabel={shortDate}
+              xLabel={dayDate}
               height={96}
               summary={`${int(ctx.days.reduce((t, d) => t + totalOn(ix, 'sub', d), 0))} reported`}
             />
@@ -465,8 +508,13 @@ function TodaySection({ ix, ctx, isToday, at }: { ix: UsageIndex; ctx: Ctx; isTo
         key: 'act',
         label: 'First readings',
         value: int(totalOn(ix, 'act', day)),
+        // Of the installs that first ran on this day, how many took a first reading on it.
+        aside: fresh ? `/ ${pct((sameDayActs / fresh) * 100)}` : undefined,
         change: headline((d) => knownTotal(ix, 'act', d)),
-        comparisons: d7((d) => knownTotal(ix, 'act', d)),
+        comparisons: [
+          ...d7((d) => knownTotal(ix, 'act', d)),
+          ...(fresh ? [{ label: `By that day's installs`, value: `${int(sameDayActs)} of ${int(fresh)}` }] : []),
+        ],
         splits: [{ title: 'Sensor', parts: parts(SENSORS, entry(ix, 'act', day)?.slots ?? {}), format: int }],
         chart: chart('Over the range', (d) => knownTotal(ix, 'act', d)),
       },
@@ -511,8 +559,9 @@ function TodaySection({ ix, ctx, isToday, at }: { ix: UsageIndex; ctx: Ctx; isTo
   }, [ix, ctx, day, isToday, at]);
 
   const ages = useMemo(() => activeByCohort(ix, day), [ix, day]);
-  const [whoMode, setWhoMode] = useState<'basic' | 'expanded'>('basic');
+  const [whoMode, setWhoMode] = useState<'basic' | 'expanded' | 'status'>('basic');
   const activeTotal = ages.reduce((t, a) => t + a.count, 0);
+  const byStatus = whoMode === 'status';
 
   return (
     <>
@@ -521,25 +570,32 @@ function TodaySection({ ix, ctx, isToday, at }: { ix: UsageIndex; ctx: Ctx; isTo
         <StackedBars
           title="Who is using it"
           right={
-            <View style={{ width: 150 }}>
+            <View style={{ width: 214 }}>
               <Segmented
                 compact
                 options={[
                   { key: 'basic', label: 'Basic' },
                   { key: 'expanded', label: 'Expanded' },
+                  { key: 'status', label: 'Status' },
                 ]}
                 value={whoMode}
                 onChange={setWhoMode}
               />
             </View>
           }
-          keys={[
-            { key: 'trial', label: 'In trial (D0–14)', color: '#199e70' },
-            { key: 'past', label: 'Past trial (D15+)', color: '#c98500' },
-          ]}
-          rows={ages.map((a) => ({ x: `D${a.age}`, values: a.age <= 14 ? { trial: a.count, past: 0 } : { trial: 0, past: a.count } }))}
+          keys={
+            byStatus
+              ? TIERS
+              : [
+                  { key: 'trial', label: 'In trial (D0–14)', color: '#199e70' },
+                  { key: 'past', label: 'Past trial (D15+)', color: '#c98500' },
+                ]
+          }
+          rows={ages.map((a) => ({ x: `D${a.age}`, values: byStatus ? a.tiers : a.age <= 14 ? { trial: a.count, past: 0 } : { trial: 0, past: a.count } }))}
+          format={int}
           summary={`${int(activeTotal)} by install age`}
-          readout={(i) => `D${ages[i].age} / ${int(ages[i].count)} ${ages[i].count === 1 ? 'visitor' : 'visitors'}`}
+          // By status the bar is read part by part, so the chart's own per-key line does it.
+          readout={byStatus ? undefined : (i) => `D${ages[i].age} / ${int(ages[i].count)} ${ages[i].count === 1 ? 'visitor' : 'visitors'}`}
           detail={whoMode === 'expanded' ? (i) => <CohortBar ix={ix} row={ages[i]} day={day} days={ctx.days} total={activeTotal} /> : undefined}
         />
         <Note>That day's actives by how old their install is. Dominated by the youngest bars means activity is propped up by acquisition; a long tail means older installs keep coming back.</Note>
@@ -549,7 +605,7 @@ function TodaySection({ ix, ctx, isToday, at }: { ix: UsageIndex; ctx: Ctx; isTo
 }
 
 /* The subscriptions reported on one day, one row per purchase: when that
-   install first ran, the store, the plan, a check when the store confirmed it
+   install first ran, the store, when it came in, the plan, a check when the store confirmed it
    within an hour of a buy tap, and a button that drafts it into the ledger as
    a sale (the price is the one thing a ping cannot carry). A purchase already
    in the ledger reads Converted. */
@@ -558,13 +614,13 @@ function SubsList({ day, platform }: { day: string; platform: UsageIndex['platfo
   const [draft, setDraft] = useState<SubPing | null>(null);
   const rows = useMemo(() => {
     const letter = platform === 'ios' ? 'I' : platform === 'android' ? 'A' : null;
-    const out: { key: string; ping: SubPing; verified: boolean; converted: boolean }[] = [];
+    const out: { key: string; ping: SubPing; verified: boolean; converted: boolean; door: string | null }[] = [];
     subscribePings(snap)
       .filter((p) => p.date === day && (!letter || p.store === letter))
       .forEach((p) => {
         // One row per purchase. Which unit of a shared ping is which is not
         // knowable, so the recorded and the verified ones are listed first.
-        for (let i = 0; i < p.count; i++) out.push({ key: `${p.ping}#${i}`, ping: p, verified: i < p.verified, converted: i < p.count - p.remaining });
+        for (let i = 0; i < p.count; i++) out.push({ key: `${p.ping}#${i}`, ping: p, verified: i < p.verified, converted: i < p.count - p.remaining, door: p.doors[i] ?? null });
       });
     return out;
   }, [snap, day, platform]);
@@ -584,25 +640,15 @@ function SubsList({ day, platform }: { day: string; platform: UsageIndex['platfo
             </View>
             <Text style={[s.subMeta, num]} numberOfLines={1}>
               Installed {shortDate(r.ping.cohort)} · {r.ping.store === 'I' ? 'iOS' : r.ping.store === 'A' ? 'Android' : 'No store'}
+              {pingTime(r.ping) ? ` · ${pingTime(r.ping)}` : ''}
             </Text>
+            {r.door ? (
+              <Text style={s.subMeta} numberOfLines={1}>
+                Bought from {doorName(r.door)}
+              </Text>
+            ) : null}
           </View>
-          {r.converted ? (
-            <View style={[s.subBtn, s.subBtnDone]}>
-              <SymbolView name="checkmark" size={11} weight="bold" tintColor={C.dim} />
-              <Text style={[s.subBtnText, { color: C.dim }]}>Converted</Text>
-            </View>
-          ) : (
-            <Pressable
-              hitSlop={6}
-              onPress={() => {
-                Haptics.selectionAsync();
-                setDraft(r.ping);
-              }}
-              style={({ pressed }) => [s.subBtn, pressed && { opacity: 0.6 }]}
-            >
-              <Text style={s.subBtnText}>Convert</Text>
-            </Pressable>
-          )}
+          <ConvertButton converted={r.converted} onConvert={() => setDraft(r.ping)} />
         </View>
       ))}
       {rows.some((r) => r.verified) ? <Text style={s.subEmpty}>A check means the store confirmed it within an hour of a buy tap.</Text> : null}
@@ -709,7 +755,7 @@ function GrowthCard({ ix, days, mode, setMode }: { ix: UsageIndex; days: string[
         title="Growth & usage"
         keys={WHO}
         rows={growth}
-        xLabel={shortDate}
+        xLabel={dayDate}
         percent={mode === 'share'}
         summary={`avg ${int(growth.reduce((t, r) => t + r.values.back + r.values.fresh, 0) / Math.max(1, days.length))}/day`}
       />
@@ -741,7 +787,7 @@ function RangeSection({
   const { snap } = useData();
   const { days } = ctx;
   const n = days.length;
-  const xl = shortDate;
+  const xl = dayDate;
 
   const specs = useMemo<MetricSpec[]>(() => {
     const avg = (ds: string[], f: (d: string) => number) => (ds.length ? ds.reduce((t, d) => t + f(d), 0) / ds.length : 0);
@@ -843,6 +889,10 @@ function RangeSection({
   const half = Math.ceil(knownHrv.length / 2);
   const halves = knownHrv.length >= 6 ? [measureRate(ix, knownHrv.slice(0, half)), measureRate(ix, knownHrv.slice(half))] : null;
   const funnel = captureFunnel(ix, days);
+  const saves = saveFunnel(ix, days);
+  const camera = captureOutcomes(ix.report, days, ix.platform, 'camera');
+  const strap = captureOutcomes(ix.report, days, ix.platform, 'polar');
+  const sold = doorsOver(ix, days);
   const payDays = days.filter((d) => known(ix, 'pay', d));
   const pays = payDays.reduce((t, d) => t + totalOn(ix, 'pay', d), 0);
   const payActive = payDays.reduce((t, d) => t + activeOn(ix, d), 0);
@@ -980,6 +1030,30 @@ function RangeSection({
         />
         <Note>A start with no completion is the app asking for something the person could not give it: a strap that would not pair, a session too long.</Note>
       </Card>
+
+      <Card>
+        <OverlayBars
+          title="Completed vs saved"
+          back={{ key: 'hrv', label: 'Completed', color: '#199e70' }}
+          front={{ key: 'sav', label: 'Saved', color: '#5ac8fa' }}
+          rows={days.map((d) => ({ x: d, back: known(ix, 'sav', d) ? knownTotal(ix, 'hrv', d) : null, front: knownTotal(ix, 'sav', d) }))}
+          xLabel={xl}
+          summary={pct(saves.pct)}
+        />
+        <Rows
+          rows={SENSORS.filter((k) => k.key !== '?')
+            .map((k) => ({ k, f: saveFunnel(ix, days, k.key) }))
+            .filter((x) => x.f.completed > 0 || x.f.saved > 0)
+            .sort((a, b) => b.f.completed - a.f.completed)
+            .map(({ k, f }) => ({ label: k.label, value: pct(f.pct), sub: `${int(f.saved)} saved, ${int(f.completed)} completed` }))}
+        />
+        <Note>
+          Completed is a reading that ran to its end, before anything judged it. Saved is an entry in the journal. The gap is readings the app declined.
+          {ix.firstDay.sav ? '' : ' No build sending the saved counter has reported yet.'}
+        </Note>
+      </Card>
+
+      <CaptureCard title="Camera readings, per attempt" o={camera} other={{ label: 'Chest strap, same measure', o: strap }} days={days} xLabel={xl} />
         </>
       ) : part === 'errors' ? (
         <>
@@ -1033,6 +1107,27 @@ function RangeSection({
           summary={topWall && walls[topWall.key] ? `${topWall.label} ${pct((walls[topWall.key] / Math.max(1, wallTotal)) * 100)}` : ''}
         />
         <Note>The first wall each install met that day: the app's front door to Pro, not how often each feature is locked. Settings is somebody who went looking.</Note>
+      </Card>
+
+      <Card title="Which door sold it">
+        {sold.known ? (
+          <Rows
+            rows={DOORS.filter((k) => sold.doors[k.key])
+              .sort((a, b) => sold.doors[b.key] - sold.doors[a.key])
+              .map((k) => {
+                const met = k.key === 'A' || k.key === 'F' ? offerFunnel(ix, days, k.key).shown : walls[k.key] || 0;
+                return {
+                  label: k.label,
+                  value: int(sold.doors[k.key]),
+                  sub: met ? `${int(met)} install-days ${k.key === 'A' || k.key === 'F' ? 'were shown it' : 'met it first'}` : undefined,
+                };
+              })}
+          />
+        ) : (
+          <Note>{sold.first ? 'No sale in this range named its door.' : 'No sale has named its door yet. Builds from this release on send it.'}</Note>
+        )}
+        {sold.unknown ? <Note>{int(sold.unknown)} more {sold.unknown === 1 ? 'sale' : 'sales'} in this range did not say: an older build, or a payment that cleared with no buy tap behind it.</Note> : null}
+        <Note>The paywall a sale was bought from, by the locked thing that raised it, or the offer card it came from. Sales are every purchase; the count beside each is install-days, so read it as scale, not as a rate.</Note>
       </Card>
 
       <Card>
@@ -1455,9 +1550,6 @@ const s = StyleSheet.create({
   subTitleRow: { flexDirection: 'row', alignItems: 'center', gap: 6 },
   subTitle: { color: C.text, fontSize: 14, fontWeight: '700', flexShrink: 1 },
   subMeta: { color: C.dim, fontSize: 12, marginTop: 1 },
-  subBtn: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'rgba(255,255,255,0.14)' },
-  subBtnDone: { backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
-  subBtnText: { color: C.text, fontSize: 13, fontWeight: '600' },
   cb: { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 14, padding: 12, marginBottom: 12, gap: 2 },
   cbHead: { color: C.text, fontSize: 14, fontWeight: '700' },
   cbSub: { color: C.dim, fontSize: 12 },

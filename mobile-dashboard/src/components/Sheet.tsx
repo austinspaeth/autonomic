@@ -22,7 +22,7 @@ import { BlurView } from 'expo-blur';
 import Animated, { Easing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SymbolView } from 'expo-symbols';
-import { PANEL_W, WIDE_FROM } from '../lib/wide';
+import { BoardWidth, PANEL_W, WIDE_FROM } from '../lib/wide';
 import { C } from '../theme';
 
 export function Sheet({
@@ -149,7 +149,9 @@ export function Sheet({
             </View>
             {/* The panel is full height either way, so a content-sized card's
                 form scrolls in it and insets itself by the keyboard. */}
-            <View style={{ flex: 1 }}>{full ? children(close) : scrolling(children(close), true)}</View>
+            <BoardWidth.Provider value={null}>
+              <View style={{ flex: 1 }}>{full ? children(close) : scrolling(children(close), true)}</View>
+            </BoardWidth.Provider>
           </Animated.View>
         </View>
       </Modal>

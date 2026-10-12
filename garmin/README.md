@@ -13,21 +13,50 @@ Apple Watch offers are deliberately NOT here: the Connect IQ store rejected
 them, so `StandTest.mc` / `Orthostatic.mc` / `Views.mc` were removed rather
 than hidden. Do not re-add them to this target.
 
-## The two rules that make the sensor work
+## The rules that make the sensor work
 
-Both were expensive to find and neither is discoverable from the docs. They are
-commented at length in `source/RrCollector.mc`; do not "clean up" either one.
+All expensive to find and none discoverable from the docs. They are commented
+at length in `source/RrCollector.mc` and `source/Recording.mc`; do not "clean
+up" any of them.
 
-1. **`SENSOR_ONBOARD_HEARTRATE`, never `SENSOR_HEARTRATE`.** `SensorType` is
+1. **A throwaway activity session is open for the whole reading**
+   (`Recording.mc`, `Fit` permission, discarded on stop so nothing is ever
+   logged). The optical sensor only produces beat-to-beat in its activity-rate
+   mode, and asking for the onboard sensor from a Connect IQ app does not
+   reliably switch it there: Garmin's tracker holds an acknowledged report
+   ([Elevate 5 not enabling in CIQ apps](https://forums.garmin.com/developer/connect-iq/i/bug-reports/critical-bug-elevate-optical-sensor-heart-rate-is-not-enabling))
+   of the sensor staying in low-power mode whenever the watch's Wrist Heart
+   Rate setting is Auto, on some firmware. That is a live pulse and an empty
+   interval array for the whole reading — the "stuck on Getting a signal"
+   report — on some users' watches and never on the development Venu 4. A
+   recording session is what every native activity does to get the fast mode.
+   The session is a helper, never a precondition: if the watch refuses it the
+   reading runs as before.
+2. **`SENSOR_ONBOARD_HEARTRATE`, never `SENSOR_HEARTRATE`.** `SensorType` is
    split into `RemoteSensorType` and `OnboardSensorType`. `SENSOR_HEARTRATE` is
    the *remote chest strap*. Asking for it yields a working heart rate and no
    beat-to-beat intervals, which is indistinguishable from a broken sensor.
-2. **Only the FIRST `registerSensorDataListener` after launch yields
-   beat-to-beat.** Unregister and register again and every callback returns an
-   empty interval array while HR keeps working perfectly. So the listener is
-   armed once, left up between readings, and released only when the app closes.
-   `setEnabledSensors` is likewise called exactly once, in `arm()`. A second
-   call anywhere breaks it.
+3. **The listener is armed once and left up between readings.** On the Venu 4
+   only the first `registerSensorDataListener` after launch yielded
+   beat-to-beat; re-registering every few seconds to "refresh" it made things
+   strictly worse, since each call restarts optical acquisition.
+4. **...but a reading that has produced NOTHING is re-armed** — once at 25 s,
+   again at 50 s — and a reading whose callbacks stop entirely mid-way (the app
+   went inactive; Connect IQ disables sensors on inactive) is re-armed the same
+   way, up to three times. At that point there is nothing to lose: the
+   alternative was a spinner that ran until the user gave up.
+5. **A reading that cannot lock is STOPPED at 75 s and told why**, with a TRY
+   AGAIN. Three different sentences for three different fixes: no pulse (band
+   fit, or wrist HR off in the watch settings), a pulse but no beats (the fast
+   mode not engaging), beats but too few. And a `diag` message goes to the
+   phone in place of the reading — device, firmware, what the sensor did, how
+   many re-arms, whether the session took — which the phone files on the fault
+   route as `garmin.noSignal` (`mobile/src/lib/garmin/diag.ts`). Before this a
+   watch that never locked left no trace anywhere.
+
+The HR monitor opens the same session (that is its keep-awake: the activity
+display timeout instead of the watch face's) and adds the sensor with
+`enableSensorType`, which does not reset whatever the collector armed.
 
 ## Devices
 
@@ -99,7 +128,8 @@ of it.
 
 | File | Purpose |
 | --- | --- |
-| `source/RrCollector.mc` | The capture engine. Owns both rules above. |
+| `source/RrCollector.mc` | The capture engine. Owns the listener, the re-arm ladder and the give-up. |
+| `source/Recording.mc` | The throwaway activity session that puts the sensor in activity mode. |
 | `source/Link.mc` | Store-and-forward to the phone: queues readings, retries with backoff, clears only on the phone's ack. |
 | `source/Payload.mc` | Wire format (`SCHEMA`), local-ISO timestamps with no timezone suffix (the phone parses them as local). |
 | `source/Theme.mc` | Design tokens ported from the Apple Watch's `DesignSystem.swift`, plus pill/chevron/heart drawing. CIQ has no anti-aliasing, so the heart and check are bitmaps, drawn at their own size from the per-family assets. |

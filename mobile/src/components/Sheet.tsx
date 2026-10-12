@@ -23,6 +23,7 @@ import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-cont
 import { radius, usePalette } from '../theme';
 import { notifyChartsBlur } from './charts';
 import { Icon } from './Icon';
+import { tapAwayBlur } from './tapAway';
 
 /** The pill's delete tint: the Button `danger` red (#d63b3b) lifted a step,
  *  because the pill it sits in is near-black glass and the darker red reads as
@@ -148,6 +149,7 @@ export function SheetProvider({ children }: { children: React.ReactNode }) {
           <View
             style={StyleSheet.absoluteFill}
             onStartShouldSetResponderCapture={() => { notifyChartsBlur(); return false; }}
+            {...tapAwayBlur}
           >
             {stack.map((entry, i) => (
               <SheetView
@@ -202,6 +204,22 @@ function SheetHost({ children, onRequestClose }: { children: React.ReactNode; on
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
+/**
+ * Height of the opaque strip to draw over the system navigation area, or 0.
+ *
+ * The app is edge-to-edge, so content scrolls under whatever the OS draws at
+ * the bottom of the screen. Under iOS's home indicator and Android's gesture
+ * handle that is a thin line and the right look. Under Android's THREE-BUTTON
+ * bar it is 48dp of live content with three system icons printed across it: a
+ * filter row colliding with the home button, a settings row cut through its
+ * label. So when the bottom inset is tall enough to be a button bar, the tab
+ * layout and the sheets paint that strip solid in their own surface colour.
+ * Gesture navigation reports well under the bar, and keeps the see-through.
+ */
+export function navBarCover(bottomInset: number): number {
+  return Platform.OS === 'android' && bottomInset >= 40 ? bottomInset : 0;
+}
+
 function SheetView({ entry, isTop, behind, closing, requestClose, onExited, closeAll, liveOpts }: {
   entry: SheetEntry; isTop: boolean; behind: boolean; closing: boolean;
   requestClose: () => void; onExited: () => void; closeAll: () => void;
@@ -253,6 +271,7 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
   // Live mirrors for the keyboard listener (registered once, deps [kb]).
   const footerHRef = useRef(0);
   const hasFooterRef = useRef(false); hasFooterRef.current = !!footer;
+  const bottomInsetRef = useRef(insets.bottom); bottomInsetRef.current = insets.bottom;
   const mounted = useRef(false);
   // Options as opened, patched by anything the content set through
   // controls.setOptions. Kept here rather than on the stack entry so a card
@@ -289,14 +308,21 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
     const ios = Platform.OS === 'ios';
     const onShow = (e: { endCoordinates: { height: number; screenY?: number }; duration?: number }) => {
       if (!isTopRef.current) return;
-      kb.value = withTiming(e.endCoordinates.height, { duration: e.duration || 250, easing: Easing.out(Easing.cubic) });
-      kbSpace.value = e.endCoordinates.height; // instant — see declaration
+      // Android reports the keyboard's height ABOVE the system navigation bar
+      // (ReactRootView: `imeInsets.bottom - barInsets.bottom`), while this
+      // sheet is edge-to-edge and its footer starts at the screen's own bottom
+      // edge. Lifting by the reported figure alone left the footer short by the
+      // bar's height: with three-button navigation that is 48dp, which put the
+      // Save button behind the keyboard on every form with a text field.
+      const kbH = e.endCoordinates.height + (ios ? 0 : bottomInsetRef.current);
+      kb.value = withTiming(kbH, { duration: e.duration || 250, easing: Easing.out(Easing.cubic) });
+      kbSpace.value = kbH; // instant — see declaration
       setKbOpen(true);
       // Auto-scroll the focused field clear of the keyboard AND the raised footer
       // (fields near the sheet bottom are otherwise typed into blind). iOS refires
       // will-show on every focus change, so hopping between fields re-runs this.
       const input = TextInput.State.currentlyFocusedInput();
-      const kbTop = e.endCoordinates.screenY ?? SCREEN_H - e.endCoordinates.height;
+      const kbTop = ios ? (e.endCoordinates.screenY ?? SCREEN_H - kbH) : SCREEN_H - kbH;
       if (input && scrollRef.current) {
         // Small delay so the spacer's new height has landed in the content size.
         setTimeout(() => {
@@ -452,6 +478,10 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
             {!full && !hideClose && <SheetPillButton icon="x" size={18} onPress={dismiss} label="Close" />}
           </SheetPill>
         )}
+        {/* Nothing scrolls behind the system navigation buttons (see navBarCover). */}
+        {!fit && !footer && navBarCover(insets.bottom) > 0 ? (
+          <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: navBarCover(insets.bottom), backgroundColor: p.surface }} />
+        ) : null}
         {footer && (
           <Animated.View onLayout={(e) => { setFooterH(e.nativeEvent.layout.height); footerHRef.current = e.nativeEvent.layout.height; }} style={[styles.footer, { backgroundColor: p.surface, borderTopColor: p.border }, footerStyle]}>
             {kbOpen && (

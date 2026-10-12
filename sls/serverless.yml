@@ -196,6 +196,13 @@ functions:
       - httpApi:
           method: GET
           path: /ping/hrv/{cohort}
+      # An HRV reading was SAVED to the journal today: filed by the app, kept
+      # by the user from a refusal, or arrived from the wrist. The third phase
+      # beside the two above, capped the same way, so sav/hrv is the share of
+      # finished readings that became an entry.
+      - httpApi:
+          method: GET
+          path: /ping/sav/{cohort}
       # The paywall came up today. Once per install per Eastern day, like the
       # two above, so it is a share of PEOPLE who met a wall and not a count of
       # taps. One letter for which surface raised it (R progress range /

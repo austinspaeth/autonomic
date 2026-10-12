@@ -14,12 +14,21 @@ import { SheetControls, SheetFooter } from '../components/Sheet';
 import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
 
-export function PromptSheet({ title, rangeText, prompt, controls, subtitle, header }: { title: string; rangeText: string; prompt: string; controls: SheetControls; subtitle?: string; header?: React.ReactNode }) {
+export function PromptSheet({ title, rangeText, prompt, controls, subtitle, header, closeAllOnCopy }: {
+  title: string; rangeText: string; prompt: string; controls: SheetControls; subtitle?: string; header?: React.ReactNode;
+  /** Copy closes the WHOLE sheet stack rather than this sheet. For a prompt
+   *  raised from the AI reports card: once the prompt is on the clipboard the
+   *  user is leaving for another app, and dropping them back onto the menu they
+   *  just chose from is a second close they have to find. Off by default,
+   *  because other callers sit over cards the user still wants (the camera
+   *  setup card's support dump, the downturn sheet). */
+  closeAllOnCopy?: boolean;
+}) {
   const p = usePalette();
   const toast = useToast();
   const copy = async () => {
     await Clipboard.setStringAsync(prompt);
-    controls.close();
+    if (closeAllOnCopy) controls.closeAll(); else controls.close();
     toast('Copied to clipboard');
   };
   const share = async () => {

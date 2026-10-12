@@ -1,8 +1,8 @@
 /**
- * The access-code card. Reached by holding the Subscription row in Settings —
- * unlabelled on purpose, like the support dump: a code is something the
- * developer hands to one person along with where to type it, not a field every
- * user should wonder whether they are missing.
+ * The access-code card. Reached from "Redeem a code", just above Restore purchase,
+ * on the Subscription sheet in Settings (hidden from a subscriber). It
+ * used to hide behind a long-press on the Subscription row, which meant every
+ * code had to travel with instructions for a gesture nothing on screen hinted at.
  *
  * One input, one button. The answer is said INSIDE the card (a toast cannot be
  * seen from a sheet), and the three ways it can go wrong are three different
@@ -17,6 +17,7 @@ import { radius, usePalette } from '../theme';
 import { StoreError, StoreOkNotice } from './Paywall';
 import { redeemAccessCode, type RedeemResult } from '../store/accessCode';
 import { CODE_MAX, grantAddedText, isPlausibleCode } from '../lib/accessCode';
+import { getTrialDaysLeft } from '../store/tier';
 
 const FAILURE: Record<Exclude<RedeemResult['status'], 'ok'>, string> = {
   used: 'This code has already been used.',
@@ -74,7 +75,7 @@ export function AccessCodeSheet({ controls }: { controls: SheetControls }) {
         <View style={{ marginBottom: 12 }}><StoreError text={FAILURE[result.status]} /></View>
       ) : null}
       {result?.status === 'ok' ? (
-        <View style={{ marginBottom: 12 }}><StoreOkNotice text={grantAddedText(result.days)} /></View>
+        <View style={{ marginBottom: 12 }}><StoreOkNotice text={grantAddedText(result.days, getTrialDaysLeft())} /></View>
       ) : null}
 
       {done

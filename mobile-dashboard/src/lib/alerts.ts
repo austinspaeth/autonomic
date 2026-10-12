@@ -255,6 +255,17 @@ export function diff(prev: Snapshot, next: Snapshot): AlertEvent[] {
   return out;
 }
 
+/**
+ * The install day everybody in an event shares, or null when they differ.
+ * Never for installs (the cohort IS the day it arrived, so it says nothing),
+ * and never for an event with no rows (records, crashes).
+ */
+export function singleCohort(e: Pick<AlertEvent, 'kind' | 'rows'>): string | null {
+  if (e.kind === 'download' || !e.rows.length) return null;
+  const c = e.rows[0].cohort;
+  return c && e.rows.every((r) => r.cohort === c) ? c : null;
+}
+
 /* -------------------------------------------------------------- records */
 
 export type RecordMetric = { key: string; label: string; kind: PingKind; firstRunOnly?: boolean };

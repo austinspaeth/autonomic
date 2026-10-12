@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated as RNAnimated, Easing, InteractionManager, type LayoutChangeEvent, Pressable, ScrollView, Text, View } from 'react-native';
+import { Animated as RNAnimated, Easing, InteractionManager, type LayoutChangeEvent, Platform, Pressable, ScrollView, Text, View, type ViewStyle } from 'react-native';
 import Animated, { Easing as REasing, runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { useIsFocused } from '@react-navigation/native';
@@ -9,7 +9,7 @@ import { Icon } from '../../src/components/Icon';
 import { Ghost, HelpDot, ScoreDot } from '../../src/components/ui';
 import { Bars, BpDumbbell, LineChart, MarginColumns, StackedBars, ZonesToggle, useChartsBlur } from '../../src/components/charts';
 import { TAIL_STYLE, fonts, radius, readoutTail, usePalette } from '../../src/theme';
-import { getWaveform, useAppState } from '../../src/store/store';
+import { getWaveform, useAppState, useUnits } from '../../src/store/store';
 import { useTier } from '../../src/store/tier';
 import { takeProgressRange, useProgressRangeSignal } from '../../src/store/nav';
 import { LockedOverlay } from '../../src/features/LockedOverlay';
@@ -51,6 +51,7 @@ export default function AnalysisScreen() {
   const [hrvFilt, setHrvFilt] = useState<Filt>('all');
   const sex = state.profile.sex;
   const height = state.profile.height;
+  const units = useUnits();
   const pacemaker = state.profile.pacemaker;
 
   const scrollRef = useRef<ScrollView>(null);
@@ -481,7 +482,10 @@ export default function AnalysisScreen() {
   // whenever any build input changes.
   const buildArgs = useMemo(
     () => ({ days, sex, height, protocol: resolveProtocol(state.settings.protocol), customTypes: state.customTypes, hrCurve }),
-    [days, sex, height, state.settings.protocol, state.customTypes],
+    // `units` is not read by the build's arguments: the cards format through
+    // lib/units, so a new identity here is what drops the cached documents.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [days, sex, height, state.settings.protocol, state.customTypes, units],
   );
   // What the document is *actually* built from. Frozen while the tab is
   // unfocused: a journal edit made elsewhere doesn't rebuild this pre-mounted
@@ -958,6 +962,12 @@ const HANDOFF_LEAD = 28;
 // Height of the pinned section bar.
 const STICKY_BAR_H = 52;
 
+/** The pinned bar's surface: dark glass on iOS, a plain opaque View on Android. */
+function PinBar({ intensity, tint, style, children }: { intensity: number; tint: 'dark'; style: ViewStyle; children: React.ReactNode }) {
+  if (Platform.OS === 'android') return <View style={style}>{children}</View>;
+  return <BlurView intensity={intensity} tint={tint} style={style}>{children}</BlurView>;
+}
+
 /**
  * The pinned section bar under the top header. Always mounted (it fades in/out
  * rather than mounting/unmounting a BlurView — the old toggle thrash was the
@@ -1027,7 +1037,11 @@ function StickyBar({ headerH, active, dir, onUp, hrvFilt, setHrvFilt }: {
 
   return (
     <RNAnimated.View pointerEvents={shown ? 'box-none' : 'none'} style={{ position: 'absolute', top: headerH, left: 0, right: 0, opacity: containerOp }}>
-      <BlurView intensity={50} tint="dark" style={{ flexDirection: 'row', alignItems: 'center', height: BAR_H, paddingHorizontal: 16, backgroundColor: 'rgba(4,4,7,0.97)', borderBottomWidth: 0.5, borderBottomColor: p.border }}>
+      {/* Android: a solid bar, the same call the top header makes. expo-blur
+          has no real blur there and replaces this style's near-opaque fill
+          with its own translucent tint, so the stat tiles scrolling beneath
+          ghosted straight through the section title. */}
+      <PinBar intensity={50} tint="dark" style={{ flexDirection: 'row', alignItems: 'center', height: BAR_H, paddingHorizontal: 16, backgroundColor: Platform.OS === 'android' ? '#040407' : 'rgba(4,4,7,0.97)', borderBottomWidth: 0.5, borderBottomColor: p.border }}>
         <Pressable onPress={onUp} hitSlop={10} style={{ marginLeft: -4, marginRight: 8 }}>
           <Icon name="arrowUp" size={22} color={p.text} />
         </Pressable>
@@ -1035,7 +1049,7 @@ function StickyBar({ headerH, active, dir, onUp, hrvFilt, setHrvFilt }: {
           {layer(layers.out, outStyle, false)}
           {layer(layers.in, inStyle, true)}
         </View>
-      </BlurView>
+      </PinBar>
     </RNAnimated.View>
   );
 }

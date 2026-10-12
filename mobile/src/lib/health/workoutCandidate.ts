@@ -6,6 +6,7 @@
 import { fmtTime12 } from '../dates';
 import { ACTIVITY_TYPES, entryFields } from '../registry';
 import type { ImportedWorkout } from './index';
+import { fmtDist } from '../units';
 
 /** One importable workout, shaped for the activity import card + prefill. */
 export interface WorkoutCandidate {
@@ -42,7 +43,7 @@ function workoutEntry(w: ImportedWorkout): Record<string, string> {
  *  add-activity import card and the periodic health-updates check). */
 export function workoutCandidateOf(w: ImportedWorkout): WorkoutCandidate {
   const def = ACTIVITY_TYPES[w.type];
-  const label = [def.label, `${w.durationMin} min`, w.distanceMi != null ? `${w.distanceMi} mi` : null]
+  const label = [def.label, `${w.durationMin} min`, w.distanceMi != null ? fmtDist(w.distanceMi) : null]
     .filter(Boolean).join(' · ');
   const sub = [fmtTime12(w.time), w.avgHr != null ? `Avg HR ${w.avgHr}` : null, w.sourceName]
     .filter(Boolean).join(' · ');

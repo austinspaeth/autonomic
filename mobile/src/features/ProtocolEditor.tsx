@@ -15,6 +15,7 @@ import { typesFor } from '../lib/typeCatalog';
 import { todayKey } from '../lib/dates';
 import { mutate, useAppState } from '../store/store';
 import { pingFeature } from '../store/ping';
+import { fmtWater } from '../lib/units';
 
 import type { Protocol } from '../lib/types';
 
@@ -104,7 +105,7 @@ export function ProtocolEditor({ controls }: { controls: SheetControls }) {
       >
         <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: 8 }}>
           <Text style={{ fontSize: 15, color: p.text }}>Daily goal</Text>
-          <Stepper value={proto.water.liters} step={0.25} format={(v) => `${v} L`} onChange={(v) => setProto((x) => ({ ...x, water: { ...x.water, liters: v } }))} />
+          <Stepper value={proto.water.liters} step={0.25} format={(v) => fmtWater(v)} onChange={(v) => setProto((x) => ({ ...x, water: { ...x.water, liters: v } }))} />
         </View>
       </ReqSection>
 

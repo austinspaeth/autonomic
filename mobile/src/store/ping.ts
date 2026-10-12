@@ -83,18 +83,18 @@
 import { AppState as RNAppState, Platform } from 'react-native';
 import { MMKV } from 'react-native-mmkv';
 import {
-  easternDay, featureCode, findingCode, logCode, methodCode, morningPromptCode, notifyCode, offerCode,
+  doorCode, easternDay, featureCode, findingCode, logCode, methodCode, morningPromptCode, notifyCode, offerCode,
   offerFailureBody, pingUrl, planCode, platformCode, readingKindCode, reportCode, resolveCohort, shouldPingDaily,
   surfaceCode, tierCode, type PlanCode,
   type LogKind, type OfferFailureBody, type PingKind, type PotsCode, type PurchaseOutcome,
-  type SlotCode, type ViewCode,
+  type DoorCode, type SlotCode, type SurfaceCode, type ViewCode,
 } from '../lib/ping';
 import {
-  afterSend, duplicateOf, notePurchase, RESTORE_SETTLE_MS, subscriberStep, type SubscriberMemory,
+  afterSend, duplicateOf, notePurchase, RESTORE_SETTLE_MS, subscriberStep, TAP_WINDOW_MS, type SubscriberMemory,
 } from '../lib/subscriberPing';
 import { reportFault } from './errorReport';
 import {
-  getIapState, hasRecentTap, onNewPurchase, onPurchaseOutcome, paywallBypassed, subscribeIap,
+  getIapState, hasRecentTap, onNewPurchase, onPurchaseOutcome, paywallBypassed, subscribeIap, tapOriginFor,
   type NewPurchaseEvent,
 } from './iap';
 import { getTier } from './tier';
@@ -114,6 +114,7 @@ const KEY_EXCLUDED = 'pingExcluded';    // '1' — this device sends nothing (ow
 const KEY_ACT_SENT = 'pingActSent';     // '1' once the activation ping landed
 const KEY_LAST_CAP = 'pingLastCap';     // ISO date (Eastern) of the last capture-started ping
 const KEY_LAST_HRV = 'pingLastHrv';     // ISO date (Eastern) of the last capture-completed ping
+const KEY_LAST_SAV = 'pingLastSav';     // ISO date (Eastern) of the last reading-saved ping
 const KEY_LAST_PAY = 'pingLastPay';     // ISO date (Eastern) of the last paywall ping
 const KEY_LAST_NOT = 'pingLastNot';     // + the notification letter — one per day EACH
 const KEY_LAST_POT = 'pingLastPot';     // + the POTS letter
@@ -210,14 +211,14 @@ function appVersion(): string | undefined {
  * when the event happened — a purchase mid-session moves the NEXT ping, which
  * is what makes a cohort's drift from F to P a conversion curve.
  */
-async function send(kind: PingKind, cohort: string, slot?: SlotCode, evidence?: 'V' | 'S'): Promise<boolean> {
+async function send(kind: PingKind, cohort: string, slot?: SlotCode, evidence?: 'V' | 'S', door?: DoorCode): Promise<boolean> {
   // Reported as delivered so no caller retries it forever: the event did
   // happen, this phone just does not count.
   if (isPingExcluded()) return true;
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
   const url = pingUrl(
-    kind, cohort, platformCode(Platform.OS), slot, tierCode(getTier()), appVersion(), evidence,
+    kind, cohort, platformCode(Platform.OS), slot, tierCode(getTier()), appVersion(), evidence, door,
   );
   try {
     const res = await fetch(url, { method: 'GET', signal: controller.signal });
@@ -338,6 +339,7 @@ function readSubscriberMemory(): SubscriberMemory {
         evidence: v.evidence === 'V' || v.evidence === 'S' ? v.evidence : undefined,
         txn: typeof v.txn === 'string' && v.txn ? v.txn : undefined,
         original: typeof v.original === 'string' && v.original ? v.original : undefined,
+        door: typeof v.door === 'string' && /^[A-Z]$/.test(v.door) ? v.door : undefined,
       };
     }
   } catch { pending = undefined; }
@@ -390,6 +392,23 @@ function noteDuplicate(rule: 'txn' | 'original' | 'day', evidence?: string) {
   try { reportFault('ping.subDuplicate', `${rule} ${evidence ?? '-'}`); } catch { /* never let a report break this */ }
 }
 
+/**
+ * The wall the paywall was last raised from, kept in memory.
+ *
+ * Set on EVERY raise, before the daily cap is even looked at: the `pay` ping
+ * names the day's first wall, but a purchase has to be tied to the wall the
+ * buyer was actually standing at, which may be the day's fourth.
+ */
+let lastWall: { code: SurfaceCode; at: number } | undefined;
+
+/** The door a purchase of `sku` came through, or undefined when this session
+ *  holds no buy tap for it (see `DoorCode`). A wall older than the tap window
+ *  is not the wall this purchase was made at. */
+function purchaseDoor(sku: string): DoorCode | undefined {
+  const wall = lastWall && Date.now() - lastWall.at < TAP_WINDOW_MS ? lastWall.code : undefined;
+  return doorCode(tapOriginFor(sku), wall);
+}
+
 /** A purchase this install made, from ./iap. Remembered on disk before
  *  anything is sent, so a phone killed between the store sheet and the ping
  *  still reports it on its next launch. */
@@ -398,7 +417,9 @@ function onPurchased(e: NewPurchaseEvent) {
   const memory = readSubscriberMemory();
   const dup = duplicateOf(memory, e.txn, e.original);
   if (dup) { noteDuplicate(dup, e.evidence); return; }
-  writeSubscriberMemory(notePurchase(memory, planCode(e.sku), e.acknowledged, e.evidence, e.txn, e.original));
+  writeSubscriberMemory(notePurchase(
+    memory, planCode(e.sku), e.acknowledged, e.evidence, e.txn, e.original, purchaseDoor(e.sku),
+  ));
   void pingSubscriber();
 }
 
@@ -449,7 +470,8 @@ async function pingSubscriber(): Promise<void> {
   }
   inFlight.subscriber = true;
   try {
-    if (await send(step.kind, cohortDate(now), step.plan, step.kind === 'sub' ? step.evidence : undefined)) {
+    const sale = step.kind === 'sub' ? step : undefined;
+    if (await send(step.kind, cohortDate(now), step.plan, sale?.evidence, sale?.door as DoorCode | undefined)) {
       writeSubscriberMemory(afterSend(readSubscriberMemory(), step.kind, step.plan, easternDay(now)));
     }
   } finally {
@@ -566,6 +588,29 @@ export function pingWristReading(source: string | undefined): void {
   pingCaptureStarted(source);
   pingCaptureCompleted(source);
   pingActivation(source);
+  // A wrist reading is filed the moment it arrives, so it is saved too.
+  pingReadingSaved(source);
+}
+
+/**
+ * Send today's reading-SAVED ping, unless this install already sent one today.
+ *
+ * The third phase, and a route of its own for the reason started and completed
+ * each have one: they are read against each other. `hrv` fires when a reading
+ * FINISHES, before anything has judged its beats, so a phone whose every
+ * reading is refused shows a full set of completed captures; this fires only
+ * when an entry is actually written to the journal — filed by the app, kept by
+ * the user from a refusal, or arrived from the wrist. `sav / hrv` is therefore
+ * the share of finished readings that became one, per sensor, and the gap is
+ * exactly the readings the app declined.
+ *
+ * Capped like its two twins, once per install per Eastern day for the whole
+ * route, so `sav[day] / open[day]` is a share of people and the sensor letter
+ * names the day's first SAVED reading — which need not be the sensor that was
+ * tried first, and that difference is the point.
+ */
+export function pingReadingSaved(source: string | undefined): void {
+  pingDaily('sav', KEY_LAST_SAV, methodCode(source));
 }
 
 /**
@@ -591,7 +636,9 @@ export function pingWristReading(source: string | undefined): void {
  * counter that would have hidden it is the one that filtered by tier.
  */
 export function pingPaywall(surface: string | undefined): void {
-  pingDaily('pay', KEY_LAST_PAY, surfaceCode(surface));
+  const code = surfaceCode(surface);
+  if (code) lastWall = { code, at: Date.now() };
+  pingDaily('pay', KEY_LAST_PAY, code);
 }
 
 /**

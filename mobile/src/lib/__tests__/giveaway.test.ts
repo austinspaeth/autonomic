@@ -1,5 +1,5 @@
 import {
-  GIVEAWAY_END, GIVEAWAY_MAX_ENTRIES, giveawayBody, giveawayEntries, giveawayEntryList, giveawayOpen, isPlausibleEmail,
+  GIVEAWAY_END, GIVEAWAY_MAX_ENTRIES, giveawayBody, giveawayEntries, giveawayEntryList, giveawayOpen, giveawayPhase, isPlausibleEmail,
 } from '../giveaway';
 import { blankDay } from '../migrate';
 import type { AppState, DayRecord, Entry } from '../types';
@@ -49,6 +49,13 @@ describe('giveaway entries', () => {
     expect(giveawayOpen('2026-09-27')).toBe(true);
     expect(giveawayOpen(GIVEAWAY_END)).toBe(true);
     expect(giveawayOpen('2026-11-01')).toBe(false);
+  });
+
+  it('swaps to the ended row on November 1st and drops it after the 10th', () => {
+    expect(giveawayPhase(GIVEAWAY_END)).toBe('open');
+    expect(giveawayPhase('2026-11-01')).toBe('ended');
+    expect(giveawayPhase('2026-11-10')).toBe('ended');
+    expect(giveawayPhase('2026-11-11')).toBe('gone');
   });
 
   it('accepts ordinary addresses and refuses obvious non-addresses', () => {

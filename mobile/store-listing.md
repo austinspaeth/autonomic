@@ -1,4 +1,4 @@
-# Store listing — v1.28.0
+# Store listing — v1.33.0
 
 Copy-paste source for **App Store Connect** and the **Google Play Console**.
 Character counts verified against each store's limits.
@@ -8,7 +8,23 @@ Console *configuration* (products, offers, price changes) is not here — that i
 
 ---
 
-## Submission checklist — 1.28.0
+## Submission checklist — 1.33.0
+
+The live App Store name and subtitle have been "Autonomic: HRV & POTS Tracker" /
+"Pacing for Long COVID & ME/CFS" since the pacing release; this file carried
+the older name until 1.33, so the name/subtitle block below is the record, not a
+change. What changes with 1.33: the **keyword field** (rebuilt around the
+subtitle, see the keyword block) and **What's New**. Native build: the Android
+back-button plugin, three-button-navigation fixes and the Halloween assets ride
+the binary, so this is a version submission on both stores.
+
+- [ ] **Keywords** → replace with the 1.33 field (99/100).
+- [ ] **What's New** → the 1.33 block below, both stores.
+- [ ] **Name / Subtitle / Promotional text / Description / Review notes** → unchanged.
+- [ ] `FORCE_TIER` null, `FORCE_ANNUAL_OFFER` null, `FORCE_FOUNDER_OFFER` false,
+      `PREVIEW_PAYWALL` false in the shipped commit (verified 2026-10-11).
+
+## Submission checklist — 1.28.0 (previous)
 
 What changed since the listings were last written (1.25.1): **the pacing budget**
 (1.28), the redesigned Outlook card and free POTS captures (1.27), and wider
@@ -80,9 +96,10 @@ all of them):
 - [ ] **`annual_founder_first_year` is deleted (or inactive) in App Store
       Connect.** While it exists, every new yearly subscriber gets a discounted
       first year for nothing. See `STORE_SETUP.md` Part 7.
-- [ ] Part 6's `com.autonomic.journal.yearly.promo` exists and is ACTIVE on both
-      stores. It is the product behind BOTH the annual offer card and the
-      founding-member card.
+- [ ] Part 7's `com.autonomic.journal.yearly.founder` exists and is ACTIVE on
+      both stores. It is the product behind BOTH the annual offer card and the
+      founding-member card. Part 6's `com.autonomic.journal.yearly.promo` is no
+      longer sold by anything but stays ACTIVE for its existing subscribers.
 - [ ] Neither store has a free-trial intro offer configured. The app's 14-day
       window is local (`TRIAL_DAYS`, `src/lib/tier.ts`).
 - [ ] **The ping lambda is deployed.** The pacing paywall surface sends a new
@@ -112,23 +129,63 @@ updated anytime (they go through a short content review, no binary needed).
 
 For long covid, POTS and dysautonomia. Take a 5-minute HRV reading, then let it set your pacing budget for the day, in minutes of effort, fitted to your own history.
 
-## Keywords (98/100 chars)
+## Name (29/30 chars)
 
-long,covid,hrv,heart,rate,variability,pots,dysautonomia,orthostatic,watch,rmssd,pacing,pem,fatigue
+Autonomic: HRV & POTS Tracker
 
-Changed for 1.28: `chest,strap` out, `pem,fatigue` in. The strap is a thing this
-app WORKS WITH, and nobody looking for help searches for it — where "pacing",
-"PEM" and "fatigue" are what the people this release is for actually type. The
-rest is unchanged and still covers the intent that matters.
+## Subtitle (30/30 chars)
+
+Pacing for Long COVID & ME/CFS
+
+Both live since the pacing release. Together they already index autonomic, hrv,
+pots, tracker, pacing, long, covid, me and cfs, so none of those may appear in
+the keyword field.
+
+## Keywords (99/100 chars)
+
+heart,rate,variability,dysautonomia,orthostatic,tachycardia,watch,rmssd,symptom,fatigue,polar,dizzy
+
+Rebuilt for 1.33 around the subtitle. The field before it
+(`orthostatic,pem,fatigue,energy,spoons,crash,heart,rate,variability,tachycardia,symptom,pacing,vagus`)
+repeated `pacing` from the subtitle, had dropped `dysautonomia`, `watch` and
+`rmssd`, and spent 31 characters on ME/CFS community words (`spoons`, `crash`,
+`energy`, `vagus`, `pem`) that are weak or ambiguous as store searches. Search
+traffic fell after it went live.
+
+Why each word: `heart,rate` completes "heart rate variability" with `hrv` in
+the name and covers every "pots heart rate" search; `dysautonomia`,
+`orthostatic`, `tachycardia` are the diagnosis words the converting user types;
+`watch` catches Apple Watch searches without the trademark; `rmssd` is the
+HRV-literate buyer's word and nobody else bids on it; `symptom` covers
+"symptoms" (Apple indexes plurals); `fatigue` and `dizzy` catch the
+symptom-first searcher; `polar` buys Polar H10 owners, the highest-intent HRV
+buyer. `garmin` was considered and left out while the Garmin path is unreliable.
 
 Standing notes: single words, not phrases (ASC recombines them and spaces waste
 chars); any word already in the App Store *name* or *subtitle* is indexed from
-there and is wasted here (on Play the app name is
-"Autonomic Journal: HRV & POTS", so `hrv` and `pots` would be dead weight in an
-equivalent field); do **not** add "free", Apple indexes the price separately.
-The next terms worth buying if space frees up are `cfs`, `vagus` and `energy`.
+there and is wasted here; do **not** add "free", Apple indexes the price
+separately. Next in line if space frees up: `strap`, `vagus`, `garmin` (once
+the watch path is solid).
 
-## What's New (1.28, App Store — 1,165/4,000 chars)
+## What's New (1.33, both stores — 385/4,000 chars)
+
+NEW: Enter a POTS stand test or episode by hand, with a guided walkthrough. No strap or watch needed.
+
+Choose imperial or metric units in your Profile.
+
+Insights now compares your best weeks with your hardest ones.
+
+Triggers can carry a time and a note.
+
+Easier input fields throughout the app.
+
+Camera reading improvements.
+
+And many smaller changes based on your feedback. Thank you!
+
+Play's 500-character limit fits the same text unchanged.
+
+## What's New (1.28, App Store — 1,165/4,000 chars) — previous
 
 NEW: your daily pacing budget.
 

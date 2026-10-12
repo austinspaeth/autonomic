@@ -32,11 +32,13 @@ import { HrvSetup, KIND_COPY, suggestedKind } from './hrv/Setup';
 import { OrthostaticIntroSheet } from './OrthostaticIntro';
 import { DevicesScreen } from './Devices';
 import { StandTestSession } from './pots/StandTestSession';
+import { ManualEpisode, ManualStandTest } from './pots/ManualStandTest';
 import { OrthostaticSession } from './pots/OrthostaticSession';
 // Re-exported so `./forms` stays the one import site for entry editing; they
 // live in their own module to keep the capture sheets out of a require cycle.
-import { confirmDelete, EntryForm, type ArrKey } from './EntryForm';
+import { confirmDelete, EntryForm, useDeleteButton, type ArrKey } from './EntryForm';
 import { profileCtx } from '../lib/scoring';
+import { distText, distToMi, distUnit } from '../lib/units';
 export { confirmDelete, EntryForm };
 export type { ArrKey };
 
@@ -228,8 +230,8 @@ function ReadingPicker({ isToday, onLive, onBaseline, onPick }: {
     standTest: 'Lie and stand test',
     orthostatic: 'Stairs or other events',
   };
-  // The two POTS captures lead the manual list (the stand test is live-only but
-  // stays in, pointing at the watch app); BP and resting HR follow.
+  // The two POTS captures lead the manual list (the stand test is timed, so it
+  // belongs to today only); BP and resting HR follow.
   const manual = isToday ? ['standTest', 'orthostatic', 'bp', 'restingHr'] : ['orthostatic', 'bp', 'restingHr'];
   // Nothing here is gated any more. Capture is never metered — the stand test
   // included, on a strap as on the watch — and reading a POTS RESULT is the Pro
@@ -282,7 +284,7 @@ export function BikeForm({ dk, existing, prefill = null, controls, onSaved }: { 
   const init = existing ? (JSON.parse(JSON.stringify(existing)) as Entry) : prefill ? { ...blank, ...prefill } : blank;
   const [time, setTime] = useState((init.time as string) || defaultTimeFor(dk));
   const [num, setNum] = useState<Record<string, string>>({
-    duration: (init.duration as string) || '', distance: (init.distance as string) || '', avgHr: (init.avgHr as string) || '',
+    duration: (init.duration as string) || '', distance: distText(init.distance), avgHr: (init.avgHr as string) || '',
     maxHr: (init.maxHr as string) || '', minHr: (init.minHr as string) || '', resistance: (init.resistance as string) || '', hr60: (init.hr60 as string) || '',
   });
   const [interval, setInterval] = useState(!!init.interval);
@@ -293,6 +295,7 @@ export function BikeForm({ dk, existing, prefill = null, controls, onSaved }: { 
   const save = () => {
     const r: Entry = { ...init, time };
     ['duration', 'distance', 'avgHr', 'maxHr', 'minHr'].forEach((k) => { r[k] = num[k].trim(); });
+    r.distance = distToMi(num.distance);
     r.interval = interval;
     if (interval) { r.intervals = intervals.map((iv) => ({ length: iv.length.trim(), resistance: iv.resistance.trim(), avgHr: iv.avgHr.trim(), maxHr: iv.maxHr.trim() })); r.resistance = ''; }
     else { r.resistance = num.resistance.trim(); r.intervals = []; }
@@ -308,13 +311,18 @@ export function BikeForm({ dk, existing, prefill = null, controls, onSaved }: { 
     onSaved(stripped);
   };
 
+  useDeleteButton(controls, existing ? {
+    title: 'Delete this indoor bike?',
+    onConfirm: () => { deleteEntry(dk, 'activities', existing.id); controls.closeAll(); onSaved(); },
+  } : null);
+
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>{(existing ? 'Edit ' : '') + 'Indoor bike'}</Text>
       <TimeField label="Time" value={time} onChange={setTime} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-        {[['duration', 'Duration (min)'], ['distance', 'Distance (mi)'], ['avgHr', 'Avg HR'], ['maxHr', 'Max HR'], ['minHr', 'Min HR']].map(([k, lbl]) => (
-          <View key={k} style={{ width: '47%' }}><TextField label={lbl} value={num[k]} onChange={(v) => setN(k, v)} keyboardType="decimal-pad" /></View>
+        {[['duration', 'Duration', 'min'], ['distance', 'Distance', distUnit()], ['avgHr', 'Avg HR', 'bpm'], ['maxHr', 'Max HR', 'bpm'], ['minHr', 'Min HR', 'bpm']].map(([k, lbl, unit]) => (
+          <View key={k} style={{ width: '47%' }}><TextField label={lbl} unit={unit} value={num[k]} onChange={(v) => setN(k, v)} keyboardType="decimal-pad" /></View>
         ))}
       </View>
       <Pressable onPress={() => setInterval((v) => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, marginBottom: 8 }}>
@@ -332,8 +340,8 @@ export function BikeForm({ dk, existing, prefill = null, controls, onSaved }: { 
                 <Pressable onPress={() => setIntervals((prev) => prev.filter((_, j) => j !== i))}><Icon name="x" size={16} color={p.textDim} /></Pressable>
               </View>
               <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                {[['length', 'Length (min)'], ['resistance', 'Resistance'], ['avgHr', 'Avg HR'], ['maxHr', 'Max HR']].map(([k, lbl]) => (
-                  <View key={k} style={{ width: '47%' }}><TextField label={lbl} value={iv[k]} onChange={(v) => setIntervals((prev) => prev.map((x, j) => (j === i ? { ...x, [k]: v } : x)))} keyboardType="decimal-pad" /></View>
+                {[['length', 'Length', 'min'], ['resistance', 'Resistance', ''], ['avgHr', 'Avg HR', 'bpm'], ['maxHr', 'Max HR', 'bpm']].map(([k, lbl, unit]) => (
+                  <View key={k} style={{ width: '47%' }}><TextField label={lbl} unit={unit} value={iv[k]} onChange={(v) => setIntervals((prev) => prev.map((x, j) => (j === i ? { ...x, [k]: v } : x)))} keyboardType="decimal-pad" /></View>
                 ))}
               </View>
             </View>
@@ -344,11 +352,11 @@ export function BikeForm({ dk, existing, prefill = null, controls, onSaved }: { 
         <TextField label="Resistance" value={num.resistance} onChange={(v) => setN('resistance', v)} keyboardType="decimal-pad" />
       )}
       <View style={{ height: 12 }} />
-      <TextField label="HR after 60 seconds" value={num.hr60} onChange={(v) => setN('hr60', v)} keyboardType="decimal-pad" />
+      <TextField label="HR after 60 seconds" unit="bpm" value={num.hr60} onChange={(v) => setN('hr60', v)} keyboardType="decimal-pad" />
+      <View style={{ height: 1, backgroundColor: p.border, marginVertical: 6, marginBottom: 18 }} />
       <TextField label="Notes" value={note} onChange={setNote} placeholder="Optional note" multiline />
       <SheetFooter>
-        {existing ? <Button title="Delete" variant="danger" onPress={() => { deleteEntry(dk, 'activities', existing.id); controls.closeAll(); onSaved(); }} /> : null}
-        <DaySaveButton dk={dk} title="Save" onPress={save} />
+        <DaySaveButton dk={dk} title={existing ? 'Save' : 'Save activity'} onPress={save} />
       </SheetFooter>
     </View>
   );
@@ -446,7 +454,8 @@ export function openWorkoutReport(openSheet: OpenSheet, r: Entry, dk: string, ju
 function startPotsLive(openSheet: OpenSheet, type: 'standTest' | 'orthostatic'): void {
   const open = () => openSheet(
     (c) => (type === 'standTest' ? <StandTestSession controls={c} /> : <OrthostaticSession controls={c} />),
-    { hideClose: true },
+    // The stand test wears the sheet's own ✕, like its hand-entered twin.
+    type === 'standTest' ? {} : { hideClose: true },
   );
   if (!getState().settings.lastBleDeviceId) {
     openSheet((c) => (
@@ -466,9 +475,14 @@ function startPotsLive(openSheet: OpenSheet, type: 'standTest' | 'orthostatic'):
  * test (which syncs in by itself) with the in-app strap capture behind it.
  * Shared by the Journal's reading picker and the pacing Todo, so "Log a
  * standing test" can never open a different card from "+ Add reading".
- * `onManual` is the episode's manual form; the stand test is live-only.
+ * Both can also be done with no device, typing a heart rate at each point of the
+ * protocol (features/pots/
+ * ManualStandTest): `onManual` opens the episode's, the stand test's is here.
  */
 export function openPotsCapture(openSheet: OpenSheet, type: 'standTest' | 'orthostatic', onManual?: () => void): void {
+  const manual = type === 'standTest'
+    ? () => openSheet((c) => <ManualStandTest controls={c} />)
+    : onManual;
   openSheet(() => (
     <OrthostaticIntroSheet
       title={`Add ${pickerLabel(type)}`}
@@ -477,9 +491,10 @@ export function openPotsCapture(openSheet: OpenSheet, type: 'standTest' | 'ortho
           ? 'Capture live from your watch or a chest strap, or enter an event manually.'
           : 'Capture live from a chest strap, or enter an event manually.')
         : (Platform.OS === 'ios'
-          ? 'Run the guided test from your Apple Watch or with a Bluetooth chest strap.'
-          : 'Run the guided test with a Bluetooth chest strap.')}
-      onManual={onManual}
+          ? 'Run the guided test from your Apple Watch or with a chest strap, or type your readings in as you go.'
+          : 'Run the guided test with a chest strap, or type your readings in as you go.')}
+      onManual={manual}
+      manualLabel={type === 'standTest' ? 'Enter readings manually' : undefined}
       onStrap={() => startPotsLive(openSheet, type)}
     />
   ), { fitContent: true });
@@ -512,10 +527,11 @@ export function useEntryForms(dk: string) {
     // the day it happens) — an episode goes straight to the manual form.
     if (type === 'orthostatic' && dk !== todayKey()) { openReadingForm(type, null); return; }
     // Both POTS types share the watch-pointer card, each with a live strap
-    // capture behind it. The episode keeps a manual form too; the stand test
-    // is live-only, so no manual fallback.
+    // capture behind it and a way to do it with no device at all.
     if (type === 'orthostatic' || type === 'standTest') {
-      openPotsCapture(openSheet, type, type === 'orthostatic' ? () => openReadingForm(type, null) : undefined);
+      openPotsCapture(openSheet, type, type === 'orthostatic'
+        ? () => openSheet((c) => <ManualEpisode dk={dk} controls={c} onSaved={(saved) => { refresh(); openReadingSummary(saved); }} />)
+        : undefined);
       return;
     }
     const source = healthSourceFor(type);
@@ -573,7 +589,9 @@ export function useEntryForms(dk: string) {
   const openWorkoutImport = (c: WorkoutCandidate) => {
     // The HR trace rides inline on the prefill; the form's save splits it into
     // the waveform sidecar. Saving then pops the workout report.
-    const prefill = { id: uid(), type: c.type, time: c.time, note: '', source: 'health', imported: true, ...c.entry, ...(c.hrSeries?.length ? { sampledHr: c.hrSeries } : {}) } as Entry;
+    // healthKey rides along so a later delete declines THIS sample even if the
+    // time was corrected in the form first (the fingerprint follows the entry).
+    const prefill = { id: uid(), type: c.type, time: c.time, note: '', source: 'health', imported: true, healthKey: c.key, ...c.entry, ...(c.hrSeries?.length ? { sampledHr: c.hrSeries } : {}) } as Entry;
     const afterImport = (saved?: Entry) => { refresh(); if (saved && workoutCurveFor(saved)) openActivitySummary(saved, true); };
     if (c.type === 'indoorBike') openSheet((sc) => <BikeForm dk={dk} existing={null} prefill={prefill} controls={sc} onSaved={afterImport} />);
     else openSheet((sc) => <EntryForm typeMap={typesFor(getState(), 'activities')} arrKey="activities" dk={dk} type={c.type} existing={null} prefill={prefill} controls={sc} onSaved={afterImport} />);
@@ -653,7 +671,7 @@ const BIKE_DETAIL_FIELDS: { key: string; label: string }[] = [
   { key: 'resistance', label: 'Resistance' },
   { key: 'minHr', label: 'Min HR' },
   { key: 'maxHr', label: 'Max HR' },
-  { key: 'hr60', label: 'HR @60s rest' },
+  { key: 'hr60', label: 'HR @60s' },
 ];
 
 /** The numeric details this activity type declares that the import left blank —

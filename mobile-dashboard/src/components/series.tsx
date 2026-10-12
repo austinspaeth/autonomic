@@ -176,7 +176,7 @@ export function StackedBars({
   height?: number;
   summary?: string;
 }) {
-  const height = heightProp ?? (useWide() ? 230 : 140);
+  const height = heightProp ?? (useWide() ? 150 : 140);
   const n = rows.length;
   const { width, sel, responders } = useScrub(n, !!detail);
   const { focus, toggle } = useFocus();
@@ -277,7 +277,7 @@ export function OverlayBars({
   height?: number;
   summary?: string;
 }) {
-  const height = heightProp ?? (useWide() ? 230 : 140);
+  const height = heightProp ?? (useWide() ? 150 : 140);
   const n = rows.length;
   const { width, sel, responders } = useScrub(n);
   const { focus, toggle } = useFocus();

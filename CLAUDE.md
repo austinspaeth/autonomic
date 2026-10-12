@@ -61,6 +61,7 @@ old web app so old `export.json` files import directly.
 {
   "version": 1,
   "settings": { "theme": "light" | "dark",
+                "units": "imperial" | "metric",   // display only; undefined = imperial (lib/units)
                 "reminder": { "enabled": true, "time": "08:00" } },  // daily morning nudge; source of truth for the OS schedule
   "profile": { "sex", "birthday", "weight", "height" },  // age+sex: HRV norm bubbles (lib/hrvNorms), max-HR formula, AI prompts; no score reads it
   "customTypes": { "meds": { "custom-magnesium": { /* pure-JSON TypeDef */ } } },  // user-created types (activities/meds/symptoms/triggers)
@@ -146,7 +147,11 @@ old web app so old `export.json` files import directly.
   imported entry is stronger: `deleteEntry` records its `healthKey` (stamped at
   import) plus a day/kind/type/time fingerprint in a permanent declined list
   (`src/lib/health/declined.ts`), and `filterDeclined` keeps the pill from ever
-  suggesting that sample again. Settings →
+  suggesting that sample again. The fingerprint is a TOMBSTONE with the journal's
+  own tolerance (same type within `NEAR_MIN`), not an exact-minute match: one
+  workout reaches a health store more than once (the watch, then Garmin
+  Connect's or Strava's copy an hour later, a minute either side), and the
+  later copy was imported straight back after a delete. Settings →
   Apple Health → "Check for updates" ignores that memory and sweeps the last 24h
   (`checkHealthUpdatesLast24h`). Imports write through the normal store paths
   (scores + waveform sidecar).
@@ -241,12 +246,36 @@ old web app so old `export.json` files import directly.
   could add still missing `MIN_COVERAGE_RATIO` is arithmetic, and a pulse
   arriving at under `TROUBLE_MIN_RATE` of the clock after `TROUBLE_GRACE_SEC` is
   a call. It never stops a reading already holding enough pulse to be
-  salvageable. The session store's own clock runs it — camera only, since a
+  salvageable. **It is fed what triage would KEEP, never the raw sum of
+  collected intervals** (`liveCoverage`: kept seconds plus the stretch still
+  being collected, which is undecided rather than lost). The raw sum was the
+  bug behind the fault log's commonest camera row: a lock that breaks every
+  fifteen seconds collects minutes of pulse while every stretch falls under
+  `MIN_SEGMENT_BEATS`, so the rule saw a healthy reading, never stopped it, and
+  `Results` refused it five minutes later holding zero beats (`art?`, which
+  forces `cov<25`, so that signature never meant "no pulse"). The judgement
+  half is deferred while pulse is arriving (`isRecovering`), so a fumbled first
+  half minute is not stopped the second it settles, but only up to
+  `TROUBLE_MAX_DISCARDED` broken stretches: past that it is a pattern. It is
+  asked BEFORE the duration check, or a reading left in the background and
+  returned to after its five minutes finishes instead. **A camera reading
+  finished by hand inside the grace period is an abandon** (`'early'`), not a
+  refusal. A stop by the app is FELT (`stopBuzz`, two short error pulses, never
+  the sustained completion buzz): the phone is face down and the screen was the
+  only thing that used to change. **The pulse gate accepts a smooth SWEEP as
+  steady** (`assessPulse` in `lib/ppg/detect.ts`: CV under `STEADY_MAX_CV`, or
+  `neighbourDeviation` under `STEADY_MAX_NEIGHBOUR_DEV`). Spread around the mean
+  cannot tell noise from a trend, and deep paced breathing sweeps the rate far
+  enough to cross 0.18 once per breath, which closed the gate once per breath
+  and left a clean signal with minutes of pulse and no stretch long enough to
+  keep. The second bar sits well inside what the first tolerates, so it admits
+  nothing for being noisy; do not replace it with "ignore the worst interval",
+  which was measured letting noisy readings through at double their RMSSD. The session store's own clock runs it — camera only, since a
   strap's answer is `rrSupport` and is known before the reading starts — and
   calls `abandonSession('signal')`, which writes NO result and fires neither
   `pingCaptureCompleted` nor `pingActivation`: the gap between `cap` and `hrv` is
   the only place an abandoned capture exists in the counters, and crediting one
-  would close it.
+  would close it. It DOES report `hrv.abandoned` on the fault route (below).
   (4) **The advice is real, and it arrives at the moment of failure.**
   `lib/ppg/tips.ts` (pure + tested) is ordered by how often each thing is the
   CAUSE, which is why pressure leads — pressing occludes the capillaries whose
@@ -290,7 +319,22 @@ old web app so old `export.json` files import directly.
   noise. Note it is NOT the same question as `hasFields` — a reading can keep
   beats and still compute no metrics, and there the rate is real. That buys occurrences beside install-days, split by
   platform / build / tier and ranked by breadth in the dashboard's Failures tab,
-  with no new route, no lambda change and no deploy ordering. Before this,
+  with no new route, no lambda change and no deploy ordering. **The whole
+  capture funnel now rides that route, per ATTEMPT** (`CAPTURE_TAGS` in
+  `lib/hrv/refusal.ts`), for the phone-read sensors only: `hrv.attempt` from
+  `beginCollection`, `hrv.filed` when the app saves one, `hrv.refused`,
+  `hrv.salvaged`, and `hrv.abandoned` (`signal` / `user` / `early`) from
+  `abandonSession`. The pings count people, once a day, so six failed tries and
+  a success read as one start and one completion; here each try is one count,
+  and "failed" is `attempt - filed - salvaged`. `hrv.attempt`, `hrv.filed` and
+  `hrv.salvaged` are NOT failures (`CAPTURE_EVENT_TAGS`): they go through
+  `reportEvent`, which always waits for the debounce, and every consumer that
+  counts failures must leave them out (`isFailure` in the phone dashboard,
+  `failuresOf` in the web one). The signature also says what was COLLECTED
+  (`raw`), in how many stretches (`seg`), for how long (`dur`) and whether paced:
+  `cov<25 raw50+ seg5+` is a lock that would not hold, `cov<25 raw<25` a pulse
+  that never came. A refusal with no `dur` token is from a build that reported
+  no attempts and is kept out of the per-attempt rate. Before this,
   `finishSession` fired `pingCaptureCompleted` and `pingActivation` BEFORE
   anything judged the beats, so a phone that could never get a reading read as
   activated with a full set of completed captures, and `hrv / cap` — the
@@ -361,8 +405,9 @@ old web app so old `export.json` files import directly.
   never neighbours. It always goes through `confirmDelete` (`features/forms.tsx`)
   → `<ConfirmDeleteSheet/>` (`components/ui.tsx`), a `fitContent` card asking one
   question, which then closes the WHOLE stack: the card beneath is a view of an
-  entry that no longer exists. Forms are not cards and keep their own footer
-  Delete.
+  entry that no longer exists. **Forms follow the same rule**: an edit form
+  arms the pill's trash through `useDeleteButton` (`features/EntryForm.tsx`)
+  and never carries a red Delete in its footer, which holds the save alone.
 - **A live HRV reading outlives the card that shows it.** The capture engine is
   `src/features/hrv/sessionStore.ts` (timer, BLE/PPG collection, rolling SDNN,
   breathing clock, haptics, keep-awake) in the same module-store shape as
@@ -432,6 +477,23 @@ old web app so old `export.json` files import directly.
   when its own `startedAt` is within `INTENT_WINDOW_MS` of the phone's start.
   One intent claims one reading; a re-delivery keeps the label it was first
   filed under. Before this every Garmin training reading landed as a baseline.
+- **A Garmin reading that cannot get a signal is stopped, explained, and
+  REPORTED; the watch never spins for ever.** The sensor rules live in
+  `garmin/README.md` and `garmin/source/RrCollector.mc`. The short version:
+  the watch holds a throwaway activity session open for the reading
+  (`Recording.mc`, discarded on stop) because the optical sensor only gives
+  beat-to-beat in its activity-rate mode and a Connect IQ app asking for the
+  onboard sensor does not reliably get it (an acknowledged Garmin bug when
+  Wrist Heart Rate is Auto); a feed that produces nothing is re-armed at 25 s
+  and 50 s and given up on at 75 s with a TRY AGAIN and a sentence that
+  depends on whether a pulse was ever seen. In place of the reading the watch
+  sends a `type: 'diag'` message, which `lib/garmin/receiver.ts` files through
+  `reportFault` as `garmin.noSignal` (`lib/garmin/diag.ts`, pure + tested:
+  model + firmware + `nopulse`/`nobeats`/`thin` + feed state + reason + session
+  + re-arms + duration band) and acks. An old phone build acks it as an
+  unmappable payload and counts nothing, so the watch ships first without
+  harm. Needs the `Fit` permission on the watch and is a watch-app release;
+  the phone side is JS and ships OTA.
 - **The app's local notifications live in `src/lib/reminders.ts`, plus pacing
   alerts in `src/store/pacingAlerts.ts` (next bullet).**
   (1) The morning reminder: `settings.reminder` is the source of truth and the OS
@@ -912,6 +974,39 @@ old web app so old `export.json` files import directly.
   movements carried a constant column whose p = 1 tests padded the BH family and made
   it stricter than `FDR_Q` says. Reading those days as unknown is correct; the
   padding went and seed 12 became the 1 in 30.
+- **"Since you started X" has to be EARNED twice, and a slide that was already
+  under way belongs to nobody.** A real 133-day journal headlined "RMSSD is down
+  since you started MCT Oil" about a supplement taken on 15 of the 49 days it was
+  credited with, for a fall that began seven weeks before the first dose. Three
+  rules in `change.ts`, pure + tested (`changeRules.test.ts`). (1) **Started
+  means kept up**: `ONSET_MIN_DENSITY` (0.6) of the known days after the first
+  dose, or it was tried, not started. (2) **The before has to be level**
+  (`alreadyMoving`, applied to onsets AND stops): the same movement worth
+  `PRETREND_SHARE` of the claimed change, across the before window's two halves
+  or from the window before it, means the event did not start it; unknown is
+  never read as movement. (3) **The slow slide has a home**: shifts are tested
+  at two windows, a month (`shift:`) and `LONG_SHIFT_DAYS` (`shift2:`, "over the
+  last two months"), because a metric losing a little every month never moves
+  enough inside one pair of months and was left to be explained by whatever
+  started nearby. Only `shift:` drops its Trend Watch row (same two windows);
+  a shift now carries `onsetIndex` (where its recent window begins) so the sheet
+  draws the split. And an onset or stop with `CROWDED_EVENTS` (3) other starts
+  or stops inside its stretch keeps its date and numbers and loses the name
+  ("RMSSD has been lower since August 23rd").
+- **"Best vs hardest weeks" is a DESCRIPTION, not a test** (`insights/weeks.ts`,
+  pure + tested; `WeeksCard` in `features/insights/Sections.tsx`, under Biggest
+  change). Seven-day blocks counted back from the last complete day, ranked by
+  median score (`MIN_WEEK_DAYS` scored days to be ranked), three a side from
+  nine ranked weeks and two from six, nothing when the sets are under `MIN_GAP`
+  points apart. Rows are registry metrics held to their own `minDelta`, habits
+  as days a week, and what was taken through one set and rarely in the other;
+  a week from before a category was logged is unknown, never "not taken". The
+  strip draws every week so the reader sees WHEN the chosen ones were, which is
+  the card's whole honesty: good weeks sit together, so everything that changed
+  between the two stretches shows up at once and the copy must never say why.
+  Its rows are one sunk table, not bubbles (bubbles open things). Skeleton
+  height rides `shape.weeks` / `weeksHeight`, optional so an older stored shape
+  still parses.
 - **The weak tier answers TWO different empty screens** (`Correlation.tier`).
   `'early'` is the original: a journal too YOUNG for the main sweep, relaxed coverage
   floors, "Early signals". `'unconfirmed'` is the new one: a long, well-logged
@@ -1372,14 +1467,18 @@ old web app so old `export.json` files import directly.
   series** and fall back to the min/max tiles.
 - **The half-off annual offer is the one offer that isn't a rotating surface,
   and it is a NOTE rather than a pitch.** `src/lib/upsell/annual.ts` (pure +
-  tested) + `annualMemory.ts` (flags MMKV): at 30 / 90 / 180 / 365 **calendar
+  tested) + `annualMemory.ts` (flags MMKV): at 50 / 90 / 365 **calendar
   days since install** — not engaged days, the deliberate difference from the
-  surfaces above — a free user is asked once to pay for the app, at half price
-  (`PROMO_YEARLY_SKU`, a SEPARATE product because Apple can only target a price
-  cut through server-signed promotional offers; it therefore RENEWS at the
-  discount, see `STORE_SETUP.md` Part 6). **It STANDS until it is answered**:
+  surfaces above — a free user is asked once to pay for the app, at the
+  founding-member price (`FOUNDER_YEARLY_SKU`, the SAME product the founder card
+  sells, which RENEWS at its own price; see `STORE_SETUP.md` Part 7). It used to
+  sell a deeper half-price year, `PROMO_YEARLY_SKU`, which no card offers any
+  more and which stays in `PRO_SKUS` only so its existing subscribers are still
+  recognised as Pro. **It STANDS until it is answered**:
   the ✕ is the only thing that takes it down (`dismissOffer` clears the standing
-  milestone), and the next milestone is what brings it back. It used to be a
+  milestone and spends every milestone reached by then, so a card raised on day
+  50 and dismissed on day 95 does not come straight back for day 90), and the
+  next milestone still ahead is what brings it back. It used to be a
   24-hour window that ALSO unlocked Pro for the day, and both are gone — an
   unlock that has to be spent before the card expires is a countdown wearing a
   gift's clothes, and a card that took itself down overnight was never seen by
@@ -1426,9 +1525,9 @@ old web app so old `export.json` files import directly.
   today.") rather than as its own red line under the button, which turned the
   card into a countdown ad. On both stores it sells its OWN product,
   `FOUNDER_YEARLY_SKU` (`com.autonomic.journal.yearly.founder`, Play base plan
-  `yearly-founder`), which renews at its own price — deliberately not
-  `PROMO_YEARLY_SKU`, the annual card's deeper cut, so the two cards stay two
-  offers. **Every number in the copy is derived from the prices the store
+  `yearly-founder`), which renews at its own price. The annual card above now sells
+  this same product, so the two cards are one price at two moments and a user
+  who declines here cannot meet a lower one later. **Every number in the copy is derived from the prices the store
   returned** (`priceOf` + `discountPct`, which parses comma-decimal and grouped
   currencies), never hardcoded from the store setup. `STORE_SETUP.md` Part 7.
 - **The only thing the app sends anywhere is an anonymous cohort ping.**
@@ -1444,6 +1543,10 @@ old web app so old `export.json` files import directly.
   `pingCaptureCompleted`, both fired from the ENGINE — `beginCollection` and
   `finishSession` in `features/hrv/sessionStore.ts` — never from a view, since a
   reading can be minimized, restored and finished from three different places),
+  `/ping/sav/D{MMDDYY}{P}{M}` when a reading is SAVED to the journal
+  (`pingReadingSaved`, from `Results.persist` and the wrist receivers; the third
+  phase, capped like its twins, so `sav / hrv` is the share of finished readings
+  that became an entry and the gap is what the app refused),
   `/ping/pay/D{MMDDYY}{P}{S}` when a locked surface raises the paywall
   (`pingPaywall`, from `usePaywall()`), plus `not` (a notification turned on),
   `pot` (a POTS capture finished), `see` (a gated view opened — `I` Insights, `P`
@@ -1637,7 +1740,14 @@ old web app so old `export.json` files import directly.
   both the newest-day "Subscriptions reported on <day>" tile and the range tile
   (Within 1h of tap / No tap / Older build) plus the purchase list's Known by column. It was first a clause in the
   tile's fine print that hid itself until a tagged sale arrived, and nobody
-  could find it. **A purchase is reported once per
+  could find it. **Every `sub` also says which DOOR it
+  came through**, as a `-W` tail token (`doorCode` in `lib/ping.ts`): the wall
+  that raised the paywall it was bought from (the `pay` letters, remembered on
+  every raise and not only the day's first) or the offer card (`A` / `F`). It
+  needs the buy tap, so a store-only sale carries none and reads as unknown,
+  never as a door. The lambda counts it in a `doors` map on the SUB row beside
+  `evidence`, and an older lambda drops the token and still counts the sale.
+  **A purchase is reported once per
   transaction**: the store's id (Play token, StoreKit transaction id) is kept
   on the phone in `pingSubReported` and never sent, which is what stops a
   replayed transaction counting on every launch. **The purchase must be on
@@ -2013,9 +2123,10 @@ old web app so old `export.json` files import directly.
   (`GIVEAWAY`, the dashboard's Giveaway tab), never the shared-key report. The
   lambda must be deployed before a build carrying the card ships.
 - **An access code extends the trial, and it is the developer's to hand out.**
-  Holding the Subscription row in Settings (`ROW_HOLD_MS`, unlabelled like the
-  support dump) opens `<AccessCodeSheet/>` (`features/AccessCode.tsx`) instead
-  of the subscription sheet. `redeemAccessCode` (`store/accessCode.ts`) POSTs
+  Settings → Subscription carries a "Redeem a code" button above Restore purchase (hidden from a
+  subscriber, for whom a code would be spent and change nothing) that stacks
+  `<AccessCodeSheet/>` (`features/AccessCode.tsx`) over the sheet. It used to be
+  an unlabelled long-press on the Subscription row; that gesture is gone. `redeemAccessCode` (`store/accessCode.ts`) POSTs
   `/ping/cde/{install code}` with the code and nothing else; like the giveaway
   it ANSWERS (200 `{ days }` / 409 already used / 404 no such code) and ignores
   `__DEV__` (a dev build is told what a code is worth without spending it). On a yes, `grantAccessDays`
@@ -2027,7 +2138,11 @@ old web app so old `export.json` files import directly.
   `useAccessGrant`) the app does not sell: the founder offer defers
   (`codeAccess`), the plan tab under the nav bar is hidden, and the Subscription
   sheet says "Full access" rather than "Free trial". 999 days is the dashboard's
-  "forever" and the copy stops counting at it (`lib/accessCode.ts`). **A code works ONCE,
+  "forever", and anyone with more than 180 days of code access LEFT is SHOWN as
+  Pro (`showsAsPro` / `PRO_LABEL_DAYS` in `lib/accessCode.ts`: green "Pro" on the Settings row and in the sheet, no
+  Upgrade button, no day count). Display only: the tier underneath is still
+  `'trial'`, so the pings and anything asking "did this install pay" are
+  unchanged. **A code works ONCE,
   and that is the SERVER's rule**: the first redemption stamps the row in one
   conditional write and every later attempt, from any phone, is answered "used",
   so a reinstall or a new phone needs a new code. `accessCodesUsed` on the phone
@@ -2042,6 +2157,24 @@ old web app so old `export.json` files import directly.
   like it did more than it does. `normalizeCode` and the lambda's `normCode`
   are the same rule; move both. JS only, so it ships OTA, but the lambda must
   be deployed first.
+- **Units are a DISPLAY preference; the journal never changes unit.**
+  `settings.units` (Profile sheet, Imperial by default, never guessed from the
+  region) is read through `src/lib/units.ts`. Stored values stay what they
+  always were: water in litres, weight in pounds, height in inches, distance in
+  miles, pressure in hPa. Conversion happens only at the edge, a stored value on
+  its way to the screen or a typed one on its way in, so exports, scoring and
+  the Insights sweep see one scale and flipping the setting rewrites nothing.
+  The active system is AMBIENT (`getUnits()`, synced by the store inside
+  `emit`), the way a locale is, so the type registry (`fieldLabel`, a field
+  declared `unit: 'mi'`), the trends registry (`waterIntake`'s `unit` is a
+  getter) and the report builders format without a parameter; components
+  subscribe with `useUnits()`. A cache keyed only on `days` will not notice a
+  change, which is why Progress's `buildArgs` lists `units`. **A glass in the
+  water drawer is `CUP_L` (0.25 L) in both systems**: taps and steps move
+  litres and the ounces are derived ("about 8 oz"), so a glass logged under one
+  setting is the same glass under the other. New copy that names an amount goes
+  through `fmtWater` / `fmtDist` / `fmtWeight` / `fmtHeight` / `fmtPressureGap`,
+  never a literal unit.
 - **Types come in two layers.** Built-ins live in the `*_TYPES` maps in
   `src/lib/registry.ts` (add an icon in `src/components/Icon.tsx` when adding one).
   Users can also create their own activities, meds/supplements, symptoms and

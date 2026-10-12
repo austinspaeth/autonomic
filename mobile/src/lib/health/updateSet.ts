@@ -131,12 +131,48 @@ export function dayAlreadyHas(
   return (list || []).some((e) => same(e.type) && near(e.time, time, kind === 'med' ? MED_NEAR_MIN : NEAR_MIN));
 }
 
-/** Drop items the user imported and then DELETED (./declined) — matched by
- *  item key or by fingerprint, so pre-`healthKey` entries count too. The pill
- *  never re-offers these; the Settings check skips this filter. */
+/**
+ * The deleted imports recorded for `dk`, read back out of their fingerprints.
+ *
+ * A fingerprint is `fp:<dk>:<kind>:<type>:<HH:MM>`; the type may itself hold a
+ * colon, the time never holds anything but its own, so the time is the tail.
+ */
+function declinedOn(dk: string, declined: ReadonlySet<string>): { kind: string; type: string; time: string }[] {
+  const out: { kind: string; type: string; time: string }[] = [];
+  const head = `fp:${dk}:`;
+  for (const k of declined) {
+    if (!k.startsWith(head)) continue;
+    const rest = k.slice(head.length);
+    const cut = rest.indexOf(':');
+    if (cut < 0 || rest.length - cut < 7) continue;
+    out.push({ kind: rest.slice(0, cut), type: rest.slice(cut + 1, -6), time: rest.slice(-5) });
+  }
+  return out;
+}
+
+/**
+ * Drop items the user imported and then DELETED (./declined). The pill never
+ * re-offers these; the Settings check skips this filter.
+ *
+ * A deleted import is a TOMBSTONE, and it dedups exactly the way the live entry
+ * did: same type, within the same tolerance `buildUpdateSet` holds a candidate
+ * to against the journal. Matching only the item key or the exact minute was
+ * narrower than that, and the gap is the ordinary case rather than a corner:
+ * one workout reaches a health store more than once (the watch's own record,
+ * then Garmin Connect's or Strava's copy syncing in an hour later, starting a
+ * minute or two either side), and a store that re-writes a session hands it
+ * back under a new start instant. While the entry stood, the journal absorbed
+ * every one of those; the moment it was deleted, the copy became "new" and was
+ * imported straight back, which reads as the app arguing with the delete.
+ */
 export function filterDeclined(set: HealthUpdateSet, declined: ReadonlySet<string>): HealthUpdateSet {
+  const stones = declinedOn(set.dk, declined);
+  const sameType = (kind: ItemKind, a: string, b: string) =>
+    (kind === 'reading' && (a === 'hrv' || a === 'breathHrv') ? b === 'hrv' || b === 'breathHrv' : a === b);
   const gone = (key: string, kind: ItemKind, type: string, time: string) =>
-    declined.has(key) || declined.has(importFingerprint(set.dk, kind, type, time));
+    declined.has(key)
+    || stones.some((d) => d.kind === kind && sameType(kind, d.type, type)
+      && near(d.time, time, kind === 'med' ? MED_NEAR_MIN : NEAR_MIN));
   return {
     dk: set.dk,
     sleep: set.sleep,

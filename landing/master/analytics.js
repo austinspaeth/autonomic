@@ -2442,6 +2442,23 @@ window.Analytics = (function () {
   }
 
   /**
+   * The fault rows that are FAILURES.
+   *
+   * The app's capture funnel rides the fault route, because it is the only one
+   * that counts every occurrence by store: a reading that began (`hrv.attempt`),
+   * one the app filed (`hrv.filed`) and one the user kept from a refusal
+   * (`hrv.salvaged`). None of the three is something going wrong, so every
+   * reader below starts from this list. The phone dashboard draws them (its
+   * `captureOutcomes`); here they are only kept out of the failure counts.
+   */
+  var CAPTURE_EVENT_TAGS = { 'hrv.attempt': 1, 'hrv.filed': 1, 'hrv.salvaged': 1 };
+  function failuresOf(report) {
+    return ((report && report.faults) || []).filter(function (raw) {
+      return !(raw && CAPTURE_EVENT_TAGS[raw.tag]);
+    });
+  }
+
+  /**
    * Every fault in the range, grouped by SIGNATURE — the same failure at the
    * same call site, however many days it spanned.
    *
@@ -2462,7 +2479,7 @@ window.Analytics = (function () {
   function faultGroups(report, platform, from, to) {
     var only = platformFilter(platform);
     var by = {};
-    ((report && report.faults) || []).forEach(function (raw) {
+    failuresOf(report).forEach(function (raw) {
       var r = faultRow(raw);
       if (!r.day || !r.msg) return;
       if (from && r.day < from) return;
@@ -2513,7 +2530,7 @@ window.Analytics = (function () {
    *  one phone can contribute hundreds. */
   function faultsOn(report, platform, day) {
     var only = platformFilter(platform);
-    return ((report && report.faults) || []).reduce(function (a, raw) {
+    return failuresOf(report).reduce(function (a, raw) {
       var r = faultRow(raw);
       if (r.day !== day) return a;
       return a + (only ? splitTotal(r.platforms, only) : r.installs);
@@ -2548,7 +2565,7 @@ window.Analytics = (function () {
       crashInstalls: 0, crashOccurrences: 0, crashSignatures: 0,
       platforms: {}, crashPlatforms: {}
     };
-    ((report && report.faults) || []).forEach(function (raw) {
+    failuresOf(report).forEach(function (raw) {
       var r = faultRow(raw);
       if (r.day !== day) return;
       var installs = only ? splitTotal(r.platforms, only) : r.installs;

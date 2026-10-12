@@ -1,8 +1,8 @@
 /**
  * The half-off annual offer — pure logic, unit-tested (see __tests__/annual).
  *
- * A free user who is still here at day 30, 90, 180 or 365 is asked, once, to
- * pay for the app. The card STANDS on the Journal until they answer it: the ✕
+ * A free user who is still here at day 50, day 90 or one year is asked, once,
+ * to pay for the app. The card STANDS on the Journal until they answer it: the ✕
  * is the only thing that takes it down, and it comes back at the next milestone
  * rather than at a time of its own choosing.
  *
@@ -15,13 +15,16 @@
  * Milestones are CALENDAR days since install, not days logged. That's a
  * deliberate difference from the surfaces in ./eligibility, which fire off
  * `engagedDayCount` because they're arguments about the user's own data. This
- * one isn't; it's a renewal-shaped moment, and it should land on day 30 whether
- * the user logged thirty days or three.
+ * one isn't; it's a renewal-shaped moment, and it should land on day 50 whether
+ * the user logged fifty days or three.
  *
  * The milestone is spent at the moment the card OPENS, not when it is answered:
  * `startOffer` consumes every milestone at or below the one being awarded. That
- * keeps a user who installs and disappears for 200 days from being handed four
+ * keeps a user who installs and disappears for 200 days from being handed two
  * offers in a row on their return — they get one, the highest they reached.
+ * The ✕ does the same for the days the card STOOD through: a card raised on day
+ * 50 and dismissed on day 95 spends 90 as well, so the next ask is the next
+ * milestone still ahead and never one that passed while this card was up.
  *
  * Pure: no store, no MMKV, no expo. ./annualMemory supplies the persistence and
  * ../../features/AnnualOffer renders the thing.
@@ -30,7 +33,7 @@
 const DAY_MS = 86_400_000;
 
 /** Days since install at which the offer may be raised, ascending. */
-export const OFFER_MILESTONE_DAYS = [30, 90, 180, 365];
+export const OFFER_MILESTONE_DAYS = [50, 90, 365];
 
 export interface AnnualOfferMemory {
   /** Milestones already spent. Written when a card OPENS, not when it is answered. */
@@ -91,9 +94,14 @@ export function startOffer(m: AnnualOfferMemory, milestone: number, nowMs: numbe
 }
 
 /**
- * The ✕. Takes the card down and leaves the milestone spent, so the next ask is
- * the next milestone and never this one again.
+ * The ✕. Takes the card down and spends every milestone reached by now, so the
+ * next ask is the next milestone still AHEAD. Without that, a card that stood
+ * across a later milestone would be dismissed and raised again a week on, which
+ * is the same ask refusing to take no for an answer.
  */
-export function dismissOffer(m: AnnualOfferMemory): AnnualOfferMemory {
-  return { ...m, milestone: undefined };
+export function dismissOffer(m: AnnualOfferMemory, installedAtMs: number | null, nowMs: number): AnnualOfferMemory {
+  const age = daysSinceInstall(installedAtMs, nowMs);
+  const spent = new Set(m.consumed);
+  for (const d of OFFER_MILESTONE_DAYS) if (d <= age) spent.add(d);
+  return { ...m, consumed: [...spent].sort((a, b) => a - b), milestone: undefined };
 }

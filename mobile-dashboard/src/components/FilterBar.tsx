@@ -94,7 +94,7 @@ export function FilterBar<R extends string>({
         </Pressable>
         <View style={s.divider} />
         {/* A phone's ranges share the bar's width; a wide bar is as long as what it holds. */}
-        <View style={[s.ranges, wide && { flex: 0, width: ranges.length * RANGE_W }]}>
+        <View style={[s.ranges, wide ? { flex: 0, width: ranges.length * RANGE_W } : { flex: 1, width: 'auto' }]}>
           <SlidingPill count={ranges.length} index={Math.max(0, ranges.findIndex((o) => o.key === range))} style={s.segPill} />
           {ranges.map((o) => {
             const on = o.key === range;

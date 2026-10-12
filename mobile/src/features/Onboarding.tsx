@@ -167,7 +167,7 @@ async function importHealthHistory(onProgress?: (p: HistoryProgress) => void): P
       const cand = workoutCandidateOf(w);
       if (dayAlreadyHas(s.days[w.dayKey], 'workout', cand.type, cand.time)) continue;
       const entry: Record<string, unknown> = {
-        id: uid(), type: cand.type, time: cand.time, note: '', source: 'health', imported: true, ...cand.entry,
+        id: uid(), type: cand.type, time: cand.time, note: '', source: 'health', imported: true, healthKey: cand.key, ...cand.entry,
       };
       // The full HR trace powers the workout report; sidecar, never inline.
       if (cand.hrSeries?.length) storeWaveform(entry.id as string, { sampledHr: cand.hrSeries });

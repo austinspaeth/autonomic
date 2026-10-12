@@ -10,6 +10,7 @@
  */
 import type { Entry, FieldDef, TypeDef } from './types';
 import { orthoMaxDelta } from './scoring';
+import { fieldShown, fieldUnit, fmtDist } from './units';
 
 /** Blood-pressure auto-advance: a value starting with 1 (or, for systolic, 2)
  *  is a 3-digit number; anything else is complete at 2 digits. Exact match so
@@ -29,7 +30,7 @@ export const READING_TYPES: Record<string, TypeDef> = {
       { key: 'stressIndex', label: 'Stress index' },
       { divider: true },
       { type: 'number', key: 'sdnn', label: 'SDNN' },
-      { type: 'number', key: 'avgHr', label: 'Avg HR' },
+      { type: 'number', key: 'avgHr', label: 'Avg HR', unit: 'bpm' },
       { type: 'number', key: 'meanRr', label: 'Mean RR' },
       { type: 'number', key: 'rmssd', label: 'RMSSD' },
       { type: 'number', key: 'pnn50', label: 'pNN50' },
@@ -59,7 +60,7 @@ export const READING_TYPES: Record<string, TypeDef> = {
       { key: 'stressIndex', label: 'Stress index' },
       { divider: true },
       { type: 'number', key: 'sdnn', label: 'SDNN' },
-      { type: 'number', key: 'hr', label: 'HR' },
+      { type: 'number', key: 'hr', label: 'HR', unit: 'bpm' },
       { type: 'number', key: 'meanRr', label: 'Mean RR' },
       { type: 'number', key: 'rmssd', label: 'RMSSD' },
       { type: 'number', key: 'pnn50', label: 'pNN50' },
@@ -91,7 +92,7 @@ export const READING_TYPES: Record<string, TypeDef> = {
     label: 'Resting Heart Rate',
     icon: 'heart',
     fields: [
-      { type: 'number', key: 'hr', label: 'HR' },
+      { type: 'number', key: 'hr', label: 'HR', unit: 'bpm' },
       { type: 'time', key: 'time', label: 'Time' },
       { type: 'select', key: 'position', label: 'Position', options: ['Laying', 'Sitting'] },
     ],
@@ -100,13 +101,15 @@ export const READING_TYPES: Record<string, TypeDef> = {
     label: 'POTS Test',
     icon: 'standing',
     fields: [
-      { type: 'number', key: 'baselineHr', label: 'Baseline HR' },
-      { type: 'number', key: 'peakHr', label: 'Peak HR' },
+      { type: 'number', key: 'baselineHr', label: 'Baseline HR', unit: 'bpm' },
+      { type: 'number', key: 'peakHr', label: 'Peak HR', unit: 'bpm' },
       { type: 'number', key: 'peakDelta', label: 'Peak Δ', signed: true },
       { type: 'number', key: 'sustainedDelta', label: 'Sustained Δ', signed: true },
-      { type: 'check', key: 'metThreshold', label: 'Sustained rise ≥30 bpm' },
+      { type: 'number', key: 'maxHrReached', label: 'Max HR reached', unit: 'bpm' },
+      // No `metThreshold` field: it is a function of the sustained rise and the
+      // user's age (`metThresholdFor`), so the form derives it on save rather
+      // than asking for an answer that could contradict the number beside it.
       { divider: true },
-      { type: 'number', key: 'maxHrReached', label: 'Max HR reached' },
       { type: 'time', key: 'time', label: 'Time' },
     ],
   },
@@ -115,9 +118,9 @@ export const READING_TYPES: Record<string, TypeDef> = {
     icon: 'stairs',
     fields: [
       { type: 'select', key: 'transition', label: 'Transition', options: ['Laying to standing', 'Sitting to standing', 'Climbing stairs', 'Other'] },
-      { type: 'number', key: 'beforeHr', label: 'Before HR' },
-      { type: 'number', key: 'afterHr', label: 'After HR' },
-      { type: 'number', key: 'hr1min', label: 'HR after 1 min' },
+      { type: 'number', key: 'beforeHr', label: 'Before HR', unit: 'bpm' },
+      { type: 'number', key: 'afterHr', label: 'After HR', unit: 'bpm' },
+      { type: 'number', key: 'hr1min', label: 'HR after 1 min', unit: 'bpm' },
     ],
   },
 };
@@ -130,62 +133,66 @@ export const ACTIVITY_TYPES: Record<string, TypeDef> = {
     label: 'Breathwork / meditation', icon: 'wind',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'minHr', label: 'Min HR' },
+      { key: 'minHr', label: 'Min HR', unit: 'bpm' },
     ],
   },
   carWash: {
     label: 'Car wash', icon: 'car',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
-      { key: 'maxHr', label: 'Max HR' },
+      { key: 'avgHr', label: 'Avg HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
+      { divider: true },
+      { type: 'check', key: 'hotTemp', label: 'Hot temp' },
+      { type: 'check', key: 'highHumidity', label: 'High humidity' },
+      { type: 'check', key: 'palpitations', label: 'Palpitations' },
     ],
   },
   cooldown: {
     label: 'Cooldown', icon: 'wind',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'minHr', label: 'Min HR' },
+      { key: 'minHr', label: 'Min HR', unit: 'bpm' },
     ],
   },
   coreWorkout: {
     label: 'Core workout', icon: 'target',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'minHr', label: 'Min HR' },
-      { key: 'maxHr', label: 'Max HR' },
+      { key: 'minHr', label: 'Min HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
     ],
   },
   dance: {
     label: 'Dance', icon: 'sparkles',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
-      { key: 'maxHr', label: 'Max HR' },
+      { key: 'avgHr', label: 'Avg HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
     ],
   },
   elliptical: {
     label: 'Elliptical', icon: 'activity',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
-      { key: 'maxHr', label: 'Max HR' },
+      { key: 'avgHr', label: 'Avg HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
     ],
   },
   errands: {
     label: 'Errands / shopping', icon: 'car',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
-      { key: 'maxHr', label: 'Max HR' },
+      { key: 'avgHr', label: 'Avg HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
     ],
   },
   hiit: {
     label: 'HIIT', icon: 'flame',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
-      { key: 'maxHr', label: 'Max HR' },
+      { key: 'avgHr', label: 'Avg HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
     ],
   },
   hike: {
@@ -193,25 +200,29 @@ export const ACTIVITY_TYPES: Record<string, TypeDef> = {
     fields: [
       { key: 'distance', label: 'Distance', unit: 'mi' },
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
-      { key: 'maxHr', label: 'Max HR' },
+      { key: 'avgHr', label: 'Avg HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
+      { divider: true },
+      { type: 'check', key: 'hotTemp', label: 'Hot temp' },
+      { type: 'check', key: 'highHumidity', label: 'High humidity' },
+      { type: 'check', key: 'palpitations', label: 'Palpitations' },
     ],
   },
   shower: {
     label: 'Hot shower / bath', icon: 'droplet',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'maxHr', label: 'Max HR' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
     ],
   },
   indoorBike: {
     label: 'Indoor bike',
     icon: 'bike',
     custom: 'bike',
-    summary: (r: Entry) => (r.duration ? `${r.duration} min` : r.distance ? `${r.distance}` : ''),
+    summary: (r: Entry) => (r.duration ? `${r.duration} min` : r.distance ? fieldShown('mi', r.distance) : ''),
     detail: (r: Entry) => {
       const p: string[] = [];
-      if (r.distance) p.push(`Dist ${r.distance} mi`);
+      if (r.distance) p.push(`Dist ${fmtDist(r.distance)}`);
       if (r.avgHr) p.push(`Avg HR ${r.avgHr}`);
       const ivs = (r.intervals as unknown[]) || [];
       if (r.interval) p.push(`${ivs.length} interval${ivs.length === 1 ? '' : 's'}`);
@@ -225,22 +236,22 @@ export const ACTIVITY_TYPES: Record<string, TypeDef> = {
     label: 'Kickboxing', icon: 'target',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
-      { key: 'maxHr', label: 'Max HR' },
+      { key: 'avgHr', label: 'Avg HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
     ],
   },
   legsUp: {
     label: 'Legs up', icon: 'legsUp',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'lowHr', label: 'Low HR' },
+      { key: 'lowHr', label: 'Low HR', unit: 'bpm' },
     ],
   },
   nap: {
     label: 'Nap', icon: 'moon',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'lowHr', label: 'Low HR' },
+      { key: 'lowHr', label: 'Low HR', unit: 'bpm' },
     ],
   },
   cycle: {
@@ -248,31 +259,35 @@ export const ACTIVITY_TYPES: Record<string, TypeDef> = {
     fields: [
       { key: 'distance', label: 'Distance', unit: 'mi' },
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
-      { key: 'maxHr', label: 'Max HR' },
+      { key: 'avgHr', label: 'Avg HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
+      { divider: true },
+      { type: 'check', key: 'hotTemp', label: 'Hot temp' },
+      { type: 'check', key: 'highHumidity', label: 'High humidity' },
+      { type: 'check', key: 'palpitations', label: 'Palpitations' },
     ],
   },
   pilates: {
     label: 'Pilates', icon: 'standing',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'minHr', label: 'Min HR' },
-      { key: 'maxHr', label: 'Max HR' },
+      { key: 'minHr', label: 'Min HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
     ],
   },
   rower: {
     label: 'Rowing', icon: 'activity',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
-      { key: 'maxHr', label: 'Max HR' },
+      { key: 'avgHr', label: 'Avg HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
     ],
   },
   rest: {
     label: 'Rest / lying down', icon: 'legsUp',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'lowHr', label: 'Low HR' },
+      { key: 'lowHr', label: 'Low HR', unit: 'bpm' },
     ],
   },
   run: {
@@ -280,67 +295,74 @@ export const ACTIVITY_TYPES: Record<string, TypeDef> = {
     fields: [
       { key: 'distance', label: 'Distance', unit: 'mi' },
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
-      { key: 'minHr', label: 'Min HR' },
-      { key: 'maxHr', label: 'Max HR' },
-      { key: 'hr60', label: 'HR @60s rest' },
+      { key: 'avgHr', label: 'Avg HR', unit: 'bpm' },
+      { key: 'minHr', label: 'Min HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
+      { key: 'hr60', label: 'HR @60s', unit: 'bpm' },
+      { divider: true },
+      { type: 'check', key: 'hotTemp', label: 'Hot temp' },
+      { type: 'check', key: 'highHumidity', label: 'High humidity' },
+      { type: 'check', key: 'palpitations', label: 'Palpitations' },
     ],
   },
   sex: {
     label: 'Sex', icon: 'heart',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
-      { key: 'maxHr', label: 'Max HR' },
+      { key: 'avgHr', label: 'Avg HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
     ],
   },
   stairStepper: {
     label: 'Stair stepper', icon: 'stairs',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
-      { key: 'maxHr', label: 'Max HR' },
+      { key: 'avgHr', label: 'Avg HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
     ],
   },
   strength: {
     label: 'Strength training', icon: 'barbell',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
-      { key: 'minHr', label: 'Min HR' },
-      { key: 'maxHr', label: 'Max HR' },
+      { key: 'avgHr', label: 'Avg HR', unit: 'bpm' },
+      { key: 'minHr', label: 'Min HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
     ],
   },
   strenuousWork: {
     label: 'Strenuous work', icon: 'flame',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
-      { key: 'maxHr', label: 'Max HR' },
+      { key: 'avgHr', label: 'Avg HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
     ],
   },
   stressfulWork: {
     label: 'Stressful work', icon: 'zap',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
-      { key: 'maxHr', label: 'Max HR' },
+      { key: 'avgHr', label: 'Avg HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
     ],
   },
   swim: {
     label: 'Swim', icon: 'droplet',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
-      { key: 'maxHr', label: 'Max HR' },
+      // Keyed `laps`, not `distance`: that key is miles everywhere else, and an
+      // imported swim would prefill its mileage into a field counted in laps.
+      { key: 'laps', label: 'Distance', unit: 'laps' },
+      { key: 'avgHr', label: 'Avg HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
     ],
   },
   taiChi: {
     label: 'Tai chi', icon: 'wind',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'minHr', label: 'Min HR' },
-      { key: 'maxHr', label: 'Max HR' },
+      { key: 'minHr', label: 'Min HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
     ],
   },
   walk: {
@@ -348,11 +370,10 @@ export const ACTIVITY_TYPES: Record<string, TypeDef> = {
     fields: [
       { key: 'distance', label: 'Distance', unit: 'mi' },
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
-      { key: 'maxHr', label: 'Max HR' },
-      { key: 'minHr', label: 'Min HR' },
-      { key: 'hr60', label: 'HR @60s rest' },
-      { type: 'time', key: 'time', label: 'Time' },
+      { key: 'avgHr', label: 'Avg HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
+      { key: 'minHr', label: 'Min HR', unit: 'bpm' },
+      { key: 'hr60', label: 'HR @60s', unit: 'bpm' },
       { divider: true },
       { type: 'check', key: 'hotTemp', label: 'Hot temp' },
       { type: 'check', key: 'highHumidity', label: 'High humidity' },
@@ -363,19 +384,20 @@ export const ACTIVITY_TYPES: Record<string, TypeDef> = {
     label: 'Yoga / stretching', icon: 'standing',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'minHr', label: 'Min HR' },
-      { key: 'maxHr', label: 'Max HR' },
+      { key: 'minHr', label: 'Min HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
+      { divider: true },
+      { type: 'check', key: 'lowFlow', label: 'Low flow yoga' },
     ],
   },
   otherExercise: {
     label: 'Other exercise', icon: 'activity',
     fields: [
       { key: 'duration', label: 'Duration', unit: 'min' },
-      { key: 'avgHr', label: 'Avg HR' },
-      { key: 'minHr', label: 'Min HR' },
-      { key: 'maxHr', label: 'Max HR' },
-      { key: 'hr60', label: 'HR @60s rest' },
-      { type: 'time', key: 'time', label: 'Time' },
+      { key: 'avgHr', label: 'Avg HR', unit: 'bpm' },
+      { key: 'minHr', label: 'Min HR', unit: 'bpm' },
+      { key: 'maxHr', label: 'Max HR', unit: 'bpm' },
+      { key: 'hr60', label: 'HR @60s', unit: 'bpm' },
       { divider: true },
       { type: 'check', key: 'hotTemp', label: 'Hot temp' },
       { type: 'check', key: 'highHumidity', label: 'High humidity' },
@@ -439,9 +461,9 @@ export const SYMPTOM_TYPES: Record<string, TypeDef> = {
     { type: 'select', key: 'position', label: 'Position', options: ['Laying', 'Sitting'] },
   ]),
   labileHr: symptom('High HR', [
-    { type: 'number', key: 'hr', label: 'HR' },
+    { type: 'number', key: 'hr', label: 'HR', unit: 'bpm' },
     { type: 'select', key: 'position', label: 'Position', options: ['Sitting', 'Standing'] },
-    { type: 'number', key: 'hr5', label: 'HR after 5 min rest' },
+    { type: 'number', key: 'hr5', label: 'HR after 5 min rest', unit: 'bpm' },
     { type: 'time', key: 'time', label: 'Time' },
   ]),
   hives: symptom('Hives / itching'),
@@ -529,7 +551,7 @@ export const BM_VOLUMES = [
 /* ---------- generic field-schema helpers (shared by forms & rows) ---------- */
 export const isDivider = (f: FieldDef) => !!f.divider || f.type === 'divider';
 export const isNumberField = (f: FieldDef) => f.type === 'number' || (!f.type && !!f.key && !f.divider);
-export const fieldLabel = (f: FieldDef) => (f.label || '') + (f.unit ? ` (${f.unit})` : '');
+export const fieldLabel = (f: FieldDef) => (f.label || '') + (f.unit ? ` (${fieldUnit(f.unit)})` : '');
 
 /**
  * The fields to render. Auto-adds a Time input (before any free-text fields)
@@ -564,7 +586,7 @@ export function summarizeFields(def: TypeDef | undefined, r: Entry): string {
   for (const f of entryFields(def)) {
     if (!isNumberField(f)) continue;
     const v = r[f.key!];
-    if (v != null && v !== '') return String(v) + (f.unit || '');
+    if (v != null && v !== '') return fieldShown(f.unit, v) + (fieldUnit(f.unit) || '');
   }
   return '';
 }

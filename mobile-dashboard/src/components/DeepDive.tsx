@@ -8,6 +8,7 @@ import { SymbolView, type SFSymbol } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { C, num } from '../theme';
+import { useBoardWidth } from '../lib/wide';
 import { Sheet } from './Sheet';
 import { KEYBOARD_SCROLL } from './ui';
 
@@ -16,6 +17,11 @@ export function DeepDiveGrid({ children }: { children: ReactNode }) {
   /* By the grid's own width, not the window's: on the wide board a section is
      one column of several, and can be narrower than a phone in landscape. */
   const [w, setW] = useState(0);
+  const boardW = useBoardWidth();
+  /* On the board the buttons are not a block: each is an item of the flow in
+     its own right, so the ones that still fit under a section's cards stay
+     there and only the rest wrap, instead of all four leaving together. */
+  if (boardW) return <>{children}</>;
   return (
     <View style={st.grid} onLayout={(e) => setW(e.nativeEvent.layout.width)}>
       <TwoAcross.Provider value={w >= TWO_ACROSS_FROM}>{children}</TwoAcross.Provider>
@@ -30,6 +36,7 @@ export function DeepDive({ icon, title, sub, children }: { icon: SFSymbol; title
   const [open, setOpen] = useState(false);
   const insets = useSafeAreaInsets();
   const wide = useContext(TwoAcross);
+  const boardW = useBoardWidth();
   return (
     <>
       <Pressable
@@ -37,7 +44,7 @@ export function DeepDive({ icon, title, sub, children }: { icon: SFSymbol; title
           Haptics.selectionAsync();
           setOpen(true);
         }}
-        style={({ pressed }) => [st.btn, wide && st.btnWide, pressed && { opacity: 0.7 }]}
+        style={({ pressed }) => [st.btn, wide && st.btnWide, boardW ? { width: boardW } : null, pressed && { opacity: 0.7 }]}
       >
         <View style={st.icon}>
           <SymbolView name={icon} size={17} weight="semibold" tintColor={C.text} />

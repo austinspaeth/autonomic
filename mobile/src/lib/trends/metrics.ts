@@ -20,6 +20,7 @@ import { orthoMaxDelta, totalPower, type ScoreContext } from '../scoring';
 import { DEFAULT_PROTOCOL, dayCleanliness, scoreCat, scoreSet, sleepHours, type DaysMap } from '../scoring/day';
 import { isTrustedReading } from '../hrvQuality';
 import { dayBristol, movementCount } from '../digestion';
+import { fmtWater, waterNum, waterUnit } from '../units';
 
 export type TrendMetricId =
   // The six the Journal's Trend card walks (TREND_PRIORITY).
@@ -553,7 +554,9 @@ export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
     // being measured, which is the wrong half of a correlation row's arrow.
     label: 'Water consumption',
     subject: 'Your water intake is',
-    unit: 'L',
+    // Stored and compared in litres (minDelta below is litres); only what is
+    // printed follows the units setting.
+    get unit() { return waterUnit(); },
     countNoun: 'logged days',
     better: 'up',
     aggregate: 'median',
@@ -565,8 +568,8 @@ export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
     // those would manufacture a rising trend out of somebody simply starting to
     // track hydration.
     value: (d) => { const w = d && d.food ? num(d.food.water) : null; return w != null && w > 0 ? w : null; },
-    phrase: (delta) => `${dir(delta, 'up', 'down')} ${round1(Math.abs(delta))} L`,
-    fmt: (v) => `${round1(v)}`,
+    phrase: (delta) => `${dir(delta, 'up', 'down')} ${fmtWater(Math.abs(delta), undefined, 1)}`,
+    fmt: (v) => `${waterNum(v, undefined, 1)}`,
   },
 
   cleanDays: {

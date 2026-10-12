@@ -602,6 +602,72 @@ export const TROUBLE_GRACE_SEC = 45;
 export const TROUBLE_MIN_RATE = 0.2;
 
 /**
+ * How much of a reading IN PROGRESS the statistics would keep, were it to end
+ * now. The stop rule's input, and the reason it is its own function.
+ *
+ * {@link hopelessCoverage} used to be fed the raw sum of every collected
+ * interval. That is not the quantity a reading is refused on: `computeHrv`
+ * judges what survives {@link triageSegments}, and a fingertip whose lock
+ * breaks every ten or fifteen seconds collects pulse steadily while every
+ * stretch of it is thrown away for being under {@link MIN_SEGMENT_BEATS}. Such
+ * a session held 230 s of "usable" pulse and zero kept beats, was therefore
+ * never stopped, and ran the full five minutes to a card declining to save
+ * anything — the exact outcome the stop rule exists to prevent, and by the
+ * fault log the commonest way a camera reading fails.
+ *
+ * So this runs the SAME pipeline the verdict will ({@link cleanSegments} then
+ * triage) and reports two numbers:
+ *
+ *  - `keptSec`: what triage keeps today.
+ *  - `openSec`: the stretch still being collected, when triage would drop it
+ *    for one reason only — it is not twenty beats long YET. It is the one
+ *    segment whose fate is undecided, and counting it as lost would stop a
+ *    reading in the first seconds after every relock.
+ *
+ * `openSec` is optimistic on purpose (the stretch may break before it reaches
+ * twenty beats), so a caller that adds the two still only ever errs toward
+ * letting the reading continue. A trailing stretch that is already disqualified
+ * on its own evidence — too many corrected beats — is not counted: there is
+ * nothing undecided about it.
+ */
+export function liveCoverage(
+  rrRaw: number[],
+  opts: { source?: string; segmentStarts?: number[] } = {},
+): { keptSec: number; openSec: number; discarded: number } {
+  if (!rrRaw.length) return { keptSec: 0, openSec: 0, discarded: 0 };
+  const { cleaned } = cleanSegments(splitSegments(rrRaw, opts.segmentStarts), opts.source);
+  const { kept, keep, dropped } = triageSegments(cleaned);
+  const secOf = (s: number[]) => s.reduce((a, x) => a + x, 0) / 1000;
+  const keptSec = kept.reduce((t, s) => t + secOf(s), 0);
+  const last = cleaned[cleaned.length - 1];
+  const undecided = !!last && !keep[keep.length - 1]
+    && last.clean.length < MIN_SEGMENT_BEATS && last.artifactPct <= SEGMENT_MAX_ARTIFACT;
+  // The undecided stretch is not a discard yet, so it is not counted as one.
+  return { keptSec, openSec: undecided ? secOf(last.clean) : 0, discarded: dropped - (undecided ? 1 : 0) };
+}
+
+/**
+ * How recently a beat has to have arrived for pulse to count as arriving NOW,
+ * and how many discarded stretches a reading may hold and still be read as
+ * "fumbled the start and has settled" rather than "keeps losing the lock".
+ *
+ * The second bound is what stops the deferral below becoming a loophole. A
+ * finger whose lock breaks every fifteen seconds is collecting pulse at almost
+ * every instant it is asked, so "is pulse arriving" alone would defer the
+ * judgement for ever and the reading would run until the arithmetic caught it
+ * at about 2:45. Two discards is one bad start and one slip; a third is a
+ * pattern, and from there the reading is judged on what it has kept.
+ */
+export const TROUBLE_ALIVE_SEC = 3;
+export const TROUBLE_MAX_DISCARDED = 2;
+
+/** Is this reading mid-recovery — pulse arriving now, and too few broken
+ *  stretches behind it to call that a pattern? See the constants above. */
+export function isRecovering(o: { sinceBeatSec: number; discarded: number }): boolean {
+  return o.sinceBeatSec <= TROUBLE_ALIVE_SEC && o.discarded <= TROUBLE_MAX_DISCARDED;
+}
+
+/**
  * Can this reading still reach the coverage bar, and is it worth carrying on?
  *
  * Two questions, and only the first is a proof. `best` is the most coverage the
@@ -611,9 +677,21 @@ export const TROUBLE_MIN_RATE = 0.2;
  * and is labelled as one: a pulse arriving at under a fifth of the clock is not
  * going to become one arriving at half of it.
  *
+ * `usableSec` must be the KEPT coverage ({@link liveCoverage}, kept plus the
+ * open stretch), not the raw sum of collected intervals — see there for what
+ * the raw sum let through.
+ *
  * A reading that already holds enough pulse to be SALVAGEABLE is never stopped,
  * whatever the arithmetic says — the user would lose a reading they could have
  * chosen to keep, which is the opposite of the point.
+ *
+ * `growing` ({@link isRecovering}) defers the JUDGEMENT, never the proof. It
+ * means a stretch of pulse
+ * is being collected right now, and a rate measured at that instant is a rate
+ * measured mid-recovery: somebody who fumbled the first half minute and has
+ * just settled reads as hopeless at 0:45 and would have gone on to a clean
+ * reading. The moment that stretch breaks the judgement applies again, so a
+ * finger that keeps losing the lock is still stopped at its next dropout.
  *
  * Pure so the stop rule is testable without a camera; called from the session
  * store's own clock.
@@ -621,12 +699,15 @@ export const TROUBLE_MIN_RATE = 0.2;
 export function hopelessCoverage(o: {
   usableSec: number; elapsedSec: number; durationSec: number;
   graceSec?: number; minRate?: number;
+  /** A stretch of pulse is arriving right now. Defers the rate judgement only. */
+  growing?: boolean;
 }): boolean {
   const grace = o.graceSec ?? TROUBLE_GRACE_SEC;
   if (!(o.durationSec > 0) || o.elapsedSec < grace) return false;
   if (o.usableSec >= SALVAGE_MIN_COVERAGE_SEC) return false;
   const best = o.usableSec + Math.max(0, o.durationSec - o.elapsedSec);
   if (best < MIN_COVERAGE_RATIO * o.durationSec) return true;
+  if (o.growing) return false;
   return o.usableSec / o.elapsedSec < (o.minRate ?? TROUBLE_MIN_RATE);
 }
 

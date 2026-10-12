@@ -3,6 +3,7 @@
  * copyable analysis prompt from the user's data over a range. Pure text, no
  * network. Sections are rendered as the same [stamp]-prefixed lines.
  */
+import { standReadingRows } from '../pots/manual';
 import { addDays, dateFromKey, fmtNum, fmtTime12, keyOf } from '../dates';
 import type { AppState, CustomTypes, DayRecord, Entry } from '../types';
 import type { Downturn } from '../scoring/downturn';
@@ -19,6 +20,7 @@ import { isRestType } from '../budget/load';
 import { exertionLine } from '../budget/baseline';
 import { typesFor } from '../typeResolve';
 import { gutSummaryLine, summarizeGut } from '../digestion';
+import { distNum, distText, distUnit, fieldShown, fieldUnit, fmtHeight, fmtWater, fmtWeight, paceStr } from '../units';
 
 export type ReportRange = 'day' | 'week' | 'month' | 'year' | 'all';
 
@@ -114,11 +116,11 @@ function secSleep(days: DaysMap, keys: string[]) {
   keys.forEach((k) => { const d = days[k]; if (!d || !d.sleep) return; const s = d.sleep; const bed = s.bed || ''; if (!bed && !s.wake && !rv(s, 'hrLow') && !rv(s, 'hrHigh')) return; const hrs = sleepHours(days, k); const st = s.stages; const stages = st ? ` | Stages: Deep ${st.deep}m, REM ${st.rem}m, Core ${st.core}m, Awake ${st.awake}m` : ''; lines.push(`[${k}] Bed last night: ${bed ? fmtTime12(bed) : '-'} | Woke this morning: ${s.wake ? fmtTime12(s.wake) : '-'} | Duration: ${hrs != null ? hrs.toFixed(1) + ' hrs' : '-'} | Quality: ${s.quality === 'interrupted' ? 'Interrupted' : 'Good'} | Low HR: ${rv(s, 'hrLow') ?? '-'} | High HR: ${rv(s, 'hrHigh') ?? '-'}${stages}`); });
   return orNone(lines);
 }
-const secActivities = (days: DaysMap, keys: string[], custom?: CustomTypes) => orNone(eachEntry(days, keys, (d, k) => (d.activities || []).map((a) => { const def = custom?.activities?.[a.type] || ACTIVITY_TYPES[a.type]; const label = (def ? def.label : a.type) + (isRestType(custom?.activities?.[a.type], a.type) ? ' (rest, not exercise)' : ''); const parts: string[] = []; if (def && def.custom === 'bike') { ([['Duration', 'duration', ' min'], ['Distance', 'distance', ' mi'], ['Avg HR', 'avgHr'], ['Max HR', 'maxHr'], ['Min HR', 'minHr'], ['Resistance', 'resistance'], ['HR @60s rest', 'hr60']] as [string, string, string?][]).forEach(([l, key, unit]) => { const v = rv(a, key); if (v != null) parts.push(`${l}: ${v}${unit || ''}`); }); const ivs = (a.intervals as { length?: string; resistance?: string; avgHr?: string; maxHr?: string }[]) || []; if (a.interval && ivs.length) parts.push(`Intervals: ${ivs.map((iv, i) => `#${i + 1} ${iv.length || '-'} min, resistance ${iv.resistance || '-'}, avg HR ${iv.avgHr || '-'}, max HR ${iv.maxHr || '-'}`).join('; ')}`); } else if (def) { (def.fields || []).forEach((f) => { if (isDivider(f) || f.type === 'time' || f.type === 'check' || f.key === 'note') return; const val = rv(a, f.key!); if (val != null) parts.push(`${f.label}: ${val}${f.unit ? f.unit : ''}`); }); (def.fields || []).filter((f) => f.type === 'check' && a[f.key!]).forEach((f) => parts.push(f.label!)); } if (a.note) parts.push(`Note: ${a.note}`); return `${stamp(k, a.time as string)} ${label}${parts.length ? ' | ' + parts.join(' | ') : ''}`; })));
+const secActivities = (days: DaysMap, keys: string[], custom?: CustomTypes) => orNone(eachEntry(days, keys, (d, k) => (d.activities || []).map((a) => { const def = custom?.activities?.[a.type] || ACTIVITY_TYPES[a.type]; const label = (def ? def.label : a.type) + (isRestType(custom?.activities?.[a.type], a.type) ? ' (rest, not exercise)' : ''); const parts: string[] = []; if (def && def.custom === 'bike') { ([['Duration', 'duration', ' min'], ['Distance', 'distance', ` ${distUnit()}`], ['Avg HR', 'avgHr'], ['Max HR', 'maxHr'], ['Min HR', 'minHr'], ['Resistance', 'resistance'], ['HR @60s', 'hr60']] as [string, string, string?][]).forEach(([l, key, unit]) => { const v = key === 'distance' ? (distText(rv(a, key)) || null) : rv(a, key); if (v != null) parts.push(`${l}: ${v}${unit || ''}`); }); const ivs = (a.intervals as { length?: string; resistance?: string; avgHr?: string; maxHr?: string }[]) || []; if (a.interval && ivs.length) parts.push(`Intervals: ${ivs.map((iv, i) => `#${i + 1} ${iv.length || '-'} min, resistance ${iv.resistance || '-'}, avg HR ${iv.avgHr || '-'}, max HR ${iv.maxHr || '-'}`).join('; ')}`); } else if (def) { (def.fields || []).forEach((f) => { if (isDivider(f) || f.type === 'time' || f.type === 'check' || f.key === 'note') return; const val = rv(a, f.key!); if (val != null) parts.push(`${f.label}: ${fieldShown(f.unit, val)}${f.unit ? fieldUnit(f.unit) : ''}`); }); (def.fields || []).filter((f) => f.type === 'check' && a[f.key!]).forEach((f) => parts.push(f.label!)); } if (a.note) parts.push(`Note: ${a.note}`); return `${stamp(k, a.time as string)} ${label}${parts.length ? ' | ' + parts.join(' | ') : ''}`; })));
 function secTriggers(days: DaysMap, keys: string[], custom?: CustomTypes) {
   const lines: string[] = [];
   const trigLabel = (t: string) => custom?.triggers?.[t]?.label || TRIGGER_TYPES[t]?.label;
-  keys.forEach((k) => { const d = days[k]; if (!d || !d.food) return; const trigs = d.food.triggers || {}; const tlist = Object.keys(trigs).filter((t) => trigs[t] > 0 && trigLabel(t)).map((t) => `${trigLabel(t)}${trigs[t] > 1 ? ` x${trigs[t]}` : ''}`); if (tlist.length) lines.push(`[${k}] Triggers: ${tlist.join(', ')}`); const water = d.food.water; if (water > 0) lines.push(`[${k}] Water: ${water} L`); });
+  keys.forEach((k) => { const d = days[k]; if (!d || !d.food) return; const trigs = d.food.triggers || {}; const tlist = Object.keys(trigs).filter((t) => trigs[t] > 0 && trigLabel(t)).map((t) => `${trigLabel(t)}${trigs[t] > 1 ? ` x${trigs[t]}` : ''}`); if (tlist.length) lines.push(`[${k}] Triggers: ${tlist.join(', ')}`); (d.food.triggerLogs || []).forEach((l) => { const names = l.types.map(trigLabel).filter(Boolean); if (names.length && (l.time || l.note)) lines.push(`${stamp(k, l.time)} Logged together: ${names.join(', ')}${l.note ? ' | ' + l.note : ''}`); }); const water = d.food.water; if (water > 0) lines.push(`[${k}] Water: ${fmtWater(water)}`); });
   return orNone(lines);
 }
 const secMeds = (days: DaysMap, keys: string[], supplements: boolean, custom?: CustomTypes) => orNone(eachEntry(days, keys, (d, k) => (d.meds || []).filter((m) => (supplements ? !MED_KEYS.has(m.type) : MED_KEYS.has(m.type))).map((m) => { const label = custom?.meds?.[m.type]?.label || MED_TYPES[m.type]?.label || m.type; const bits: string[] = []; if (m.amount) bits.push(String(m.amount)); if (m.note) bits.push(m.note); return `${stamp(k, m.time as string)} ${label}${bits.length ? ' | ' + bits.join(' | ') : ''}`; })));
@@ -132,7 +134,7 @@ const secDigestion = (days: DaysMap, keys: string[]) => {
   const sum = summarizeGut(days, keys);
   return orNone(lines.length && sum ? [gutSummaryLine(sum), ...lines] : lines);
 };
-const secOrthostatic = (days: DaysMap, keys: string[]) => orNone(eachEntry(days, keys, (d, k) => { const out: string[] = []; (d.readings || []).filter((r) => r.type === 'orthostatic').forEach((r) => out.push(`${stamp(k, r.time as string)} ${rv(r, 'transition') ?? 'Position change'} | Before HR: ${rv(r, 'beforeHr') ?? '-'} | After HR: ${rv(r, 'afterHr') ?? '-'} | HR @1min: ${rv(r, 'hr1min') ?? '-'}${noteSuffix(r)}`)); (d.readings || []).filter((r) => r.type === 'standTest').forEach((r) => out.push(`${stamp(k, r.time as string)} POTS stand test | Baseline HR: ${rv(r, 'baselineHr') ?? '-'} | Peak HR: ${rv(r, 'peakHr') ?? '-'} | Peak Δ: ${rv(r, 'peakDelta') ?? '-'} | Sustained Δ: ${rv(r, 'sustainedDelta') ?? '-'} | Sustained rise ≥30 bpm: ${r.metThreshold ? 'Yes' : 'No'}${kv(r, 'Max HR reached', 'maxHrReached')}${r.endedEarly ? ' | Ended early' : ''}${r.baselineUnstable ? ' | Short resting phase (baseline may be unreliable)' : ''}${noteSuffix(r)}`)); (d.symptoms || []).filter((s) => s.type === 'labileHr').forEach((s) => out.push(`${stamp(k, s.time as string)} High HR event | HR: ${rv(s, 'hr') ?? '-'} | Position: ${rv(s, 'position') ?? '-'}${kv(s, 'HR after 5 min rest', 'hr5')}${noteSuffix(s)}`)); return out; }));
+const secOrthostatic = (days: DaysMap, keys: string[]) => orNone(eachEntry(days, keys, (d, k) => { const out: string[] = []; (d.readings || []).filter((r) => r.type === 'orthostatic').forEach((r) => out.push(`${stamp(k, r.time as string)} ${rv(r, 'transition') ?? 'Position change'} | Before HR: ${rv(r, 'beforeHr') ?? '-'} | After HR: ${rv(r, 'afterHr') ?? '-'} | HR @1min: ${rv(r, 'hr1min') ?? '-'}${noteSuffix(r)}`)); (d.readings || []).filter((r) => r.type === 'standTest').forEach((r) => out.push(`${stamp(k, r.time as string)} POTS stand test | Baseline HR: ${rv(r, 'baselineHr') ?? '-'} | Peak HR: ${rv(r, 'peakHr') ?? '-'} | Peak Δ: ${rv(r, 'peakDelta') ?? '-'} | Sustained Δ: ${rv(r, 'sustainedDelta') ?? '-'} | Sustained rise ≥30 bpm: ${r.metThreshold ? 'Yes' : 'No'}${kv(r, 'Max HR reached', 'maxHrReached')}${r.endedEarly ? ' | Ended early' : ''}${r.baselineUnstable ? ' | Short resting phase (baseline may be unreliable)' : ''}${standReadingRows(r).length ? ' | Entered by hand: ' + standReadingRows(r).map((x) => `${x.label} ${x.value.replace(' · ', ', BP ')}`).join('; ') : ''}${noteSuffix(r)}`)); (d.symptoms || []).filter((s) => s.type === 'labileHr').forEach((s) => out.push(`${stamp(k, s.time as string)} High HR event | HR: ${rv(s, 'hr') ?? '-'} | Position: ${rv(s, 'position') ?? '-'}${kv(s, 'HR after 5 min rest', 'hr5')}${noteSuffix(s)}`)); return out; }));
 
 /**
  * The pacing budget, per day.
@@ -809,11 +811,7 @@ export function buildWorkoutInsightPrompt(
   const hi = numOr(r.maxHr) ?? (bpms ? Math.max(...bpms) : null);
   const duration = numOr(r.duration), distance = numOr(r.distance);
   // "10:24 /mi", with the same plausibility guard as the report.
-  let pace: string | null = null;
-  if (duration != null && duration > 0 && distance != null && distance > 0) {
-    const secPerMi = (duration * 60) / distance;
-    if (secPerMi >= 120 && secPerMi <= 3600) pace = `${Math.floor(secPerMi / 60)}:${String(Math.round(secPerMi % 60)).padStart(2, '0')} /mi`;
-  }
+  const pace = duration != null && distance != null ? paceStr(duration, distance) : null;
 
   // Any other filled fields the type defines (resistance, intervals notes, …),
   // beyond the ones already rendered above.
@@ -823,14 +821,14 @@ export function buildWorkoutInsightPrompt(
     if (isDivider(f) || f.type === 'time' || !f.key || covered.has(f.key)) return;
     if (f.type === 'check') { if (r[f.key]) extras.push(f.label!); return; }
     const v = rv(r, f.key);
-    if (v != null) extras.push(`${f.label}: ${v}${f.unit ? ' ' + f.unit : ''}`);
+    if (v != null) extras.push(`${f.label}: ${fieldShown(f.unit, v)}${f.unit ? ' ' + fieldUnit(f.unit) : ''}`);
   });
 
   const lines = [
     line('Workout type', label),
     line('Capture source', sourceLine(r)),
     line('Duration', duration, ' min'),
-    line('Distance', distance, ' mi'),
+    line('Distance', distNum(distance), ` ${distUnit()}`),
     line('Pace', pace),
     line('Avg HR', avg, ' bpm'),
     line('Min HR', lo, ' bpm'),
@@ -912,7 +910,7 @@ export function buildDoctorPrompt(state: AppState, ctx: ScoreContext, range: Rep
   // the birthday so the document never has to show a raw date of birth.
   const prof = state.profile || ({} as AppState['profile']);
   const a = profileAge(prof);
-  const demographics = [a != null ? `Age: ${a}` : '', prof.sex ? `Sex: ${prof.sex}` : '', prof.height ? `Height: ${prof.height}` : '', prof.weight ? `Weight: ${prof.weight}` : ''].filter(Boolean).join(' | ') || 'not provided';
+  const demographics = [a != null ? `Age: ${a}` : '', prof.sex ? `Sex: ${prof.sex}` : '', fmtHeight(prof.height) ? `Height: ${fmtHeight(prof.height)}` : '', fmtWeight(prof.weight) ? `Weight: ${fmtWeight(prof.weight)}` : ''].filter(Boolean).join(' | ') || 'not provided';
 
   return `You are a clinical health writer preparing a concise, professional medical summary for a physician. The data below was self-tracked by a patient using Autonomic (autonomic.care), a personal app for autonomic recovery (dysautonomia, POTS, long COVID, ME/CFS style presentations), captured with consumer devices: phone-camera or chest-strap PPG for HRV, a home blood-pressure cuff, and wearable sleep tracking. Base every statement strictly on the data provided. Do not invent, assume, or diagnose anything that is not present in the data.
 

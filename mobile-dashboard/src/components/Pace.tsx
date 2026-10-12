@@ -11,7 +11,7 @@ import { useEffect, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import Animated, { cancelAnimation, Easing, useAnimatedProps, useSharedValue, withRepeat, withTiming } from 'react-native-reanimated';
 import Svg, { Circle, Defs, Line, LinearGradient, Path, Stop } from 'react-native-svg';
-import type { PaceModel, PaceRef, PaceStatus } from '../lib/pace';
+import { smoothPath, type PaceModel, type PaceRef, type PaceStatus } from '../lib/pace';
 import { C, num } from '../theme';
 
 const AnimatedCircle = Animated.createAnimatedComponent(Circle);
@@ -37,6 +37,8 @@ function clockText(clock: number) {
   return `${h % 12 || 12}:${String(mins % 60).padStart(2, '0')} ${h < 12 ? 'AM' : 'PM'} ET`;
 }
 
+const hourText = (h: number) => `${h % 12 || 12} ${h < 12 ? 'AM' : 'PM'} ET`;
+
 export function Pace({ pace, color = C.series }: { pace: PaceModel; color?: string }) {
   const [width, setWidth] = useState(0);
   const st = STATUS[pace.status];
@@ -53,10 +55,17 @@ export function Pace({ pace, color = C.series }: { pace: PaceModel; color?: stri
   const plotW = Math.max(0, width - PAD_END);
   const px = (h: number) => (h / 24) * plotW;
   const py = (v: number) => H - (v / max) * (H - PAD_TOP);
-  const line = (pts: [number, number][]) => pts.map(([h, v], i) => `${i ? 'L' : 'M'}${px(h).toFixed(1)},${py(v).toFixed(1)}`).join('');
+  /* Every line is a running total read at the hour boundaries, drawn as a
+     curve through them: the bends are where the day actually sped up or
+     slowed, and the curve cannot dip between two readings. */
+  const line = (pts: [number, number][]) => smoothPath(pts.map(([h, v]) => [px(h), py(v)]));
   const whole = (curve: number[]) => line(curve.map((v, i) => [i, v]));
 
   const mine: [number, number][] | null = pace.today ? [...pace.today.map((v, i) => [i, v] as [number, number]), [pace.clock, pace.now]] : null;
+  /* The stretch of today from before its hours were being counted: the same
+     line, drawn faint, since where it bends there is the usual day's doing. */
+  const placed = mine && pace.todayFrom > 0 ? mine.filter(([h]) => h <= pace.todayFrom) : null;
+  const counted = mine && placed ? mine.filter(([h]) => h >= pace.todayFrom) : mine;
   const nowX = px(pace.clock);
   const nowY = py(pace.now);
 
@@ -105,7 +114,8 @@ export function Pace({ pace, color = C.series }: { pace: PaceModel; color?: stri
             {mine ? (
               <>
                 <Path d={`${line(mine)}L${nowX.toFixed(1)},${H}L0,${H}Z`} fill="url(#paceFill)" />
-                <Path d={line(mine)} stroke={color} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" fill="none" />
+                {placed && placed.length > 1 ? <Path d={line(placed)} stroke={color} strokeOpacity={0.45} strokeWidth={2} strokeLinecap="round" fill="none" /> : null}
+                {counted && counted.length > 1 ? <Path d={line(counted)} stroke={color} strokeWidth={2.5} strokeLinejoin="round" strokeLinecap="round" fill="none" /> : null}
               </>
             ) : null}
             {pace.tail.length ? (
@@ -167,11 +177,17 @@ export function Pace({ pace, color = C.series }: { pace: PaceModel; color?: stri
         {avg ? <Cell title="vs range average" now={pace.now} to={avg} ends="usually ends on" /> : null}
       </View>
 
+      {pace.todayFrom > 0 ? (
+        <Text style={s.foot}>
+          Counting by the hour began at {hourText(pace.todayFrom)} today. Today&apos;s total is whole, but when the earlier part of it arrived was never recorded, so that
+          stretch of the line (faint) is placed by the usual shape of a day.
+        </Text>
+      ) : null}
       {y?.exact && avg?.exact ? null : (
         <Text style={s.foot}>
-          {pace.shape === 'even'
-            ? 'No hourly counts yet, so other days are assumed to fill evenly through the day. Read the morning loosely.'
-            : 'Days from before hourly counts began are placed by the usual shape of a day.'}
+          {pace.shapeDays
+            ? `Days from before hourly counts began are placed by the usual shape of a day, measured over ${pace.shapeDays} ${pace.shapeDays === 1 ? 'day' : 'days'}.`
+            : 'Hourly counts have only just begun. Until a full day of them is in, other days and the projection follow a typical day, not a measured one.'}
         </Text>
       )}
     </View>

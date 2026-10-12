@@ -66,7 +66,7 @@ import { AskAiPill } from '../../src/features/insights/AskAi';
 import { InsightsEmpty, InsightsSkeleton } from '../../src/features/insights/InsightsSkeleton';
 import { InsightsFailed } from '../../src/features/insights/BuildFailed';
 import {
-  BiggestChangeCard, ConfidenceRing, ConfidenceSheet, Correlations, EarlySignals, InsightsFooter, NoImpact, PressureCard, TrendWatch, WorthALook,
+  BiggestChangeCard, ConfidenceRing, ConfidenceSheet, Correlations, EarlySignals, InsightsFooter, NoImpact, PressureCard, TrendWatch, WeeksCard, WorthALook,
 } from '../../src/features/insights/Sections';
 import { SinceExplain } from '../../src/features/insights/SinceExplain';
 import { todayKey } from '../../src/lib/dates';
@@ -302,6 +302,7 @@ export default function InsightsScreen() {
    */
   const heights = useRef<CardHeights>({ change: 0, correlations: 0, observations: 0, noImpact: 0, watch: 0 });
   const rows = useRef<RowHeights>({ correlations: [], observations: [], noImpact: [], watch: [] });
+  const weeksH = useRef(0);
   const measure = useCallback((key: keyof CardHeights) => (e: LayoutChangeEvent) => {
     heights.current[key] = e.nativeEvent.layout.height;
   }, []);
@@ -334,6 +335,8 @@ export default function InsightsScreen() {
           observations: report.observations.length,
           noImpact: report.noImpact.length,
           watch: report.watch.length,
+          weeks: !!report.weeks,
+          weeksHeight: weeksH.current,
           heights: { ...heights.current },
           rows: { correlations: copy('correlations'), observations: copy('observations'), noImpact: copy('noImpact'), watch: copy('watch') },
         });
@@ -560,6 +563,7 @@ export default function InsightsScreen() {
                 <BiggestChangeCard change={view.change} series={view.detail[view.change.id] || null} onLayout={measure('change')} />,
               ) : null}
               <EarlySignals list={earlyBelow} detail={view.detail} />
+              {view.weeks ? <WeeksCard weeks={view.weeks} onLayout={(e) => { weeksH.current = e.nativeEvent.layout.height; }} /> : null}
               {revealIf('correlations')(
                 <Correlations
                   list={view.correlations}

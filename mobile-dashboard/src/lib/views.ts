@@ -21,28 +21,30 @@ let current: ViewKey = 'usage';
 const listeners = new Set<() => void>();
 
 export function setView(key: ViewKey) {
-  /* Always announced, even for the view already chosen: on the wide board,
-     where every view is on one page, picking one SCROLLS to it, and picking
-     the same one again after scrolling away has to work. */
+  if (current === key) return;
   current = key;
-  picks += 1;
   listeners.forEach((fn) => fn());
 }
 
-/** Counts every pick, so a repeat of the same view still reads as a change. */
-let picks = 0;
-export function usePicks(): number {
-  return useSyncExternalStore(subscribe, () => picks);
+/* Wide only. The board holds the views that are read all day; these four are
+   visited, so each opens as a side panel over the board, from a link in the
+   top bar. Which one is open lives here because the links are in the bar and
+   the panel is in the screen. */
+export const PANELS: ViewKey[] = ['forecast', 'links', 'codes', 'pings'];
+export const BOARD: ViewKey[] = ['usage', 'glance', 'sales', 'errors'];
+/* The board's columns of sections: each group starts a column of its own and
+   its views run on from one another. Crashes and errors is short, so it rides
+   under sales rather than holding a column nearly empty. */
+export const BOARD_GROUPS: ViewKey[][] = [['usage'], ['glance'], ['sales', 'errors']];
+let panel: ViewKey | null = null;
+export function openPanel(key: ViewKey | null) {
+  if (panel === key) return;
+  panel = key;
+  listeners.forEach((fn) => fn());
 }
-
-/* Where each view's section starts on the wide board, measured as it lays
-   out: `board` is the board's own top inside the scroll content, the rest are
-   offsets within it. */
-const tops: Partial<Record<ViewKey | 'board', number>> = {};
-export const noteTop = (key: ViewKey | 'board', y: number) => {
-  tops[key] = y;
-};
-export const topOf = (key: ViewKey): number | null => (tops[key] === undefined ? null : (tops.board ?? 0) + tops[key]!);
+export function usePanel(): ViewKey | null {
+  return useSyncExternalStore(subscribe, () => panel);
+}
 
 function subscribe(fn: () => void) {
   listeners.add(fn);

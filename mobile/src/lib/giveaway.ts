@@ -18,8 +18,16 @@ export const GIVEAWAY_END = '2026-10-31';
 export const GIVEAWAY_MAX_ENTRIES = 10;
 export const GIVEAWAY_INFO_URL = 'https://autonomic.care/dysautonomia-awareness-giveaway/';
 
+/** Last day the "Giveaway has ended" row is shown, inclusive. */
+export const GIVEAWAY_ENDED_UNTIL = '2026-11-10';
+
 /** Is the card shown on this day? From now until the last day of the window. */
 export const giveawayOpen = (dk: string): boolean => dk <= GIVEAWAY_END;
+
+/** What the Journal shows on this day: the live card through the window, the
+ *  "has ended" row from the day after it until `GIVEAWAY_ENDED_UNTIL`, then nothing. */
+export const giveawayPhase = (dk: string): 'open' | 'ended' | 'gone' =>
+  giveawayOpen(dk) ? 'open' : dk <= GIVEAWAY_ENDED_UNTIL ? 'ended' : 'gone';
 
 /** One earned entry as the sign-up sends it: the day, and the sensor letter of
  *  that day's first counting reading (`null` for one with no live sensor, e.g.

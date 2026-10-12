@@ -32,6 +32,8 @@ import { pingReadingKind, pingWristReading } from '../../store/ping';
 import { isFirstBaseline } from '../ping';
 import { todayKey } from '../dates';
 import { logError } from '../diagnostics/errorLog';
+import { reportFault } from '../../store/errorReport';
+import { GARMIN_DIAG_TAG, garminDiagMessage, parseGarminDiag } from './diag';
 import { health } from '../health';
 import { arrivalHealthWrite } from '../health/hrvWrite';
 import { computeScores, profileCtx } from '../scoring';
@@ -92,6 +94,7 @@ export function garminLinkIntact(): boolean {
 
 let started = false;
 let devices: GarminDevice[] = [];
+const diagSeen = new Set<string>();
 
 type ArrivalListener = (dayKey: string, entry: Entry) => void;
 const arrivalListeners = new Set<ArrivalListener>();
@@ -147,6 +150,28 @@ function receive(msg: GarminMessage) {
   const native = garminNative();
   if (!native) return;
   const deviceIdRaw = typeof msg.deviceId === 'string' ? msg.deviceId : null;
+
+  // A reading that FAILED on the wrist arrives as a diagnostic in its place
+  // (RrCollector.diagPayload). It is not a journal entry and never becomes
+  // one: it is filed on the fault route, keyed by device + firmware + what the
+  // sensor did, and acked like anything else so the watch drops it. It goes
+  // through `reportFault` directly rather than `logError`, which would spend
+  // the once-per-install error counter on a wrist-fit problem.
+  const diag = parseGarminDiag(msg as Record<string, unknown>);
+  if (diag) {
+    const diagId = typeof msg.id === 'string' ? msg.id : null;
+    // The watch re-sends until acked, so a lost ack would count one failed
+    // attempt twice. Ids seen this session are not counted again.
+    if (!diagId || !diagSeen.has(diagId)) {
+      if (diagId) diagSeen.add(diagId);
+      const model = (deviceIdRaw ? devices.find((d) => d.id === deviceIdRaw) : undefined)
+        ?? (devices.length === 1 ? devices[0] : undefined);
+      reportFault(GARMIN_DIAG_TAG, garminDiagMessage(diag, model?.model || model?.name));
+    }
+    if (deviceIdRaw && diagId) native.ackMessage(deviceIdRaw, diagId).catch(() => {});
+    return;
+  }
+
   const mapped = mapWatchPayload(msg as Record<string, unknown>);
   if (!mapped) {
     // ACK IT ANYWAY.

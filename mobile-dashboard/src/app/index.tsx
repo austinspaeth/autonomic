@@ -6,16 +6,18 @@
    Eastern day. While the selected day is today it is still filling, so the
    ping views give it neutral reference numbers rather than a red/green delta
    against whole days; a past day is complete and gets the delta. */
-import { useCallback, useMemo, useState, type ReactNode } from 'react';
+import { useCallback, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as Haptics from 'expo-haptics';
-import { ActivityIndicator, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInLeft, FadeInRight } from 'react-native-reanimated';
 import { BottomBar } from '../components/BottomBar';
 import { ToastStack } from '../components/AlertViews';
 import { BarChart, Chips, WeekdayChart } from '../components/charts';
 import { DateHeader } from '../components/DateHeader';
 import { FILTER_BAR_GAP, FILTER_BAR_HEIGHT, FilterBar } from '../components/FilterBar';
-import { Card, Screen, Segmented } from '../components/ui';
+import { Card, KEYBOARD_SCROLL, Screen, Segmented } from '../components/ui';
+import { Sheet } from '../components/Sheet';
 import { glanceSpecs } from '../features/specs';
 import { UsageView } from '../features/UsageView';
 import { SalesView } from '../features/SalesView';
@@ -26,12 +28,15 @@ import { LinksView } from '../features/LinksView';
 import { CodesView } from '../features/CodesView';
 import { Glide, MetricTiles } from '../components/MetricTiles';
 import { useData } from '../lib/data';
+import { useZoom } from '../lib/zoom';
+import { CrispZoomView } from '../../modules/crisp-zoom';
 import { addDays, ago, easternDay, shortDate } from '../lib/dates';
 import { int, money } from '../lib/format';
 import { pingRows } from '../lib/metrics';
+import { buildIndex } from '../lib/usage';
 import { buildBase, downloadBuckets, summarize, weekdayStats, type Field, type StoreFilter } from '../lib/store';
-import { noteTop, useView, VIEWS, type ViewKey } from '../lib/views';
-import { useColumns, useWide, WIDE_FILTER_H, WIDE_FILTER_MARGIN } from '../lib/wide';
+import { BOARD, BOARD_GROUPS, openPanel, usePanel, useView, VIEWS, type ViewKey } from '../lib/views';
+import { BOARD_COLUMN_MIN, BOARD_GAP_X, BOARD_GAP_Y, BOARD_GUTTER, BoardTitle, BoardWidth, NAV_H, useWide, WIDE_FILTER_H, WIDE_FILTER_MARGIN } from '../lib/wide';
 import { C } from '../theme';
 
 
@@ -78,7 +83,8 @@ export default function Main() {
   /* Wide: the filter bar floats clear of the bottom edge on its own, always
      there, and carries the date control. */
   const wide = useWide();
-  const columns = useColumns();
+  const panel = usePanel();
+  const insets = useSafeAreaInsets();
   const dateEl = dated && !wide ? <DateHeader dk={dk} today={today} earliest={earliest} intensity={intensity} onChange={onChange} /> : null;
   const filterRoom = wide ? WIDE_FILTER_H + WIDE_FILTER_MARGIN + 10 : !filtered ? 0 : FILTER_BAR_HEIGHT + FILTER_BAR_GAP;
 
@@ -128,25 +134,13 @@ export default function Main() {
           refreshing={false}
           bottomExtra={filterRoom}
         >
-          {statusEl}
           {errorEl}
           {!snap ? (
             <Card>
               <ActivityIndicator color={C.dim} />
             </Card>
           ) : (
-            <Board
-              columns={columns}
-              body={body}
-              heads={{
-                // The forecast looks forward, so it has its own span, not the range.
-                forecast: (
-                  <View style={{ width: 230 }}>
-                    <Segmented compact options={HORIZONS} value={horizon} onChange={setHorizon} />
-                  </View>
-                ),
-              }}
-            />
+            <Board body={body} bottomRoom={filterRoom} reflow={`${dk}|${glance.range}|${glance.platform}|${snap.pingsFullAt ?? 0}`} taken={error ? 70 : 0} />
           )}
         </Screen>
         <FilterBar
@@ -157,6 +151,18 @@ export default function Main() {
           onRange={(range) => patchGlance({ range })}
           date={<DateHeader bare dk={dk} today={today} earliest={earliest} intensity={intensity} onChange={onChange} />}
         />
+        {/* The visited views, each a panel over the board. */}
+        <Sheet visible={!!panel} onClose={() => openPanel(null)} title={VIEWS.find((v) => v.key === panel)?.label} full bleed>
+          {() =>
+            panel ? (
+              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ gap: 12, paddingBottom: 24 + insets.bottom }} showsVerticalScrollIndicator={false} {...KEYBOARD_SCROLL}>
+                {/* The forecast looks forward, so it has its own span, not the range. */}
+                {panel === 'forecast' ? <Segmented compact options={HORIZONS} value={horizon} onChange={setHorizon} /> : null}
+                {body(panel)}
+              </ScrollView>
+            ) : null
+          }
+        </Sheet>
         <ToastStack raisedBy={filterRoom} />
         <BottomBar />
       </View>
@@ -210,49 +216,112 @@ export default function Main() {
   );
 }
 
-/* Which sections stand in which column, by how many columns there are. Set by
-   hand rather than balanced by measurement: a section must not hop columns as
-   its data loads, and the longest reads (usage, forecast, raw pings) are kept
-   apart so the columns end near each other. */
-const LAYOUTS: Record<number, ViewKey[][]> = {
-  1: [['usage', 'glance', 'sales', 'forecast', 'errors', 'pings', 'links', 'codes']],
-  2: [
-    ['usage', 'sales', 'errors', 'links'],
-    ['glance', 'forecast', 'codes', 'pings'],
-  ],
-  3: [
-    ['usage', 'errors', 'links'],
-    ['glance', 'sales', 'codes'],
-    ['forecast', 'pings'],
-  ],
-};
+/* Growing the board (another column, or more height) is only allowed for this
+   long after something that legitimately re-flows it. Past that, an overflow
+   is a card the reader just opened, and re-columning the whole board under
+   their finger would be worse than letting it run off the edge. */
+const SETTLE_MS = 2500;
 
 /**
- * The wide screen's one page: every view as a titled section, in columns that
- * fill the window. All of it reads the one date and the one filter, so it is a
- * single picture of the day rather than eight pages to visit. Each section
- * reports where it starts, which is what the top bar's jump menu scrolls to.
+ * The wide screen's one page: the day's views as ONE flow of cards that runs
+ * down a column and wraps into the next, in a box exactly as tall as the
+ * window has to give, so nothing is below the fold while the window can hold
+ * it (or, failing that, STACKED: see below). It fits itself: it starts at two columns and, while the flow still runs
+ * off the right edge, adds a column (narrowing them all) down to the
+ * narrowest a card can be; only then does it give up on one screen and grow
+ * taller, which is the one case that scrolls.
+ *
+ * The cards are the views' own top-level cards, unwrapped: a view returns a
+ * fragment, so its cards land directly in the flow and can wrap one by one.
+ * Each is told the column width through `BoardWidth`.
+ *
+ * Every GROUP of sections (`BOARD_GROUPS`) starts its own column: a group is its own wrapping flow, as
+ * tall as the board, and the sections stand side by side. So a section's
+ * title is always at the top of a column and its cards wrap into as many
+ * columns as they need without running off the bottom. That costs the tail of
+ * each section's last column, so it is only done while the window can give
+ * every section a column of its own; narrower than that, the board falls back
+ * to one continuous flow.
  */
-function Board({ columns, body, heads }: { columns: number; body: (key: ViewKey) => ReactNode; heads: Partial<Record<ViewKey, ReactNode>> }) {
-  const layout = LAYOUTS[columns] ?? LAYOUTS[1];
+function Board({ body, bottomRoom, reflow, taken }: { body: (key: ViewKey) => ReactNode; bottomRoom: number; /** Changes when the content legitimately re-flows. */ reflow: string; /** Height used above the board. */ taken: number }) {
+  const insets = useSafeAreaInsets();
+  const { width: winW, height: winH } = useWindowDimensions();
+  /* Zoom: the board is laid out for a window 1/zoom the size and then drawn
+     at zoom, so zooming out genuinely makes room for more columns and more
+     rows rather than just shrinking a layout that still does not fit. */
+  const zoom = useZoom();
+  const avail = (winW - BOARD_GUTTER * 2) / zoom;
+  const maxCols = Math.max(1, Math.floor((avail + BOARD_GAP_X) / (BOARD_COLUMN_MIN + BOARD_GAP_X)));
+  const room = Math.max(320, winH - insets.top - NAV_H - 12 - taken - (insets.bottom + BOTTOM_ROOM + bottomRoom)) / zoom;
+  const key = `${winW}x${winH}|${zoom}|${reflow}`;
+  const split = maxCols >= BOARD_GROUPS.length;
+  const start = split ? BOARD_GROUPS.length : Math.min(2, maxCols);
+  const [fit, setFit] = useState({ key, cols: start, tall: 1, stacked: false });
+  const [inner, setInner] = useState({ w: 0, h: 0 });
+  const since = useRef(Date.now());
+  // A new window size, zoom or content starts the fitting over.
+  const cur = fit.key === key ? fit : { key, cols: start, tall: 1, stacked: false };
+  if (cur !== fit) {
+    since.current = Date.now();
+    setFit(cur);
+  }
+  /* STACKED is what the board falls back to when even its narrowest columns
+     cannot hold everything on one screen: one column per group, as wide as
+     they can be, each simply as tall as its cards, and the page scrolls. A
+     board that has to scroll anyway is better read as three whole sections
+     than as a wrap with a nearly empty last column. Zooming out is how to
+     get back to one screen. */
+  const stacked = split && cur.stacked;
+  const cols = stacked ? BOARD_GROUPS.length : Math.min(cur.cols, maxCols);
+  const colW = Math.floor((avail - BOARD_GAP_X * (cols - 1)) / cols);
+  const measured = (w: number, h: number) => {
+    setInner((cur0) => (cur0.w === w && cur0.h === h ? cur0 : { w, h }));
+    if (stacked || w <= avail + 1 || Date.now() - since.current > SETTLE_MS) return;
+    setFit((f) => (f.key !== key ? f : f.cols < maxCols ? { ...f, cols: f.cols + 1 } : split ? { ...f, stacked: true } : { ...f, tall: f.tall + 0.25 }));
+  };
+  const height = Math.round(room * cur.tall);
+  const label = (k: ViewKey) => VIEWS.find((v) => v.key === k)?.label ?? null;
   return (
-    <View style={s.board} onLayout={(e) => noteTop('board', e.nativeEvent.layout.y)}>
-      {layout.map((keys, i) => (
-        <View key={i} style={s.column}>
-          {keys.map((key) => (
-            <View key={key} style={s.section} onLayout={(e) => noteTop(key, e.nativeEvent.layout.y)}>
-              <View style={s.sectionHead}>
-                <Text style={s.sectionTitle}>{VIEWS.find((v) => v.key === key)?.label}</Text>
-                {heads[key]}
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} style={{ flexGrow: 0 }}>
+      {/* The outer box is the board's size on screen; the inner one is its
+          size as laid out, scaled from its top left corner. It is a
+          CrispZoomView so what is inside is REDRAWN at the zoomed resolution
+          rather than stretched, which is what blurred it. */}
+      <View style={{ width: Math.ceil(inner.w * zoom), height: Math.ceil((stacked ? inner.h : height) * zoom) }}>
+        <CrispZoomView
+          zoom={zoom}
+          onLayout={(e) => measured(e.nativeEvent.layout.width, e.nativeEvent.layout.height)}
+          style={[s.sections, { position: 'absolute', left: 0, top: 0, height: stacked ? undefined : height, transform: [{ scale: zoom }], transformOrigin: 'left top' }]}
+        >
+          <BoardWidth.Provider value={colW}>
+            {split ? (
+              BOARD_GROUPS.map((group) => (
+                <View key={group[0]} style={stacked ? s.stack : [s.board, { height }]}>
+                  {group.map((k) => (
+                    <BoardTitle.Provider key={k} value={label(k)}>
+                      {body(k)}
+                    </BoardTitle.Provider>
+                  ))}
+                </View>
+              ))
+            ) : (
+              <View style={[s.board, { height }]}>
+                {BOARD.map((k) => (
+                  <BoardTitle.Provider key={k} value={label(k)}>
+                    {body(k)}
+                  </BoardTitle.Provider>
+                ))}
               </View>
-              {body(key)}
-            </View>
-          ))}
-        </View>
-      ))}
-    </View>
+            )}
+          </BoardWidth.Provider>
+        </CrispZoomView>
+      </View>
+    </ScrollView>
   );
 }
+
+/** What the Screen pads under its content, besides the floating controls. */
+const BOTTOM_ROOM = 24;
 
 export type RangeKey = '7' | '30' | '90' | 'all';
 const RANGES: { key: RangeKey; label: string }[] = [
@@ -294,6 +363,16 @@ function Glance({ dk, st, set }: { dk: string; st: GlanceState; set: (patch: Par
   const { snap } = useData();
   const b = useMemo(() => buildBase(snap ?? null, st.platform), [snap, st.platform]);
   const cur = snap?.load?.settings?.currency || '$';
+  /* The conversion cards read the app's own pings. Kept apart from the memo
+     below, which re-runs on every chip, so the index is built once per day. */
+  const usage = useMemo(
+    () => ({
+      all: buildIndex(snap?.pings, st.platform, dk),
+      ios: st.platform === 'all' ? buildIndex(snap?.pings, 'ios', dk) : null,
+      android: st.platform === 'all' ? buildIndex(snap?.pings, 'android', dk) : null,
+    }),
+    [snap, st.platform, dk],
+  );
   const lastEntry = b.lastReported;
   const m = useMemo(() => {
     /* Store reports arrive by import and lag a day or two. A day after the
@@ -310,14 +389,14 @@ function Glance({ dk, st, set }: { dk: string; st: GlanceState; set: (patch: Par
     const grain = spanDays(from, dk) > WEEKLY_AFTER ? 'week' : 'day';
     return {
       from,
-      specs: glanceSpecs(snap ?? null, st.platform, b, { from, to: dk, prevFrom, prevTo, deltaOK }),
+      specs: glanceSpecs(snap ?? null, st.platform, b, { from, to: dk, prevFrom, prevTo, deltaOK }, usage),
       s: summarize(b, from, dk),
       buckets: downloadBuckets(b, from, dk, grain),
       grain,
       storeTo,
       dow: weekdayStats(b, from, ledgerMetric || from > storeTo ? dk : storeTo, st.metric),
     };
-  }, [snap, b, dk, st.range, st.metric, st.platform, lastEntry]);
+  }, [snap, b, usage, dk, st.range, st.metric, st.platform, lastEntry]);
   const { s, specs } = m;
   const metric = DOW_METRICS.find((x) => x.key === st.metric) ?? DOW_METRICS[0];
   const dowFormat = st.metric === 'revenue' ? (n: number) => money(n, cur) : (n: number) => (n >= 10 ? int(n) : n.toFixed(1));
@@ -372,11 +451,9 @@ const s_ = StyleSheet.create({
 
 
 const s = StyleSheet.create({
-  board: { flexDirection: 'row', alignItems: 'flex-start', gap: 24 },
-  column: { flex: 1, minWidth: 0, gap: 36 },
-  section: { gap: 14 },
-  sectionHead: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12, minHeight: 34, paddingBottom: 8, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: 'rgba(255,255,255,0.14)' },
-  sectionTitle: { color: C.text, fontSize: 22, fontWeight: '700', letterSpacing: -0.4 },
+  stack: { flexDirection: 'column', rowGap: BOARD_GAP_Y },
+  board: { flexDirection: 'column', flexWrap: 'wrap', alignContent: 'flex-start', columnGap: BOARD_GAP_X, rowGap: BOARD_GAP_Y },
+  sections: { flexDirection: 'row', alignItems: 'flex-start', columnGap: BOARD_GAP_X },
   status: { height: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },
   statusSlot: { width: 22, height: 22, alignItems: 'center', justifyContent: 'center' },
   statusText: { color: C.muted, fontSize: 12, lineHeight: 20 },

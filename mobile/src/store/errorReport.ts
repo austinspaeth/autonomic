@@ -225,6 +225,29 @@ export function reportFault(tag: string, msg: string, fatal?: boolean): void {
   }
 }
 
+/**
+ * Count one occurrence of something that is NOT a failure, on the same route.
+ *
+ * The capture funnel rides `/fault` because it is the only route that counts
+ * every occurrence, by platform and build (see `CAPTURE_TAGS` in
+ * lib/hrv/refusal): a reading that began, and one that was filed. Those happen
+ * on every reading, so unlike a failure they are never sent on first sight —
+ * they wait for the debounce, a background or the next launch, and go out as
+ * one request carrying their count. A user retrying a camera reading ten times
+ * would otherwise spend most of a launch's request budget announcing that
+ * readings were being taken, and a real failure behind them would wait.
+ */
+export function reportEvent(tag: string, msg: string): void {
+  if (__DEV__) return;
+  try {
+    const day = easternDay(Date.now());
+    save(notePending(load(), faultSignature(tag, msg), { tag, msg }, day));
+    scheduleFlush();
+  } catch {
+    /* reporting must never be a failure */
+  }
+}
+
 let started = false;
 
 /**

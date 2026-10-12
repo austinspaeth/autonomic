@@ -32,7 +32,11 @@ import {
   noteRrSample, rrSupport, RR_WATCH_START, type RrSupport, type RrWatch,
 } from '../../lib/ble/rrSupport';
 import { ppg, type PpgSignal } from '../../lib/ppg/camera';
-import { computeHrv, correctArtifacts, hopelessCoverage, std } from '../../lib/hrv';
+import {
+  TROUBLE_GRACE_SEC, computeHrv, correctArtifacts, hopelessCoverage, isRecovering, liveCoverage, std,
+} from '../../lib/hrv';
+import { CAPTURE_TAGS, abandonSignature, attemptSignature } from '../../lib/hrv/refusal';
+import { reportEvent, reportFault } from '../../store/errorReport';
 import { readingDoneCopy } from '../../lib/notifications';
 import { notifyHrvComplete } from '../../lib/reminders';
 import { logError } from '../../lib/diagnostics/errorLog';
@@ -95,17 +99,22 @@ export type SessionStatus = 'idle' | 'armed' | 'running' | 'finished';
  * Why a reading ended WITHOUT a result, when it did.
  *
  * `null` is the ordinary case: the duration ran out or Finish now was pressed,
- * and `result` holds the beats. The two values here are the same event seen
+ * and `result` holds the beats. `'signal'` and `'user'` are the same event seen
  * from either side — the app worked out the reading could not get there, or the
  * user did — and both mean there is nothing to hand to `Results`, so the host
  * raises the trouble card instead.
+ *
+ * `'early'` is a camera reading finished by hand inside the grace period. There
+ * is not enough of it to judge, let alone to measure from, so it is not handed
+ * to a results card to be refused: it ends here, and the card says it was too
+ * short.
  *
  * It is deliberately NOT a variant of finishing. A reading abandoned this way
  * fires no completion or activation ping: an abandoned session is the one place
  * in the whole counter system where a capture that started and never finished
  * is visible at all, and crediting it would close the only gap we have.
  */
-export type SessionStopReason = 'signal' | 'user';
+export type SessionStopReason = 'signal' | 'user' | 'early';
 
 export interface SessionSnapshot {
   status: SessionStatus;
@@ -131,14 +140,17 @@ export interface SessionSnapshot {
   artifact: boolean;
   signal: PpgSignal;
   /**
-   * Seconds of pulse actually collected — the summed RR, not the clock.
+   * Seconds of pulse the reading holds, as the stop rule last judged it.
    *
-   * The camera emits no beats at all from a window that does not read as a
-   * steady pulse (`ppgBridge.analyze`), so on that source this and `elapsed`
-   * diverge exactly as much as the finger is misbehaving, and the gap is what
-   * the stop rule reads. An optimistic upper bound on the pipeline's own
-   * `coverageSec`, which is over CLEAN kept beats — so a stop decision taken
-   * from it only ever errs toward letting the reading continue.
+   * On a camera reading past its grace period this is `liveCoverage`: what
+   * segment triage would KEEP, plus the stretch still being collected. Before
+   * then, and on every other source, it is the summed RR.
+   *
+   * It used to be the summed RR always, on the reasoning that an optimistic
+   * upper bound on `coverageSec` could only err toward letting a reading
+   * continue. It erred all the way: a lock that broke every fifteen seconds
+   * collected minutes of pulse of which triage kept none, so the stop rule saw a
+   * healthy reading and the results card refused it for holding nothing.
    */
   usableSec: number;
   /** Set only when the reading ended with no result. See {@link SessionStopReason}. */
@@ -175,6 +187,11 @@ let recentRr: number[] = [];
 /** Running total of collected RR (ms), kept rather than re-summed: `bump` runs
  *  on every sample and a 5-minute reading is ~350 beats. */
 let usableMs = 0;
+/** What the stop rule last judged the reading to hold (seconds), or null while
+ *  nothing has judged it. Camera only; see `SessionSnapshot.usableSec`. */
+let judgedSec: number | null = null;
+/** When the last beat arrived (ms), for "is pulse arriving right now". */
+let lastBeatMs = 0;
 /** What the strap has told us about its own capability. Not reset on a
  *  reconnect: this is a fact about the device, not about the link. */
 let rrWatch: RrWatch = RR_WATCH_START;
@@ -194,7 +211,7 @@ function bump(patch: Partial<SessionSnapshot> = {}) {
     ...snap,
     ...patch,
     beats: rr.length,
-    usableSec: Math.round(usableMs / 1000),
+    usableSec: Math.round(judgedSec ?? usableMs / 1000),
     rrSupport: rrSupport(rrWatch),
     hrTrace: hrSamples.length ? hrSamples.slice(-HR_TRACE).map((s) => s.bpm) : [],
     sdnnTrace: sdnnSamples.length ? sdnnSamples.slice(-SDNN_TRACE).map((s) => s.sdnn) : [],
@@ -238,6 +255,7 @@ function collect(s: { hr: number; rr: number[]; gap?: boolean }) {
   // would otherwise straddle the gap.
   if (s.gap && rr.length) { segmentStarts.push(rr.length); recentRr = []; }
   s.rr.forEach((v) => { rr.push(v); usableMs += v; });
+  if (s.rr.length) lastBeatMs = now;
 
   // Live artifact hint over the last ~10 beats.
   let artifact = snap.artifact;
@@ -273,24 +291,55 @@ function syncElapsed() {
   if (snap.status !== 'running') return;
   const e = Math.floor((Date.now() - startedAtMs) / 1000);
   if (e !== snap.elapsed) bump({ elapsed: Math.min(e, snap.durationSec) });
-  if (e >= snap.durationSec) { void finishSession(); return; }
   // A camera reading that cannot reach the coverage bar is stopped where it is
   // rather than run to the end.
   //
-  // The whole cost of a bad finger placement used to be paid at 3:00, in the
+  // The whole cost of a bad finger placement used to be paid at the end, in the
   // form of a card declining to save anything — which is the right verdict at
   // the worst possible moment, and a user who repeats the attempt has spent
-  // twenty minutes to be told the same sentence seven times. The decision was
-  // already made by 0:45; the only thing the remaining time bought was the
-  // user's patience. `hopelessCoverage` is the arithmetic, and it never stops a
-  // reading holding enough pulse to be offered.
+  // twenty minutes to be told the same sentence seven times. `hopelessCoverage`
+  // is the arithmetic, and it never stops a reading holding enough pulse to be
+  // offered.
+  //
+  // It is judged on what triage would KEEP (`judgeCamera`), not on how much
+  // pulse was collected, and it is asked BEFORE the duration check. The order
+  // matters for one case: the camera delivers nothing while the app is in the
+  // background and this clock does not tick there either, so a reading left
+  // early and returned to after its five minutes arrives here already over. It
+  // used to finish, and hand an all but empty series to a results card.
   //
   // Camera only: a strap either delivers beats or does not, and that question
   // is answered before the reading starts (`rrSupport`).
-  if (snap.config?.source === 'camera' && hopelessCoverage({
-    usableSec: usableMs / 1000, elapsedSec: e, durationSec: snap.durationSec,
-  })) {
+  if (snap.config?.source === 'camera' && judgeCamera(Math.min(e, snap.durationSec))) {
     void abandonSession('signal');
+    return;
+  }
+  if (e >= snap.durationSec) void finishSession();
+}
+
+/**
+ * Is this camera reading past saving? Also records what it was judged to hold,
+ * so the card that explains a stop quotes the figure the stop was made on.
+ *
+ * Runs the real cleaning and triage over the series collected so far. That is
+ * a few hundred beats at most, once a second, and only once the grace period
+ * is over — before it `hopelessCoverage` answers false whatever it is handed.
+ * A failure here must never end a reading: it reports and lets it run.
+ */
+function judgeCamera(elapsedSec: number): boolean {
+  if (elapsedSec < TROUBLE_GRACE_SEC) return false;
+  try {
+    const live = liveCoverage(rr, { source: 'camera', segmentStarts });
+    judgedSec = live.keptSec + live.openSec;
+    return hopelessCoverage({
+      usableSec: judgedSec,
+      elapsedSec,
+      durationSec: snap.durationSec,
+      growing: isRecovering({ sinceBeatSec: (Date.now() - lastBeatMs) / 1000, discarded: live.discarded }),
+    });
+  } catch (err) {
+    logError('hrv.judge', err);
+    return false;
   }
 }
 
@@ -331,6 +380,21 @@ async function completionBuzz() {
   }
 }
 
+/**
+ * The stop signal: two short error pulses, a beat apart.
+ *
+ * It must not be mistaken for `completionBuzz`, which is one sustained second —
+ * a reader who cannot see the screen has only the shape of the vibration to
+ * tell "done" from "that did not work", so this is deliberately the other
+ * shape. No reason to hold back for the sensor's sake: the reading is over.
+ */
+async function stopBuzz() {
+  for (let i = 0; i < 2; i++) {
+    Haptics.notificationAsync(Haptics.NotificationFeedbackType.Error).catch(() => {});
+    await new Promise((r) => setTimeout(r, 450));
+  }
+}
+
 /* ---------- lifecycle ---------- */
 
 /**
@@ -344,7 +408,7 @@ export function startSession(config: SessionConfig, autoStart?: boolean) {
   // cannot exist. Reopening from the pill relies on exactly this.
   if (snap.status !== 'idle') return;
   rr = []; segmentStarts = []; hrSamples = []; sdnnSamples = []; recentRr = [];
-  usableMs = 0;
+  usableMs = 0; judgedSec = null; lastBeatMs = 0;
   rrWatch = RR_WATCH_START;
   startedAtMs = 0;
   const now = Date.now();
@@ -473,6 +537,11 @@ export function beginCollection() {
   // mounted because this is the one path a running reading can start from,
   // whatever opened it and wherever it is later minimized to.
   pingCaptureStarted(src);
+  // And every attempt, not just the day's first: the ping above is capped at
+  // one per install per day, so it counts PEOPLE and can never say how many
+  // tries a reading took. Only where the phone runs the reading — a wrist
+  // reading's attempts happen on the wrist, out of sight.
+  if (src && streamsLive(src)) reportEvent(CAPTURE_TAGS.attempt, attemptSignature(src, snap.config?.kind));
   // A camera reading is taken face down, so the screen cannot say it started.
   // The placement card promises this buzz; the completion buzz is its pair.
   if (src === 'camera') Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success).catch(() => {});
@@ -487,6 +556,16 @@ export function beginCollection() {
  */
 export async function finishSession() {
   if (snap.status === 'finished' || snap.status === 'idle') return;
+  // A camera reading finished by hand inside the grace period is not a reading.
+  // The stop rule has not judged it yet and the pipeline could not make a
+  // measurement of it: handing it to the results card bought the user a refusal
+  // and the counters a "completed" capture. It ends as what it is. Only the
+  // camera, and only by hand — the clock cannot get here this early.
+  if (snap.status === 'running' && snap.config?.source === 'camera' && startedAtMs
+    && (Date.now() - startedAtMs) / 1000 < TROUBLE_GRACE_SEC) {
+    await abandonSession('early');
+    return;
+  }
   // Wall-clock capture length: auto-finish can fire long after the duration if
   // the app was backgrounded, and never before `beginCollection` stamped a start.
   const capturedSec = startedAtMs
@@ -558,13 +637,58 @@ export async function finishSession() {
  * says what it saw ("stopped at 0:48, 14s of usable pulse"), and a number that
  * had been reset to zero would be the app failing to explain itself at the one
  * moment it is trying to.
+ *
+ * It IS reported, as a failed attempt (`reportAbandon`), once a reading was
+ * actually running. That is not the completion ping coming back: it lands on
+ * the fault route, under its own tag.
  */
 export async function abandonSession(reason: SessionStopReason) {
   if (snap.status === 'finished' || snap.status === 'idle') return;
   if (breathTimer) { clearTimeout(breathTimer); breathTimer = null; }
   if (timer) { clearInterval(timer); timer = null; }
+  const wasRunning = snap.status === 'running';
   bump({ status: 'finished', minimized: false, hidden: false, result: null, stopReason: reason });
+  if (wasRunning) reportAbandon(reason);
+  // The app stopping a reading has to be FELT. A camera reading is taken with
+  // the phone face down, and until this the only thing a stop did was change a
+  // screen nobody was looking at: the user sat on, finger on the lens, waiting
+  // for a completion buzz that was never going to come. Only when the app is
+  // the one that stopped it — a user who tapped out is looking at the phone.
+  if (reason === 'signal') void stopBuzz();
   await releaseCapture();
+}
+
+/**
+ * Tell the fault log a reading ended with nothing to show.
+ *
+ * An abandoned reading reaches no results card, and the results card is the
+ * only thing that reported a failed capture — so the better the stop rule got
+ * at ending hopeless readings early, the more failures left the one place they
+ * could be counted. `reportFault` directly, never `logError`: this is a finger
+ * on a lens, not a phone worth asking for a support dump.
+ */
+function reportAbandon(reason: SessionStopReason) {
+  try {
+    const src = snap.config?.source;
+    if (!src || !streamsLive(src)) return;
+    const elapsedSec = startedAtMs ? Math.max(0, (Date.now() - startedAtMs) / 1000) : 0;
+    let keptSec = usableMs / 1000;
+    if (src === 'camera') {
+      const live = liveCoverage(rr, { source: src, segmentStarts });
+      keptSec = live.keptSec + live.openSec;
+    }
+    reportFault(CAPTURE_TAGS.abandoned, abandonSignature({
+      source: src,
+      reason,
+      keptSec,
+      rawSec: usableMs / 1000,
+      segments: rr.length ? segmentStarts.length + 1 : 0,
+      elapsedSec: Math.min(elapsedSec, snap.durationSec),
+      kind: snap.config?.kind,
+    }));
+  } catch (err) {
+    logError('hrv.abandon.report', err);
+  }
 }
 
 /** Drop the strap / camera. Safe to call twice. */
@@ -591,7 +715,7 @@ export function endSession() {
   void releaseCapture();
   deactivateKeepAwake('hrv-session');
   rr = []; segmentStarts = []; hrSamples = []; sdnnSamples = []; recentRr = [];
-  usableMs = 0;
+  usableMs = 0; judgedSec = null; lastBeatMs = 0;
   rrWatch = RR_WATCH_START;
   snap = IDLE;
   emit();

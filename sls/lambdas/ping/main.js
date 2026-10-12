@@ -1,7 +1,7 @@
 /**
  * Cohort ping — the only endpoint the mobile app itself talks to.
  *
- * Twenty-one routes. Twenty public writers, no auth, no response payload, and no
+ * Twenty-two routes. Twenty-one public writers, no auth, no response payload, and no
  * body on any of them but the one POST:
  *
  *   GET /ping/open/D082126I   the app was opened today by an install from that cohort
@@ -14,6 +14,8 @@
  *   GET /ping/act/D082126IB   an install from that cohort took its FIRST HRV reading
  *   GET /ping/cap/D082126IG   an install STARTED a reading today
  *   GET /ping/hrv/D082126IG   an install COMPLETED one today
+ *   GET /ping/sav/D082126IG   an install SAVED one to its journal today (filed by the
+ *                             app, kept from a refusal, or arrived from the wrist)
  *   GET /ping/pay/D082126IR   an install met the PAYWALL today
  *   GET /ping/not/D082126IM   an install turned a NOTIFICATION on today
  *   GET /ping/pot/D082126IT   an install finished a POTS capture today
@@ -212,7 +214,7 @@ const SKEW_MS = 36 * 60 * 60 * 1000;
 
 const KINDS = {
   open: 'OPEN', sub: 'SUB', rst: 'RST', lap: 'LAP', act: 'ACT',
-  cap: 'CAP', hrv: 'HRV',
+  cap: 'CAP', hrv: 'HRV', sav: 'SAV',
   pay: 'PAY', not: 'NOT', pot: 'POT', see: 'SEE', err: 'ERR',
   osh: 'OSH', odm: 'ODM', oac: 'OAC', ofl: 'OFL',
   log: 'LOG', use: 'USE', fnd: 'FND', rpt: 'RPT',
@@ -220,7 +222,7 @@ const KINDS = {
 };
 
 /** The routes whose slot letter is a capture SENSOR. */
-const READING_KINDS = { ACT: 1, CAP: 1, HRV: 1 };
+const READING_KINDS = { ACT: 1, CAP: 1, HRV: 1, SAV: 1 };
 
 /** The routes whose slot letter is a subscription PLAN. */
 const PLAN_KINDS = { SUB: 1, RST: 1, LAP: 1 };
@@ -274,6 +276,23 @@ const TIERS = { F: 'free', T: 'trial', P: 'pro' };
  * with no token (every older build) is simply absent from it.
  */
 const EVIDENCE = { V: 'verified', S: 'store' };
+
+/**
+ * The DOOR a sale came through, from the `-W` token newer builds send on `sub`:
+ * the wall that raised the paywall it was bought from (the PAY route's own
+ * letters), or one of the two offer cards (the OSH route's). The two alphabets
+ * do not collide, so one letter says which kind of door and which one.
+ *
+ * `pay` says which locked thing people tap and `sub` says somebody paid, and
+ * until this nothing joined them: a wall met constantly and never bought from
+ * was indistinguishable from the one that sells the app. Counted in a map of
+ * its own on the SUB row, never in the cohort key, exactly as `evidence` is and
+ * for the same reason — every existing reader of `cohorts` is untouched, and a
+ * sale with no token (an older build, or a payment with no buy tap behind it)
+ * is simply absent from the map, which reads as "not known" and never as a
+ * door of its own.
+ */
+const DOORS = { ...SURFACES, A: 'annual-offer', F: 'founder-offer' };
 
 /** Which notification was turned ON — the NOT route. Only enables are sent. */
 const NOTIFY = { M: 'morning-reminder', C: 'crash-warning', P: 'pacing-alerts' };
@@ -363,7 +382,7 @@ const MORNING_PROMPT = { S: 'shown', T: 'take-reading', X: 'closed' };
  * row.
  */
 const ALPHABET = {
-  ACT: METHODS, CAP: METHODS, HRV: METHODS,
+  ACT: METHODS, CAP: METHODS, HRV: METHODS, SAV: METHODS,
   PAY: SURFACES, NOT: NOTIFY, POT: POTS, SEE: VIEWS,
   OSH: OFFERS, ODM: OFFERS, OAC: OFFERS, OFL: OFFER_FAILS,
   LOG: LOGS, USE: FEATURES, FND: FINDINGS, RPT: REPORTS,
@@ -413,6 +432,7 @@ const decodeCohort = (raw) => {
   let tier = null;
   let version = null;
   let evidence = null;
+  let door = null;
   parts.slice(1).forEach((tok) => {
     if (/^T[A-Z]$/.test(tok)) tier = TIERS[tok[1]] ? tok[1] : null;
     // A version is a map key, so it is accepted only in the one shape a human
@@ -420,9 +440,11 @@ const decodeCohort = (raw) => {
     if (/^V\d+(\.\d+){0,2}$/.test(tok)) version = tok.slice(1);
     // How a sale was known — see EVIDENCE. Anything else is dropped.
     if (/^E[A-Z]$/.test(tok)) evidence = EVIDENCE[tok[1]] ? tok[1] : null;
+    // The door a sale came through — see DOORS. Anything else is dropped.
+    if (/^W[A-Z]$/.test(tok)) door = DOORS[tok[1]] ? tok[1] : null;
   });
 
-  return { iso, platform: PLATFORMS[p] ? p : 'U', slot: slot || null, tier, version, evidence };
+  return { iso, platform: PLATFORMS[p] ? p : 'U', slot: slot || null, tier, version, evidence, door };
 };
 
 /**
@@ -550,11 +572,18 @@ const hourKey = (nowMs, platform, fresh) => (
   + `${platform || 'U'}${fresh ? 'N' : ''}`
 );
 
-const bump = async (kind, day, cohortIso, platform, slot, tier, version, evidence, nowMs) => {
+/* WHEN a sale arrived: SUB rows keep a `times` map, cohort key -> the ISO
+   instant of the latest ping counted under it. A day row only ever said how
+   many, so "what time did that come in" had no answer anywhere. One instant
+   per key, not a list: two sales under one key in a day is rare, and the
+   later one is then the one it names. Bounded by the cohort map beside it. */
+const bump = async (kind, day, cohortIso, platform, slot, tier, version, evidence, nowMs, door) => {
   const cKey = cohortKey(cohortIso, platform, slot, tier);
   const bKey = buildKey(platform, tier, version);
   const withEvidence = kind === 'SUB' && !!EVIDENCE[evidence];
   const withHours = kind === 'OPEN' && Number.isFinite(nowMs);
+  const withTimes = kind === 'SUB' && Number.isFinite(nowMs);
+  const withDoor = kind === 'SUB' && !!DOORS[door];
   const add = new UpdateCommand({
     TableName: TABLE,
     Key: { PK: `PING#${kind}`, SK: day },
@@ -563,6 +592,8 @@ const bump = async (kind, day, cohortIso, platform, slot, tier, version, evidenc
       '#builds.#b = if_not_exists(#builds.#b, :zero) + :one',
       ...(withEvidence ? ['#evidence.#e = if_not_exists(#evidence.#e, :zero) + :one'] : []),
       ...(withHours ? ['#hours.#h = if_not_exists(#hours.#h, :zero) + :one'] : []),
+      ...(withTimes ? ['#times.#c = :now'] : []),
+      ...(withDoor ? ['#doors.#w = if_not_exists(#doors.#w, :zero) + :one'] : []),
       '#total = if_not_exists(#total, :zero) + :one',
       '#day = :day',
       'entityType = :t',
@@ -572,8 +603,13 @@ const bump = async (kind, day, cohortIso, platform, slot, tier, version, evidenc
       '#total': 'total', '#day': 'day',
       ...(withEvidence ? { '#evidence': 'evidence', '#e': evidenceKey(cKey, evidence) } : {}),
       ...(withHours ? { '#hours': 'hours', '#h': hourKey(nowMs, platform, cohortIso === day) } : {}),
+      ...(withTimes ? { '#times': 'times' } : {}),
+      ...(withDoor ? { '#doors': 'doors', '#w': evidenceKey(cKey, door) } : {}),
     },
-    ExpressionAttributeValues: { ':zero': 0, ':one': 1, ':day': day, ':t': 'PING_DAY' },
+    ExpressionAttributeValues: {
+      ':zero': 0, ':one': 1, ':day': day, ':t': 'PING_DAY',
+      ...(withTimes ? { ':now': new Date(nowMs).toISOString() } : {}),
+    },
   });
 
   try {
@@ -591,10 +627,14 @@ const bump = async (kind, day, cohortIso, platform, slot, tier, version, evidenc
       Key: { PK: `PING#${kind}`, SK: day },
       UpdateExpression: 'SET #cohorts = if_not_exists(#cohorts, :empty), #builds = if_not_exists(#builds, :empty)'
         + (withEvidence ? ', #evidence = if_not_exists(#evidence, :empty)' : '')
-        + (withHours ? ', #hours = if_not_exists(#hours, :empty)' : ''),
+        + (withHours ? ', #hours = if_not_exists(#hours, :empty)' : '')
+        + (withTimes ? ', #times = if_not_exists(#times, :empty)' : '')
+        + (withDoor ? ', #doors = if_not_exists(#doors, :empty)' : ''),
       ExpressionAttributeNames: {
         '#cohorts': 'cohorts', '#builds': 'builds', ...(withEvidence ? { '#evidence': 'evidence' } : {}),
         ...(withHours ? { '#hours': 'hours' } : {}),
+        ...(withTimes ? { '#times': 'times' } : {}),
+        ...(withDoor ? { '#doors': 'doors' } : {}),
       },
       ExpressionAttributeValues: { ':empty': {} },
     }));
@@ -616,7 +656,7 @@ const bump = async (kind, day, cohortIso, platform, slot, tier, version, evidenc
  */
 /* COMPACT rows (`report(since, { compact: true })`): the stored maps as they
    are, `{ day, total, c: { cohortKey: n }, b?: { buildKey: n }, e?: { "key~V": n },
-   h?: { hourKey: n } }`.
+   h?: { hourKey: n }, t?: { cohortKey: iso }, w?: { "key~I": n } }`.
    Every field the expanded row spells out is decoded from the keys, so the
    expanded form repeats each one per entry; for the phone dashboard, which
    decodes the keys itself, that was most of a multi-megabyte report. The
@@ -630,6 +670,8 @@ const compactRow = (item) => {
   if (item.builds && Object.keys(item.builds).length) row.b = num(item.builds);
   if (item.evidence && Object.keys(item.evidence).length) row.e = num(item.evidence);
   if (item.hours && Object.keys(item.hours).length) row.h = num(item.hours);
+  if (item.times && Object.keys(item.times).length) row.t = { ...item.times };
+  if (item.doors && Object.keys(item.doors).length) row.w = num(item.doors);
   return row;
 };
 
@@ -730,6 +772,20 @@ const readDays = async (kind, since, compact = false) => {
             return acc;
           }, {}),
         } : {}),
+        // The door each sale came through (SUB rows only; see DOORS), joinable
+        // on the cohort key like `evidence`. Absent before builds sent it.
+        ...(kind === 'SUB' && item.doors && Object.keys(item.doors).length ? {
+          doors: Object.keys(item.doors)
+            .map((k) => {
+              const [key, letter] = String(k).split('~');
+              return DOORS[letter] ? { key, door: letter, count: Number(item.doors[k]) || 0 } : null;
+            })
+            .filter(Boolean)
+            .sort((a, b) => a.key.localeCompare(b.key) || a.door.localeCompare(b.door)),
+        } : {}),
+        // When the latest sale under each cohort key arrived (SUB rows only).
+        // Absent before it was kept, which is unknown and not midnight.
+        ...(item.times && Object.keys(item.times).length ? { times: { ...item.times } } : {}),
       });
     });
     ExclusiveStartKey = res.LastEvaluatedKey;
@@ -1431,7 +1487,7 @@ const handler = async (event) => {
 
   const decoded = decodeCohort(event?.pathParameters?.cohort);
   if (!decoded) return noContent;
-  const { iso: cohort, platform, slot, tier, version, evidence } = decoded;
+  const { iso: cohort, platform, slot, tier, version, evidence, door } = decoded;
 
   const now = Date.now();
   if (cohort < EPOCH) return noContent;
@@ -1446,7 +1502,7 @@ const handler = async (event) => {
   const slotFor = alphabet && alphabet[slot] ? slot : null;
 
   try {
-    await bump(kind, easternDay(now), cohort, platform, slotFor, tier, version, evidence, now);
+    await bump(kind, easternDay(now), cohort, platform, slotFor, tier, version, evidence, now, door);
   } catch (err) {
     // Nothing downstream cares and the client is already gone, but log the
     // failure so a flatlined chart has an explanation other than "nobody
@@ -1469,7 +1525,7 @@ const handler = async (event) => {
 
 module.exports = {
   handler, decodeCohort, cohortKey, buildKey, hourKey, easternDay, report, ALPHABET, KINDS,
-  LOGS, FEATURES, FINDINGS, REPORTS, PLANS, READING_TYPES, MORNING_PROMPT,
+  LOGS, FEATURES, FINDINGS, REPORTS, PLANS, READING_TYPES, MORNING_PROMPT, DOORS,
   redactFault, safeTag, faultKey, hash8, FAULT_MSG_MAX, FAULT_TTL_DAYS, FAULT_MAX_N,
   readOfferFailure, offerFailKey, OUTCOMES, OFFER_FAIL_TTL_DAYS,
 };

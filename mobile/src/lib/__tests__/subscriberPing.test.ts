@@ -272,3 +272,25 @@ describe('which subscriber ping is owed', () => {
     });
   });
 });
+
+describe('the door rides with the purchase it describes', () => {
+  const blank2 = {} as Parameters<typeof notePurchase>[0];
+  const liveNow = { answered: true, isPro: true, plan: 'Y' as const, settled: true, today: '2026-10-11', activeAcked: true };
+
+  it('is reported on the sale', () => {
+    const m = notePurchase(blank2, 'Y', true, 'V', 'tx-1', undefined, 'I');
+    expect(subscriberStep(m, liveNow)).toEqual({ kind: 'sub', plan: 'Y', evidence: 'V', door: 'I' });
+  });
+
+  // The listener and the entitlement query both describe the one purchase, and
+  // only the first knows where the tap was.
+  it('is kept when a later report of the same purchase has none', () => {
+    const m = notePurchase(notePurchase(blank2, 'Y', false, 'V', 'tx-1', undefined, 'F'), 'Y', true, 'V', 'tx-1');
+    expect(m.pending?.door).toBe('F');
+  });
+
+  it('is absent when nothing knew it', () => {
+    const step = subscriberStep(notePurchase(blank2, 'Y', true, 'S', 'tx-1'), liveNow);
+    expect(step && 'door' in step ? step.door : undefined).toBeUndefined();
+  });
+});

@@ -31,6 +31,7 @@ import { resetPauseMemory } from '../lib/budget/pauseMemory';
 import { resetAlertMemory } from '../lib/budget/alertMemory';
 import { importFingerprint } from '../lib/health/updateSet';
 import type { AppState, DayRecord, Entry } from '../lib/types';
+import { getUnits, resolveUnits, setUnits, type UnitSystem } from '../lib/units';
 import {
   collectImportWaveforms, extractWaveforms, findEmbeddedWaveform, sleepWaveformId,
   waveformIds, type WaveformData,
@@ -333,7 +334,16 @@ const listeners = new Set<() => void>();
 let snapshotVersion = 0;
 let cachedSnapshot: { state: AppState; v: number } = { state, v: snapshotVersion };
 
+/** Point lib/units at the journal's own choice. Run from `emit`, so every path
+ *  that can change it (a save, an import, Clear all data) is covered and every
+ *  subscriber already reads the new system when it is notified. */
+function syncUnits() {
+  setUnits(resolveUnits(state.settings?.units));
+}
+syncUnits();
+
 function emit() {
+  syncUnits();
   snapshotVersion++;
   cachedSnapshot = { state, v: snapshotVersion };
   listeners.forEach((l) => l());
@@ -548,6 +558,11 @@ export function useStore<T>(selector: (snap: { state: AppState; v: number }) => 
 }
 
 /** Convenience: re-render on any state change, return the live state. */
+/** The active unit system, re-rendering when the setting changes. */
+export function useUnits(): UnitSystem {
+  return useStore(() => getUnits());
+}
+
 export function useAppState(): AppState {
   return useStore((s) => s.state);
 }

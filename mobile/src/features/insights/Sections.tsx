@@ -27,11 +27,13 @@ import { Icon, type IconName } from '../../components/Icon';
 import { useSheets, type SheetControls } from '../../components/Sheet';
 import { fonts, usePalette } from '../../theme';
 import { VISIBLE_CORRELATIONS, groupCorrelations } from '../../lib/insights';
-import type { BiggestChange, ConfidencePart, Correlation, DataConfidence, DetailSeries, NoImpactItem, Observation, PressureInsight, WatchItem } from '../../lib/insights';
+import type { BiggestChange, ConfidencePart, Correlation, DataConfidence, DetailSeries, NoImpactItem, Observation, PressureInsight, WatchItem, WeekBlock, WeeksReport } from '../../lib/insights';
+import { fmtShort } from '../../lib/dates';
+import { scoreCat } from '../../lib/scoring/day';
 import { pressureHeadline } from '../../lib/insights/pressureCopy';
 import { TREND_METRICS } from '../../lib/trends';
 import { ChangeSheet, CorrelationSheet, PressureSheet, WatchSheet } from './FindingSheet';
-import { Bar, CardButton, CardRow, CorrelationsAiButton, FindingCard, InsightCard } from './Card';
+import { Bar, CardButton, CardRow, CorrelationsAiButton, FindingCard, InsightCard, Tile } from './Card';
 import * as S from './style';
 
 // Re-exported so the modules that already import the card pieces from here
@@ -45,6 +47,8 @@ const GOOD = S.GOOD;
  *  the copy cannot move when the report lands. */
 export const OBS_DESC = 'Smaller patterns and gaps the app noticed while you were logging.';
 export const NO_IMPACT_DESC = 'Things you have taken long enough to test that show no measurable effect on anything tracked here. Absence of a detected effect, not proof of none.';
+export const WEEKS_TITLE = 'Best vs hardest weeks';
+export const WEEKS_DESC = 'What your highest-scoring weeks looked like beside your lowest. A picture of those weeks, not a cause.';
 export const WATCH_DESC = 'Metrics that have genuinely moved over the last month, against the month before it.';
 
 
@@ -115,8 +119,10 @@ export function BiggestChangeCard({ change, series, onLayout }: {
         { value: change.afterValue, unit: change.unit, label: 'After', color },
         { value: change.changeValue, unit: change.changeUnit, label: 'Change', color },
       ]}
-      pips={change.pips}
-      confidence={change.confidence}
+      // A shift states its coverage where a link states its confidence.
+      pips={change.coverage ? undefined : change.pips}
+      confidence={change.coverage ? undefined : change.confidence}
+      note={change.coverage || undefined}
       good={change.good}
       onPress={open}
       onLayout={onLayout}
@@ -433,6 +439,145 @@ export function NoImpact({ list, onRowLayout, onLayout }: {
           </View>
         </CardRow>
       ))}
+    </InsightCard>
+  );
+}
+
+/* ---------- best weeks vs hardest weeks ---------- */
+
+const STRIP_H = 56;
+const STRIP_MIN = 0.22;
+const COL_W = 74;
+// A unit rides beside its label only when it is a symbol (ms, bpm, L). A phrase
+// ("days a week") pushed the label itself into an ellipsis on a phone.
+const UNIT_MAX = 3;
+
+/** "Jun 14, Jun 21 and Aug 9" */
+const listDates = (weeks: WeekBlock[]) => {
+  const d = weeks.map((w) => fmtShort(w.startKey));
+  return d.length > 1 ? `${d.slice(0, -1).join(', ')} and ${d[d.length - 1]}` : d[0] || '';
+};
+
+/**
+ * Every week in the window as one bar, its height the week's median score.
+ *
+ * The chosen weeks wear their own grade colour and the rest stay grey, so the
+ * strip answers "when were they" before anything below is read. That matters
+ * here more than anywhere: good weeks sit together and so do hard ones, and a
+ * table that hid the calendar would be hiding the first thing to know about it.
+ */
+function WeekStrip({ weeks }: { weeks: WeekBlock[] }) {
+  const p = usePalette();
+  const scored = weeks.map((w) => w.score).filter((s): s is number => s != null);
+  const lo = Math.min(...scored), hi = Math.max(...scored);
+  const span = Math.max(1, hi - lo);
+  return (
+    <View style={{ marginTop: 14 }}>
+      <View style={{ height: STRIP_H, flexDirection: 'row', alignItems: 'flex-end', gap: 3 }}>
+        {weeks.map((w) => {
+          const frac = w.score == null ? 0 : STRIP_MIN + (1 - STRIP_MIN) * ((w.score - lo) / span);
+          return (
+            <View
+              key={w.startKey}
+              style={{
+                flex: 1, borderRadius: 3,
+                height: w.score == null ? 2 : Math.round(STRIP_H * frac),
+                backgroundColor: w.side && w.score != null ? scoreCat(w.score).color : p.border,
+              }}
+            />
+          );
+        })}
+      </View>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 6 }}>
+        <Text style={[S.ROW_NOTE, { color: p.textDim }]}>{fmtShort(weeks[0].startKey)}</Text>
+        <Text style={[S.ROW_NOTE, { color: p.textDim }]}>{fmtShort(weeks[weeks.length - 1].endKey)}</Text>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * The comparison itself: one card, read top to bottom as when, how far apart, and
+ * what each set of weeks held.
+ *
+ * Its rows are NOT bubbles. Every bubble on this screen opens something, and
+ * these go nowhere — they are the two columns of one table, so they sit in a
+ * single sunk panel under one pair of column heads.
+ */
+export function WeeksCard({ weeks, onLayout }: { weeks: WeeksReport; onLayout?: (e: LayoutChangeEvent) => void }) {
+  const p = usePalette();
+  const bestColor = scoreCat(weeks.best.score).color;
+  const worstColor = scoreCat(weeks.worst.score).color;
+  const best = weeks.weeks.filter((w) => w.side === 'best');
+  const worst = weeks.weeks.filter((w) => w.side === 'worst');
+  const head = (label: string, color: string) => (
+    <View style={{ width: COL_W, flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 6 }}>
+      <View style={{ width: S.NEW_DOT, height: S.NEW_DOT, borderRadius: S.NEW_DOT / 2, backgroundColor: color }} />
+      <Text style={[S.ROW_NOTE, { color: p.textDim, fontWeight: '700' }]}>{label}</Text>
+    </View>
+  );
+  const groups: { key: 'body' | 'habits'; title: string }[] = [
+    { key: 'body', title: 'Your readings' },
+    { key: 'habits', title: 'Your weeks' },
+  ];
+  return (
+    <InsightCard title={WEEKS_TITLE} help="weeks" desc={WEEKS_DESC} onLayout={onLayout}>
+      <WeekStrip weeks={weeks.weeks} />
+      <View style={S.TILE_ROW}>
+        <Tile value={String(Math.round(weeks.best.score))} unit="pts" label={`Best ${weeks.best.count} weeks`} color={bestColor} />
+        <Tile value={String(Math.round(weeks.worst.score))} unit="pts" label={`Hardest ${weeks.worst.count} weeks`} color={worstColor} />
+      </View>
+      <Text style={[S.ROW_NOTE, { color: p.textDim, marginTop: 4, lineHeight: 17 }]}>
+        {`Best: weeks of ${listDates(best)}. Hardest: ${listDates(worst)}.`}
+      </Text>
+
+      {weeks.rows.length ? (
+        <View style={{ marginTop: 12, borderWidth: 1, borderRadius: S.ROW.borderRadius, borderColor: p.border, backgroundColor: p.bg, paddingHorizontal: 13 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', paddingTop: 11, paddingBottom: 3 }}>
+            <View style={{ flex: 1 }} />
+            {head('Best', bestColor)}
+            {head('Hardest', worstColor)}
+          </View>
+          {groups.map((g) => {
+            const rows = weeks.rows.filter((r) => r.group === g.key);
+            if (!rows.length) return null;
+            return (
+              <View key={g.key}>
+                <Text style={[S.ROW_NOTE, { color: p.textDim, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.8, marginTop: 10, marginBottom: 2 }]}>{g.title}</Text>
+                {rows.map((r, i) => (
+                  <View key={r.id} style={{ flexDirection: 'row', alignItems: 'center', paddingVertical: 10, borderTopWidth: i ? 1 : 0, borderTopColor: p.border }}>
+                    <Text numberOfLines={1} style={[S.PAIR_METRIC, { flex: 1, minWidth: 0, color: p.text }]}>
+                      {r.label}
+                      {r.unit && r.unit.length <= UNIT_MAX ? <Text style={{ color: p.textDim }}>{`  ${r.unit}`}</Text> : null}
+                    </Text>
+                    <Text numberOfLines={1} style={[S.R_VALUE, { width: COL_W, textAlign: 'right', color: p.text, fontVariant: ['tabular-nums'] }]}>{r.best}</Text>
+                    <Text numberOfLines={1} style={[S.R_VALUE, { width: COL_W, textAlign: 'right', color: p.text, fontVariant: ['tabular-nums'] }]}>{r.worst}</Text>
+                  </View>
+                ))}
+              </View>
+            );
+          })}
+          <View style={{ height: 3 }} />
+        </View>
+      ) : null}
+
+      {weeks.taking.best.length ? (
+        <Text style={[S.CARD_DESC, { color: p.textDim }]}>
+          {'Taken through your best weeks and rarely in the hardest: '}
+          <Text style={{ color: p.text, fontWeight: '600' }}>{weeks.taking.best.join(', ')}</Text>.
+        </Text>
+      ) : null}
+      {weeks.taking.worst.length ? (
+        <Text style={[S.CARD_DESC, { color: p.textDim }]}>
+          {'Taken through your hardest weeks and rarely in the best: '}
+          <Text style={{ color: p.text, fontWeight: '600' }}>{weeks.taking.worst.join(', ')}</Text>.
+        </Text>
+      ) : null}
+      {weeks.taking.best.length || weeks.taking.worst.length ? (
+        <Text style={[S.CARD_DESC, { color: p.textDim }]}>
+          {`These weeks sit in different stretches of your journal, so this says what was true of them, not what caused them.${weeks.taking.medication ? ' Talk to your doctor before changing a medication.' : ''}`}
+        </Text>
+      ) : null}
     </InsightCard>
   );
 }

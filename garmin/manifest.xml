@@ -142,6 +142,10 @@
         </iq:products>
         <iq:permissions>
             <iq:uses-permission id="Communications"/>
+            <!-- Fit: the throwaway activity session (source/Recording.mc) that
+                 puts the optical sensor into its activity-rate mode. Nothing
+                 is ever saved; every session is discarded. -->
+            <iq:uses-permission id="Fit"/>
             <iq:uses-permission id="Sensor"/>
         </iq:permissions>
         <iq:languages>

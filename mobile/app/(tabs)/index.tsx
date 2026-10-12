@@ -4,6 +4,8 @@ import Animated, { Easing, Extrapolation, interpolate, runOnJS, useAnimatedScrol
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen, headerHeight } from '../../src/components/Header';
 import { BrandMark, brandMarkWidth } from '../../src/components/Icon';
+import { HangingSpider } from '../../src/components/Halloween';
+import { useHalloween } from '../../src/store/seasonal';
 import { useSheets } from '../../src/components/Sheet';
 import { DaySummary } from '../../src/features/DaySummary';
 import { JournalSections } from '../../src/features/JournalSections';
@@ -56,6 +58,7 @@ export default function JournalScreen() {
   const dk = useCurrentKey();
   const { openSheet, depth } = useSheets();
   const isToday = dk === todayKey();
+  const halloween = useHalloween();
   // Home-screen widgets' Start HRV buttons land here (autonomic://?capture=hrv).
   useCaptureDeepLink();
   // Arriving on the Journal is the moment the pacing strip is actually looked
@@ -227,9 +230,13 @@ export default function JournalScreen() {
               <Text style={{ color: shownDk === todayKey() ? p.accent : p.text, fontSize: 17, fontWeight: '600', textAlign: 'center' }}>{fmtDateLong(shownDk)}</Text>
             </Animated.View>
           </Pressable>
-          <Pressable disabled={isToday} onPress={() => shiftCurrent(1)} hitSlop={8} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', opacity: isToday ? 0.3 : 1 }}>
-            <Text style={{ color: p.text, fontSize: 25 }}>›</Text>
-          </Pressable>
+          <View>
+            {/* Halloween week: hangs just inside the date button's right corner. */}
+            {halloween ? <HangingSpider top={-14} left={-18} /> : null}
+            <Pressable disabled={isToday} onPress={() => shiftCurrent(1)} hitSlop={8} style={{ width: 40, height: 40, alignItems: 'center', justifyContent: 'center', opacity: isToday ? 0.3 : 1 }}>
+              <Text style={{ color: p.text, fontSize: 25 }}>›</Text>
+            </Pressable>
+          </View>
         </View>
       }
     >

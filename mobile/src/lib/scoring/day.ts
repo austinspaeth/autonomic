@@ -14,6 +14,7 @@ import {
   type ScoreContext,
 } from './index';
 import { personalBaselineCat, usualBaseline } from './baseline';
+import { fmtWater } from '../units';
 
 export type DaysMap = Record<string, DayRecord>;
 
@@ -582,7 +583,7 @@ export function protocolCriteria(days: DaysMap, dk: string, protocol: Protocol =
 
   if (protocol.water.enabled) {
     const water = (d && d.food && d.food.water) || 0;
-    criteria.push({ key: 'water', label: `Water (${protocol.water.liters} L)`, pass: water >= protocol.water.liters });
+    criteria.push({ key: 'water', label: `Water (${fmtWater(protocol.water.liters)})`, pass: water >= protocol.water.liters });
   }
 
   // Each required medication/activity is its own criterion (own checkmark).

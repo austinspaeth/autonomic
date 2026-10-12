@@ -16,10 +16,10 @@ import { OverlayBars } from '../components/series';
 import { Card, Divider, Empty, Pill } from '../components/ui';
 import { DeepDive, DeepDiveGrid } from '../components/DeepDive';
 import { useData } from '../lib/data';
-import { addDays, shortDate } from '../lib/dates';
+import { addDays, dayDate, shortDate } from '../lib/dates';
 import { int } from '../lib/format';
 import type { Fault } from '../lib/types';
-import { compareVersions, rangeDays } from '../lib/usage';
+import { compareVersions, isFailure, rangeDays } from '../lib/usage';
 import { C, num } from '../theme';
 
 type Sort = 'installs' | 'often' | 'recent' | 'new' | 'fatal';
@@ -187,7 +187,9 @@ export function ErrorsView({ dk, range, platform }: { dk: string; range: '7' | '
   const L = platform === 'ios' ? 'I' : platform === 'android' ? 'A' : null;
 
   const m = useMemo(() => {
-    const faults = snap?.pings?.faults || [];
+    // Not everything on the fault route is a failure: the capture funnel counts
+    // its attempts and its saved readings there too (App usage draws those).
+    const faults = (snap?.pings?.faults || []).filter(isFailure);
     const first = faults.reduce((min, f) => (f.day < min ? f.day : min), dk);
     let from = range === 'all' ? first : addDays(dk, -(Number(range) - 1));
     if (from > dk) from = dk;
@@ -351,7 +353,7 @@ export function ErrorsView({ dk, range, platform }: { dk: string; range: '7' | '
           back={{ key: 'open', label: 'In the app', color: C.series }}
           front={{ key: 'f', label: 'Hit a failure', color: '#e66767' }}
           rows={m.perDay}
-          xLabel={shortDate}
+          xLabel={dayDate}
         />
         <Text style={s.note}>The gap turns a count into a rate: ten failures on a day with ten people in the app is a broken release.</Text>
       </Card>

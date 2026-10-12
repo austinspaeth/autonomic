@@ -8,8 +8,11 @@ import Animated, { Easing as REasing, useAnimatedStyle, useSharedValue, withSpri
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { BrandMark, Icon, IconName } from '../../src/components/Icon';
+import { PUMPKIN } from '../../src/lib/seasonal';
+import { useHalloween } from '../../src/store/seasonal';
+import { useToast } from '../../src/components/Toast';
 import { HeaderRule, headerHeight } from '../../src/components/Header';
-import { useSheets } from '../../src/components/Sheet';
+import { navBarCover, useSheets } from '../../src/components/Sheet';
 import { MenuSheet } from '../../src/features/Settings';
 import { GRADE_COLORS, usePalette } from '../../src/theme';
 import { useInsightsUnseen } from '../../src/store/insightsBadge';
@@ -214,10 +217,16 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
   // sells, and a "Keep it" link under a gift of 999 days is a nag.
   const gifted = useAccessGrant();
   const showPlan = tier !== 'pro' && !gifted;
+  const halloween = useHalloween();
+  const toast = useToast();
   const [rowH, setRowH] = useState(0);
   const lift = showPlan ? Math.max(0, PLAN_TAB_H + PLAN_EDGE_GAP - 12 - insets.bottom) : 0;
 
+  const cover = navBarCover(insets.bottom);
   return (
+    <>
+    {/* Three-button navigation: nothing scrolls behind the system buttons. */}
+    {cover > 0 ? <View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, bottom: 0, height: cover, backgroundColor: p.bg }} /> : null}
     <View pointerEvents="box-none" style={{ position: 'absolute', bottom: insets.bottom + 12 + lift - (showPlan ? PLAN_TAB_H : 0), left: 0, right: 0, alignItems: 'center' }}>
       <View style={{ zIndex: 2, elevation: 8 }}>
       <BarShell maxWidth={avail}>
@@ -226,9 +235,9 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
         style={{ flexDirection: 'row', alignItems: 'center', gap: 2, padding: PAD, backgroundColor: Platform.OS === 'ios' ? 'rgba(6,6,9,0.82)' : '#0a0a0e' }}
       >
         {markFits ? (
-          <View style={{ paddingLeft: 8, paddingRight: 6, marginRight: 8, justifyContent: 'center' }}>
-            <BrandMark size={20} />
-          </View>
+          <Pressable disabled={!halloween} onPress={() => toast('Happy Halloween 🎃', 3000)} hitSlop={8} style={{ paddingLeft: 8, paddingRight: 6, marginRight: 8, justifyContent: 'center' }}>
+            <BrandMark size={20} color={halloween ? PUMPKIN : undefined} />
+          </Pressable>
         ) : null}
         {/* Sliding highlight pill sits behind the tabs. */}
         <Animated.View
@@ -294,6 +303,7 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
         />
       ) : null}
     </View>
+    </>
   );
 }
 

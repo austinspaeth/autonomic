@@ -10,20 +10,25 @@ import { SymbolView, type SFSymbol } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
 import { Sheet } from '../components/Sheet';
 import { Choice, DangerButton, DateField, Field, newId, num, NumberField, SaveButton } from '../components/forms';
-import { KEYBOARD_SCROLL, Segmented } from '../components/ui';
+import { FORM_SCROLL, Segmented } from '../components/ui';
 import { api } from '../lib/api';
 import { useData } from '../lib/data';
 import { addDays, easternDay, shortDate } from '../lib/dates';
 import type { Churn, Entry, Platform, Sale } from '../lib/types';
 import { mrrOf } from '../lib/sales';
+import { PromptSheet } from './PromptExport';
 import { C } from '../theme';
 
 type Kind = 'store' | 'sale' | 'churn';
 
-const OPTIONS: { key: Kind; label: string; icon: SFSymbol; color: string }[] = [
+/** What the plus card offers: the three things to record, and the prompt export. */
+type AddPick = Kind | 'prompt';
+
+const OPTIONS: { key: AddPick; label: string; icon: SFSymbol; color: string }[] = [
   { key: 'store', label: 'Store data', icon: 'chart.bar.fill', color: C.series },
   { key: 'sale', label: 'Sale', icon: 'dollarsign', color: '#FFC93C' },
   { key: 'churn', label: 'Churn', icon: 'arrow.down.right', color: '#e66767' },
+  { key: 'prompt', label: 'AI prompt', icon: 'sparkles', color: '#8b5cf6' },
 ];
 
 const PLATFORMS: { key: Platform; label: string }[] = [
@@ -35,8 +40,9 @@ export function AddSheet({ visible, onClose }: { visible: boolean; onClose: () =
   /* A ref, not state: the sheet's close callback is captured when its card
      renders, so it would read the choice from BEFORE the tap and do nothing
      on the first try. */
-  const pending = useRef<Kind | null>(null);
+  const pending = useRef<AddPick | null>(null);
   const [entry, setEntry] = useState<Kind | null>(null);
+  const [prompt, setPrompt] = useState(false);
   return (
     <>
       <Sheet
@@ -44,10 +50,9 @@ export function AddSheet({ visible, onClose }: { visible: boolean; onClose: () =
         onClose={() => {
           onClose();
           // The chooser has animated away: now raise the full card it picked.
-          if (pending.current) {
-            setEntry(pending.current);
-            pending.current = null;
-          }
+          if (pending.current === 'prompt') setPrompt(true);
+          else if (pending.current) setEntry(pending.current);
+          pending.current = null;
         }}
         title="Add"
       >
@@ -74,6 +79,7 @@ export function AddSheet({ visible, onClose }: { visible: boolean; onClose: () =
         )}
       </Sheet>
       <EntrySheet kind={entry} onClose={() => setEntry(null)} />
+      <PromptSheet visible={prompt} onClose={() => setPrompt(false)} />
     </>
   );
 }
@@ -126,7 +132,7 @@ function EntrySheet({ kind, onClose }: { kind: Kind | null; onClose: () => void 
             <ScrollView
               style={{ flex: 1 }}
               contentContainerStyle={{ paddingBottom: 40 }}
-              {...KEYBOARD_SCROLL}
+              {...FORM_SCROLL}
               showsVerticalScrollIndicator={false}
             >
               <Animated.View key={`${mode}|${prefill?.ping ?? ''}|${churnSale?.id ?? ''}`} entering={FadeIn.duration(180)}>
@@ -492,7 +498,20 @@ const TIER_NAME: Record<string, string> = { F: 'Free', T: 'Trial', P: 'Pro' };
 /** Every subscribe ping in the report as a draftable purchase, newest first,
  *  with how many of its purchases are still unrecorded (`remaining`) and how
  *  many the store confirmed within an hour of a buy tap (`verified`). */
-export type SubPing = SalePrefill & { count: number; remaining: number; verified: number; tier: string; planLetter: string | null; store: 'I' | 'A' | 'U' };
+export type SubPing = SalePrefill & {
+  count: number;
+  remaining: number;
+  verified: number;
+  tier: string;
+  planLetter: string | null;
+  store: 'I' | 'A' | 'U';
+  /** When it came in (ISO): the latest, when several share the ping. Absent before the server kept it. */
+  at?: string;
+  /** The door each purchase under this ping came through (a wall or offer
+   *  letter), one per purchase that named one; shorter than `count` when some
+   *  did not. */
+  doors: string[];
+};
 
 export function subscribePings(snap: ReturnType<typeof useData>['snap']): SubPing[] {
   const sales = snap?.load?.sales || [];
@@ -506,6 +525,12 @@ export function subscribePings(snap: ReturnType<typeof useData>['snap']): SubPin
   (snap?.pings?.sub || []).forEach((row) => {
     const verified = new Map<string, number>();
     (row.evidence || []).forEach((ev) => ev.evidence === 'V' && verified.set(ev.key, (verified.get(ev.key) || 0) + ev.count));
+    const doors = new Map<string, string[]>();
+    (row.doors || []).forEach((w) => {
+      const list = doors.get(w.key) || [];
+      for (let i = 0; i < w.count; i++) list.push(w.door);
+      doors.set(w.key, list);
+    });
     (row.cohorts || []).forEach((c) => {
       const ref = `${row.day}|${c.key}`;
       const letter = c.slot && PING_PLAN[c.slot] ? c.slot : null;
@@ -531,6 +556,8 @@ export function subscribePings(snap: ReturnType<typeof useData>['snap']): SubPin
         tier: c.tier || '?',
         planLetter: letter,
         store: c.platform === 'A' || c.platform === 'I' ? c.platform : 'U',
+        at: row.times?.[c.key],
+        doors: (doors.get(c.key) || []).slice(0, c.count),
       });
     });
   });
@@ -538,6 +565,39 @@ export function subscribePings(snap: ReturnType<typeof useData>['snap']): SubPin
 }
 
 export const pingPlanName = (letter: string | null) => (letter ? PING_PLAN_NAME[letter] : 'Plan unknown');
+
+/** A subscribe ping's arrival as a clock time on this device, or null when the server never kept one. */
+export function pingTime(p: Pick<SubPing, 'at' | 'count'>): string | null {
+  const ms = p.at ? Date.parse(p.at) : NaN;
+  if (!Number.isFinite(ms)) return null;
+  const t = new Date(ms).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+  // One instant is kept per ping, so with several it is the latest of them.
+  return p.count > 1 ? `last ${t}` : t;
+}
+
+/** Drafts a reported subscription into the ledger; one already there reads Converted. */
+export function ConvertButton({ converted, onConvert }: { converted: boolean; onConvert: () => void }) {
+  if (converted) {
+    return (
+      <View style={[st.convert, st.convertDone]}>
+        <SymbolView name="checkmark" size={11} weight="bold" tintColor={C.dim} />
+        <Text style={[st.convertText, { color: C.dim }]}>Converted</Text>
+      </View>
+    );
+  }
+  return (
+    <Pressable
+      hitSlop={6}
+      onPress={() => {
+        Haptics.selectionAsync();
+        onConvert();
+      }}
+      style={({ pressed }) => [st.convert, pressed && { opacity: 0.6 }]}
+    >
+      <Text style={st.convertText}>Convert</Text>
+    </Pressable>
+  );
+}
 
 /** The sale form on its own card, drafted from one subscribe ping. */
 export function SaleFromPingSheet({ ping, onClose }: { ping: SalePrefill | null; onClose: () => void }) {
@@ -548,7 +608,7 @@ export function SaleFromPingSheet({ ping, onClose }: { ping: SalePrefill | null;
           <ScrollView
             style={{ flex: 1 }}
             contentContainerStyle={{ paddingBottom: 40 }}
-            {...KEYBOARD_SCROLL}
+            {...FORM_SCROLL}
             showsVerticalScrollIndicator={false}
           >
             <SaleForm key={ping.ping} prefill={ping} done={close} />
@@ -711,6 +771,9 @@ const st = StyleSheet.create({
   empty: { color: C.muted, fontSize: 14, textAlign: 'center', paddingVertical: 30 },
   saleCard: { padding: 14, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.06)', gap: 2 },
   dot: { width: 10, height: 10, borderRadius: 5, marginHorizontal: 4 },
+  convert: { flexDirection: 'row', alignItems: 'center', gap: 5, borderRadius: 999, paddingHorizontal: 12, paddingVertical: 6, backgroundColor: 'rgba(255,255,255,0.14)' },
+  convertDone: { backgroundColor: 'transparent', borderWidth: 1, borderColor: 'rgba(255,255,255,0.12)' },
+  convertText: { color: C.text, fontSize: 13, fontWeight: '600' },
   ping: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 12, borderRadius: 14, backgroundColor: 'rgba(255,255,255,0.06)' },
   batchDay: { gap: 6, paddingVertical: 6 },
   batchDate: { color: C.text, fontSize: 14, fontWeight: '700' },

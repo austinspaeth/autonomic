@@ -181,6 +181,32 @@ describe('buildUpdateSet', () => {
     expect(filterDeclined(withSleep, new Set()).sleep).not.toBeNull();
   });
 
+  /* A deleted import is a tombstone with the journal's own tolerance. One
+     workout reaches a health store more than once, and the copy that syncs in
+     later starts a minute or two either side of the one that was deleted. */
+  it('filterDeclined drops a later copy of a deleted workout', () => {
+    const deleted = new Set([importFingerprint(DK, 'workout', 'walk', '07:15'), 'walk-2000']);
+    const check = (workouts: ImportedWorkout[]) =>
+      filterDeclined(buildUpdateSet(DK, day(), raw({ workouts }), MED_TYPES), deleted).workouts;
+    // The mirror starts EARLIER, so it wins the in-set dedup over the original.
+    const mirror = workout({ time: '07:13', startMs: 1900, sourceName: 'Garmin Connect' });
+    expect(check([mirror, workout()])).toHaveLength(0);
+    // The store re-wrote the session under a new start instant.
+    expect(check([workout({ time: '07:16', startMs: 2060 })])).toHaveLength(0);
+    // A different activity at that moment, or the same one later, is its own item.
+    expect(check([workout({ type: 'run', startMs: 2001 })])).toHaveLength(1);
+    expect(check([workout({ time: '07:40', startMs: 3500 })])).toHaveLength(1);
+    // Another day's delete says nothing about today.
+    const other = new Set([importFingerprint('2000-01-01', 'workout', 'walk', '07:15')]);
+    expect(filterDeclined(buildUpdateSet(DK, day(), raw({ workouts: [workout()] }), MED_TYPES), other).workouts).toHaveLength(1);
+  });
+
+  it('filterDeclined reads a type holding a colon and ignores a timeless delete', () => {
+    const set = buildUpdateSet(DK, day(), raw({ workouts: [workout()] }), MED_TYPES);
+    expect(filterDeclined(set, new Set([importFingerprint(DK, 'workout', 'a:b', '07:15')])).workouts).toHaveLength(1);
+    expect(filterDeclined(set, new Set([importFingerprint(DK, 'workout', 'walk', '')])).workouts).toHaveLength(1);
+  });
+
   /* The historical backfill's only defence against writing a second copy of a
      week the daily import pill already brought in. */
   describe('dayAlreadyHas', () => {

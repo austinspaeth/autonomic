@@ -10,11 +10,11 @@
  */
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { Alert, AppState, Linking, Pressable, Text, View } from 'react-native';
-import Animated, { Easing, interpolateColor, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { TimePickerSheet } from '../components/Field';
 import { Icon, IconName } from '../components/Icon';
 import { useSheets } from '../components/Sheet';
 import { useToast } from '../components/Toast';
+import { Toggle } from '../components/ui';
 import { addDays, fmtTime12, todayKey } from '../lib/dates';
 import { exertionLine } from '../lib/budget';
 import { EXERTION_RUN_MIN, NEARLY_SHARE, alertsEnabled, type PacingAlertKind } from '../lib/budget/alerts';
@@ -108,24 +108,6 @@ export function useReminderToggle() {
   return { on, time, toggle };
 }
 
-/** Animated checkbox. `tone` lets the wizard pass its own darker palette. */
-export function CheckBox({ on, tone }: { on: boolean; tone: { accent: string; border: string } }) {
-  const t = useSharedValue(on ? 1 : 0);
-  React.useEffect(() => { t.value = withTiming(on ? 1 : 0, { duration: 200, easing: Easing.out(Easing.cubic) }); }, [on, t]);
-  const boxStyle = useAnimatedStyle(() => ({
-    backgroundColor: interpolateColor(t.value, [0, 1], ['rgba(0,0,0,0)', tone.accent]),
-    borderColor: interpolateColor(t.value, [0, 1], [tone.border, tone.accent]),
-  }));
-  const checkStyle = useAnimatedStyle(() => ({ opacity: t.value, transform: [{ scale: 0.5 + 0.5 * t.value }] }));
-  return (
-    <Animated.View style={[{ width: 22, height: 22, borderRadius: 7, borderWidth: 1, alignItems: 'center', justifyContent: 'center' }, boxStyle]}>
-      <Animated.View style={checkStyle}>
-        <Icon name="check" size={14} color="#fff" strokeWidth={3} />
-      </Animated.View>
-    </Animated.View>
-  );
-}
-
 /** Crash-warning state + check/uncheck flow, same shape as useReminderToggle.
  *  No time to pick — enabling is permission + persist. */
 export function useCrashAlertToggle() {
@@ -174,14 +156,14 @@ function PressureAlertRow({ granted }: { granted: boolean }) {
   return <NotifRow icon="gauge" title="Low pressure" sub={sub} on={on} onToggle={toggle} />;
 }
 
-/** One opt-in row in the Notifications view: icon + title/sub + checkbox, the
+/** One opt-in row in the Notifications view: icon + title/sub + switch, the
  *  same silhouette as the Settings list rows. */
 function NotifRow({ icon, title, sub, on, onToggle }: { icon: IconName; title: string; sub: string; on: boolean; onToggle: () => void }) {
   const p = usePalette();
   return (
     <Pressable
       onPress={onToggle}
-      accessibilityRole="checkbox"
+      accessibilityRole="switch"
       accessibilityState={{ checked: on }}
       style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderTopWidth: 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}
     >
@@ -190,7 +172,7 @@ function NotifRow({ icon, title, sub, on, onToggle }: { icon: IconName; title: s
         <Text style={{ color: p.text, fontSize: 17 }}>{title}</Text>
         <Text style={{ color: p.textDim, fontSize: 13 }}>{sub}</Text>
       </View>
-      <CheckBox on={on} tone={{ accent: p.accent, border: p.border }} />
+      <Toggle on={on} />
     </Pressable>
   );
 }

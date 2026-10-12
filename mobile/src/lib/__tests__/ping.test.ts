@@ -1,5 +1,6 @@
 import {
   cohortCode,
+  doorCode,
   easternDay,
   featureCode,
   findingCode,
@@ -291,5 +292,31 @@ describe('cohort resolution', () => {
     expect(resolveCohort(undefined, 'not-a-date', now)).toBe('2026-08-21');
     // Clock rolled back after stamping: a future birthday is not a cohort.
     expect(resolveCohort(undefined, '2027-01-01T00:00:00.000Z', now)).toBe('2026-08-21');
+  });
+});
+
+describe('the door a purchase came through', () => {
+  it('names the offer card, or the wall behind the paywall', () => {
+    expect(doorCode('annual')).toBe('A');
+    expect(doorCode('founder')).toBe('F');
+    expect(doorCode('paywall', 'I')).toBe('I');
+    expect(doorCode('paywall', 'S')).toBe('S');
+  });
+
+  // An unknown door is left off, never guessed: a paywall whose wall this
+  // session does not hold, or a purchase with no buy tap behind it.
+  it('says nothing when the door is not known', () => {
+    expect(doorCode('paywall')).toBeUndefined();
+    expect(doorCode(undefined, 'I')).toBeUndefined();
+  });
+
+  it('rides last on the code, tagged, after the evidence', () => {
+    expect(cohortCode('2026-08-21', 'A', 'Y', 'T', '1.32.0', 'V', 'I')).toBe('D082126AY-TT-V1.32.0-EV-WI');
+    expect(cohortCode('2026-08-21', 'I', 'F', 'T', '1.32.0', 'V', 'F')).toBe('D082126IF-TT-V1.32.0-EV-WF');
+    expect(cohortCode('2026-08-21', 'A', 'Y', 'T', '1.32.0', 'S')).toBe('D082126AY-TT-V1.32.0-ES');
+  });
+
+  it('sends a saved reading on its own route, with the sensor', () => {
+    expect(pingUrl('sav', '2026-08-21', 'A', methodCode('camera'))).toBe('https://api.autonomic.care/ping/sav/D082126AF');
   });
 });
