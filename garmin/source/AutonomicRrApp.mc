@@ -35,17 +35,12 @@ class AutonomicRrApp extends Application.AppBase {
     }
 
     // Called when the app is closing, including when it is replaced by a new
-    // sideload. Without this a reading in progress leaves its activity
-    // recording behind, which then blocks every later reading.
-
+    // sideload. Without this a reading in progress leaves the sensor listener
+    // registered behind it.
     function onStop(state) {
         _collector.stop();
         _collector.release();
         _monitor.stop();
-        // Belt to the braces above: whichever mode was running has already
-        // discarded its session, and this catches one that did not get the
-        // chance. A session left open blocks every later reading.
-        Recording.end();
     }
 
     // The ONE way a reading ends — the five-minute clock, the button, back, or

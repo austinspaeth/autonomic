@@ -32,8 +32,8 @@ import { pingReadingKind, pingWristReading } from '../../store/ping';
 import { isFirstBaseline } from '../ping';
 import { todayKey } from '../dates';
 import { logError } from '../diagnostics/errorLog';
-import { reportFault } from '../../store/errorReport';
-import { GARMIN_DIAG_TAG, garminDiagMessage, parseGarminDiag } from './diag';
+import { reportEvent, reportFault } from '../../store/errorReport';
+import { GARMIN_DIAG_TAG, GARMIN_READING_TAG, garminDiagMessage, garminReadingMessage, parseGarminDiag } from './diag';
 import { health } from '../health';
 import { arrivalHealthWrite } from '../health/hrvWrite';
 import { computeScores, profileCtx } from '../scoring';
@@ -247,6 +247,19 @@ function receive(msg: GarminMessage) {
     // for a reading that belongs to TODAY: the watch queues while the phone is
     // unreachable, so last night's reading can land on this morning's launch.
     const kind = mapped.entry.type;
+    if (kind === 'hrv' || kind === 'breathHrv') {
+      // Every arrival, by watch, on the fault route beside `garmin.noSignal`:
+      // the pings below are capped once a day and carry no device, so this
+      // is the only count that can say WHICH watches produce readings and
+      // which only produce failures. A reading from an earlier day still
+      // counts (it happened), marked `late`.
+      reportEvent(GARMIN_READING_TAG, garminReadingMessage(
+        named?.model || named?.name,
+        typeof msg.device === 'string' ? msg.device : '?',
+        msg.rearms,
+        mapped.dayKey !== todayKey(),
+      ));
+    }
     if ((kind === 'hrv' || kind === 'breathHrv') && mapped.dayKey === todayKey()) {
       pingWristReading('garmin');
       // Already written above, so it excludes itself from "the day's first".

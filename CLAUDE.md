@@ -480,20 +480,25 @@ old web app so old `export.json` files import directly.
 - **A Garmin reading that cannot get a signal is stopped, explained, and
   REPORTED; the watch never spins for ever.** The sensor rules live in
   `garmin/README.md` and `garmin/source/RrCollector.mc`. The short version:
-  the watch holds a throwaway activity session open for the reading
-  (`Recording.mc`, discarded on stop) because the optical sensor only gives
-  beat-to-beat in its activity-rate mode and a Connect IQ app asking for the
-  onboard sensor does not reliably get it (an acknowledged Garmin bug when
-  Wrist Heart Rate is Auto); a feed that produces nothing is re-armed at 25 s
-  and 50 s and given up on at 75 s with a TRY AGAIN and a sentence that
-  depends on whether a pulse was ever seen. In place of the reading the watch
-  sends a `type: 'diag'` message, which `lib/garmin/receiver.ts` files through
-  `reportFault` as `garmin.noSignal` (`lib/garmin/diag.ts`, pure + tested:
-  model + firmware + `nopulse`/`nobeats`/`thin` + feed state + reason + session
-  + re-arms + duration band) and acks. An old phone build acks it as an
-  unmappable payload and counts nothing, so the watch ships first without
-  harm. Needs the `Fit` permission on the watch and is a watch-app release;
-  the phone side is JS and ships OTA.
+  a feed that produces nothing is re-armed at 25 s and 50 s and given up on
+  at 75 s with a TRY AGAIN and a sentence that depends on whether a pulse was
+  ever seen. In place of the reading the watch sends a `type: 'diag'`
+  message, which `lib/garmin/receiver.ts` files through `reportFault` as
+  `garmin.noSignal` (`lib/garmin/diag.ts`, pure + tested: model + firmware +
+  `nopulse`/`nobeats`/`thin` + feed state + reason + re-arms + duration band)
+  and acks. An old phone build acks it as an unmappable payload and counts
+  nothing, so the watch ships first without harm. **Every reading that
+  ARRIVES is counted on the same route as `garmin.reading`** (`reportEvent`,
+  never a failure: it is in the event-tag lists of both dashboards), with the
+  watch's model first (`Venu 4 ok rearm0`, `late` when delivered after its
+  day), so the phone dashboard's "Garmin watches" card and the prompt export
+  can put each model's readings beside its failures with the server's own
+  timestamps for when each last happened. **A throwaway activity
+  session (the `Fit` permission + `ActivityRecording`) was tried as the way
+  to force the optical sensor out of its low-power mode and must NOT come
+  back**: on the Venu 4 it stopped beat-to-beat entirely and listed the app
+  under the watch's Activities instead of Apps. Watch-app release; the phone
+  side is JS and ships OTA.
 - **The app's local notifications live in `src/lib/reminders.ts`, plus pacing
   alerts in `src/store/pacingAlerts.ts` (next bullet).**
   (1) The morning reminder: `settings.reminder` is the source of truth and the OS

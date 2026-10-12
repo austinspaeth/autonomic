@@ -24,6 +24,7 @@ import { Card, Divider, Segmented } from '../components/ui';
 import { DeepDive, DeepDiveGrid } from '../components/DeepDive';
 import { useData } from '../lib/data';
 import { addDays, dayDate, easternClock, easternDay, shortDate } from '../lib/dates';
+import { garminShapeLabel, garminWatches, type GarminWatch } from '../lib/usage';
 import { buildPace, TYPICAL_DAY } from '../lib/pace';
 import { int } from '../lib/format';
 import type { PingKind } from '../lib/types';
@@ -180,6 +181,82 @@ function Rows({ rows }: { rows: { label: string; value: string; sub?: string }[]
         </View>
       ))}
     </View>
+  );
+}
+
+/* Times are the phone's own zone; the DAY is US Eastern, the server's bucket. */
+const stampAt = (x: { day: string; at: string | null } | null) =>
+  !x ? 'never' : x.at
+    ? `${new Date(x.at).toLocaleDateString([], { month: 'short', day: 'numeric' })}, ${new Date(x.at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}`
+    : shortDate(x.day);
+
+/**
+ * Each Garmin model the app has heard from: readings that arrived beside
+ * readings the watch gave up on, and when each last happened. The question
+ * this answers is "which watches work", which nothing capped per install per
+ * day can.
+ */
+function GarminCard({ watches, days, xLabel }: { watches: GarminWatch[]; days: string[]; xLabel: (d: string) => string }) {
+  const [open, setOpen] = useState<string | null>(null);
+  if (!watches.length) {
+    return (
+      <Card title="Garmin watches">
+        <Note>No Garmin watch has reported in this range. Counted from the build that reports each arrival and each no-signal failure by model.</Note>
+      </Card>
+    );
+  }
+  const total = watches.reduce((t, w) => t + w.readings, 0);
+  const failed = watches.reduce((t, w) => t + w.failed, 0);
+  return (
+    <Card>
+      <OverlayBars
+        title="Garmin watches"
+        back={{ key: 'try', label: 'Readings + failures', color: '#d95926' }}
+        front={{ key: 'ok', label: 'Readings', color: '#199e70' }}
+        rows={days.map((d) => {
+          const r = watches.reduce((t, w) => t + (w.byDay.find((x) => x.day === d)?.readings ?? 0), 0);
+          const f = watches.reduce((t, w) => t + (w.byDay.find((x) => x.day === d)?.failed ?? 0), 0);
+          return { x: d, back: r + f, front: r };
+        })}
+        xLabel={xLabel}
+        summary={`${int(total)} readings · ${int(failed)} failed`}
+      />
+      <View style={s.rows}>
+        {watches.map((w, i) => {
+          const isOpen = open === w.name;
+          const tries = w.readings + w.failed;
+          return (
+            <View key={w.name}>
+              {i ? <Divider /> : null}
+              <Pressable onPress={() => setOpen(isOpen ? null : w.name)} style={s.row}>
+                <View style={{ flex: 1 }}>
+                  <Text style={s.rowLabel}>{w.name}</Text>
+                  <Text style={s.rowSub}>
+                    {w.failed ? `${int(w.failed)} failed, ${pct((w.failed / tries) * 100)}` : 'no failures'}
+                    {` · last reading ${stampAt(w.lastReading)}`}
+                  </Text>
+                </View>
+                <Text style={[s.rowValue, num, w.readings ? null : { color: C.down }]}>{int(w.readings)}</Text>
+              </Pressable>
+              {isOpen ? (
+                <View style={{ paddingBottom: 10 }}>
+                  <Rows
+                    rows={[
+                      { label: 'Readings', value: int(w.readings), sub: `${int(w.readingInstalls)} install-days${w.late ? ` · ${int(w.late)} delivered after their day` : ''}` },
+                      { label: 'Failed on the watch', value: int(w.failed), sub: `${int(w.failedInstalls)} install-days · last ${stampAt(w.lastFailure)}` },
+                      ...w.shapes.slice(0, 6).map((sh) => ({ label: garminShapeLabel(sh.msg), value: `${int(sh.n)}×`, sub: sh.msg })),
+                    ]}
+                  />
+                </View>
+              ) : null}
+            </View>
+          );
+        })}
+      </View>
+      <Note>
+        A reading is one that reached the phone; a failure is one the watch gave up on after 75 seconds with no beat-to-beat. Pulse but no beats is the sensor's fast mode not engaging on that model. Tap a watch for what its failures looked like.
+      </Note>
+    </Card>
   );
 }
 
@@ -892,6 +969,7 @@ function RangeSection({
   const saves = saveFunnel(ix, days);
   const camera = captureOutcomes(ix.report, days, ix.platform, 'camera');
   const strap = captureOutcomes(ix.report, days, ix.platform, 'polar');
+  const garmin = garminWatches(ix.report, days, ix.platform);
   const sold = doorsOver(ix, days);
   const payDays = days.filter((d) => known(ix, 'pay', d));
   const pays = payDays.reduce((t, d) => t + totalOn(ix, 'pay', d), 0);
@@ -1054,6 +1132,7 @@ function RangeSection({
       </Card>
 
       <CaptureCard title="Camera readings, per attempt" o={camera} other={{ label: 'Chest strap, same measure', o: strap }} days={days} xLabel={xl} />
+      <GarminCard watches={garmin} days={days} xLabel={xl} />
         </>
       ) : part === 'errors' ? (
         <>

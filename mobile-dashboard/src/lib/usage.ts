@@ -763,7 +763,10 @@ export function splitFor(cohorts: string[], releases: { date: string; label: str
  * `CAPTURE_EVENT_TAGS` in the app's lib/hrv/refusal.ts.
  */
 export const CAPTURE_TAG = { attempt: 'hrv.attempt', filed: 'hrv.filed', refused: 'hrv.refused', salvaged: 'hrv.salvaged', abandoned: 'hrv.abandoned' } as const;
-const EVENT_TAGS = new Set<string>([CAPTURE_TAG.attempt, CAPTURE_TAG.filed, CAPTURE_TAG.salvaged]);
+/** The Garmin pair: a reading that arrived (an event) and one the watch gave up on (a failure).
+ *  Mirrors `GARMIN_READING_TAG` / `GARMIN_DIAG_TAG` in the app's lib/garmin/diag.ts. */
+export const GARMIN_TAG = { reading: 'garmin.reading', noSignal: 'garmin.noSignal' } as const;
+const EVENT_TAGS = new Set<string>([CAPTURE_TAG.attempt, CAPTURE_TAG.filed, CAPTURE_TAG.salvaged, GARMIN_TAG.reading]);
 export const isFailure = (f: Pick<Fault, 'tag'>) => !EVENT_TAGS.has(f.tag);
 
 type Split = { n: number; I: number; A: number; U: number };
@@ -895,6 +898,104 @@ export function shapeLabel(tag: string, msg: string): string {
 
 /** A sensor's failure rate for one store, or null with no attempts there. */
 export const failPctFor = (o: CaptureOutcomes, k: 'I' | 'A') => (o.attempts[k] ? (o.failed[k] / o.attempts[k]) * 100 : null);
+
+export type GarminWatch = {
+  /** The model as Garmin Connect names it ("Venu 4"), or the part number when the phone could not name it. */
+  name: string;
+  /** Readings that arrived. Every one, not one per install per day. */
+  readings: number;
+  /** ...of which were taken on an earlier day and delivered later. */
+  late: number;
+  /** Readings the watch gave up on and reported instead. */
+  failed: number;
+  /** Install-days with a reading / with a failure: as close to "how many people" as the route gets. */
+  readingInstalls: number;
+  failedInstalls: number;
+  /** When the latest reading and the latest failure were reported (ISO), with the day each is filed under. */
+  lastReading: { day: string; at: string | null } | null;
+  lastFailure: { day: string; at: string | null } | null;
+  /** The failures by what the sensor did, most first. The message minus the watch's name. */
+  shapes: { msg: string; n: number; installs: number }[];
+  /** Per day: readings that arrived and failures reported. */
+  byDay: { day: string; readings: number; failed: number }[];
+};
+
+/** The tokens the watch name is followed by. Everything before the first of them is the name. */
+const GARMIN_AFTER_NAME = /^(ok|fw[\d.?]+|nopulse|nobeats|thin)$/;
+
+/** The watch's name off a `garmin.*` message, or null for a message with no recognisable shape. */
+export function garminWatchName(msg: string): string | null {
+  const t = msg.split(' ');
+  const i = t.findIndex((x) => GARMIN_AFTER_NAME.test(x));
+  if (i <= 0) return null;
+  return t.slice(0, i).join(' ');
+}
+
+/**
+ * Each Garmin model the app has heard from: readings beside failures, and
+ * when each last happened. The whole point of the two tags is this table — a
+ * watch with readings and no failures works, one with only failures does not,
+ * and a watch with both says how often. The route has no identifier, so
+ * "install-days" is the nearest thing to phones.
+ */
+export function garminWatches(report: PingReport | null | undefined, days: string[], platform: PlatformKey): GarminWatch[] {
+  const L = platform === 'ios' ? 'I' : platform === 'android' ? 'A' : null;
+  const want = new Set(days);
+  const map = new Map<string, GarminWatch & { perDay: Map<string, { readings: number; failed: number }>; shapeMap: Map<string, GarminWatch['shapes'][number]> }>();
+  (report?.faults || []).forEach((f) => {
+    if (f.tag !== GARMIN_TAG.reading && f.tag !== GARMIN_TAG.noSignal) return;
+    if (!want.has(f.day)) return;
+    const name = garminWatchName(f.msg);
+    if (!name) return;
+    const occ = L ? f.occPlatforms?.[L] || 0 : f.occurrences;
+    const inst = L ? f.platforms?.[L] || 0 : f.installs;
+    if (L && !occ && !inst) return;
+    const w = map.get(name) || {
+      name, readings: 0, late: 0, failed: 0, readingInstalls: 0, failedInstalls: 0, lastReading: null, lastFailure: null, shapes: [], byDay: [],
+      perDay: new Map(), shapeMap: new Map(),
+    };
+    const day = w.perDay.get(f.day) || { readings: 0, failed: 0 };
+    const later = (cur: GarminWatch['lastReading'], f2: Fault) =>
+      !cur || f2.day > cur.day || (f2.day === cur.day && (f2.lastAt || '') > (cur.at || '')) ? { day: f2.day, at: f2.lastAt || null } : cur;
+    if (f.tag === GARMIN_TAG.reading) {
+      w.readings += occ;
+      w.readingInstalls += inst;
+      if (/ late\b/.test(f.msg)) w.late += occ;
+      day.readings += occ;
+      w.lastReading = later(w.lastReading, f);
+    } else {
+      w.failed += occ;
+      w.failedInstalls += inst;
+      day.failed += occ;
+      w.lastFailure = later(w.lastFailure, f);
+      const shape = f.msg.slice(name.length).trim();
+      const g = w.shapeMap.get(shape) || { msg: shape, n: 0, installs: 0 };
+      g.n += occ;
+      g.installs += inst;
+      w.shapeMap.set(shape, g);
+    }
+    w.perDay.set(f.day, day);
+    map.set(name, w);
+  });
+  return [...map.values()]
+    .map(({ perDay, shapeMap, ...w }) => ({
+      ...w,
+      shapes: [...shapeMap.values()].sort((a, b) => b.n - a.n),
+      byDay: days.map((d) => ({ day: d, readings: perDay.get(d)?.readings ?? 0, failed: perDay.get(d)?.failed ?? 0 })),
+    }))
+    // Most heard from first: the watch with the most traffic is the one the answer is surest about.
+    .sort((a, b) => b.readings + b.failed - (a.readings + a.failed) || a.name.localeCompare(b.name));
+}
+
+/** A Garmin failure shape in words, from the tokens after the watch's name. */
+export function garminShapeLabel(shape: string): string {
+  const t = shape.split(' ');
+  const has = (x: string) => t.includes(x);
+  const what = has('nopulse') ? 'No pulse at all' : has('nobeats') ? 'Pulse, but no beats' : has('thin') ? 'Beats, too few' : 'No signal';
+  const why = has('feed:none') ? 'listener never called back' : has('feed:empty') ? 'sensor sent empty arrays' : '';
+  const who = has('nosignal') ? 'stopped by the watch' : has('user-nolock') || has('user-short') ? 'stopped by the user' : '';
+  return [what, [why, who].filter(Boolean).join(', ')].filter(Boolean).join(': ');
+}
 
 export function faultDay(ix: UsageIndex, d: string) {
   const L = ix.platform === 'ios' ? 'I' : ix.platform === 'android' ? 'A' : null;

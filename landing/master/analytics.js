@@ -2450,8 +2450,10 @@ window.Analytics = (function () {
    * (`hrv.salvaged`). None of the three is something going wrong, so every
    * reader below starts from this list. The phone dashboard draws them (its
    * `captureOutcomes`); here they are only kept out of the failure counts.
+   * `garmin.reading` is the same idea for the watch: one count per reading
+   * that arrived from a Garmin, named by model, beside `garmin.noSignal`.
    */
-  var CAPTURE_EVENT_TAGS = { 'hrv.attempt': 1, 'hrv.filed': 1, 'hrv.salvaged': 1 };
+  var CAPTURE_EVENT_TAGS = { 'hrv.attempt': 1, 'hrv.filed': 1, 'hrv.salvaged': 1, 'garmin.reading': 1 };
   function failuresOf(report) {
     return ((report && report.faults) || []).filter(function (raw) {
       return !(raw && CAPTURE_EVENT_TAGS[raw.tag]);

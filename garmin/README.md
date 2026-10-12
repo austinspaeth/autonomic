@@ -16,22 +16,19 @@ than hidden. Do not re-add them to this target.
 ## The rules that make the sensor work
 
 All expensive to find and none discoverable from the docs. They are commented
-at length in `source/RrCollector.mc` and `source/Recording.mc`; do not "clean
-up" any of them.
+at length in `source/RrCollector.mc`; do not "clean up" any of them.
 
-1. **A throwaway activity session is open for the whole reading**
-   (`Recording.mc`, `Fit` permission, discarded on stop so nothing is ever
-   logged). The optical sensor only produces beat-to-beat in its activity-rate
-   mode, and asking for the onboard sensor from a Connect IQ app does not
-   reliably switch it there: Garmin's tracker holds an acknowledged report
+1. **No activity session, and no `Fit` permission.** It was tried
+   (2026-10-12) as the documented way to force the optical sensor into its
+   activity-rate mode, because Garmin's tracker holds an acknowledged report
    ([Elevate 5 not enabling in CIQ apps](https://forums.garmin.com/developer/connect-iq/i/bug-reports/critical-bug-elevate-optical-sensor-heart-rate-is-not-enabling))
-   of the sensor staying in low-power mode whenever the watch's Wrist Heart
-   Rate setting is Auto, on some firmware. That is a live pulse and an empty
-   interval array for the whole reading — the "stuck on Getting a signal"
-   report — on some users' watches and never on the development Venu 4. A
-   recording session is what every native activity does to get the fast mode.
-   The session is a helper, never a precondition: if the watch refuses it the
-   reading runs as before.
+   of the sensor staying in low-power mode for Connect IQ apps whenever the
+   watch's Wrist Heart Rate setting is Auto, on some firmware. On the Venu 4
+   it did the opposite: a reading that locked in seconds produced no
+   beat-to-beat at all with a session open, and the permission listed the app
+   under the watch's Activities instead of its Apps. Do not bring it back.
+   The low-power report is still the best explanation for other users'
+   watches; the `diag` message in rule 5 is how we find out which ones.
 2. **`SENSOR_ONBOARD_HEARTRATE`, never `SENSOR_HEARTRATE`.** `SensorType` is
    split into `RemoteSensorType` and `OnboardSensorType`. `SENSOR_HEARTRATE` is
    the *remote chest strap*. Asking for it yields a working heart rate and no
@@ -50,13 +47,12 @@ up" any of them.
    fit, or wrist HR off in the watch settings), a pulse but no beats (the fast
    mode not engaging), beats but too few. And a `diag` message goes to the
    phone in place of the reading — device, firmware, what the sensor did, how
-   many re-arms, whether the session took — which the phone files on the fault
-   route as `garmin.noSignal` (`mobile/src/lib/garmin/diag.ts`). Before this a
-   watch that never locked left no trace anywhere.
+   many re-arms — which the phone files on the fault route as
+   `garmin.noSignal` (`mobile/src/lib/garmin/diag.ts`). Before this a watch
+   that never locked left no trace anywhere.
 
-The HR monitor opens the same session (that is its keep-awake: the activity
-display timeout instead of the watch face's) and adds the sensor with
-`enableSensorType`, which does not reset whatever the collector armed.
+The HR monitor adds the sensor with `enableSensorType`, which does not reset
+whatever the collector armed.
 
 ## Devices
 
@@ -129,7 +125,6 @@ of it.
 | File | Purpose |
 | --- | --- |
 | `source/RrCollector.mc` | The capture engine. Owns the listener, the re-arm ladder and the give-up. |
-| `source/Recording.mc` | The throwaway activity session that puts the sensor in activity mode. |
 | `source/Link.mc` | Store-and-forward to the phone: queues readings, retries with backoff, clears only on the phone's ack. |
 | `source/Payload.mc` | Wire format (`SCHEMA`), local-ISO timestamps with no timezone suffix (the phone parses them as local). |
 | `source/Theme.mc` | Design tokens ported from the Apple Watch's `DesignSystem.swift`, plus pill/chevron/heart drawing. CIQ has no anti-aliasing, so the heart and check are bitmaps, drawn at their own size from the per-family assets. |
@@ -146,7 +141,7 @@ the sidecar and entry, flushes, and only then acks).
 ```bash
 ./build.sh sim      # run in the simulator
 ./build.sh device   # sideloadable dist/AutonomicRr.prg
-./build.sh store    # signed dist/AutonomicRr.iq for the Connect IQ store
+./build.sh store    # signed dist/Autonomic.iq for the Connect IQ store
 ```
 
 `build.sh` generates `resources/strings/version.xml` from `mobile/app.json`, so

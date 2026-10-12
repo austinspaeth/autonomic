@@ -14,11 +14,12 @@ using Toybox.Graphics;
 //
 // STAYING AWAKE: an ordinary watch app is subject to the device's backlight
 // timeout, and `Attention.backlight()` cannot override it — the API explicitly
-// respects the device setting. The mechanism that does work is recording an
-// ACTIVITY: that puts the watch into activity mode, keeps this app in the
-// foreground, and follows the activity display settings instead of the short
-// watch-face timeout. It is the same trick the Apple Watch companion plays with
-// HKWorkoutSession, and for the same reason.
+// respects the device setting. Recording an ACTIVITY would get the activity
+// display timeout instead, the way the Apple Watch companion uses
+// HKWorkoutSession, but it is NOT used here: the Fit permission it needs
+// lists the whole app under the watch's Activities instead of its Apps, and
+// an open session stopped the Venu 4 producing beat-to-beat for the HRV
+// reading (see RrCollector.mc). The monitor lives with the device timeout.
 //
 // Signal handling follows the Apple Watch rule: the last good HR is HELD on
 // screen. Before the first ever reading the value shows a grey "00"; once a
@@ -70,10 +71,6 @@ class HrMonitor {
         if (_running) { return; }
         reset();
         _running = true;
-        // The session is what keeps the screen on for a long monitor (the
-        // activity display timeout, not the watch face's) and puts the sensor
-        // in its activity-rate mode. Discarded on stop; nothing is logged.
-        Recording.begin("HR Monitor");
         // Onboard (wrist), not SENSOR_HEARTRATE which is the remote strap type.
         // enableSensorType ADDS the sensor without touching whatever else is
         // enabled, so opening the monitor after an HRV reading cannot reset
@@ -97,7 +94,6 @@ class HrMonitor {
         if (!_running) { return; }
         _running = false;
         if (_timer != null) { _timer.stop(); _timer = null; }
-        Recording.end();
     }
 
     function onTick() as Void {

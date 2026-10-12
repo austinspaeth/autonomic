@@ -10,15 +10,15 @@ using Toybox.Lang;
 // HOW THE SENSOR IS DRIVEN, and why each step is there. All of it was expensive
 // to find and none of it is in the docs.
 //
-//   1. A throwaway activity SESSION is opened for the reading (Recording.mc).
-//      The optical sensor only produces beat-to-beat in its activity-rate mode,
-//      and asking for SENSOR_ONBOARD_HEARTRATE does not reliably put it there:
-//      Garmin's tracker holds an acknowledged report of Connect IQ apps being
-//      left in the low-power mode on some firmware whenever the watch's Wrist
-//      Heart Rate setting is Auto. That is a watch that shows a pulse and never
-//      a beat — the "stuck on Getting a signal" report — on some users' watches
-//      and never on the one it was developed on. A recording session is the
-//      documented way every native activity gets the fast mode.
+//   1. NO activity session. It was tried (ActivityRecording.createSession with
+//      the Fit permission, discarded on stop) as the documented way to force
+//      the optical sensor into its activity-rate mode, because Garmin's tracker
+//      holds an acknowledged report of Connect IQ apps being left in the
+//      low-power mode on some firmware when the watch's Wrist Heart Rate
+//      setting is Auto. On the Venu 4 it did the opposite: a reading that had
+//      locked in 3-5 s every time stopped producing ANY beat-to-beat with the
+//      session open, and the Fit permission moved the app into the watch's
+//      Activities list. Do not bring it back.
 //   2. setEnabledSensors asks for SENSOR_ONBOARD_HEARTRATE — the WRIST sensor.
 //      SENSOR_HEARTRATE is the remote chest-strap type, and asking for it made
 //      beat-to-beat unreliable for a whole day.
@@ -92,7 +92,6 @@ class RrCollector {
     hidden var _nullCallbacks = 0;     // callbacks that carried no heartRateData
     hidden var _emptyCallbacks = 0;    // callbacks with an empty interval array
     hidden var _rearms = 0;
-    hidden var _recording = false;     // the activity session took
     hidden var _failed = null;         // why the app itself stopped the reading
     hidden var _error = null;
     hidden var _frozenElapsed = 0;
@@ -118,7 +117,6 @@ class RrCollector {
         _nullCallbacks = 0;
         _emptyCallbacks = 0;
         _rearms = 0;
-        _recording = false;
         _failed = null;
         _error = null;
         _frozenElapsed = 0;
@@ -146,9 +144,6 @@ class RrCollector {
         _startTimer = System.getTimer();
         _lastCallbackTimer = _startTimer;
         _running = true;
-        // Session FIRST, so the sensor is already being asked for its activity
-        // rate when the listener comes up.
-        _recording = Recording.begin("HRV");
         arm();
     }
 
@@ -180,14 +175,11 @@ class RrCollector {
     }
 
     // Tear the listener down and bring it back. Only for a reading that is
-    // getting NOTHING — see the header. The session is retried too: the one
-    // that was refused at start (another activity still open, say) may take
-    // now.
+    // getting NOTHING — see the header.
     hidden function rearm() {
         _rearms = _rearms + 1;
         _lastCallbackTimer = System.getTimer();
         release();
-        if (!_recording) { _recording = Recording.begin("HRV"); }
         arm();
     }
 
@@ -208,7 +200,6 @@ class RrCollector {
         _frozenMeasured = (_lockTimer == null) ? 0 : (System.getTimer() - _lockTimer) / 1000;
         _running = false;
         _endedAt = Time.now().value();
-        Recording.end();
         persist();
     }
 
@@ -334,7 +325,6 @@ class RrCollector {
                 "nullCallbacks" => _nullCallbacks,
                 "emptyCallbacks" => _emptyCallbacks,
                 "rearms" => _rearms,
-                "recording" => _recording,
                 "failed" => _failed
             });
         } catch (ex) {
@@ -353,7 +343,6 @@ class RrCollector {
             "emptyCallbacks" => _emptyCallbacks,
             "nullCallbacks" => _nullCallbacks,
             "rearms" => _rearms,
-            "recording" => _recording,
             "rrMs" => _intervals,
             "source" => "garmin-optical",
             // The device's OWN part number, not a model name. The phone does
@@ -368,7 +357,7 @@ class RrCollector {
     // What goes to the phone INSTEAD of a reading when there is none. It
     // carries no beats and nothing about the person: which hardware, which
     // firmware, how long the sensor was given, whether it ever saw a pulse,
-    // whether the activity session took, and how many re-arms were spent.
+    // and how many re-arms were spent.
     // The phone files it on the fault route, grouped by that shape, which is
     // how "the Garmin app doesn't work" becomes a row per device.
     function diagPayload(reason) {
@@ -386,7 +375,6 @@ class RrCollector {
             "nullCallbacks" => _nullCallbacks,
             "hrSeen" => _lastHr != null,
             "rearms" => _rearms,
-            "recording" => _recording,
             "device" => ds.partNumber,
             "firmware" => ds.firmwareVersion,
             "ciq" => ds.monkeyVersion

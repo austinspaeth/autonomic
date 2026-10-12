@@ -30,6 +30,8 @@ import {
   doorsOver,
   entry,
   faultDay,
+  garminShapeLabel,
+  garminWatches,
   known,
   measureRate,
   MILESTONES,
@@ -219,6 +221,33 @@ function capture(ix: UsageIndex, w: PromptWindow): string {
     ),
     shapes.length ? 'What the failed attempts looked like (signature tokens: cov = share of the session with usable pulse kept, raw = share with any pulse collected, seg = separate stretches of pulse, dur = how long it ran, paced/free = paced breathing or not):' : null,
     shapes.length ? table(['sensor', 'what', 'times', 'ios', 'android', 'install_days', 'signature'], shapes) : null,
+    '',
+    garmin(ix, w),
+  ]
+    .filter((x) => x !== null)
+    .join('\n');
+}
+
+/** Garmin watches, by model: readings that arrived beside readings the watch gave up on. */
+function garmin(ix: UsageIndex, w: PromptWindow): string {
+  const watches = garminWatches(ix.report, w.days, 'all');
+  if (!watches.length) return 'Garmin watches: none heard from in this period (counted from the build that reports arrivals and no-signal failures by model).';
+  const when = (x: { day: string; at: string | null } | null) => (x ? x.at || x.day : null);
+  return [
+    'Garmin watches, by model. A reading is one that reached the phone from the watch app (every one counts, not one per install per day); a failure is a reading the watch app gave up on after 75 seconds with no beat-to-beat and reported in its place. A model with readings and no failures works; one with only failures does not; install-days is the nearest thing to how many phones. Times are when the phone reported it, in UTC; a reading marked late was taken on an earlier day and delivered when the phone next met the watch.',
+    table(
+      ['model', 'readings', 'delivered_late', 'failures', 'fail_pct', 'reading_install_days', 'failure_install_days', 'last_reading', 'last_failure'],
+      watches.map((x) => [
+        x.name, x.readings, x.late, x.failed, x.readings + x.failed ? (x.failed / (x.readings + x.failed)) * 100 : null,
+        x.readingInstalls, x.failedInstalls, when(x.lastReading), when(x.lastFailure),
+      ]),
+    ),
+    watches.some((x) => x.shapes.length)
+      ? table(
+        ['model', 'what', 'times', 'install_days', 'signature'],
+        watches.flatMap((x) => x.shapes.slice(0, 6).map((sh) => [x.name, garminShapeLabel(sh.msg), sh.n, sh.installs, sh.msg] as Cell[])),
+      )
+      : null,
   ]
     .filter((x) => x !== null)
     .join('\n');

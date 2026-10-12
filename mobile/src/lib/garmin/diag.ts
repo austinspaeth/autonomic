@@ -5,8 +5,7 @@
  * long enough to count and produced too few beats to send (RrCollector.
  * diagPayload). It carries no beats and nothing about the person: the
  * hardware, the firmware, how long the sensor was given, whether it ever saw a
- * pulse, whether the activity session took, how many re-arms were spent, and
- * why the reading ended. Before this a watch that could not get a signal left
+ * pulse, how many re-arms were spent, and why the reading ended. Before this a watch that could not get a signal left
  * no trace anywhere: the reading was never sent, so the phone never knew an
  * attempt had happened, and the only evidence was a support email.
  *
@@ -22,6 +21,28 @@
 
 export const GARMIN_DIAG_TAG = 'garmin.noSignal';
 
+/**
+ * A reading that ARRIVED, on the same route, so the failures have something to
+ * be read against. Every arrival is one count, with the watch's name first, so
+ * the dashboard can list each model with its readings beside its failures and
+ * the server's own timestamps say when each landed. It is an EVENT, not a
+ * failure: everything that counts things going wrong must leave it out, the way
+ * `CAPTURE_EVENT_TAGS` in lib/hrv/refusal.ts is left out.
+ */
+export const GARMIN_READING_TAG = 'garmin.reading';
+export const GARMIN_EVENT_TAGS: readonly string[] = [GARMIN_READING_TAG];
+
+/**
+ * The message for an arrival: the watch, `ok`, how many re-arms the reading
+ * cost, and `late` when it was taken on an earlier day and only delivered now
+ * (the watch queues while the phone is away), so the dashboard's "when" is the
+ * delivery and the token says the reading itself was older.
+ */
+export function garminReadingMessage(model: string | null | undefined, device: string, rearms: unknown, late: boolean): string {
+  const dev = (model && model.trim()) || device || '?';
+  return `${dev} ok rearm${Math.min(num(rearms), 9)}${late ? ' late' : ''}`;
+}
+
 export interface GarminDiag {
   reason: string;
   elapsedSec: number;
@@ -32,7 +53,6 @@ export interface GarminDiag {
   nullCallbacks: number;
   hrSeen: boolean;
   rearms: number;
-  recording: boolean;
   device: string;
   firmware: string;
   ciq: string;
@@ -63,7 +83,6 @@ export function parseGarminDiag(payload: Record<string, unknown>): GarminDiag | 
     nullCallbacks: num(payload.nullCallbacks),
     hrSeen: payload.hrSeen === true,
     rearms: num(payload.rearms),
-    recording: payload.recording === true,
     device: typeof payload.device === 'string' && payload.device ? payload.device : '?',
     firmware: version(payload.firmware),
     ciq: version(payload.ciq),
@@ -100,7 +119,7 @@ export function garminDiagMessage(d: GarminDiag, model?: string | null): string 
   const dev = (model && model.trim()) || d.device;
   const fw = d.firmware === '?' ? '' : ` fw${d.firmware}`;
   return `${dev}${fw} ${signalWord(d)} ${feedWord(d)} ${d.reason}`
-    + ` rec:${d.recording ? 'on' : 'off'} rearm${Math.min(d.rearms, 9)} ${elapsedBand(d.elapsedSec)}`;
+    + ` rearm${Math.min(d.rearms, 9)} ${elapsedBand(d.elapsedSec)}`;
 }
 
 /** How long the sensor was given. The watch gives up at 75s on its own, so

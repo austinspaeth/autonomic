@@ -142,10 +142,10 @@
         </iq:products>
         <iq:permissions>
             <iq:uses-permission id="Communications"/>
-            <!-- Fit: the throwaway activity session (source/Recording.mc) that
-                 puts the optical sensor into its activity-rate mode. Nothing
-                 is ever saved; every session is discarded. -->
-            <iq:uses-permission id="Fit"/>
+            <!-- NO Fit permission. An activity session was tried (2026-10-12)
+                 as a way to force the optical sensor into activity-rate mode;
+                 it moved the app into the watch's ACTIVITIES list and the
+                 Venu 4 stopped producing beat-to-beat entirely. -->
             <iq:uses-permission id="Sensor"/>
         </iq:permissions>
         <iq:languages>
