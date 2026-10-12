@@ -7,10 +7,20 @@
  * Custom defs are pure JSON (no summary/detail functions) so they persist
  * through MMKV and export/import untouched.
  */
-import type { TypeDef } from './types';
+import type { AppState, TypeDef } from './types';
 import type { LoadWeight } from './budget/load';
 import { getState, save } from '../store/store';
-import { BUILTIN, CUSTOM_FIELDS, CUSTOM_ICON, slugify, typesFor, type TypeKind } from './typeResolve';
+import { BUILTIN, CUSTOM_FIELDS, CUSTOM_ICON, reconcileProtocol, slugify, typesFor, type TypeKind } from './typeResolve';
+
+/** Keep the clean-day protocol pointed at types the user can see — run after
+ *  every catalog change, so a deleted type stops being required the moment it
+ *  goes, and a type added back by name takes over its old requirement. */
+function syncProtocol(state: AppState) {
+  const p = state.settings.protocol;
+  if (!p) return;
+  const next = reconcileProtocol(p, state);
+  if (next !== p) state.settings.protocol = next;
+}
 
 // The pure half lives in ./typeResolve so the pure libraries (src/lib/budget)
 // can resolve types without importing the store. Re-exported so every existing
@@ -37,6 +47,7 @@ export function addCustomType(kind: TypeKind, name: string, opts?: { dosage?: st
   // Fresh top-level object (not an in-place write) so useMemos keyed on
   // state.customTypes see the change — save() only re-wraps state and days.
   state.customTypes = { ...(state.customTypes || {}), [kind]: { ...(state.customTypes?.[kind] || {}), [key]: def } };
+  syncProtocol(state);
   save();
   return key;
 }
@@ -86,5 +97,6 @@ export function deleteType(kind: TypeKind, key: string) {
     const list = state.hiddenTypes?.[kind] || [];
     if (!list.includes(key)) state.hiddenTypes = { ...(state.hiddenTypes || {}), [kind]: [...list, key] };
   }
+  syncProtocol(state);
   save();
 }

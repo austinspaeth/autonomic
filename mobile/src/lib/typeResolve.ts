@@ -9,7 +9,7 @@
  * here and ./typeCatalog re-exports it, leaving every existing import working.
  */
 import { ACTIVITY_TYPES, MED_TYPES, SYMPTOM_TYPES, TRIGGER_TYPES } from './registry';
-import type { AppState, TypeDef } from './types';
+import type { AppState, Protocol, TypeDef } from './types';
 
 export type TypeKind = 'activities' | 'meds' | 'symptoms' | 'triggers';
 
@@ -82,5 +82,46 @@ export function typeInUse(state: AppState, kind: TypeKind, key: string): boolean
 
 export function slugify(name: string): string {
   return name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '');
+}
+
+/**
+ * Point the clean-day protocol's med / activity requirements at types the
+ * user can actually SEE.
+ *
+ * The protocol stores type keys, and the editor lists `typesFor` — so a key
+ * that is no longer in the catalog (a built-in deleted from the picker, which
+ * is allowed while it is in use, or a custom type that was removed) is a
+ * requirement the user can neither see nor untick, labelled with a name they
+ * deleted, and failing every day. Each stale key is MOVED to the visible type
+ * of the same name when there is one (the thing was deleted and added back,
+ * which comes back as `custom-…`), and dropped otherwise: deleting the type
+ * was the user's answer. Trigger requirements are left alone — an empty list
+ * there means "no triggers at all", so pruning the last key would widen the
+ * rule rather than narrow it, and a stale trigger key can only ever pass.
+ *
+ * Returns the SAME object when nothing changes, so a caller can compare by
+ * identity and memos keyed on the protocol are not disturbed.
+ */
+export function reconcileProtocol(protocol: Protocol, state: AppState): Protocol {
+  let out = protocol;
+  (['meds', 'activities'] as const).forEach((kind) => {
+    const sec = protocol[kind];
+    if (!sec || !Array.isArray(sec.types) || !sec.types.length) return;
+    const visible = typesFor(state, kind);
+    const byName = new Map<string, string>();
+    Object.keys(visible).forEach((k) => byName.set(visible[k].label.toLowerCase(), k));
+    const next: string[] = [];
+    sec.types.forEach((k) => {
+      let key: string | undefined = visible[k] ? k : undefined;
+      if (!key) {
+        const label = BUILTIN[kind][k]?.label;
+        if (label) key = byName.get(label.toLowerCase());
+      }
+      if (key && !next.includes(key)) next.push(key);
+    });
+    const same = next.length === sec.types.length && next.every((k, i) => k === sec.types[i]);
+    if (!same) out = { ...out, [kind]: { ...sec, types: next } };
+  });
+  return out;
 }
 
