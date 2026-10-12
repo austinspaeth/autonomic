@@ -553,6 +553,21 @@ export function waterGoalL(p?: Partial<Protocol> | null): number {
 const typeLabel = (map: Record<string, { label: string }>, k: string, custom?: Record<string, { label: string }>) => custom?.[k]?.label || map[k]?.label || k;
 const joinLabels = (map: Record<string, { label: string }>, keys: string[], custom?: Record<string, { label: string }>) => keys.map((k) => typeLabel(map, k, custom)).join(', ');
 
+/** Does a logged entry satisfy a requirement for type `want`? By key, or by the
+ *  NAME the two keys resolve to. One thing can live under two keys: a built-in
+ *  deleted from the picker (allowed while in use — its past logs are hidden,
+ *  not removed) and then added back by name comes back as `custom-…`, and the
+ *  protocol still names the old key — so Gaviscon logged at 5:22pm read as
+ *  missed, on the Journal and in every export. Two VISIBLE types never share a
+ *  name (`addCustomType` / `editType` refuse), so same name is same thing. A
+ *  hidden built-in still resolves through the registry map, which is what an
+ *  entry logged before the delete needs. The comparison is case-insensitive,
+ *  the same rule the catalog's duplicate check applies. */
+const satisfies = (map: Record<string, { label: string }>, want: string, custom?: Record<string, { label: string }>) => {
+  const name = typeLabel(map, want, custom).toLowerCase();
+  return (e: Entry) => e.type === want || typeLabel(map, e.type, custom).toLowerCase() === name;
+};
+
 /** Build the clean-day checklist for a day against a protocol. An absent or
  *  empty day yields the same criteria as a blank one — every requirement simply
  *  reads as unmet. This is the DISPLAY primitive: it lets the streak widget show
@@ -591,7 +606,7 @@ export function protocolCriteria(days: DaysMap, dk: string, protocol: Protocol =
     const meds = (d && d.meds) || [];
     protocol.meds.types.forEach((t) => {
       const label = typeLabel(MED_TYPES, t, custom?.meds);
-      criteria.push({ key: `meds:${t}`, label, pass: meds.some((m) => m.type === t) });
+      criteria.push({ key: `meds:${t}`, label, pass: meds.some(satisfies(MED_TYPES, t, custom?.meds)) });
     });
   }
 
@@ -599,7 +614,7 @@ export function protocolCriteria(days: DaysMap, dk: string, protocol: Protocol =
     const acts = (d && d.activities) || [];
     protocol.activities.types.forEach((t) => {
       const label = typeLabel(ACTIVITY_TYPES, t, custom?.activities);
-      criteria.push({ key: `activities:${t}`, label, pass: acts.some((a) => a.type === t) });
+      criteria.push({ key: `activities:${t}`, label, pass: acts.some(satisfies(ACTIVITY_TYPES, t, custom?.activities)) });
     });
   }
 
@@ -639,7 +654,7 @@ export function streakInfo(days: DaysMap, dk: string, protocol: Protocol = DEFAU
   if (dk === today && (!cur || !cur.clean)) cursor.setDate(cursor.getDate() - 1);
   let current = 0;
   for (;;) {
-    const c = dayCleanliness(days, keyOf(cursor), protocol);
+    const c = dayCleanliness(days, keyOf(cursor), protocol, custom);
     if (!c || !c.clean) break;
     current++;
     cursor.setDate(cursor.getDate() - 1);
@@ -649,7 +664,7 @@ export function streakInfo(days: DaysMap, dk: string, protocol: Protocol = DEFAU
   if (keys.length) {
     const end = dateFromKey(dk);
     for (let cd = dateFromKey(keys[0]); cd <= end; cd.setDate(cd.getDate() + 1)) {
-      const c = dayCleanliness(days, keyOf(cd), protocol);
+      const c = dayCleanliness(days, keyOf(cd), protocol, custom);
       if (c && c.clean) { run++; if (run > longest) longest = run; }
       else run = 0;
     }
@@ -657,7 +672,7 @@ export function streakInfo(days: DaysMap, dk: string, protocol: Protocol = DEFAU
   let cleanN = 0, total = 0;
   const e = dateFromKey(dk);
   for (let i = 0; i < 30; i++) {
-    const c = dayCleanliness(days, keyOf(new Date(e.getFullYear(), e.getMonth(), e.getDate() - i)), protocol);
+    const c = dayCleanliness(days, keyOf(new Date(e.getFullYear(), e.getMonth(), e.getDate() - i)), protocol, custom);
     if (c) { total++; if (c.clean) cleanN++; }
   }
   return { current, longest, rate: total ? Math.round((cleanN / total) * 100) : null, today: cur, isToday: dk === today };

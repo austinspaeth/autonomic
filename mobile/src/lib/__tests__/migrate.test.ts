@@ -226,11 +226,25 @@ describe('migrate: top-level sections', () => {
     const valid = {
       triggers: { enabled: true, types: [] },
       water: { enabled: true, liters: 2 },
-      meds: { enabled: false, types: ['ldn'] },
+      meds: { enabled: false, types: ['melatonin'] },
       activities: { enabled: false, types: [] },
       sleep: { enabled: true, hours: 7.5 },
     };
     expect(migrate({ settings: { protocol: valid } }).settings.protocol).toEqual(valid);
+  });
+
+  it('re-points a protocol requirement at the visible type of the same name', () => {
+    // Gaviscon was deleted from the picker (hidden) and added back by name,
+    // which created custom-gaviscon; the protocol still named the built-in,
+    // so every day read as missing it. Repaired on load, not only on edit.
+    const out = migrate({
+      settings: { protocol: { triggers: { enabled: true, types: [] }, water: { enabled: true, liters: 2 }, meds: { enabled: true, types: ['gaviscon'] }, activities: { enabled: true, types: ['yoga', 'custom-gone'] }, sleep: { enabled: true, hours: 7 } } },
+      hiddenTypes: { meds: ['gaviscon'] },
+      customTypes: { meds: { 'custom-gaviscon': { label: 'Gaviscon', icon: 'pill', fields: [], userDefined: true } } },
+    });
+    expect(out.settings.protocol!.meds.types).toEqual(['custom-gaviscon']);
+    // A key with no visible twin is dropped; a visible one is untouched.
+    expect(out.settings.protocol!.activities.types).toEqual(['yoga']);
   });
 
   it('coerces profile fields to strings', () => {

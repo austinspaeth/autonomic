@@ -15,6 +15,7 @@
 import { addDays, todayKey, uid } from './dates';
 import { MED_TYPES } from './registry';
 import { isPlausibleHpa, type PressureMap } from './pressure';
+import { reconcileProtocol } from './typeResolve';
 import type {
   AppState,
   DayLoad,
@@ -429,6 +430,16 @@ export function migrate(s: unknown): AppState {
   if (out.customTypes?.activities) {
     delete out.customTypes.activities.upperBody;
     delete out.customTypes.activities.lowerBody;
+  }
+
+  // A protocol requirement must name a type the user can see in the editor.
+  // Repaired here so a journal already carrying a stale key (a built-in
+  // deleted from the picker and added back by name) is fixed on its next
+  // launch or import, not only on the next catalog edit. Needs the cleaned
+  // catalog above, which is why it runs after it.
+  if (out.settings.protocol) {
+    const next = reconcileProtocol(out.settings.protocol, out);
+    if (next !== out.settings.protocol) out.settings.protocol = next;
   }
 
   const days = isPlainObject(src.days) ? (src.days as Record<string, unknown>) : {};
