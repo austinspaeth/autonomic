@@ -40,6 +40,9 @@ export interface AppDiagnostics {
   journal: Rows;
   settings: Rows;
   errors: LoggedError[];
+  /** This session's breadcrumb trail (lib/diagnostics/crumbs): screens and
+   *  cards, oldest first. Names only, never data. */
+  trail?: string;
   notes: string[];
 }
 
@@ -87,6 +90,7 @@ export function formatAppDiagnostics(d: AppDiagnostics): string {
   out.push('', ...block('JOURNAL (counts only)', d.journal));
   out.push('', ...block('SETTINGS', d.settings));
 
+  if (d.trail !== undefined) out.push('', 'THIS SESSION (oldest first)', `  ${d.trail}`);
   out.push('', `ERRORS (${d.errors.length}${d.errors.length ? ', oldest first' : ''})`);
   if (d.errors.length) d.errors.forEach((e) => out.push(...errorLines(e)));
   else out.push('  none recorded');

@@ -1,10 +1,13 @@
 /**
  * Reading the native crash log — the pure half.
  *
- * The Android module writes crashes to a file from inside a dying process (see
- * `modules/app-env`), and the next launch hands the raw JSON here. Everything
- * in this file is parsing and phrasing, with no imports at all, so jest can pin
- * the shape of what ends up in the error log and on the `/fault` route.
+ * Two writers feed it. The Android module writes a row from inside a dying
+ * process (its Java uncaught-exception handler), and the iOS module writes
+ * rows from MetricKit's diagnostics, which the system hands over on the launch
+ * after a crash. Either way the next launch (or, on iOS, a module event a few
+ * seconds in) hands the raw JSON here. Everything in this file is parsing and
+ * phrasing, with no imports at all, so jest can pin the shape of what ends up
+ * in the error log and on the `/fault` route.
  *
  * The shell — installing the handler, draining the log into `logError` — lives
  * in ./errorLog beside the JavaScript hook it completes.
@@ -13,20 +16,23 @@
  * else in this app is that the TAG is the location and the message is a
  * courtesy: a release build's JS stack is minified bytecode offsets, so
  * `area.thing` plus an error type is the whole diagnosis. A native crash
- * inverts that. There is only one site — "something threw on a Java thread" —
- * so the tag can say nothing useful about WHERE, and the exception type and its
- * root cause carry the entire finding. `BadParcelableException:
- * ClassNotFoundException when unmarshalling: com.garmin.android.connectiq.IQDevice`
- * IS the bug report. So the message is composed carefully, and it survives
- * `redactMessage` intact: no digit runs, no slashes, and dotted class names
- * break into segments too short for the id rule.
+ * inverts that. There is only one site — "something threw on a Java thread",
+ * "the process took a signal" — so the tag can say nothing useful about WHERE,
+ * and the exception type and its root cause carry the entire finding.
+ * `BadParcelableException: ClassNotFoundException when unmarshalling:
+ * com.garmin.android.connectiq.IQDevice` IS the bug report; so is
+ * `SIGSEGV: Autonomic +0x1a2b3c`. So the message is composed carefully, and it
+ * survives `redactMessage` intact: no digit runs, no slashes, dotted names
+ * break into short segments, and a long exception class is a word rather than
+ * an id to the redaction (it checks for a digit).
  */
 
-/** One crash, as the Android module recorded it. Every field is optional: it
- *  was written by a process on its way out, and an older build's row must still
- *  parse rather than taking the drain down with it. */
+/** One crash, as a native module recorded it. Every field is optional: it
+ *  was written by a process on its way out, or by an older build, and a row
+ *  must still parse rather than taking the drain down with it. */
 export interface NativeCrash {
-  /** Epoch ms, stamped at the crash rather than at the read. */
+  /** Epoch ms, stamped at the crash (Android) or at the end of the diagnostic
+   *  window MetricKit collected it in (iOS — NOT the instant it happened). */
   at?: number;
   thread?: string;
   type?: string;
@@ -34,6 +40,17 @@ export interface NativeCrash {
   causeType?: string;
   causeMessage?: string;
   frame?: string;
+  /** `crash` (the default) or `hang`: MetricKit also reports a main thread
+   *  stuck for seconds, which is what a JavaScript infinite loop looks like
+   *  from outside the process. */
+  kind?: 'crash' | 'hang';
+  /** The build that CRASHED. The fault report stamps the build that SENDS,
+   *  and on iOS the two can differ (a crash from before an update is delivered
+   *  after it), so it rides in the message. */
+  version?: string;
+  /** Who wrote the row. MetricKit's `at` is a window, so a trail is matched
+   *  to it by session rather than by time. */
+  source?: 'java' | 'metrickit';
 }
 
 /**
@@ -46,6 +63,12 @@ export interface NativeCrash {
  * prefix. A tag per type would scatter that across the list.
  */
 export const NATIVE_CRASH_TAG = 'native.crash';
+
+/** A main thread hang (iOS, MetricKit). Its own tag because it is not a
+ *  crash: the app came back. Not fatal on the dashboard for the same reason. */
+export const NATIVE_HANG_TAG = 'native.hang';
+
+export const tagForNativeCrash = (c: NativeCrash): string => (c.kind === 'hang' ? NATIVE_HANG_TAG : NATIVE_CRASH_TAG);
 
 /** Longest composed message worth carrying. `redactMessage` truncates to its
  *  own limit afterwards; this only stops a pathological native string from
@@ -64,12 +87,13 @@ function simpleName(qualified: string): string {
 
 /**
  * One line describing a crash, in the shape `describeError` produces for
- * everything else: `Type: message (cause: CauseType: message)`.
+ * everything else: `Type: message (cause: CauseType: message) [v1.33.0]`.
  *
  * The cause is included rather than replacing the top exception, because which
  * wrapper threw is half the diagnosis — `BadParcelableException` says the
  * failure was unmarshalling an intent extra, and `ClassNotFoundException`
- * alone would not.
+ * alone would not. The version is the one that crashed, when the writer knew
+ * it, since the report's own version field is the build doing the sending.
  */
 export function describeNativeCrash(c: NativeCrash): string {
   const type = c.type ? simpleName(c.type) : '';
@@ -77,7 +101,8 @@ export function describeNativeCrash(c: NativeCrash): string {
   const causeType = c.causeType ? simpleName(c.causeType) : '';
   const causeBody = [causeType, (c.causeMessage || '').trim()].filter(Boolean).join(': ');
   const cause = causeBody ? ` (cause: ${causeBody})` : '';
-  const line = (head + cause).replace(/\s+/g, ' ').trim() || 'unknown native crash';
+  const version = c.version ? ` [v${c.version}]` : '';
+  const line = (head + cause + version).replace(/\s+/g, ' ').trim() || 'unknown native crash';
   return line.length > MAX_DESCRIPTION ? `${line.slice(0, MAX_DESCRIPTION - 1)}…` : line;
 }
 
@@ -112,6 +137,9 @@ export function parseNativeCrashes(raw: string | null | undefined): NativeCrash[
       causeType: str(r.causeType),
       causeMessage: str(r.causeMessage),
       frame: str(r.frame),
+      kind: r.kind === 'hang' ? 'hang' : 'crash',
+      version: str(r.version),
+      source: r.source === 'metrickit' ? 'metrickit' : 'java',
     };
     // A row carrying no identifying text at all describes nothing and would
     // report as "unknown native crash", which is a row on the dashboard that

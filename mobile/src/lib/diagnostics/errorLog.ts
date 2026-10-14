@@ -17,9 +17,11 @@
  * in-memory copy and moves on.
  */
 import { MMKV } from 'react-native-mmkv';
+import { initBreadcrumbs, liveTrail, previousTrail } from './breadcrumbs';
+import { type CrumbTrail, formatWhere } from './crumbs';
 import { describeError } from './env';
 import { MAX_ERRORS, parseErrorLog, pushError, type LoggedError } from './errorBuffer';
-import { describeNativeCrash, NATIVE_CRASH_TAG, parseNativeCrashes } from './nativeCrash';
+import { describeNativeCrash, parseNativeCrashes, tagForNativeCrash } from './nativeCrash';
 
 export type { LoggedError };
 
@@ -44,12 +46,32 @@ function load(): LoggedError[] {
   return mem;
 }
 
+/** The tag a crash's CONTEXT lands under: where the user was, as a trail of
+ *  crumbs (see ./crumbs). Its own row beside the crash's, never folded into
+ *  the crash's message — that would split one crash into a signature per
+ *  path and lose the "3 phones" the crash row exists to say. */
+export const CRASH_WHERE_TAG = 'crash.where';
+
 /**
  * Record a failure. `tag` is a stable dotted key naming the site
  * (`store.persist`, `iap.init`, `health.check`) — it's what makes a dump
  * skimmable, so prefer an existing tag over a new phrasing of one.
+ *
+ * A FATAL also files where it happened. `where` is the trail to use when the
+ * caller knows better than "this session" — a native crash drained from a
+ * previous process passes that process's trail — and `null` says there is no
+ * trustworthy trail, in which case the row still goes out saying `unknown`:
+ * a crash with no context is still a crash whose context was asked for.
+ *
+ * `dying` says the process will not outlive this call (the uncaught-error
+ * hook): the reports are then buffered for the next launch rather than sent,
+ * because a request in flight when the process is killed is a report lost.
  */
-export function logError(tag: string, err: unknown, opts?: { fatal?: boolean }): void {
+export function logError(
+  tag: string,
+  err: unknown,
+  opts?: { fatal?: boolean; dying?: boolean; where?: { trail: CrumbTrail; approx: boolean } | null },
+): void {
   try {
     const msg = describeError(err);
     mem = pushError(load(), {
@@ -78,8 +100,17 @@ export function logError(tag: string, err: unknown, opts?: { fatal?: boolean }):
     // cannot flush this window.
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     try { require('../../store/ping').pingErrorSeen(); } catch { /* not wired up yet */ }
+    const send = { defer: !!opts?.dying };
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    try { require('../../store/errorReport').reportFault(tag, msg, opts?.fatal); } catch { /* not wired up yet */ }
+    try { require('../../store/errorReport').reportFault(tag, msg, opts?.fatal, send); } catch { /* not wired up yet */ }
+    if (opts?.fatal) {
+      // The context row. Not fatal itself: it is not a second crash, and must
+      // not wear the dashboard's CRASH pill or push a second alert.
+      const where = opts.where === undefined ? { trail: liveTrail(), approx: false } : opts.where;
+      const line = formatWhere(tag, where?.trail, { approx: !!where?.approx });
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      try { require('../../store/errorReport').reportFault(CRASH_WHERE_TAG, line, false, send); } catch { /* not wired up yet */ }
+    }
   } catch { /* logging must never throw */ }
 }
 
@@ -109,7 +140,10 @@ let installed = false;
 export function installErrorLogging(): void {
   if (installed) return;
   installed = true;
-  // The NATIVE half, first, because the JS block below can bail early.
+  // Where the user is, from this moment on. First, so the trail the previous
+  // session left is read back before anything this launch does overwrites it.
+  initBreadcrumbs();
+  // The NATIVE half next, because the JS block below can bail early.
   //
   // `ErrorUtils` is JavaScript's global handler and sees JavaScript throws.
   // Nothing routes a Java exception through it, so an exception on the Android
@@ -117,9 +151,10 @@ export function installErrorLogging(): void {
   // no `catch` of ours can reach it — killed the process and left this log
   // completely empty. An empty log reads as "nothing went wrong", which is the
   // worst possible answer: the one bug class the app degrades WORST on was the
-  // one class it recorded nothing about. The handler writes to a file (the
-  // process is dying; MMKV is JSI and the runtime may already be gone) and
-  // `drainNativeCrashes` picks it up next launch.
+  // one class it recorded nothing about. The Android handler writes to a file
+  // (the process is dying; MMKV is JSI and the runtime may already be gone);
+  // the iOS one subscribes to MetricKit, which writes the same file on the
+  // launch after a crash. `drainNativeCrashes` picks both up.
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     require('../../../modules/app-env').installNativeCrashHandler();
@@ -132,7 +167,9 @@ export function installErrorLogging(): void {
     if (!EU?.setGlobalHandler) return;
     const prev = EU.getGlobalHandler();
     EU.setGlobalHandler((e, isFatal) => {
-      logError(isFatal ? 'uncaught.fatal' : 'uncaught', e, { fatal: !!isFatal });
+      // A fatal here is the process ending: in a release build the default
+      // handler we hand it to next tears the app down.
+      logError(isFatal ? 'uncaught.fatal' : 'uncaught', e, { fatal: !!isFatal, dying: !!isFatal });
       prev?.(e, isFatal);
     });
   } catch { /* no ErrorUtils here — explicit logError calls still work */ }
@@ -149,14 +186,30 @@ export function installErrorLogging(): void {
  * must happen once there is something to report through.
  *
  * Marked `fatal`, because that is exactly what it was: unlike a logged
- * failure, the app did not carry on afterwards.
+ * failure, the app did not carry on afterwards. (A MetricKit HANG is the one
+ * row that is not: the app came back, so it is filed as a plain failure under
+ * its own tag.)
+ *
+ * The context row takes the PREVIOUS session's trail, matched by time for a
+ * Java crash (which is stamped at the instant) and by session for a MetricKit
+ * one (which is stamped with the window it was collected in). See
+ * ./breadcrumbs for why the two trails exist.
+ *
+ * On iOS the diagnostics arrive a few seconds AFTER launch, through the
+ * module's `onCrashLog` event, so the first call also subscribes to it and
+ * drains again whenever it fires.
  */
+let crashLogSub: { remove(): void } | null = null;
 export function drainNativeCrashes(): void {
   try {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
-    const raw = require('../../../modules/app-env').takeNativeCrashLog() as string;
+    const appEnv = require('../../../modules/app-env') as typeof import('../../../modules/app-env');
+    const raw = appEnv.takeNativeCrashLog();
     for (const crash of parseNativeCrashes(raw)) {
-      logError(NATIVE_CRASH_TAG, new Error(describeNativeCrash(crash)), { fatal: true });
+      const hang = crash.kind === 'hang';
+      const where = previousTrail(crash.source === 'metrickit' ? undefined : crash.at);
+      logError(tagForNativeCrash(crash), new Error(describeNativeCrash(crash)), hang ? undefined : { fatal: true, where });
     }
+    if (!crashLogSub) crashLogSub = appEnv.onNativeCrashLog(() => drainNativeCrashes());
   } catch { /* nothing recorded, or no native module — either way there is nothing to say */ }
 }

@@ -30,14 +30,21 @@ public class AppEnvModule: Module {
     // Nothing is missing, so nothing is disabled.
     Function("missingClasses") { (_: [String]) -> [String] in [] }
 
-    // Deliberately NOT `NSSetUncaughtExceptionHandler`. That catches ObjC
-    // exceptions, and almost nothing that kills an iOS build is one — a Swift
-    // trap, a force-unwrap, a JSI abort and an OOM are all signals, which it
-    // never sees. Installing it would report a handful of crashes and imply we
-    // were watching for the rest. Crash reporting on iOS is a real project with
-    // a signal handler in it, not a line here.
-    Function("installCrashHandler") { () -> Bool in false }
-    Function("takeCrashLog") { () -> String in "" }
+    // Crash recording. Deliberately NOT `NSSetUncaughtExceptionHandler`: that
+    // catches ObjC exceptions, and almost nothing that kills an iOS build is
+    // one — a Swift trap, a force-unwrap, a JSI abort and a watchdog kill are
+    // all signals, which it never sees. MetricKit is the system's own record
+    // of those, delivered on the launch after (see CrashLog.swift). The
+    // subscriber is started from the AppDelegate; this call connects it to the
+    // event below so a delivery after the launch-time drain is drained too.
+    Events("onCrashLog")
+    OnCreate {
+      CrashLog.shared.onWrite = { [weak self] in
+        DispatchQueue.main.async { self?.sendEvent("onCrashLog", [:]) }
+      }
+    }
+    Function("installCrashHandler") { () -> Bool in CrashLog.shared.start() }
+    Function("takeCrashLog") { () -> String in CrashLog.take() }
 
     // Background time for a pacing refresh (src/store/pacingBackground.ts). A
     // HealthKit background-delivery launch gets a few seconds before iOS

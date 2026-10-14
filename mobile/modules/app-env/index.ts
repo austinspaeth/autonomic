@@ -9,10 +9,13 @@ interface AppEnvNative {
   installerPackage?: string;
   /** Which of these class names this build can no longer resolve. iOS always []. */
   missingClasses?: (names: string[]) => string[];
-  /** Install the Java uncaught-exception handler. iOS is a no-op returning false. */
+  /** Android: install the Java uncaught-exception handler. iOS: subscribe to
+   *  MetricKit's crash diagnostics. False where neither exists. */
   installCrashHandler?: () => boolean;
   /** Crashes recorded since the last call, as raw JSON, clearing them. */
   takeCrashLog?: () => string;
+  /** iOS: MetricKit handed over diagnostics and they were written to the log. */
+  addListener?: (event: 'onCrashLog', cb: () => void) => { remove(): void };
   /** iOS: UIApplication.beginBackgroundTask, resolving its identifier. */
   beginBackgroundTask?: (name: string) => Promise<number>;
   /** iOS: end a task `beginBackgroundTask` started. */
@@ -80,19 +83,37 @@ export function missingClasses(names: string[]): string[] {
 }
 
 /**
- * Start recording Java crashes. Android only; returns false everywhere else.
+ * Start recording native crashes. Returns false where the binary cannot.
  *
  * The JS-side `installErrorLogging()` hooks React Native's `ErrorUtils`, which
  * only ever sees JavaScript throws — a Java exception on the main thread took
  * the process down and left the on-device error log empty, which reads exactly
- * like "nothing went wrong". This closes that half.
+ * like "nothing went wrong". Android closes that half with an uncaught-
+ * exception handler. iOS closes it with MetricKit: almost nothing that kills
+ * an iOS build is an ObjC exception (a Swift trap, a bad access, a watchdog
+ * kill are all signals), and MetricKit is the system's own record of those,
+ * handed to the app on the launch after. The iOS subscriber is ALSO started
+ * from the AppDelegate so a delivery cannot beat the first JS call; this call
+ * is what connects it to the module's event.
  */
 export function installNativeCrashHandler(): boolean {
-  if (Platform.OS !== 'android') return false;
   try {
     return appEnvNative()?.installCrashHandler?.() ?? false;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Hear about crash rows written AFTER launch. iOS only in practice: MetricKit
+ * delivers a few seconds in, after the launch-time drain has already run.
+ * Returns the subscription, or null where the module has no such event.
+ */
+export function onNativeCrashLog(fn: () => void): { remove(): void } | null {
+  try {
+    return appEnvNative()?.addListener?.('onCrashLog', fn) ?? null;
+  } catch {
+    return null;
   }
 }
 
@@ -123,7 +144,6 @@ export function holdBackgroundTime(name: string): () => void {
 
 /** Crashes recorded since the last call, as raw JSON. Reading them clears them. */
 export function takeNativeCrashLog(): string {
-  if (Platform.OS !== 'android') return '';
   try {
     return appEnvNative()?.takeCrashLog?.() ?? '';
   } catch {

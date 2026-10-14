@@ -21,6 +21,7 @@ import Animated, {
 import { BlurView } from 'expo-blur';
 import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, usePalette } from '../theme';
+import { noteCrumb } from '../lib/diagnostics/breadcrumbs';
 import { notifyChartsBlur } from './charts';
 import { Icon } from './Icon';
 import { tapAwayBlur } from './tapAway';
@@ -414,6 +415,15 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
   // Stable context value so a footer update doesn't force SheetFooter (a consumer)
   // to re-render through the context and re-trigger the loop above.
   const ctxValue = React.useMemo(() => ({ setFooter }), [setFooter]);
+  // Which card is up, for the crash context trail (lib/diagnostics/crumbs): the
+  // component's own name, which the release bundle keeps (metro.config.js).
+  React.useEffect(() => {
+    const name = sheetName(content);
+    noteCrumb(`sheet:${name}`);
+    return () => noteCrumb(`close:${name}`);
+    // Once per card: `content` is memoized on the entry.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [entry.id]);
 
   return (
     <>
@@ -537,6 +547,15 @@ export function SheetPillButton({ icon, size = 18, onPress, label, disabled, col
       <Icon name={icon} size={size} color={color || p.textDim} />
     </Pressable>
   );
+}
+
+/** The component name of a sheet's root element, for the breadcrumb trail.
+ *  Nothing from its props — a crumb is a name this code chose, never data. */
+function sheetName(content: React.ReactNode): string {
+  if (!React.isValidElement(content)) return '?';
+  const type = content.type as { displayName?: string; name?: string } | string;
+  if (typeof type === 'string') return type;
+  return type.displayName || type.name || '?';
 }
 
 /** Lets a sheet's content register a fixed footer (primary action row). */

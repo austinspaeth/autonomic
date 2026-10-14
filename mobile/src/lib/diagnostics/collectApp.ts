@@ -21,6 +21,7 @@
  */
 import { Platform } from 'react-native';
 import { appInfo, describeError, platformInfo } from './env';
+import { describeTrail } from './breadcrumbs';
 import { getErrorLog } from './errorLog';
 import type { AppDiagnostics, Rows } from './appReport';
 import { getState, loadIssue, storageStats } from '../../store/store';
@@ -529,6 +530,7 @@ export async function collectAppDiagnostics(): Promise<AppDiagnostics> {
     journal: await safe(() => journalRows(s), {}),
     settings: await safe(() => settingsRows(s), {}),
     errors: getErrorLog(),
+    trail: describeTrail(),
   };
   return { ...partial, notes: await safe(() => buildNotes(partial), []) };
 }

@@ -19,6 +19,7 @@ import { useInsightsUnseen } from '../../src/store/insightsBadge';
 import { usePaywall } from '../../src/features/Paywall';
 import { MONTHLY_SKU, priceOf, useIap } from '../../src/store/iap';
 import { getTrialDaysLeft, useAccessGrant, useTier } from '../../src/store/tier';
+import { noteCrumb } from '../../src/lib/diagnostics/breadcrumbs';
 
 /**
  * The Journal is where the app opens, always.
@@ -164,6 +165,12 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
     if (rowW > 0 && cogEnd > 0 && cogEnd + PAD > rowW + 0.5) setMarkFits(false);
   }, [rowW, cogEnd]);
   const activeIndex = Math.max(0, tabRoutes.findIndex((r) => state.routes.indexOf(r) === state.index));
+  // Which tab the user is on, for the crash context trail (lib/diagnostics/crumbs).
+  const activeName = tabRoutes[activeIndex]?.name;
+  useEffect(() => {
+    const label = TABS.find((t) => t.name === activeName)?.label ?? activeName ?? '?';
+    noteCrumb(`tab:${label.toLowerCase()}`);
+  }, [activeName]);
 
   // Android staging: the pill (and icon tint) moves the moment a tab is
   // pressed, while navigation state only advances after the out-animation —

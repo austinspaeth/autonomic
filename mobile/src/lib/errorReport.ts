@@ -156,7 +156,12 @@ export function redactMessage(msg: string | undefined, max = MAX_FAULT_MSG): str
   });
   s = s.replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '<id>');
   s = s.replace(/\b[0-9a-f]{12,}\b/gi, '<id>');
-  s = s.replace(/\b[A-Za-z0-9_-]{24,}\b/g, '<id>');
+  // A long mixed token is an id only if it carries a digit. Pure letters that
+  // long are a NAME — `RetryableMountingLayerException` is 31 characters and
+  // was leaving the phone as `<id>`, which turned the one field a native crash
+  // row has to say what threw into a blank. Tokens, receipt ids and update ids
+  // all carry digits; a word does not.
+  s = s.replace(/\b(?=[A-Za-z_-]*\d)[A-Za-z0-9_-]{24,}\b/g, '<id>');
   s = s.replace(/\d{4,}/g, '<n>');
   return trimFault(s, max);
 }
