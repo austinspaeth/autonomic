@@ -2300,6 +2300,18 @@ old web app so old `export.json` files import directly.
   "+ Add" opens a `TypePicker` (or the bespoke `ReadingPicker`, which also offers
   Live HRV) of registry types; choosing one stacks its `EntryForm` to capture
   fields. See `src/features/forms.tsx` and `src/features/JournalSections.tsx`.
+- **Reanimated is PATCHED** (`mobile/patches/react-native-reanimated+3.19.5.patch`,
+  applied by `postinstall`; 3.19 sits above the SDK's 3.17, so it is in
+  `expo.install.exclude`). Its commit hook re-applied the last props of every
+  view it had EVER animated on every commit, and Android's ScrollView commits
+  its offset as state on every scroll frame (iOS too), so each fling frame
+  re-mounted all of them and re-rasterised their SVGs. The patch skips a view
+  whose props that commit did not change (a React commit always differs, since
+  React's tree never holds Reanimated's values, so it is still re-applied), and
+  a skipped Reanimated commit asks for the full re-commit after the pause.
+  Measured on a Galaxy S25 Edge: main-thread frames over budget during a fling
+  354 → 41 of ~1,400. Native, so not OTA. **Re-check the patch on any
+  Reanimated upgrade**; Reanimated 4 on RN 0.81+ fixes this upstream.
 - **Sheets are bottom sheets that stack iOS-style** via `useSheets` /
   `src/components/Sheet.tsx` (`openSheet`, `closeSheet`, `closeAll`). A sheet
   whose content FITS does not scroll — content and viewport heights are measured

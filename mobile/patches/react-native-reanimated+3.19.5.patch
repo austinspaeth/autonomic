@@ -1,0 +1,80 @@
+diff --git a/node_modules/react-native-reanimated/Common/cpp/reanimated/Fabric/ReanimatedCommitHook.cpp b/node_modules/react-native-reanimated/Common/cpp/reanimated/Fabric/ReanimatedCommitHook.cpp
+index 3b65e73..5deb992 100644
+--- a/node_modules/react-native-reanimated/Common/cpp/reanimated/Fabric/ReanimatedCommitHook.cpp
++++ b/node_modules/react-native-reanimated/Common/cpp/reanimated/Fabric/ReanimatedCommitHook.cpp
+@@ -49,9 +49,23 @@ void ReanimatedCommitHook::maybeInitializeLayoutAnimations(
+   }
+ }
+ 
++// The node `family` occupies in `root`, or null when it is not in that tree.
++static const ShadowNode *findInTree(
++    const ShadowNodeFamily &family,
++    const RootShadowNode &root) {
++  const auto ancestors = family.getAncestors(root);
++  if (ancestors.empty()) {
++    return nullptr;
++  }
++  const auto &[parent, index] = ancestors.back();
++  const auto &children = parent.get().getChildren();
++  return index < static_cast<int>(children.size()) ? children[index].get()
++                                                   : nullptr;
++}
++
+ RootShadowNode::Unshared ReanimatedCommitHook::shadowTreeWillCommit(
+     ShadowTree const &,
+-    RootShadowNode::Shared const &,
++    RootShadowNode::Shared const &oldRootShadowNode,
+     RootShadowNode::Unshared const &newRootShadowNode
+ #if REACT_NATIVE_MINOR_VERSION >= 80
+     ,
+@@ -80,8 +94,27 @@ RootShadowNode::Unshared ReanimatedCommitHook::shadowTreeWillCommit(
+   {
+     auto lock = propsRegistry_->createLock();
+ 
++    // [autonomic patch] Re-apply a view's animated props only when this
++    // commit actually carries different props for it. A React commit is built
++    // from React's own copy of the tree, which never holds Reanimated's values,
++    // so every view React rendered still compares different and is re-applied
++    // as before. A state-only commit (Android's ScrollView reports its offset
++    // as state on EVERY scroll frame) is cloned from the committed tree, whose
++    // nodes already carry the registry's values; re-applying them there
++    // re-mounted every view Reanimated had ever animated, every frame of a
++    // fling, re-recording their drawing and re-rasterising SVGs.
+     propsRegistry_->for_each(
+         [&](const ShadowNodeFamily &family, const folly::dynamic &props) {
++          const auto *newNode = findInTree(family, *newRootShadowNode);
++          if (newNode == nullptr) {
++            return;
++          }
++          const auto *oldNode =
++              oldRootShadowNode ? findInTree(family, *oldRootShadowNode)
++                                : nullptr;
++          if (oldNode != nullptr && oldNode->getProps() == newNode->getProps()) {
++            return;
++          }
+           propsMap[&family].emplace_back(props);
+         });
+ 
+diff --git a/node_modules/react-native-reanimated/Common/cpp/reanimated/NativeModules/ReanimatedModuleProxy.cpp b/node_modules/react-native-reanimated/Common/cpp/reanimated/NativeModules/ReanimatedModuleProxy.cpp
+index e7516a4..fcc5e39 100644
+--- a/node_modules/react-native-reanimated/Common/cpp/reanimated/NativeModules/ReanimatedModuleProxy.cpp
++++ b/node_modules/react-native-reanimated/Common/cpp/reanimated/NativeModules/ReanimatedModuleProxy.cpp
+@@ -797,6 +797,9 @@ void ReanimatedModuleProxy::performOperations() {
+     // In this case, we should skip the commit here and let React Native do
+     // it. The commit will include the current values from PropsRegistry which
+     // will be applied in ReanimatedCommitHook.
++    // [autonomic patch] ...except the hook now skips views whose props that
++    // commit did not change, so ask for the full re-commit after the pause.
++    propsRegistry_->pleaseCommitAfterPause();
+     return;
+   }
+ 
+@@ -818,6 +821,8 @@ void ReanimatedModuleProxy::performOperations() {
+           [&](RootShadowNode const &oldRootShadowNode)
+               -> RootShadowNode::Unshared {
+             if (propsRegistry_->shouldReanimatedSkipCommit()) {
++              // [autonomic patch] see the early return above.
++              propsRegistry_->pleaseCommitAfterPause();
+               return nullptr;
+             }
+ 

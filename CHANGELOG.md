@@ -7,6 +7,10 @@ in the app's "What's new" card are a separate, deliberately plainer log in
 `mobile/src/lib/whatsNew.ts` — update it whenever `version` in `mobile/app.json`
 crosses to a new `x.x` (a unit test fails if the shipping minor has no entry).
 
+## Unreleased
+
+- **`react-native-reanimated` is pinned to 3.19.x, above Expo SDK 53's bundled 3.17**, and listed in `expo.install.exclude`: 3.19 carries the Android Fabric layout-animation fixes for the `RetryableMountingLayerException: Unable to find viewState for tag N` crash (facebook/react-native#49077) reported on 1.32.0. Our commit-hook patch (`mobile/patches/`) was ported to 3.19.5.
+
 ## 1.32.0
 
 **A Garmin reading now reaches Apple Health / Health Connect, and the linked
