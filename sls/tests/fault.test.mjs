@@ -38,6 +38,13 @@ test('nothing identifying can reach the table', () => {
   );
   assert.equal(redactFault('device aabbccddeeff00 not paired'), 'device <id> not paired');
   assert.equal(redactFault('token eyJhbGciOiJIUzI1NiwidHlwIjoiSldUIn0 expired'), 'token <id> expired');
+  // A long token with a digit in it is an id; a long word is a NAME, and an
+  // exception class is the whole finding on a native crash row.
+  assert.equal(redactFault('token AbCdEfGhIjKlMnOpQrStUvWx1 expired'), 'token <id> expired');
+  assert.equal(
+    redactFault('RetryableMountingLayerException: Unable to find viewState for tag 42'),
+    'RetryableMountingLayerException: Unable to find viewState for tag 42',
+  );
 });
 
 test('the shape of the failure survives, because that is the point', () => {

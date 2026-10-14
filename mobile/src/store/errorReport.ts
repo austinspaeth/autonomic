@@ -207,7 +207,7 @@ function scheduleFlush(): void {
  * is redacted by `faultUrl` before it can reach the network. That redaction is
  * the reason this route is allowed to exist at all — see ../lib/errorReport.
  */
-export function reportFault(tag: string, msg: string, fatal?: boolean): void {
+export function reportFault(tag: string, msg: string, fatal?: boolean, opts?: { defer?: boolean }): void {
   if (__DEV__) return;
   try {
     const day = easternDay(Date.now());
@@ -219,6 +219,15 @@ export function reportFault(tag: string, msg: string, fatal?: boolean): void {
     // failure is the one report that must not be delayed, and a one-off error
     // — which is most of them — is therefore reported the instant it happens.
     // Everything after it in this window rides the debounce.
+    //
+    // EXCEPT a report written by a process that is about to die (`defer`, set
+    // by the uncaught-error hook for the crash row and its context row). That
+    // one is buffered and nothing more: an immediate send TAKES the count out
+    // of the buffer and puts it back only when the request fails, and a
+    // process killed with the request in flight does neither — the one report
+    // that mattered most was the one most likely to be lost. It goes out on
+    // the next launch, which for a crash is usually seconds away.
+    if (opts?.defer) return;
     if (first) flushSignature(sig); else scheduleFlush();
   } catch {
     /* reporting a failure must never be one */

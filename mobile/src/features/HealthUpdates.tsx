@@ -47,6 +47,7 @@ import { ActivityIndicator, Animated, AppState, Easing, Platform, Pressable, Scr
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetControls, useSheets } from '../components/Sheet';
+import { noteCrumb } from '../lib/diagnostics/breadcrumbs';
 import { useToast } from '../components/Toast';
 import { Button, ConfirmDeleteSheet } from '../components/ui';
 import { Icon, IconName } from '../components/Icon';
@@ -173,6 +174,10 @@ export function HealthUpdatePill() {
   // retake it on every transition, bouncing the pill behind it mid-spring.
   useEffect(() => { setPillSlotClaim('health', phase !== 'hidden'); }, [phase]);
   useEffect(() => () => setPillSlotClaim('health', false), []);
+  // For the crash context trail (lib/diagnostics/crumbs): a check or an offer
+  // in flight is one of the things most likely to be happening when a launch
+  // dies, and it is otherwise invisible.
+  useEffect(() => { if (phase !== 'hidden') noteCrumb(`health:${phase}`); }, [phase]);
 
   const fadeTo = (to: number, done?: () => void) =>
     Animated.timing(opacity, { toValue: to, duration: to ? 220 : 280, useNativeDriver: true }).start(({ finished }) => { if (finished) done?.(); });

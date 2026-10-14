@@ -2059,10 +2059,28 @@ old web app so old `export.json` files import directly.
   about where, and the exception type plus its ROOT cause carry the whole
   finding — `BadParcelableException: ClassNotFoundException when unmarshalling:
   com.garmin.android.connectiq.IQDevice` IS the bug report. A test pins that it
-  survives `redactMessage` intact. iOS is deliberately a stub:
-  `NSSetUncaughtExceptionHandler` catches ObjC exceptions, and almost nothing
-  that kills an iOS build is one, so installing it would report a handful of
-  crashes and imply we were watching for the rest. Call `logError('area.thing', e)` from a catch that would otherwise
+  survives `redactMessage` intact. **iOS writes the same file from MetricKit**
+  (`modules/app-env/ios/CrashLog.swift`), deliberately not from
+  `NSSetUncaughtExceptionHandler`: that catches ObjC exceptions, and almost
+  nothing that kills an iOS build is one (a Swift trap, a bad access, a
+  watchdog kill are all signals), while MetricKit is the OS's own record of
+  exactly those, handed to the app on the launch after. The subscriber is
+  added from an `ExpoAppDelegateSubscriber` at real launch, since a delivery
+  lands within seconds of it; the module's `onCrashLog` event re-runs
+  `drainNativeCrashes` when it does. A MetricKit row carries the signal or
+  Mach exception as its type (`SIGSEGV`), the termination reason (a watchdog
+  kill's `0x8badf00d` lives there), the ObjC exception's own words FIRST when
+  there is one (the 140-char cap eats the end of a line, so the finding
+  leads), the crashing frame as `binary +0xoffset` (unsymbolicated — Xcode
+  Organizer has the readable stack; this row exists to COUNT by build and
+  phone), and the version that CRASHED (`[v1.33.0]`), because the report
+  stamps the version that SENDS and after an update the two differ. Hangs
+  ride the same file as `kind: hang` under their own tag `native.hang`, not
+  fatal: the app came back, and a main thread stuck for seconds is what a
+  JavaScript infinite loop looks like from outside. The `MX*` API is
+  deprecated from iOS 27.2 in favour of a `MetricManager` Swift API; it still
+  works and the floor is 15.1. **A crash also says WHERE** — see the
+  breadcrumbs bullet below. Call `logError('area.thing', e)` from a catch that would otherwise
   be silent (already wired: store persist/load, the waveform sidecar, IAP,
   health reads + the one-shot history backfill, the strap connect loop,
   reminders, backups, widgets, Garmin, Insights), and prefer an existing tag
@@ -2107,11 +2125,48 @@ old web app so old `export.json` files import directly.
   emails, URLs to their host, paths to a basename, anything id-shaped, digit runs
   of 4+ — the second pass being the one that makes it true of the TABLE rather
   than of the builds we shipped; the digit rule is also what groups a retry loop
-  into one signature. And **it must never route back into `logError`**, or a
+  into one signature. **A long token is an id only if it carries a digit**: the
+  24+ character rule used to eat pure words too, and
+  `RetryableMountingLayerException` (31 letters) reached the dashboard as
+  `<id>: Unable to find viewState…`, blanking the one field a native crash row
+  has to say what threw. Both copies of the rule say so; move them together.
+  **A report from a DYING process is buffered, never sent** (`defer`, set by the
+  uncaught-error hook for the crash row and its context row): an immediate
+  send TAKES the count out of the buffer and restores it only on a failed
+  response, and a process killed with the request in flight does neither, so
+  the one report that mattered most was the one most likely to be lost. It
+  goes out on the next launch. And **it must never route back into `logError`**, or a
   failing network turns one error into a loop. Rows expire after 120 days
   (`expiresAt`, TTL on the table): diagnostic, not a series. Read back under
   `faults` on the same report call; drawn by the dashboard's **Failures** tab,
   which ranks by breadth and keeps the two counters visibly apart.
+- **A crash says WHERE the user was, as its own row.** A production crash is a
+  tag and a message and nothing else — a release stack is bytecode offsets,
+  React attaches no component stack to an infinite-update throw, and a signal
+  on iOS is an offset into the binary — so "Maximum update depth exceeded" on
+  three phones could not say on which screen. `src/lib/diagnostics/crumbs.ts`
+  (pure + tested) is a trail of the last twelve NAMES the app chose, consecutive
+  repeats collapsed: `launch`, `tab:journal`, `sheet:EntryForm` / `close:…`
+  (the sheet's component name, read in `SheetView`), `bg` / `fg`,
+  `hrv:running`, `health:found`. Never a value from the journal — a crumb says
+  which form was open and nothing about what was typed into it, and
+  `cleanCrumb` strips anything that is not a name. `breadcrumbs.ts` is the shell
+  (flags MMKV, written on every crumb because the process this is for never
+  gets to flush), and it keeps TWO trails: the live one, which a JS fatal takes,
+  and the one the PREVIOUS session left, which a native crash drained on the
+  next launch asks for by TIME (`trailCovers`; a Java crash is stamped at the
+  instant) or by SESSION (a MetricKit crash is stamped with its collection
+  window, so the row wears a leading `~`). A wrong context is worse than none,
+  so a crash from two launches ago gets `unknown`. Every fatal files one extra
+  fault row, `crash.where`, whose message is `<crash tag> @ crumb > crumb > …`
+  (`formatWhere`, newest eight), NOT folded into the crash's own message: that
+  would split one crash into a signature per path and lose the "3 phones" the
+  crash row exists to say. The row is not fatal (no CRASH pill, no push), so
+  the Failures tab ranks the CONTEXTS a crash happens in beside the crash.
+  **`metro.config.js` keeps function names through release minification**
+  (`keep_fnames`) because the sheet crumb reads `type.name`, and a release
+  bundle otherwise says `sheet:u`. The support dump prints the live trail as
+  THIS SESSION.
 - **The Dysautonomia Awareness giveaway is the ONE request carrying anything
   personal, and only because the user typed it in.** `<GiveawayCard/>`
   (`features/Giveaway.tsx`) sits under the Outlook on today's Journal until

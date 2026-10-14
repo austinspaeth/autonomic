@@ -7,6 +7,19 @@ const path = require('path');
 
 const config = getDefaultConfig(__dirname);
 
+// Keep function names through release minification. A production crash report
+// has no stack worth reading (bytecode offsets), so the NAMES are what is left:
+// the component a sheet opened (the breadcrumb trail in
+// src/lib/diagnostics/crumbs.ts reads `type.name`), and an error's own class.
+// Without this every component in a release bundle is `function u()` and the
+// trail says `sheet:u`. Costs a little bundle size; buys a crash row that says
+// `sheet:EntryForm`.
+config.transformer.minifierConfig = {
+  ...config.transformer.minifierConfig,
+  keep_fnames: true,
+  mangle: { ...(config.transformer.minifierConfig?.mangle ?? {}), keep_fnames: true },
+};
+
 const WEB_SHIMS = {
   'react-native-mmkv': path.resolve(__dirname, 'web-shims/mmkv.js'),
   'react-native-ble-plx': path.resolve(__dirname, 'web-shims/empty.js'),

@@ -852,7 +852,10 @@ const redactFault = (raw) => {
   });
   s = s.replace(/\b[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\b/gi, '<id>');
   s = s.replace(/\b[0-9a-f]{12,}\b/gi, '<id>');
-  s = s.replace(/\b[A-Za-z0-9_-]{24,}\b/g, '<id>');
+  // A long mixed token is an id only if it carries a digit: pure letters that
+  // long are a name (an exception class), and the app's own copy of this rule
+  // says the same. Move both together.
+  s = s.replace(/\b(?=[A-Za-z_-]*\d)[A-Za-z0-9_-]{24,}\b/g, '<id>');
   s = s.replace(/\d{4,}/g, '<n>');
   s = s.replace(/\s+/g, ' ').trim();
   return s.length > FAULT_MSG_MAX ? `${s.slice(0, FAULT_MSG_MAX - 1)}…` : s;

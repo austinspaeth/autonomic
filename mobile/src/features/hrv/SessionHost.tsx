@@ -22,6 +22,7 @@ import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import { useSheets } from '../../components/Sheet';
+import { noteCrumb } from '../../lib/diagnostics/breadcrumbs';
 import { fonts, usePalette } from '../../theme';
 import { BreathBars } from './BreathingViz';
 import { HrvSession } from './Session';
@@ -56,6 +57,8 @@ export function HrvSessionHost() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [openSheet]);
   const status = useSession((s) => s.status);
+  // A live reading, for the crash context trail (lib/diagnostics/crumbs).
+  useEffect(() => { if (status !== 'idle') noteCrumb(`hrv:${status}`); }, [status]);
   // Opened once per reading; the flag also stops a re-render from raising a
   // second results card while the first is still animating in.
   const handed = useRef(false);
