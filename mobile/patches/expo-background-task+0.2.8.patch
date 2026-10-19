@@ -1,0 +1,75 @@
+diff --git a/node_modules/expo-background-task/ios/BackgroundTaskAppDelegate.swift b/node_modules/expo-background-task/ios/BackgroundTaskAppDelegate.swift
+index b97f918..3154c32 100644
+--- a/node_modules/expo-background-task/ios/BackgroundTaskAppDelegate.swift
++++ b/node_modules/expo-background-task/ios/BackgroundTaskAppDelegate.swift
+@@ -7,7 +7,7 @@ import ExpoModulesCore
+ public class BackgroundTaskAppDelegateSubscriber: ExpoAppDelegateSubscriber {
+   public func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]? = nil) -> Bool {
+     if BackgroundTaskScheduler.supportsBackgroundTasks() {
+-      BGTaskScheduler.shared.register(forTaskWithIdentifier: BackgroundTaskConstants.BackgroundWorkerIdentifier, using: nil) { task in
++      let registered = BGTaskScheduler.shared.register(forTaskWithIdentifier: BackgroundTaskConstants.BackgroundWorkerIdentifier, using: nil) { task in
+         log.debug("Expo Background Tasks - starting background work")
+ 
+         // Set up expiration handler
+@@ -37,6 +37,13 @@ public class BackgroundTaskAppDelegateSubscriber: ExpoAppDelegateSubscriber {
+           log.error("Expo Background Tasks: Could not find TaskService module")
+         }
+       }
++      BackgroundTaskScheduler.launchHandlerRegistered = registered
++      // A task restored before this point skipped its schedule; submit it now.
++      if registered && BackgroundTaskScheduler.numberOfRegisteredTasksOfThisType > 0 {
++        Task {
++          try? await BackgroundTaskScheduler.tryScheduleWorker()
++        }
++      }
+     }
+ 
+     return true
+diff --git a/node_modules/expo-background-task/ios/BackgroundTaskModule.swift b/node_modules/expo-background-task/ios/BackgroundTaskModule.swift
+index a38d44c..affba0f 100644
+--- a/node_modules/expo-background-task/ios/BackgroundTaskModule.swift
++++ b/node_modules/expo-background-task/ios/BackgroundTaskModule.swift
+@@ -45,6 +45,11 @@ public class BackgroundTaskModule: Module {
+         throw BackgroundTasksNotConfigured()
+       }
+ 
++      // EXTaskService raises an NSException for a task it does not hold, which
++      // Swift cannot catch: two overlapping unregisters killed the app.
++      guard taskManager.hasRegisteredTask(withName: name) else {
++        return
++      }
+       taskManager.unregisterTask(withName: name, consumerClass: BackgroundTaskConsumer.self)
+     }
+ 
+diff --git a/node_modules/expo-background-task/ios/BackgroundTaskScheduler.swift b/node_modules/expo-background-task/ios/BackgroundTaskScheduler.swift
+index c6f4349..a4609db 100644
+--- a/node_modules/expo-background-task/ios/BackgroundTaskScheduler.swift
++++ b/node_modules/expo-background-task/ios/BackgroundTaskScheduler.swift
+@@ -7,6 +7,15 @@ public class BackgroundTaskScheduler {
+    */
+   static var numberOfRegisteredTasksOfThisType: Int = 0
+ 
++  /**
++   * Set once the BGTaskScheduler launch handler is registered (in the app delegate subscriber).
++   * Submitting a request before that raises an NSException inside BackgroundTasks
++   * (_handleSubmissionWithoutRegistrationForTaskRequest), which Swift cannot catch. EXTaskService
++   * restores tasks in its own didFinishLaunching, which can run first, so a restored task's
++   * schedule is deferred until the handler exists.
++   */
++  static var launchHandlerRegistered: Bool = false
++
+   /**
+    * Interval for task scheduler. The iOS BGTaskScheduler does not guarantee that the number of minutes will be
+    * exact, but it indicates when we'd like the task to start. This will be set to at least 12 hours
+@@ -50,6 +59,11 @@ public class BackgroundTaskScheduler {
+       return
+     }
+ 
++    if !launchHandlerRegistered {
++      print("Background Task: deferring scheduling until the launch handler is registered")
++      return
++    }
++
+     // Stop existing tasks
+     await stopWorker()
+ 

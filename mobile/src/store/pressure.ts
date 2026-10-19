@@ -67,9 +67,15 @@ let lastSampleAt = 0;
 let sampling = false;
 let available: boolean | null = null;
 
+/** Dev builds only: pretend the phone has a barometer, so the Settings row and
+ *  the wizard's row can be seen on a simulator (which has none). No reading
+ *  ever arrives, so nothing is recorded. Never reaches a release build. */
+const DEV_ASSUME_BAROMETER = true;
+
 /** Does this phone have a barometer at all? Cached after the first answer. */
 export async function pressureAvailable(): Promise<boolean> {
   if (available != null) return available;
+  if (__DEV__ && DEV_ASSUME_BAROMETER) return (available = true);
   const m = mod();
   if (!m) return (available = false);
   try { available = await m.Barometer.isAvailableAsync(); } catch { available = false; }

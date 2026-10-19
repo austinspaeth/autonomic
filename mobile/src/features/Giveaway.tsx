@@ -13,14 +13,15 @@
  * file's own flags-MMKV memory.
  */
 import React, { useEffect, useState } from 'react';
-import { Linking, Platform, Pressable, Text, TextInput, View } from 'react-native';
+import { Animated as RNAnimated, Easing as RNEasing, Linking, Platform, Pressable, Text, TextInput, View } from 'react-native';
 import Animated, {
-  Easing, Extrapolation, interpolate, useAnimatedStyle, useSharedValue, withRepeat, withTiming,
+  Easing, Extrapolation, interpolate, useAnimatedStyle, useSharedValue, withTiming,
 } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Path, RadialGradient, Rect, Stop } from 'react-native-svg';
 import { MMKV } from 'react-native-mmkv';
 import { Icon } from '../components/Icon';
 import { useSheets, type SheetControls } from '../components/Sheet';
+import { useNativeLoop } from '../components/nativeLoop';
 import { radius, usePalette } from '../theme';
 import { hexA } from '../lib/color';
 import { useStore } from '../store/store';
@@ -214,7 +215,7 @@ function LiveGiveawayCard() {
               RIB_MAX_H, or the measurement feeds itself (see there). */}
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: RIB_GAP, marginBottom: 12 }}>
             <View pointerEvents="none" style={{ width: ribW, height: ribH, opacity: headH > 0 ? 1 : 0 }}>
-              <Ribbon bloom />
+              <Ribbon bloom breathing={!collapsed} />
             </View>
             <View style={{ flex: 1, paddingRight: 28 }} onLayout={(e) => setHeadH(Math.round(e.nativeEvent.layout.height))}>
               <Text numberOfLines={1} style={{ fontSize: 11, fontWeight: '700', letterSpacing: 1.2, color: TEAL, marginBottom: 6 }}>
@@ -344,6 +345,8 @@ function Dots({ filled, height, glow }: { filled: number; height: number; glow?:
 
 /* ------------------------------------------------------------------ ribbon */
 
+const BREATH_EASE = RNEasing.inOut(RNEasing.sin);
+
 const RIBBON = 'M80 134 L43 63 C29 37 32 9 50 9 C68 9 71 37 57 63 L20 134';
 
 /**
@@ -351,13 +354,10 @@ const RIBBON = 'M80 134 L43 63 C29 37 32 9 50 9 C68 9 71 37 57 63 L20 134';
  * seven-second cycle; here it is two wide, faint strokes under the ribbon doing
  * the same breath, which reads the same at this size without an SVG filter.
  */
-function Ribbon({ bloom }: { bloom?: boolean }) {
-  const breath = useSharedValue(0);
-  useEffect(() => {
-    if (!bloom) return;
-    breath.value = withRepeat(withTiming(1, { duration: 3500, easing: Easing.inOut(Easing.sin) }), -1, true);
-  }, [bloom, breath]);
-  const bloomStyle = useAnimatedStyle(() => ({ opacity: 0.45 + 0.55 * breath.value }));
+function Ribbon({ bloom, breathing }: { bloom?: boolean; breathing?: boolean }) {
+  // Native-driven, never a Reanimated loop: see components/nativeLoop. Rests
+  // while the card is collapsed, where the open layer is invisible anyway.
+  const breath = useNativeLoop(!!bloom && !!breathing, { rest: 1, from: 0.45, to: 1, duration: 3500, easing: BREATH_EASE, yoyo: true });
   const id = bloom ? 'gw-rib-b' : 'gw-rib';
   const grad = (
     <Defs>
@@ -371,12 +371,12 @@ function Ribbon({ bloom }: { bloom?: boolean }) {
   return (
     <View style={{ width: '100%', height: '100%' }}>
       {bloom ? (
-        <Animated.View style={[{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }, bloomStyle]}>
+        <RNAnimated.View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, opacity: breath }}>
           <Svg width="100%" height="100%" viewBox="0 0 100 140" style={{ overflow: 'visible' }}>
             <Path d={RIBBON} fill="none" stroke={TEAL} strokeOpacity={0.08} strokeWidth={34} strokeLinejoin="round" strokeLinecap="round" />
             <Path d={RIBBON} fill="none" stroke={TEAL} strokeOpacity={0.14} strokeWidth={25} strokeLinejoin="round" strokeLinecap="round" />
           </Svg>
-        </Animated.View>
+        </RNAnimated.View>
       ) : null}
       <Svg width="100%" height="100%" viewBox="0 0 100 140" style={{ overflow: 'visible' }}>
         {grad}

@@ -26,9 +26,9 @@
  *   snapping off. Nothing is ever drawn in a colour that is not a STATE.
  */
 import React from 'react';
-import { View } from 'react-native';
+import { Animated as RNAnimated, Easing as RNEasing, View } from 'react-native';
 import Reanimated, {
-  Easing, interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withRepeat, withSequence, withTiming,
+  Easing, interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withTiming,
 } from 'react-native-reanimated';
 import type { SharedValue } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
@@ -36,6 +36,7 @@ import { hexA } from '../../lib/color';
 import { EMBER_GLOW_INSET, EMBER_GLOW_MAX, EMBER_GLOW_MIN, EMBER_GLOW_MS, EMBER_MS, emberStops } from '../../lib/ember';
 import { SCORE_COLORS } from '../../lib/scoring';
 import { CAUTION_GOLD, usePalette } from '../../theme';
+import { useNativeLoop } from '../../components/nativeLoop';
 import { PULSE_GROW_MS, PULSE_TINT_MS } from './style';
 import type { BudgetPulse } from './pulse';
 import type { BudgetState } from '../../lib/budget';
@@ -55,6 +56,7 @@ import type { BudgetState } from '../../lib/budget';
 /** The placeholder grey the Outlook card's ghost bars use, so the strip and the
  *  tiles below it are the same object while both are waiting. */
 const SKELETON_FILL = '#34343a';
+const QUAD_IN_OUT = RNEasing.inOut(RNEasing.quad);
 
 /**
  * `hexA(mixHex(...))`, on the UI thread.
@@ -95,21 +97,17 @@ export function fillColorFor(state: BudgetState, p: ReturnType<typeof usePalette
  * than running against a guess and jolting once a cycle.
  */
 function Ember({ height, color, period }: { height: number; color: string; period: number }) {
-  const shift = useSharedValue(0);
-  React.useEffect(() => {
-    if (!period) return;
-    shift.value = 0;
-    shift.value = withRepeat(withTiming(1, { duration: EMBER_MS, easing: Easing.linear }), -1, false);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [period]);
-  const drift = useAnimatedStyle(() => ({ transform: [{ translateX: -shift.value * period }] }));
+  // Native-driven (components/nativeLoop): this one runs for as long as the
+  // day stays over, under every tab and sheet.
+  const shift = useNativeLoop(period > 0, { from: 0, to: 1, duration: EMBER_MS });
+  const drift = React.useMemo(() => ({ transform: [{ translateX: shift.interpolate({ inputRange: [0, 1], outputRange: [0, -period] }) }] }), [shift, period]);
   const stops = React.useMemo(() => emberStops(color), [color]);
   const gid = React.useMemo(() => `pbEmber${Math.random().toString(36).slice(2, 8)}`, []);
 
   if (!period) return null;
   return (
     <View style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, borderRadius: 999, overflow: 'hidden' }}>
-      <Reanimated.View style={[{ width: period * 2, height: '100%' }, drift]}>
+      <RNAnimated.View style={[{ width: period * 2, height: '100%' }, drift]}>
         <Svg width={period * 2} height={height}>
           <Defs>
             <LinearGradient id={gid} x1="0" y1="0" x2="1" y2="0">
@@ -118,7 +116,7 @@ function Ember({ height, color, period }: { height: number; color: string; perio
           </Defs>
           <Rect x={0} y={0} width={period * 2} height={height} fill={`url(#${gid})`} />
         </Svg>
-      </Reanimated.View>
+      </RNAnimated.View>
     </View>
   );
 }
@@ -132,16 +130,11 @@ function Ember({ height, color, period }: { height: number; color: string; perio
  * of thing. Only its BREATHING is reserved for over budget.
  */
 function Glow({ tint, shadow, breathing }: { tint: Tint; shadow: string; breathing: boolean }) {
-  const glow = useSharedValue(breathing ? EMBER_GLOW_MIN : 1);
-  React.useEffect(() => {
-    if (!breathing) { glow.value = 1; return; }
-    glow.value = EMBER_GLOW_MIN;
-    glow.value = withRepeat(
-      withTiming(EMBER_GLOW_MAX, { duration: EMBER_GLOW_MS, easing: Easing.inOut(Easing.quad) }),
-      -1, true,
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [breathing]);
+  // The breathing is native-driven (components/nativeLoop) on a wrapper of its
+  // own; the colour below still travels with the fill's Reanimated crossfade.
+  const glow = useNativeLoop(breathing, {
+    from: EMBER_GLOW_MIN, to: EMBER_GLOW_MAX, duration: EMBER_GLOW_MS, easing: QUAD_IN_OUT, yoyo: true, rest: 1,
+  });
   // The halo's alpha travels with the colour rather than stepping: leaving the
   // hot state is one gesture, and a halo that thins in the same frame the fill
   // starts crossfading reads as two.
@@ -151,10 +144,10 @@ function Glow({ tint, shadow, breathing }: { tint: Tint; shadow: string; breathi
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [breathing]);
   const style = useAnimatedStyle(() => ({
-    opacity: glow.value,
     backgroundColor: mixRgba(tint.from.value, tint.to.value, tint.mix.value, alpha.value),
   }));
   return (
+    <RNAnimated.View pointerEvents="none" style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0, opacity: glow }}>
     <Reanimated.View
       pointerEvents="none"
       style={[{
@@ -167,6 +160,7 @@ function Glow({ tint, shadow, breathing }: { tint: Tint; shadow: string; breathi
         shadowColor: shadow, shadowOpacity: breathing ? 0.9 : 0.5, shadowRadius: 5, shadowOffset: { width: 0, height: 0 },
       }, style]}
     />
+    </RNAnimated.View>
   );
 }
 
@@ -208,21 +202,7 @@ export function BudgetBar({ state, fill, expected, still, skeleton, pulse, heigh
   // Matches GhostBar in features/DaySummary: 0.45 to 1 and back, 1600ms each
   // way, quad in-out. Copied deliberately rather than shared — the two live in
   // different layers, and the alternative was exporting an animation.
-  const breathe = useSharedValue(1);
-  React.useEffect(() => {
-    if (!skeleton) { breathe.value = 1; return; }
-    breathe.value = 0.45;
-    breathe.value = withRepeat(
-      withSequence(
-        withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.quad) }),
-        withTiming(0.45, { duration: 1600, easing: Easing.inOut(Easing.quad) }),
-      ),
-      -1,
-      false,
-    );
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [skeleton]);
-  const pulseStyle = useAnimatedStyle(() => ({ opacity: breathe.value }));
+  const breathe = useNativeLoop(!!skeleton, { from: 0.45, to: 1, duration: 1600, easing: QUAD_IN_OUT, yoyo: true, rest: 1 });
   // The fill's own width in points, which is one full cycle of the ember's
   // doubled gradient. Measured rather than assumed: a fixed guess is what made
   // the loop jolt, and a bar in a sheet is a different width from one in the
@@ -303,11 +283,8 @@ export function BudgetBar({ state, fill, expected, still, skeleton, pulse, heigh
       {/* While it is a placeholder it wears the placeholder's own tone, not the
           track's. At 6% white the pulse was technically running and visually
           absent, so it read as a still bar over three breathing tiles. */}
-      <Reanimated.View
-        style={[
-          { height, borderRadius: 999, backgroundColor: skeleton ? SKELETON_FILL : hexA(p.text, 0.06), overflow: 'visible' },
-          skeleton && pulseStyle,
-        ]}
+      <RNAnimated.View
+        style={{ height, borderRadius: 999, backgroundColor: skeleton ? SKELETON_FILL : hexA(p.text, 0.06), overflow: 'visible', opacity: breathe }}
       >
         <Reanimated.View
           onLayout={(e) => setFillW(Math.round(e.nativeEvent.layout.width))}
@@ -360,7 +337,7 @@ export function BudgetBar({ state, fill, expected, still, skeleton, pulse, heigh
             />
           </>
         ) : null}
-      </Reanimated.View>
+      </RNAnimated.View>
     </View>
   );
 }

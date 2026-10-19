@@ -29,7 +29,7 @@ import {
   restingHrBaseline, type DipNight, type DipResult,
 } from './dip';
 import {
-  lowestRollingMean, typicalOvernightLow, wakeStats, type HrPoint,
+  clipNight, lowestRollingMean, typicalOvernightLow, wakeStats, type HrPoint,
   type RespPoint, type StageSpan, type WakeStats,
 } from './night';
 import {
@@ -347,10 +347,21 @@ export function buildSleepReport(
   addDays: AddDays,
   ctx: ScoreContext = {},
   protocol?: Partial<Protocol> | null,
-  series: NightSeries = {},
+  raw: NightSeries = {},
 ): SleepReport | null {
   const night = nightOf(days, dk);
   if (!night) return null;
+  // A hand-corrected bed/wake keeps the series it was imported with (see
+  // `rebaseNight`); only what falls inside the window the user set is read.
+  const clipped = clipNight({ sampledHr: raw.hr || undefined, sampledResp: raw.resp || undefined, stageSpans: raw.spans || undefined }, night.inBedMin * 60);
+  const others = raw.hrByDay || {};
+  const series: NightSeries = {
+    hr: clipped.sampledHr, resp: clipped.sampledResp, spans: clipped.stageSpans,
+    hrByDay: Object.fromEntries(Object.entries(others).map(([k, curve]) => {
+      const n = k === dk ? night : nightOf(days, k);
+      return [k, curve && n ? clipNight({ sampledHr: curve }, n.inBedMin * 60).sampledHr : curve];
+    })),
+  };
   const parts = sleepGradeParts(days, dk, ctx);
   const nights = recentNights(days, dk, REPORT_WINDOW_NIGHTS, addDays);
   const target = resolveProtocol(protocol).sleep.hours;

@@ -19,6 +19,11 @@ interface WatchBridgeNative {
   sendAck(id: string): Promise<void>;
   /** Replace the application context the watch mirrors ({ pro, age, sex }). */
   updateContext(context: Record<string, unknown>): Promise<void>;
+  /** The same context as complication user info, which wakes the watch app so
+   *  the face redraws. Resolves to the transfers left today (-1: no
+   *  complication on the active face, nothing sent). Optional: binaries
+   *  built before the score/pacing complications do not carry it. */
+  transferComplication?(info: Record<string, unknown>): Promise<number>;
   addListener(event: 'onUserInfo', cb: (info: WatchUserInfo) => void): EventSubscription;
   addListener(event: 'onStateChange', cb: (state: WatchState) => void): EventSubscription;
 }

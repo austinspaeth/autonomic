@@ -140,8 +140,16 @@ old web app so old `export.json` files import directly.
   `modules/ecg-health` module because the kingstinct library can't express it.
   It offers only non-duplicates not authored by
   this app (dedup rules are pure + tested in `src/lib/health/updateSet.ts`; HRV
-  needs real RR ≥ 4 min). Tapping opens a grouped import sheet (Sleep / Readings /
-  Exercise / Medications — meds read is a stub, see `HealthApi.readMedications`).
+  needs real RR ≥ 4 min). Imports file themselves; the pill is a receipt that
+  NAMES the newest thing a check wrote ("Imported sleep from Apple Health" +2)
+  and fades after `RECEIPT_MS` unless a poor-quality reading awaits a decision.
+  Tapping opens the WHOLE DAY's imports, newest first by when they happened,
+  read out of the journal (`importedRows`, `src/lib/health/importLog.ts`, pure +
+  tested: entries with `imported`, plus a night with `sleep.imported`), never a
+  per-check list. Settings → Apple Health shows the same `ImportedList` under
+  "Imported today", which is what let the pill stop standing until tapped. A
+  tick there removes and declines; the night is listed but not removable (meds
+  read is a stub, see `HealthApi.readMedications`).
   Viewing the card or dismissing the pill marks those item keys "seen" (plaintext
   `autonomic.flags` MMKV, 48h TTL) so the pill never re-offers them. Deleting an
   imported entry is stronger: `deleteEntry` records its `healthKey` (stamped at
@@ -1460,8 +1468,15 @@ old web app so old `export.json` files import directly.
   `pruneWaveforms` deletes every curve on the next launch. It is thinned to
   `NIGHT_SERIES_MAX` at WRITE time, which is the only place a year-long
   backfill can be bounded. `storeSleepSeries(dk)` with no series CLEARS the
-  night, which is how a hand-corrected bed/wake drops a curve that no longer
-  describes its window (the same rule `stagesForWindow` applies to stages).
+  night (an unstaged re-import). **A hand-corrected bed/wake KEEPS the
+  series**: the times were wrong, not the measurement. It used to clear it, so
+  fixing a bedtime the watch got wrong erased the overnight HR curve and its
+  charts. The series is stored as offsets from bed, so a new bedtime SHIFTS
+  every point (`rebaseNight`, lossless) and `buildSleepReport` reads only what
+  falls inside bed → wake (`clipNight`); nothing is trimmed on disk, so moving a
+  time back restores the night. With a hypnogram the stage minutes are
+  re-summed over the new window (`stagesFromSpans`); without one,
+  `stagesForWindow`'s drop rule still applies.
   Everything derived from the series is pure and tested in `sleep/night.ts`.
   Two consequences worth remembering: the dip's basis upgrades itself to
   `'rolling-low'` (the lowest settled ten minutes) whenever a curve exists,
@@ -2300,15 +2315,24 @@ old web app so old `export.json` files import directly.
   "+ Add" opens a `TypePicker` (or the bespoke `ReadingPicker`, which also offers
   Live HRV) of registry types; choosing one stacks its `EntryForm` to capture
   fields. See `src/features/forms.tsx` and `src/features/JournalSections.tsx`.
-- **Reanimated is PATCHED** (`mobile/patches/react-native-reanimated+3.19.5.patch`,
-  applied by `postinstall`; 3.19 sits above the SDK's 3.17, so it is in
-  `expo.install.exclude`). Its commit hook re-applied the last props of every
-  view it had EVER animated on every commit, and Android's ScrollView commits
-  its offset as state on every scroll frame (iOS too), so each fling frame
+- **An animation that runs FOREVER is native-driven, never Reanimated**
+  (`useNativeLoop`, `src/components/nativeLoop.ts`). Reanimated 3.17 under the
+  New Architecture applies every frame as a full shadow-tree commit, even for
+  opacity, and on Android each one is mounted on the UI thread a ScrollView is
+  flinging on. The Journal stays mounted under every tab and sheet, so one
+  ambient loop on it (the giveaway ribbon's bloom, the budget ember) made every
+  scroll in the app stutter. Core `Animated` with `useNativeDriver` sets the
+  view prop directly; opacity/transform only. Reanimated stays the tool for
+  anything that finishes. **And Reanimated itself is PATCHED**
+  (`mobile/patches/react-native-reanimated+3.19.5.patch`, applied by
+  `postinstall`; 3.19 sits above the SDK's 3.17, so it is in
+  `expo.install.exclude`): its commit hook re-applied the last props of every view it
+  had EVER animated on every commit, and Android's ScrollView commits its
+  offset as state on every scroll frame (iOS too), so each fling frame
   re-mounted all of them and re-rasterised their SVGs. The patch skips a view
   whose props that commit did not change (a React commit always differs, since
   React's tree never holds Reanimated's values, so it is still re-applied), and
-  a skipped Reanimated commit asks for the full re-commit after the pause.
+  a skipped Reanimated commit now asks for the full re-commit after the pause.
   Measured on a Galaxy S25 Edge: main-thread frames over budget during a fling
   354 → 41 of ~1,400. Native, so not OTA. **Re-check the patch on any
   Reanimated upgrade**; Reanimated 4 on RN 0.81+ fixes this upstream.
@@ -2337,6 +2361,16 @@ old web app so old `export.json` files import directly.
   against a median that had crashed with it (weeks at 18 ms read 'good') and
   halved a recovery's "better than day one". A bad stretch that has become the
   usual is still bad.
+  **Training may lift the day at most ONE BAND above its baseline**
+  (`TRAINING_LIFT_MAX`, 15): when a day has a baseline, `scoreSet` also scores
+  it without the training-only components (`TRAINING_ONLY`) and holds the
+  headline at that anchor + 15, reporting `trainingHeld` for the explain sheet.
+  Paced breathing is designed to raise RMSSD and total power, the training bands
+  sit almost on the baseline ones, and training brings 60 of the 110 weight, so a
+  20 ms baseline followed by a paced session read as a Good day and users asked
+  which number was their real baseline. Training may still pull the day DOWN
+  freely. Confidence is unchanged. Shipped in 1.35 as a store build, not OTA,
+  because it re-scores history.
   The first baseline's `avgHr` outranks the paced HR as the resting-HR fallback.
   **The budget's HRV input is the baseline reading too** (`buildEnvelope`):
   today's FIRST baseline RMSSD against each earlier day's first, on a PERCENT

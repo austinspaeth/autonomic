@@ -436,13 +436,27 @@ export type OpenSheet = ReturnType<typeof useSheets>['openSheet'];
  * form, so nothing can be offered here that the form can't show later.
  */
 export function openWorkoutReport(openSheet: OpenSheet, r: Entry, dk: string, justImported = false): void {
-  const openEdit = () => {
-    const noop = () => { /* store change triggers re-render */ };
-    if (ACTIVITY_TYPES[r.type]?.custom === 'bike') openSheet((c) => <BikeForm dk={dk} existing={r} controls={c} onSaved={noop} />);
-    else openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'activities')} arrKey="activities" dk={dk} type={r.type} existing={r} controls={c} onSaved={noop} />);
+  // The forms end with `closeAll()`, which from here took the report down with
+  // them: the user saved their details and landed on the bare Journal. Opened
+  // over the report, a save closes only the form, so the report (which reads
+  // the live entry) is what they come back to, now holding what they typed. A
+  // delete still closes everything: the report would describe nothing.
+  const overReport = (c: SheetControls): SheetControls => ({
+    ...c,
+    closeAll: () => {
+      const stillThere = (getState().days[dk]?.activities || []).some((x) => x.id === r.id);
+      if (stillThere) c.close(); else c.closeAll();
+    },
+  });
+  const openEdit = (onSaved: () => void = () => { /* store change triggers re-render */ }) => {
+    // The edit form saves from the latest entry, never the one the report was
+    // opened with, or a second edit would undo the first.
+    const cur = (getState().days[dk]?.activities || []).find((x) => x.id === r.id) || r;
+    if (ACTIVITY_TYPES[cur.type]?.custom === 'bike') openSheet((c) => <BikeForm dk={dk} existing={cur} controls={overReport(c)} onSaved={onSaved} />);
+    else openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'activities')} arrKey="activities" dk={dk} type={cur.type} existing={cur} controls={overReport(c)} onSaved={onSaved} />);
   };
   openSheet(() => <WorkoutSummarySheet r={r} dk={dk} justImported={justImported} onEdit={openEdit} />, {
-    action: { icon: 'edit', onPress: openEdit },
+    action: { icon: 'edit', onPress: () => openEdit() },
     destructive: { onPress: () => confirmDelete(openSheet, dk, 'activities', r, ACTIVITY_TYPES[r.type]?.label || 'workout') },
   });
 }
@@ -645,8 +659,11 @@ export function openPotsLockIfNeeded(openSheet: OpenSheet, r: Entry, dk: string)
 /** The imported-workout report: the activity's HR trace with exercise zones,
  *  HR stats, time in zones, and the workout's own details (mirror of
  *  ReadingSummarySheet, over the day's activities). */
-export function WorkoutSummarySheet({ r, dk, justImported, onEdit }: { r: Entry; dk: string; justImported?: boolean; onEdit?: () => void }) {
+export function WorkoutSummarySheet({ r, dk, justImported, onEdit }: { r: Entry; dk: string; justImported?: boolean; onEdit?: (onSaved?: () => void) => void }) {
   const p = usePalette();
+  // Once the details have been saved from the prompt it has done its job; the
+  // pencil is the way back in, as on any other entry.
+  const [detailsSaved, setDetailsSaved] = useState(false);
   useAppState(); // re-render on edits
   const state = getState();
   const live = (state.days[dk]?.activities || []).find((x) => x.id === r.id) || r;
@@ -657,7 +674,7 @@ export function WorkoutSummarySheet({ r, dk, justImported, onEdit }: { r: Entry;
       {/* The edit + close pill floats top-right — keep the header text clear of it. */}
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, paddingRight: 100 }}>{def?.label || 'Workout'}</Text>
       <Text style={{ color: p.textDim, fontSize: 14, marginTop: 2, marginBottom: 14, paddingRight: 100 }}>{live.time ? fmtTime12(live.time as string) : ''}</Text>
-      {justImported && onEdit ? <WorkoutDetailsPrompt r={live} def={def} onPress={onEdit} /> : null}
+      {justImported && onEdit && !detailsSaved ? <WorkoutDetailsPrompt r={live} def={def} onPress={() => onEdit(() => setDetailsSaved(true))} /> : null}
       <WorkoutSummary r={live} days={state.days} ctx={ctx} />
       <View style={{ height: 24 }} />
     </ScrollView>

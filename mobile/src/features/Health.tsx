@@ -10,8 +10,8 @@ import { useToast } from '../components/Toast';
 import { usePalette } from '../theme';
 import { health, healthAppName, healthPermissionPath, revokeHealthAuth, SleepImport } from '../lib/health';
 import { ensureDay, getState, save, storeSleepSeries, useStore } from '../store/store';
-import { fmtTime12 } from '../lib/dates';
-import { runHealthUpdateCheck } from './HealthUpdates';
+import { fmtTime12, todayKey } from '../lib/dates';
+import { ImportedList, runHealthUpdateCheck } from './HealthUpdates';
 
 export function HealthScreen() {
   const p = usePalette();
@@ -93,6 +93,15 @@ export function HealthScreen() {
       <Text style={{ color: p.textDim, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Troubleshooting</Text>
       <Button title={`Check ${healthAppName()} for updates`} onPress={checkForUpdates} disabled={busy} />
       {busy ? <View style={{ alignItems: 'center', marginTop: 14 }}><ActivityIndicator color={p.accent} /></View> : null}
+      {connected ? (
+        <>
+          {/* The same list the import pill opens, so anything it filed can be
+              found and undone here once the pill has gone. */}
+          <View style={{ height: 1, backgroundColor: p.border, marginTop: 24, marginBottom: 20 }} />
+          <Text style={{ color: p.textDim, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Imported today</Text>
+          <ImportedList dk={todayKey()} />
+        </>
+      ) : null}
       <View style={{ height: 24 }} />
     </View>
   );
@@ -120,6 +129,7 @@ export function SleepConfirmSheet({ dk, data, controls, onDone }: {
       quality: data.interrupted ? 'interrupted' : (d.sleep?.quality || 'good'),
       ...(data.hrLow != null ? { hrLow: data.hrLow } : {}),
       ...(data.hrHigh != null ? { hrHigh: data.hrHigh } : {}),
+      imported: true,
     };
     // Stages describe the imported night; drop any from a previous import
     // rather than mixing them with the new times.

@@ -236,8 +236,9 @@ export function storeWaveform(id: string, data: WaveformData) {
  * where a year of nights would be re-stringified on every mutation.
  *
  * Passing nothing CLEARS the night's blob, which is the important half: an
- * unstaged re-import, or a hand-corrected bed/wake, must not leave yesterday's
- * curve behind describing a window it no longer covers.
+ * unstaged re-import must not leave yesterday's curve behind. A hand-corrected
+ * bed/wake does NOT clear it — the series is re-based onto the new bedtime
+ * (`rebaseNight` in lib/sleep/night) and clipped to the window at read time.
  */
 export function storeSleepSeries(dk: string, s: {
   hrSeries?: WaveformData['sampledHr'] | null;

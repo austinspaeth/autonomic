@@ -18,7 +18,7 @@ import type { HelpContent } from '../lib/help';
 import {
   BANDS, GRADE_LABEL, HRV_EXPLAIN, HRV_HELP, SCORE_COLORS, bandsFor,
   bpBce, bpKerdo, bpKvas, bpMap, bpPP, bpRobinson, catFromBands, computeScores,
-  expectedHf, hrvComposite, numOr, orthoDeltaCat, orthoMaxDelta, restingHrBands,
+  expectedHf, numOr, orthoDeltaCat, orthoMaxDelta, restingHrBands,
   rowScoreCategory, totalPower, type ScoreContext,
 } from '../lib/scoring';
 import { hrRecovery, recoveryBaseline } from '../lib/hrRecovery';
@@ -28,6 +28,7 @@ import { entryFields, isDivider, READING_TYPES } from '../lib/registry';
 import { standReadingRows } from '../lib/pots/manual';
 import { healthAppName } from '../lib/health';
 import { ageFromBirthday, fmtNum, fmtShort, todayKey } from '../lib/dates';
+import { entryDayKey, readingGrade } from '../lib/scoring/readingGrade';
 import { estimatedHrMax, hrZones, timeInZones } from '../lib/workoutZones';
 import type { NormMetric } from '../lib/hrvNorms';
 import { HrvNormNote } from './HrvNorm';
@@ -493,13 +494,6 @@ export function ReadingSummary({ r, days, ctx }: SummaryProps) {
 
 /* ---------- HRV (training + baseline) ---------- */
 
-const HRV_VERDICT: Record<string, string> = {
-  great: 'Strong parasympathetic reserves today. Room for your full protocol and a normal day.',
-  good: 'Solid recovery state. Enough reserve for a normal day.',
-  ok: 'Moderate reserves. Keep it easy and avoid pushing.',
-  bad: 'Low reserves. Favor rest and gentle activity today.',
-  crash: 'Very low reserves. Prioritize rest and recovery.',
-};
 
 /** Cleaned RR series for an HRV reading. Waveforms live in the sidecar store
  *  keyed by reading id — inline fields exist only on pre-save live previews
@@ -541,7 +535,9 @@ function traceFor(r: Entry): BeatTrace | null {
  */
 function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHrv' | 'hrv' }) {
   const s = computeScores(r, ctx);
-  const { score, overall } = hrvComposite(r, ctx);
+  // The day score's own input from this reading, never a second score.
+  const dk = useMemo(() => entryDayKey(days, String(r.id)) ?? todayKey(), [days, r.id]);
+  const grade = useMemo(() => readingGrade(r, days, dk), [r, days, dk]);
   const trace = useMemo(() => traceFor(r), [r]);
   const rr = trace && trace.rr;
   // The spectrum is drawn over the beats the numbers used, not the dropped stretches.
@@ -581,12 +577,10 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
         <CautionNote text="You saved this reading after we flagged it as low quality. It counts like any other reading, but treat it as a rough figure." />
       ) : null}
 
-      <Section cat={overall}>
-        <SectionHead
-          title="HRV score" help={HRV_HELP.score}
-          value={score != null ? String(score) : '–'} unit="/100"
-          desc={overall ? HRV_VERDICT[overall] : 'Composite of vagal tone, power, and baroreflex position.'}
-        />
+      {/* One skinny row: the grade the Outlook takes from this reading, and
+          nothing else. No score, no advice; the details follow. */}
+      <Section cat={grade.counts ? grade.cat : null}>
+        <SectionHead title="HRV grading" help={HRV_HELP.reading} />
       </Section>
 
       {rr && rr.length > 2 ? (

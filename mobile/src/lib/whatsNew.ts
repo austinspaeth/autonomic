@@ -50,6 +50,16 @@ export function fmtReleaseDate(iso: string): string {
 
 export const RELEASES: Release[] = [
   {
+    version: '1.35',
+    date: '2026-10-14',
+    notes: [
+      'NEW: Apple Watch complications for your pacing budget and Autonomic score.',
+      'Improved the algorithm behind your Autonomic score.',
+      'Smoother, more reliable imports from Apple Health and Health Connect.',
+      'Better scrolling performance, plus bug fixes.',
+    ],
+  },
+  {
     version: '1.33',
     date: '2026-10-11',
     notes: [

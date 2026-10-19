@@ -281,8 +281,32 @@ export function definePacingBackground(): void {
  * enable delivery when a background read could change today's budget, undo both
  * when it could not. Launch, foreground and every alert toggle call it; each
  * step is idempotent.
+ *
+ * SERIALISED, because idempotent is not the same as safe to overlap. Launch
+ * and the first 'active' event arrive together, and two syncs that both read
+ * "registered" both unregister: the second finds no task and expo-task-manager
+ * raises an Objective-C exception, which kills the app (no JS catch reaches
+ * it). One runs at a time; a call made while one is running asks for exactly
+ * one more pass after it, which reads the state the first one left.
  */
-export async function syncPacingBackground(): Promise<void> {
+let syncing: Promise<void> | null = null;
+let syncAgain = false;
+
+export function syncPacingBackground(): Promise<void> {
+  if (syncing) {
+    syncAgain = true;
+    return syncing;
+  }
+  syncing = (async () => {
+    do {
+      syncAgain = false;
+      await syncPacingBackgroundOnce();
+    } while (syncAgain);
+  })().finally(() => { syncing = null; });
+  return syncing;
+}
+
+async function syncPacingBackgroundOnce(): Promise<void> {
   try {
     const want = pacingBackgroundWanted();
     const mods = taskModules();

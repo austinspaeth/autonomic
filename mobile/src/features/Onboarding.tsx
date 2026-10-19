@@ -197,6 +197,7 @@ async function importHealthHistory(onProgress?: (p: HistoryProgress) => void): P
         ...(n.hrLow != null ? { hrLow: n.hrLow } : {}),
         ...(n.hrHigh != null ? { hrHigh: n.hrHigh } : {}),
         ...(n.stages ? { stages: n.stages } : {}),
+        imported: true,
       };
       // Series to the sidecar, summary numbers to the journal.
       storeSleepSeries(n.dayKey, n);

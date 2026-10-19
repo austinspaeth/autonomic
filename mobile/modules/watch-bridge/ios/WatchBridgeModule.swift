@@ -41,5 +41,9 @@ public class WatchBridgeModule: Module {
     AsyncFunction("updateContext") { (context: [String: Any]) in
       try WatchSessionManager.shared.updateContext(context)
     }
+
+    AsyncFunction("transferComplication") { (info: [String: Any]) -> Int in
+      WatchSessionManager.shared.transferComplication(info)
+    }
   }
 }

@@ -31,5 +31,10 @@ struct AutonomicWatchApp: App {
                 .environmentObject(relay)
                 .environmentObject(workout)
         }
+        // The phone's complication pushes wake the app in the background; the
+        // score and pacing complications redraw from what arrives here.
+        .backgroundTask(.watchConnectivity) {
+            await PhoneRelay.shared.drainPending()
+        }
     }
 }

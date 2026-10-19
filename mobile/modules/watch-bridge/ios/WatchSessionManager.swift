@@ -75,6 +75,24 @@ final class WatchSessionManager: NSObject, WCSessionDelegate {
     try WCSession.default.updateApplicationContext(context)
   }
 
+  /// Hand the same context to the watch as complication user info, which —
+  /// unlike the application context — wakes the watch app in the background
+  /// so the complications on the face redraw without anybody opening it.
+  /// Apple meters these (about 50 a day), so this answers how many are LEFT
+  /// after this one: -1 when no complication is on the active face (nothing
+  /// was sent), 0 when the budget is spent. An older queued complication
+  /// transfer is cancelled first: only the newest snapshot is worth a wake-up.
+  func transferComplication(_ info: [String: Any]) -> Int {
+    guard WCSession.isSupported() else { return -1 }
+    let s = WCSession.default
+    guard s.activationState == .activated, s.isPaired, s.isWatchAppInstalled, s.isComplicationEnabled else { return -1 }
+    let left = s.remainingComplicationUserInfoTransfers
+    guard left > 0 else { return 0 }
+    for t in s.outstandingUserInfoTransfers where t.isCurrentComplicationInfo { t.cancel() }
+    s.transferCurrentComplicationUserInfo(info)
+    return left - 1
+  }
+
   // MARK: - WCSessionDelegate
 
   func session(_ session: WCSession, activationDidCompleteWith activationState: WCSessionActivationState, error: Error?) {

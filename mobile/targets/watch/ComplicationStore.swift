@@ -79,4 +79,27 @@ enum ComplicationStore {
         WidgetCenter.shared.reloadTimelines(ofKind: "AutonomicHrComplication")
         WidgetCenter.shared.reloadTimelines(ofKind: "AutonomicHrDeltaComplication")
     }
+
+    // MARK: - Score + pacing complications
+
+    /// The kinds that draw today's score and pacing (PacingScoreComplication.swift).
+    static let todayKinds = ["AutonomicScoreComplication", "AutonomicPacingComplication", "AutonomicScorePacingComplication"]
+
+    /// Mirror the phone's score and pacing blocks into the app group, where the
+    /// widget process can read them. Raw JSON, decoded on the other side by the
+    /// same shapes: nothing is computed here. Reloads only when one changed, so
+    /// the context's `sentAt` churn costs the face nothing.
+    static func todayUpdate(pacingJson: String?, scoreJson: String?) {
+        var changed = false
+        if let pacingJson, defaults?.string(forKey: "today.pacing") != pacingJson {
+            defaults?.set(pacingJson, forKey: "today.pacing")
+            changed = true
+        }
+        if let scoreJson, defaults?.string(forKey: "today.score") != scoreJson {
+            defaults?.set(scoreJson, forKey: "today.score")
+            changed = true
+        }
+        guard changed else { return }
+        for kind in todayKinds { WidgetCenter.shared.reloadTimelines(ofKind: kind) }
+    }
 }

@@ -206,3 +206,67 @@ export function respMedian(resp: readonly RespPoint[] | null | undefined): numbe
   const v = s.length % 2 ? s[mid] : (s[mid - 1] + s[mid]) / 2;
   return Math.round(v * 10) / 10;
 }
+
+/* ---------- a hand-corrected window ---------- */
+
+/** The three series a night keeps, as the sidecar holds them. */
+export interface NightSeriesData {
+  sampledHr?: HrPoint[];
+  sampledResp?: RespPoint[];
+  stageSpans?: StageSpan[];
+}
+
+/**
+ * Seconds the bedtime moved, from `oldBed` to `newBed` ("HH:MM"), taking the
+ * short way round the clock: 23:30 → 00:15 is +45 min, not −23h 15m. Null when
+ * either end is missing, since there is then no old origin to move from.
+ */
+export function bedShiftSec(oldBed?: string | null, newBed?: string | null): number | null {
+  const m = (t?: string | null) => {
+    const r = /^(\d{1,2}):(\d{2})$/.exec(t || '');
+    return r ? +r[1] * 60 + +r[2] : null;
+  };
+  const a = m(oldBed), b = m(newBed);
+  if (a == null || b == null) return null;
+  let d = b - a;
+  if (d > 720) d -= 1440;
+  if (d <= -720) d += 1440;
+  return d * 60;
+}
+
+/**
+ * The same night measured from a new bedtime. The series are stored as
+ * offsets from bed, so correcting bed by hand has to move every point by the
+ * same amount or the curve slides under the clock. It is a pure SHIFT and
+ * never drops a point: samples that now sit before bed or after wake are kept
+ * on disk and simply not drawn (`clipNight`), so moving a time and moving it
+ * back again returns exactly the night that was imported.
+ */
+export function rebaseNight(series: NightSeriesData, shiftSec: number): NightSeriesData {
+  if (!shiftSec) return series;
+  const out: NightSeriesData = {};
+  if (series.sampledHr) out.sampledHr = series.sampledHr.map((q) => ({ ...q, t: q.t - shiftSec }));
+  if (series.sampledResp) out.sampledResp = series.sampledResp.map((q) => ({ ...q, t: q.t - shiftSec }));
+  if (series.stageSpans) out.stageSpans = series.stageSpans.map((q) => ({ ...q, s: q.s - shiftSec }));
+  return out;
+}
+
+/**
+ * Only what falls inside bed → wake (`windowSec` long), for drawing and for
+ * every number read off the curve. Spans straddling an edge are cut at it.
+ */
+export function clipNight(series: NightSeriesData, windowSec: number): NightSeriesData {
+  const inside = <T extends { t: number }>(rows?: T[]) => rows?.filter((q) => q.t >= 0 && q.t <= windowSec);
+  const spans = series.stageSpans?.flatMap((q) => {
+    const s = Math.max(0, q.s), e = Math.min(windowSec, q.s + q.d);
+    return e > s ? [{ ...q, s, d: e - s }] : [];
+  });
+  return { sampledHr: inside(series.sampledHr), sampledResp: inside(series.sampledResp), stageSpans: spans };
+}
+
+/** Stage minutes summed off a hypnogram, the way an import totals them. */
+export function stagesFromSpans(spans: readonly StageSpan[]): { deep: number; rem: number; core: number; awake: number } {
+  const sec = { deep: 0, rem: 0, core: 0, awake: 0 };
+  for (const q of spans) sec[q.v] += q.d;
+  return { deep: Math.round(sec.deep / 60), rem: Math.round(sec.rem / 60), core: Math.round(sec.core / 60), awake: Math.round(sec.awake / 60) };
+}

@@ -32,23 +32,25 @@
  *    review row has not been written yet, so it carries an Import link instead.
  *    One meaning per control.
  *
- * The pill does NOT fade once it has something to report: it is the only notice
- * of a silent write, so it stands until it is tapped or dismissed. After that
- * the journal is the durable undo path anyway — every imported row is deletable
- * and deleting one declines the sample.
+ * The pill NAMES what came in ("Imported sleep from Apple Health" +2) and then
+ * takes itself down after `RECEIPT_MS`, unless a reading is waiting for a
+ * decision. It used to stand until tapped, because it was the only way to see
+ * or undo a silent write. It no longer is: its card lists the whole DAY's
+ * imports straight out of the journal (`ImportedList`, over
+ * lib/health/importLog), and Settings → Apple Health shows the same list under
+ * "Imported today", so the receipt can always be found again.
  *
- * Settings → Apple Health's "Check for updates" is unchanged and still hand-
+ * Settings → Apple Health's "Check for updates" is still hand-
  * picked (`HealthUpdatesSheet`): it sweeps the last 24 hours, ignores both the
  * seen and declined memories, and is the way back to anything auto-import
  * skipped or the user removed.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, AppState, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, AppState, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetControls, useSheets } from '../components/Sheet';
 import { noteCrumb } from '../lib/diagnostics/breadcrumbs';
-import { useToast } from '../components/Toast';
 import { Button, ConfirmDeleteSheet } from '../components/ui';
 import { Icon, IconName } from '../components/Icon';
 import { CAUTION_GOLD, CAUTION_GOLD_SOFT, radius, usePalette } from '../theme';
@@ -59,11 +61,14 @@ import {
   markSeenKeys, splitForReview, undoImports, updateCount,
   type HealthUpdateSet, type UpdateReading,
 } from '../lib/health/updates';
-import type { Entry } from '../lib/types';
+import type { AppState as JournalState, Entry } from '../lib/types';
 import { importQualityNote, isPoorImport } from '../lib/hrvQuality';
 import { workoutCurveFor } from '../components/summary';
 import { openWorkoutReport } from './forms';
-import { getState } from '../store/store';
+import { getState, useAppState } from '../store/store';
+import { typesFor } from '../lib/typeCatalog';
+import { READING_TYPES } from '../lib/registry';
+import { importedRows, pillSummary, type ImportKind, type ImportRow, type LabelOf } from '../lib/health/importLog';
 import { setPillSlotClaim } from '../store/pillSlot';
 import { fmtTime12, todayKey } from '../lib/dates';
 
@@ -112,14 +117,38 @@ export async function runHealthUpdateCheck(
 type PillPhase = 'hidden' | 'checking' | 'found';
 
 /**
- * What a finished check left behind: the items already written to the journal,
- * how many that was, and the readings the app would not file unasked.
+ * What a finished check left behind: the newest thing it wrote and how many
+ * more (the pill's words), and the readings the app would not file unasked.
  *
- * `imported` keeps the whole set (not just a count) because the receipt lists
- * it, and `importedCount` is taken from `importUpdates` rather than recomputed
- * — the night counts as one item there, and nothing else knows that.
+ * It keeps no list of its own. The card lists the whole DAY's imports straight
+ * out of the journal (`importedRows`), so a second check's pill no longer
+ * hides the first check's items, and an entry deleted from the Journal is
+ * never listed as imported.
  */
-interface Receipt { dk: string; imported: HealthUpdateSet; importedCount: number; review: UpdateReading[] }
+interface Receipt { dk: string; lead: ImportRow | null; more: number; review: UpdateReading[] }
+
+/** How long a receipt with nothing left to decide stays up. The card is always
+ *  reachable from Settings → Apple Health, so the pill no longer has to wait
+ *  for an answer; a reading that needs one still holds it up. */
+const RECEIPT_MS = 8000;
+
+/** Icon + tint per kind, the import card's group palette. */
+const KIND_LOOK: Record<ImportKind, { icon: IconName; tint: string }> = {
+  sleep: { icon: 'moon', tint: SLEEP_BLUE },
+  reading: { icon: 'heartPulse', tint: '#e03127' },
+  workout: { icon: 'activity', tint: EXERCISE_GREEN },
+  med: { icon: 'pill', tint: MED_GOLD },
+};
+
+/** Labels through the user's own catalog, so a custom type keeps its name. */
+function labelOfState(): LabelOf {
+  return labelOfIn(getState());
+}
+/** Readings are built-in only (`READING_TYPES`); the rest go through the
+ *  catalog the user can extend. */
+function labelOfIn(s: JournalState): LabelOf {
+  return (kind, type) => (kind === 'readings' ? READING_TYPES[type]?.label : typesFor(s, kind)[type]?.label) ?? type;
+}
 
 /** Longest the pill will wait on the health store before giving up quietly. */
 const CHECK_TIMEOUT_MS = 30_000;
@@ -142,11 +171,9 @@ const PILL_H = 46;
 const BORDER = 1;
 
 export function HealthUpdatePill() {
-  const p = usePalette();
   const { openSheet, depth } = useSheets();
   const depthRef = useRef(depth);
   depthRef.current = depth;
-  const toast = useToast();
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<PillPhase>('hidden');
   const [found, setFound] = useState<Receipt | null>(null);
@@ -154,6 +181,12 @@ export function HealthUpdatePill() {
   // pill can tween out to it instead of snapping. The checking state needs no
   // measurement — its content sits in flow and gives the pill its width.
   const [foundW, setFoundW] = useState(0);
+  // Both lengths of the found line, measured off-screen; the long one is used
+  // only when it fits the screen with the usual 16pt gutter either side.
+  const [fullW, setFullW] = useState(0);
+  const [shortW, setShortW] = useState(0);
+  const { width: screenW } = useWindowDimensions();
+  const useFull = fullW > 0 && fullW + BORDER * 2 <= screenW - 32;
   // Only true once we're driving width ourselves; until then the pill is
   // intrinsically sized, so it can never render at zero width.
   const [morphing, setMorphing] = useState(false);
@@ -189,9 +222,24 @@ export function HealthUpdatePill() {
     // should move together.
     setPillSlotClaim('health', false);
     fadeTo(0, () => {
-      setPhase('hidden'); setFound(null); setFoundW(0); setMorphing(false); restW.current = 0;
+      setPhase('hidden'); setFound(null); setFoundW(0); setFullW(0); setShortW(0); setMorphing(false); restW.current = 0;
     });
   };
+
+  // The chosen length is what the pill tweens out to.
+  useEffect(() => {
+    const w = useFull ? fullW : shortW;
+    if (w) setFoundW((prev) => (Math.abs(prev - w) < 0.5 ? prev : w));
+  }, [useFull, fullW, shortW]);
+
+  // A receipt with nothing left to decide takes itself down. One that holds a
+  // reading the app would not file unasked waits for the answer, as before.
+  useEffect(() => {
+    if (phase !== 'found' || !found || found.review.length) return undefined;
+    const t = setTimeout(() => hide(), RECEIPT_MS);
+    return () => clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, found]);
 
   // Morph into "found": fade the checking content out, tween the width out to
   // the measured new content, fade that in as the width settles.
@@ -245,8 +293,13 @@ export function HealthUpdatePill() {
         // ignored is an answer. Settings → Apple Health is the way back.
         markSeenKeys(allItemKeys(fresh));
         if (added > 0 || review.length) {
+          const keys = new Set<string>([
+            ...auto.readings.map((r) => r.key), ...auto.workouts.map((w) => w.key), ...auto.meds.map((m) => m.key),
+            ...(auto.sleep ? ['sleep'] : []),
+          ]);
+          const summary = added > 0 ? pillSummary(importedRows(getState().days[fresh.dk], labelOfState()), keys) : null;
           settle(() => {
-            setFound({ dk: fresh.dk, imported: auto, importedCount: added, review });
+            setFound({ dk: fresh.dk, lead: summary?.lead ?? null, more: summary?.more ?? 0, review });
             setPhase('found');
             // Exactly ONE workout lands on its report, the same as importing
             // one from the card. Never over a sheet that is already up: a
@@ -283,17 +336,12 @@ export function HealthUpdatePill() {
 
   if (phase === 'hidden') return null;
 
-  const count = found ? found.importedCount : 0;
+  const lead = found?.lead ?? null;
+  const more = found?.more ?? 0;
   const reviewCount = found ? found.review.length : 0;
   const openImport = () => {
     if (!found) return;
-    openSheet((c) => (
-      <HealthReceiptSheet
-        receipt={found}
-        controls={c}
-        onRemoved={(n) => { toast(n === 1 ? '1 item removed' : `${n} items removed`); }}
-      />
-    ));
+    openSheet((c) => <HealthImportsSheet dk={found.dk} review={found.review} controls={c} />);
     // The receipt has been read; the pill's job is done either way.
     hide();
   };
@@ -309,26 +357,33 @@ export function HealthUpdatePill() {
       <Text numberOfLines={1} style={styles.label}>{`Checking ${healthAppName()}…`}</Text>
     </>
   );
-  // The receipt state. Three shapes, and the label shortens as the pill fills:
-  // "Imported from Apple Health" alone, "Imported" once a review chip has to
-  // fit beside it, and a gold line when there is nothing to report at all —
-  // that last one is a question, not a receipt, so it must not say "imported".
+  // The receipt state names what came in: "Imported sleep from Apple Health",
+  // with a "+2" chip for the rest of that check. "from Apple Health" is the
+  // part that gives way — whenever the full line would not fit the screen
+  // (measured below), and always beside a review chip. With nothing written it
+  // is a gold question instead, which must not say "imported".
+  const moreChip = (
+    <View style={styles.more}>
+      <Text style={styles.moreText}>{`+${more}`}</Text>
+    </View>
+  );
   const reviewChip = (
     <View style={styles.tag}>
       <Icon name="alert" size={11} color={CAUTION_GOLD} />
       <Text style={styles.tagText}>{reviewCount === 1 ? '1 TO REVIEW' : `${reviewCount} TO REVIEW`}</Text>
     </View>
   );
-  const foundContent = (interactive: boolean) => (
+  const foundContent = (interactive: boolean, full: boolean) => (
     <>
-      {count > 0 ? (
+      {lead ? (
         <>
-          <View style={[styles.badge, { backgroundColor: p.accent }]}>
-            <Text style={styles.badgeText}>{count}</Text>
+          <View style={[styles.badge, { backgroundColor: softTint(KIND_LOOK[lead.kind].tint) }]}>
+            <Icon name={KIND_LOOK[lead.kind].icon} size={12} color={KIND_LOOK[lead.kind].tint} />
           </View>
           <Text numberOfLines={1} style={styles.label}>
-            {reviewCount ? 'Imported' : `Imported from ${healthAppName()}`}
+            {full && !reviewCount ? `Imported ${lead.noun} from ${healthAppName()}` : `Imported ${lead.noun}`}
           </Text>
+          {more > 0 ? moreChip : null}
           {reviewCount ? reviewChip : null}
         </>
       ) : (
@@ -360,7 +415,7 @@ export function HealthUpdatePill() {
       </Animated.View>
       {found ? (
         <Animated.View pointerEvents={phase === 'found' ? 'auto' : 'none'} style={[styles.row, styles.layer, { opacity: foundOp }]}>
-          {foundContent(true)}
+          {foundContent(true, useFull)}
         </Animated.View>
       ) : null}
     </>
@@ -376,7 +431,7 @@ export function HealthUpdatePill() {
           onPress={phase === 'found' ? openImport : undefined}
           accessibilityRole="button"
           accessibilityLabel={phase === 'found'
-            ? `${count} items imported from ${healthAppName()}${reviewCount ? `, ${reviewCount} to review` : ''}`
+            ? [lead ? `Imported ${lead.noun} from ${healthAppName()}` : null, more ? `and ${more} more` : null, reviewCount ? `${reviewCount} to review` : null].filter(Boolean).join(', ')
             : `Checking ${healthAppName()}`}
         >
           {Platform.OS === 'android'
@@ -389,11 +444,13 @@ export function HealthUpdatePill() {
           knows what to tween out to. */}
       {found ? (
         <View pointerEvents="none" style={styles.measure} accessibilityElementsHidden importantForAccessibility="no-hide-descendants">
-          <View
-            style={styles.row}
-            onLayout={(e) => { const w = e.nativeEvent.layout.width; setFoundW((prev) => (Math.abs(prev - w) < 0.5 ? prev : w)); }}
-          >
-            {foundContent(false)}
+          {/* Both lengths are measured, unconstrained (the layer is wider than
+              any screen), and the long one is used only when it fits. */}
+          <View style={[styles.row, styles.measured]} onLayout={(e) => setFullW(e.nativeEvent.layout.width)}>
+            {foundContent(false, true)}
+          </View>
+          <View style={[styles.row, styles.measured]} onLayout={(e) => setShortW(e.nativeEvent.layout.width)}>
+            {foundContent(false, false)}
           </View>
         </View>
       ) : null}
@@ -415,11 +472,13 @@ const styles = StyleSheet.create({
   stack: { backgroundColor: 'rgba(6,6,9,0.82)' },
   // Contents are centered inside the animated width so they stay put mid-tween.
   layer: { ...StyleSheet.absoluteFillObject, justifyContent: 'center' },
-  measure: { position: 'absolute', bottom: 0, left: 0, opacity: 0 },
+  measure: { position: 'absolute', bottom: 0, left: 0, width: 2000, opacity: 0 },
+  measured: { alignSelf: 'flex-start' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 9, height: PILL_H - BORDER * 2, paddingHorizontal: 16, justifyContent: 'center' },
   label: { color: '#fff', fontSize: 14, fontWeight: '600' },
   badge: { minWidth: 21, height: 21, borderRadius: 999, paddingHorizontal: 6, alignItems: 'center', justifyContent: 'center' },
-  badgeText: { color: '#fff', fontSize: 12, fontWeight: '800' },
+  more: { minWidth: 26, height: 21, borderRadius: 999, paddingHorizontal: 7, alignItems: 'center', justifyContent: 'center', backgroundColor: 'rgba(255,255,255,0.12)' },
+  moreText: { color: '#fff', fontSize: 12, fontWeight: '800' },
   tag: {
     flexDirection: 'row', alignItems: 'center', gap: 3,
     backgroundColor: CAUTION_GOLD_SOFT, borderWidth: 1, borderColor: 'rgba(234,179,8,0.4)',
@@ -604,83 +663,45 @@ export function HealthUpdatesSheet({ sets, controls, onImported }: {
   );
 }
 
-/* ---------- the receipt ---------- */
+/* ---------- the day's imports ---------- */
 
 /**
- * What the auto-import wrote, and the two things the user can still do about it.
+ * The pill's card: everything the health store put into the day, newest first,
+ * with the readings still waiting for a decision pinned above.
  *
- * The card grammar is `HealthUpdatesSheet`'s, unchanged — same group headers,
- * same bubble rows, same checkbox — because it is the same object seen a moment
- * later. Only the MEANING of a tick is inverted: here it marks a row for
- * removal, and the footer counts removals only. Keeping a reviewed reading is
- * not a change to announce; the tick already did it.
- *
- * Rows that cannot be removed carry no checkbox, so a tick never means two
- * things in one list:
- *  - the night is a field on the day rather than an entry, so there is nothing
- *    to delete and nothing to decline. It is listed as a fact. (The Journal's
- *    "Last night" card is the app's one route to the sleep editor and stays
- *    that way.)
- *  - a review row has not been written yet, so it carries an Import link. Once
- *    imported it becomes an ordinary row, checkbox and all.
+ * It is a view of the JOURNAL, not of one check (`importedRows`), so it stays
+ * right however many checks have run and whatever was deleted since. A tick
+ * still means REMOVE: it deletes the entry and declines the sample for good
+ * (`undoImports` → `deleteEntry` → lib/health/declined). The card stays open
+ * after a removal — the rows leaving IS the confirmation, and a toast cannot
+ * be seen from inside a sheet anyway.
  */
-export function HealthReceiptSheet({ receipt, controls, onRemoved }: {
-  receipt: Receipt; controls: SheetControls; onRemoved: (n: number) => void;
+export function HealthImportsSheet({ dk, review: initialReview, controls }: {
+  dk: string; review: UpdateReading[]; controls: SheetControls;
 }) {
   const p = usePalette();
-  const { openSheet } = useSheets();
-  const [imported, setImported] = useState<HealthUpdateSet>(receipt.imported);
-  const [review, setReview] = useState<UpdateReading[]>(receipt.review);
-  const [written, setWritten] = useState(receipt.importedCount);
-  const [remove, setRemove] = useState<Record<string, boolean>>({});
+  const [review, setReview] = useState<UpdateReading[]>(initialReview);
 
   useEffect(() => {
     importSheetOpen = true;
     return () => { importSheetOpen = false; };
   }, []);
 
-  const groups = groupsOf([imported]);
-  const removeKeys = Object.keys(remove).filter((k) => remove[k]);
-
-  // A reviewed reading is written the moment the user says so — the card is a
-  // receipt, so an accepted row joins the list it is a receipt for.
+  // A reviewed reading is written the moment the user says so, and then simply
+  // appears in the list below, which is read from the journal.
   const importOne = (r: UpdateReading) => {
-    const { added } = importUpdates({ ...emptyUpdateSet(receipt.dk), readings: [r] }, null);
-    if (!added) return;
-    setImported((prev) => ({ ...prev, readings: [...prev.readings, r].sort((a, b) => a.time.localeCompare(b.time)) }));
-    setReview((prev) => prev.filter((x) => x.key !== r.key));
-    setWritten((n) => n + added);
+    const { added } = importUpdates({ ...emptyUpdateSet(dk), readings: [r] }, null);
+    if (added) setReview((prev) => prev.filter((x) => x.key !== r.key));
   };
-
-  const commitRemoval = () => {
-    const n = undoImports(receipt.dk, removeKeys);
-    controls.closeAll();
-    onRemoved(n);
-  };
-
-  const confirmRemoval = () => {
-    openSheet((c) => (
-      <ConfirmDeleteSheet
-        title={removeKeys.length === 1 ? 'Remove 1 item?' : `Remove ${removeKeys.length} items?`}
-        message={`It will be deleted from today and never imported from ${healthAppName()} again.`}
-        confirmTitle="Remove"
-        onConfirm={commitRemoval}
-        controls={c}
-      />
-    ), { fitContent: true });
-  };
-
-  const sub = [
-    written === 1 ? '1 item written.' : `${written} items written.`,
-    review.length ? (review.length === 1 ? '1 needs your call.' : `${review.length} need your call.`) : null,
-  ].filter(Boolean).join(' ');
 
   return (
     <ScrollView showsVerticalScrollIndicator={false}>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 4 }}>
-        {written > 0 ? `Imported from ${healthAppName()}` : `From ${healthAppName()}`}
+        {dk === todayKey() ? 'Imported today' : 'Imported'}
       </Text>
-      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16 }}>{sub}</Text>
+      <Text style={{ color: p.textDim, fontSize: 14, marginBottom: 16 }}>
+        {`From ${healthAppName()}. Tick anything you don’t want and it won’t be imported again.`}
+      </Text>
 
       {review.length ? (
         <View style={{ marginBottom: 18 }}>
@@ -722,71 +743,115 @@ export function HealthReceiptSheet({ receipt, controls, onRemoved }: {
         </View>
       ) : null}
 
-      {groups.map((g) => (
-        <View key={g.key} style={{ marginBottom: 18 }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8, marginBottom: 8 }}>
-            <Icon name={g.icon} size={15} color={g.tint} />
-            <Text style={{
-              flex: 1, fontSize: 12, fontWeight: '700', letterSpacing: 0.6,
-              textTransform: 'uppercase', color: p.textDim,
-            }}>{g.label}</Text>
-          </View>
-          <View style={{ backgroundColor: p.surface2, borderRadius: radius.card, overflow: 'hidden' }}>
-            {g.items.map((it, i) => {
-              // The night has no entry behind it, so it is stated, not offered.
-              const fixed = g.key === 'sleep';
-              const on = !!remove[it.key];
-              const row = (
-                <>
-                  {fixed ? null : (
-                    <View style={{
-                      width: 24, height: 24, borderRadius: 7, borderWidth: 2,
-                      borderColor: on ? p.accent : p.border,
-                      backgroundColor: on ? p.accent : 'transparent',
-                      alignItems: 'center', justifyContent: 'center',
-                    }}>
-                      {on ? <Icon name="check" size={14} color="#fff" /> : null}
-                    </View>
-                  )}
-                  <View style={{ flex: 1 }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                      <Text style={{
-                        color: on ? p.textDim : p.text, fontSize: 15.5, fontWeight: '600',
-                        textDecorationLine: on ? 'line-through' : 'none',
-                      }}>{it.title}</Text>
-                      {it.tag ? (
-                        <View style={styles.tag}>
-                          <Icon name="alert" size={11} color={CAUTION_GOLD} />
-                          <Text style={styles.tagText}>{it.tag}</Text>
-                        </View>
-                      ) : null}
-                    </View>
-                    <Text style={{ color: p.textDim, fontSize: 12.5, marginTop: 1 }}>{it.sub}</Text>
-                  </View>
-                </>
-              );
-              const style = {
-                flexDirection: 'row' as const, alignItems: 'center' as const, gap: 12, padding: 13,
-                borderTopWidth: i === 0 ? 0 : 1, borderTopColor: p.border,
-              };
-              if (fixed) return <View key={it.key} style={style}>{row}</View>;
-              return (
-                <Pressable
-                  key={it.key}
-                  onPress={() => setRemove((prev) => ({ ...prev, [it.key]: !prev[it.key] }))}
-                  accessibilityRole="checkbox"
-                  accessibilityState={{ checked: on }}
-                  accessibilityLabel={`Remove ${it.title}`}
-                  style={({ pressed }) => [style, on && { backgroundColor: softTint(g.tint) }, pressed && { opacity: 0.6 }]}
-                >
-                  {row}
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
-      ))}
+      <ImportedList dk={dk} />
+      <View style={{ height: 10 }} />
+      <Button title="Done" onPress={() => controls.closeAll()} />
+      <View style={{ height: 16 }} />
+    </ScrollView>
+  );
+}
 
+/**
+ * The day's imports as one list, newest first, with the Remove button under
+ * it. Shared by the pill's card and Settings → Apple Health, so the two can
+ * never list different things. Live: it re-reads the journal on every change.
+ *
+ * Each row wears its kind (the import card's group icon on its soft tint),
+ * because one chronological list has no group header to say it, and the
+ * checkbox sits on the right where the eye lands after reading the row. The
+ * night has no checkbox: it is a field on the day, not an entry, so there is
+ * nothing to delete or decline. Its time is when you woke.
+ */
+export function ImportedList({ dk }: { dk: string }) {
+  const p = usePalette();
+  const { openSheet } = useSheets();
+  const s = useAppState();
+  const rows = importedRows(s.days[dk], labelOfIn(s));
+  const [remove, setRemove] = useState<Record<string, boolean>>({});
+  // Drop ticks whose row has gone (removed here, or deleted from the Journal).
+  const live = new Set(rows.map((r) => r.key));
+  const removeKeys = Object.keys(remove).filter((k) => remove[k] && live.has(k));
+
+  if (!rows.length) {
+    return (
+      <View style={{ backgroundColor: p.surface2, borderRadius: radius.card, padding: 16, alignItems: 'center' }}>
+        <Text style={{ color: p.textDim, fontSize: 14 }}>
+          {`Nothing imported from ${healthAppName()} ${dk === todayKey() ? 'today' : 'that day'}.`}
+        </Text>
+      </View>
+    );
+  }
+
+  const confirmRemoval = () => {
+    const keys = removeKeys;
+    openSheet((c) => (
+      <ConfirmDeleteSheet
+        title={keys.length === 1 ? 'Remove 1 item?' : `Remove ${keys.length} items?`}
+        message={`${keys.length === 1 ? 'It' : 'They'} will be deleted from ${dk === todayKey() ? 'today' : 'that day'} and never imported from ${healthAppName()} again.`}
+        confirmTitle="Remove"
+        onConfirm={() => { undoImports(dk, keys); setRemove({}); }}
+        controls={c}
+      />
+    ), { fitContent: true });
+  };
+
+  return (
+    <>
+      <View style={{ backgroundColor: p.surface2, borderRadius: radius.card, overflow: 'hidden', marginBottom: 14 }}>
+        {rows.map((r, i) => {
+          const look = KIND_LOOK[r.kind];
+          const on = !!remove[r.key];
+          const style = {
+            flexDirection: 'row' as const, alignItems: 'center' as const, gap: 12, padding: 13,
+            borderTopWidth: i === 0 ? 0 : 1, borderTopColor: p.border,
+          };
+          const body = (
+            <>
+              <View style={{ width: 32, height: 32, borderRadius: 999, backgroundColor: softTint(look.tint), alignItems: 'center', justifyContent: 'center' }}>
+                <Icon name={look.icon} size={16} color={look.tint} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                  <Text numberOfLines={1} style={{
+                    flexShrink: 1, color: on ? p.textDim : p.text, fontSize: 15.5, fontWeight: '600',
+                    textDecorationLine: on ? 'line-through' : 'none',
+                  }}>{r.title}</Text>
+                  {r.poor ? (
+                    <View style={styles.tag}>
+                      <Icon name="alert" size={11} color={CAUTION_GOLD} />
+                      <Text style={styles.tagText}>POOR QUALITY</Text>
+                    </View>
+                  ) : null}
+                </View>
+                <Text numberOfLines={1} style={{ color: p.textDim, fontSize: 12.5, marginTop: 1 }}>{r.sub}</Text>
+              </View>
+              {r.removable ? (
+                <View style={{
+                  width: 24, height: 24, borderRadius: 7, borderWidth: 2,
+                  borderColor: on ? p.accent : p.border,
+                  backgroundColor: on ? p.accent : 'transparent',
+                  alignItems: 'center', justifyContent: 'center',
+                }}>
+                  {on ? <Icon name="check" size={14} color="#fff" /> : null}
+                </View>
+              ) : null}
+            </>
+          );
+          if (!r.removable) return <View key={r.key} style={style}>{body}</View>;
+          return (
+            <Pressable
+              key={r.key}
+              onPress={() => setRemove((prev) => ({ ...prev, [r.key]: !prev[r.key] }))}
+              accessibilityRole="checkbox"
+              accessibilityState={{ checked: on }}
+              accessibilityLabel={`Remove ${r.title}`}
+              style={({ pressed }) => [style, on && { backgroundColor: softTint(look.tint) }, pressed && { opacity: 0.6 }]}
+            >
+              {body}
+            </Pressable>
+          );
+        })}
+      </View>
       <Button
         title={removeKeys.length === 0 ? 'Remove'
           : removeKeys.length === 1 ? 'Remove 1 item' : `Remove ${removeKeys.length} items`}
@@ -794,9 +859,6 @@ export function HealthReceiptSheet({ receipt, controls, onRemoved }: {
         disabled={removeKeys.length === 0}
         onPress={confirmRemoval}
       />
-      <View style={{ height: 10 }} />
-      <Button title="Keep everything" onPress={() => controls.closeAll()} />
-      <View style={{ height: 16 }} />
-    </ScrollView>
+    </>
   );
 }

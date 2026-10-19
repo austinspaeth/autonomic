@@ -20,7 +20,7 @@ import { orthoDeltaCat, orthoMaxDelta, rowScoreCategory, SCORE_COLORS, GRADE_LAB
 import { fmtWater, getUnits, waterNum } from '../lib/units';
 import { sleepGrade, sleepHours, stagesForWindow, waterGoalL, type DaysMap } from '../lib/scoring/day';
 import type { SleepRecord, SleepStages } from '../lib/types';
-import { ensureDay, getState, getWaveform, save, storeSleepSeries, useAppState, useStore } from '../store/store';
+import { ensureDay, getSleepSeries, getState, getWaveform, save, storeSleepSeries, useAppState, useStore } from '../store/store';
 import { setJournalSectionY } from '../store/nav';
 import { pingLogged } from '../store/ping';
 import type { OpenSheet } from './forms';
@@ -29,7 +29,7 @@ import { fmtDateLong, fmtDuration, fmtTime12, minsBetween, periodOf, todayKey } 
 import { health, healthAppName, type SleepImport } from '../lib/health';
 import { fmtMin } from '../lib/sleep/stages';
 import { StageBar } from '../components/StageBar';
-import { typicalOvernightLow } from '../lib/sleep/night';
+import { bedShiftSec, clipNight, rebaseNight, stagesFromSpans, typicalOvernightLow } from '../lib/sleep/night';
 import { SleepConfirmSheet } from './Health';
 import { SleepReportSheet } from './SleepReport';
 import { useEntryForms } from './forms';
@@ -415,15 +415,29 @@ function SleepHrField({ label, initial, onCommit }: { label: string; initial: un
 function SleepEditFields({ dk, sleep }: { dk: string; sleep: SleepShape }) {
   const setField = (field: string, v: string) => {
     const s = ensureDay(dk).sleep;
+    const prevBed = s.bed;
     (s as never as Record<string, string>)[field] = v;
-    // Correcting the window invalidates an imported stage breakdown that no
-    // longer spans it (watch off half the night). Drop it rather than keep
-    // reporting stage minutes that contradict the times just entered.
-    // ...and the overnight series with them: a curve keyed to the old bedtime
-    // describes a window the user has just told us was wrong.
+    // Correcting the window KEEPS the overnight series: it was measured, and
+    // the times are what was wrong. The curve is stored as offsets from bed,
+    // so a new bedtime shifts every point by the same amount (lossless — what
+    // now falls outside bed → wake is hidden at read time, not deleted, so
+    // moving a time back restores the night). With a hypnogram the stage
+    // minutes are re-summed over the new window; without one, a breakdown
+    // that no longer spans it (watch off half the night) is dropped rather
+    // than reported against times that contradict it.
     if (field === 'bed' || field === 'wake') {
+      let series = getSleepSeries(dk);
+      const shift = field === 'bed' ? bedShiftSec(prevBed, v) : null;
+      if (series && shift) {
+        series = rebaseNight(series, shift);
+        storeSleepSeries(dk, { hrSeries: series.sampledHr, respSeries: series.sampledResp, spans: series.stageSpans });
+      }
+      const hrs = sleepHours({ [dk]: { sleep: s } as never }, dk);
+      if (series?.stageSpans?.length && hrs != null) {
+        const spans = clipNight(series, hrs * 3600).stageSpans || [];
+        if (spans.length) s.stages = stagesFromSpans(spans);
+      }
       if (s.stages && !stagesForWindow(s)) delete s.stages;
-      storeSleepSeries(dk);
     }
     save();
     // These fields write through, so there is no Save to count. A night is

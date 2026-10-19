@@ -60,15 +60,22 @@ struct ContentView: View {
             }
         }
         .onOpenURL { url in
-            // Complication taps: episode → POTS Episode flow, hr → HR monitor.
+            // Complication taps: episode → POTS Episode flow, hr → HR monitor,
+            // pacing → Pacing. The score glance opens home (autonomic://home).
             // Only route from home — a tap must never yank a live session out
             // from under its own screen (the discarded controller would leave
             // the workout and complication session state orphaned).
-            guard mode == .home else { return }
-            if url.host == "episode" || url.path.contains("episode") {
+            // Pacing is a screen you CHECK and owns no session, so a tap may
+            // leave it too.
+            guard mode == .home || mode == .pacing else { return }
+            if url.host == "home" {
+                mode = .home
+            } else if url.host == "episode" || url.path.contains("episode") {
                 mode = .orthostatic
             } else if url.host == "hr" || url.path.contains("hr") {
                 mode = .hr
+            } else if url.host == "pacing" {
+                mode = .pacing
             }
         }
     }

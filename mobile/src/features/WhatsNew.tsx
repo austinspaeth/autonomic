@@ -20,15 +20,16 @@
  * the seen-memory and lists every release, newest first.
  */
 import React, { useEffect, useState, useSyncExternalStore } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated as RNAnimated, Easing as RNEasing, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import Animated, {
-  Easing, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSpring, withTiming,
+  useAnimatedStyle, useSharedValue, withSpring, withTiming,
 } from 'react-native-reanimated';
 import Svg, { Path } from 'react-native-svg';
 import { BlurView } from 'expo-blur';
 import Constants from 'expo-constants';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetControls, useSheets } from '../components/Sheet';
+import { useNativeLoop } from '../components/nativeLoop';
 import { Icon } from '../components/Icon';
 import { useAccordion } from '../components/ui';
 import { radius, usePalette } from '../theme';
@@ -165,6 +166,7 @@ const RIPPLE_MS = 1800;
 /** How far a ripple grows before it's gone. Kept under the pill's inner height
  *  so `overflow: hidden` never clips one mid-flight. */
 const RIPPLE_SCALE = 2.2;
+const RIPPLE_EASE = RNEasing.out(RNEasing.quad);
 
 function FilledHeart({ size, color }: { size: number; color: string }) {
   return (
@@ -181,32 +183,25 @@ function FilledHeart({ size, color }: { size: number; color: string }) {
  * space (the pill's width must not breathe with them).
  */
 function PulsingHeart({ size, color }: { size: number; color: string }) {
-  const r1 = useSharedValue(0);
-  const r2 = useSharedValue(0);
-
-  useEffect(() => {
-    const ripple = withRepeat(withTiming(1, { duration: RIPPLE_MS, easing: Easing.out(Easing.quad) }), -1, false);
-    r1.value = ripple;
-    r2.value = withDelay(RIPPLE_MS / 2, ripple);
-  }, [r1, r2]);
-
-  const ring1 = useAnimatedStyle(() => ({
-    opacity: 0.45 * (1 - r1.value),
-    transform: [{ scale: 1 + (RIPPLE_SCALE - 1) * r1.value }],
-  }));
-  const ring2 = useAnimatedStyle(() => ({
-    opacity: 0.45 * (1 - r2.value),
-    transform: [{ scale: 1 + (RIPPLE_SCALE - 1) * r2.value }],
-  }));
+  // Native-driven: the pill floats over every tab for as long as it is up, so
+  // this loop must not commit a frame at a time (components/nativeLoop).
+  const r1 = useNativeLoop(true, { from: 0, to: 1, duration: RIPPLE_MS, easing: RIPPLE_EASE });
+  const r2 = useNativeLoop(true, { from: 0, to: 1, duration: RIPPLE_MS, easing: RIPPLE_EASE, delay: RIPPLE_MS / 2 });
+  const ring = (r: RNAnimated.Value) => ({
+    opacity: r.interpolate({ inputRange: [0, 1], outputRange: [0.45, 0] }),
+    transform: [{ scale: r.interpolate({ inputRange: [0, 1], outputRange: [1, RIPPLE_SCALE] }) }],
+  });
+  const ring1 = React.useMemo(() => ring(r1), [r1]);
+  const ring2 = React.useMemo(() => ring(r2), [r2]);
 
   return (
     <View style={{ width: size, height: size, alignItems: 'center', justifyContent: 'center' }}>
-      <Animated.View style={[StyleSheet.absoluteFill, styles.center, ring1]} pointerEvents="none">
+      <RNAnimated.View style={[StyleSheet.absoluteFill, styles.center, ring1]} pointerEvents="none">
         <FilledHeart size={size} color={color} />
-      </Animated.View>
-      <Animated.View style={[StyleSheet.absoluteFill, styles.center, ring2]} pointerEvents="none">
+      </RNAnimated.View>
+      <RNAnimated.View style={[StyleSheet.absoluteFill, styles.center, ring2]} pointerEvents="none">
         <FilledHeart size={size} color={color} />
-      </Animated.View>
+      </RNAnimated.View>
       <FilledHeart size={size} color={color} />
     </View>
   );

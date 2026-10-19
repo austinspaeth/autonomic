@@ -270,8 +270,10 @@ describe('day scoring', () => {
     const res = scoreSet(readings, d, '2026-07-02', { '2026-07-02': d });
     expect(res.comps.find((c) => c.label === 'Baseline HRV')!.p).toBe(35);
     expect(res.comps.find((c) => c.label === 'Training HRV')!.p).toBe(100);
-    // 25 and 15: the baseline is the heavier input.
-    expect(res.score).toBe(Math.round((25 * 35 + 15 * 100) / 40));
+    // 25 and 15: the baseline is the heavier input. That blend is more than a
+    // band above the baseline alone, so the day is held at baseline + one band.
+    expect(res.trainingHeld!.uncapped).toBe(Math.round((25 * 35 + 15 * 100) / 40));
+    expect(res.score).toBe(35 + 15);
   });
   it('scoreCat bands', () => {
     expect(scoreCat(90).short).toBe('Excellent');

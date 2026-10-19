@@ -62,7 +62,7 @@ const LABEL_REST = { top: 21, size: 18 };
 const LABEL_UP = { top: 10, size: 12.5 };
 /** How far the value line sits below the box's centre. */
 const VALUE_DROP = 9;
-const VALUE_SIZE = 18;
+const VALUE_SIZE = 19;
 const FOCUS_LABEL = '#e8807c';
 const FOCUS_GLOW = 'rgba(224,49,39,0.12)';
 
@@ -147,13 +147,23 @@ export function TextField({ label, value, onChange, onBlur, keyboardType, placeh
   const p = usePalette();
   const [focused, setFocused] = useState(false);
   const t = useFloat(focused || !!value);
+  // A number keyboard is a promise the field holds a number, so nothing else
+  // gets in, typed or pasted: digits (plus one dot on the decimal pad), and a
+  // leading minus only on a signed field.
+  const numeric = keyboardType === 'decimal-pad' || keyboardType === 'numeric';
+  const change = (v: string) => {
+    if (!numeric) return onChange(v);
+    const neg = signed && v.trimStart().startsWith('-') ? '-' : '';
+    const num = onlyNumeric(v);
+    onChange(neg + (keyboardType === 'numeric' ? num.replace('.', '') : num));
+  };
   const box = (
     <FieldBox focused={focused} tall={multiline}>
       {label ? <FloatLabel label={label} t={t} focused={focused} /> : null}
       <TextInput
         ref={inputRef}
         value={value}
-        onChangeText={onChange}
+        onChangeText={change}
         onFocus={() => setFocused(true)}
         onBlur={() => { setFocused(false); onBlur?.(); }}
         keyboardType={keyboardType || 'default'}

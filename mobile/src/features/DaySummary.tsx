@@ -4,14 +4,15 @@
  * this" button opens the score-explanation sheet (openScoreExplain).
  */
 import React, { useEffect, useMemo, useState } from 'react';
-import { type LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, type TextStyle, View } from 'react-native';
+import { Animated as RNAnimated, Easing as RNEasing, type LayoutChangeEvent, Platform, Pressable, StyleSheet, Text, type TextStyle, View } from 'react-native';
 import Svg, { Defs, LinearGradient as SvgGradient, RadialGradient, Rect, Stop } from 'react-native-svg';
-import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useSharedValue, withDelay, withRepeat, withSequence, withTiming } from 'react-native-reanimated';
+import Animated, { Easing, useAnimatedProps, useAnimatedStyle, useSharedValue, withSequence, withTiming } from 'react-native-reanimated';
 import { ScoreGauge } from '../components/charts';
 import { BrandMark, Icon } from '../components/Icon';
 import { CornerWeb } from '../components/Halloween';
 import { useHalloween } from '../store/seasonal';
 import { useSheets } from '../components/Sheet';
+import { useNativeLoop } from '../components/nativeLoop';
 import { SumCard, MetricRow } from '../components/summary';
 import { Button, useAccordion } from '../components/ui';
 import { AnnualOfferCard } from './AnnualOffer';
@@ -24,7 +25,7 @@ import { ProtocolEditor } from './ProtocolEditor';
 import { fonts, radius, type as T, usePalette } from '../theme';
 import { SCORE_COLORS, GRADE_LABEL, GRADE_PTS, catFromBands, profileCtx } from '../lib/scoring';
 import {
-  OUTLOOK_GUIDE, SCORE_TOTAL_WEIGHT, SCORE_WEIGHTS, TOMORROW, SCORE_TIPS, blueZone, protocolCriteria,
+  OUTLOOK_GUIDE, SCORE_TOTAL_WEIGHT, SCORE_WEIGHTS, TOMORROW, TRAINING_ONLY, TRAINING_LIFT_MAX, SCORE_TIPS, blueZone, protocolCriteria,
   readingPeriod, resolveProtocol, scoreCat, scoreSet, sleepGrade, sleepHours, streakInfo, streakTier,
   type ScoreComp, type ScoreSetResult,
 } from '../lib/scoring/day';
@@ -39,6 +40,7 @@ import { useBudgetPulse, type BudgetPulse } from './budget/pulse';
 import { openBudgetSheet } from './budget/open';
 import { useNow } from '../lib/useNow';
 import { detectStrain, type Strain } from '../lib/scoring/strain';
+import { catFromPts } from '../lib/scoring/readingGrade';
 import { hasBaselineReadingOn, hasHrvReading, trustedReadings } from '../lib/hrvQuality';
 import { buildDownturnPrompt, buildStrainPrompt } from '../lib/analysis/reports';
 import { PromptSheet } from './PromptSheet';
@@ -470,20 +472,12 @@ function BaselineWaitingCard({ dk, budget, pulse }: { dk: string; budget: Budget
 /** One placeholder bar, breathing slowly. Deliberately not a spinner: nothing
  *  is loading, these sections are genuinely empty. */
 function GhostBar({ width, delay, mb = 10 }: { width: `${number}%`; delay: number; mb?: number }) {
-  const t = useSharedValue(0.45);
-  useEffect(() => {
-    t.value = withDelay(delay, withRepeat(
-      withSequence(
-        withTiming(1, { duration: 1600, easing: Easing.inOut(Easing.quad) }),
-        withTiming(0.45, { duration: 1600, easing: Easing.inOut(Easing.quad) }),
-      ),
-      -1,
-      false,
-    ));
-  }, [t, delay]);
-  const style = useAnimatedStyle(() => ({ opacity: t.value }));
-  return <Animated.View style={[{ width, height: 11, borderRadius: 999, backgroundColor: '#34343a', marginBottom: mb }, style]} />;
+  // Native-driven: a loop that never ends must not commit a frame at a time
+  // (components/nativeLoop).
+  const t = useNativeLoop(true, { from: 0.45, to: 1, duration: 1600, easing: GHOST_EASE, yoyo: true, delay });
+  return <RNAnimated.View style={{ width, height: 11, borderRadius: 999, backgroundColor: '#34343a', marginBottom: mb, opacity: t }} />;
 }
+const GHOST_EASE = RNEasing.inOut(RNEasing.quad);
 
 // Mirrors ScoredHero's shape so the card doesn't change silhouette once a score
 // lands: same header, same gauge in the same spot, greyed out and reading 0.
@@ -1191,7 +1185,7 @@ function zoneAdvice(raw: number | null, bands: Band[] | null, unit?: string) {
 function ScoreExplain({ all, dk }: { all: ScoreSetResult; dk: string }) {
   const p = usePalette();
   const cat = scoreCat(all.score!);
-  const ptsToCat = (pt: number): ScoreCat => (pt >= 88 ? 'great' : pt >= 70 ? 'good' : pt >= 48 ? 'ok' : pt >= 23 ? 'bad' : 'crash');
+  const ptsToCat = catFromPts;
   const comps = all.comps.map((c) => ({ ...c, cat: ptsToCat(c.p) }));
   const byW = (a: ScoreComp, b: ScoreComp) => b.w - a.w;
   const helped = comps.filter((c) => c.cat === 'great' || c.cat === 'good').sort(byW);
@@ -1202,7 +1196,12 @@ function ScoreExplain({ all, dk }: { all: ScoreSetResult; dk: string }) {
   // the full input set, and dividing by it would inflate every "+X pt" number
   // by 95/100 — the score is sum(w * p) / weightSum.
   const avail = all.weightSum || SCORE_TOTAL_WEIGHT;
-  const headroom = comps.map((c) => ({ c, gain: (c.w * (ceil(c) - c.p)) / avail })).filter((x) => x.gain > 0.05).sort((a, b) => b.gain - a.gain);
+  // A held day cannot be raised by training at all: it is already past the
+  // lift its baseline allows, so only the baseline-side inputs have headroom.
+  const held = all.trainingHeld;
+  const headroom = comps
+    .filter((c) => !(held && TRAINING_ONLY.has(c.label)))
+    .map((c) => ({ c, gain: (c.w * (ceil(c) - c.p)) / avail })).filter((x) => x.gain > 0.05).sort((a, b) => b.gain - a.gain);
 
   const improveLine = (c: (typeof comps)[number]) => {
     const m = (c.detail.metrics || []).find((x) => x.raw != null && catFromBands(x.raw, x.bands) !== 'great');
@@ -1281,6 +1280,16 @@ function ScoreExplain({ all, dk }: { all: ScoreSetResult; dk: string }) {
         </View>
         <Text style={{ textAlign: 'center', fontSize: 13, color: p.textDim, fontWeight: '600' }}>{`Confidence ${all.confidence}%, the share of the full input set available to score today.`}</Text>
       </View>
+      {held ? (
+        <SumCard title="Held by your baseline">
+          <MetricRow
+            label="Training reading"
+            value={`${held.uncapped} → ${all.score}`}
+            cat={false}
+            explain={`Your baseline reading puts today at ${held.anchor}. Paced breathing is designed to raise your numbers, so a training reading can lift the day by up to ${TRAINING_LIFT_MAX} points but no further. It can still lower it.`}
+          />
+        </SumCard>
+      ) : null}
       {helped.length ? <SumCard title="What helped">{helped.map((c) => <CompRow key={c.label} c={c} improveLine={improveLine} />)}</SumCard> : null}
       {hurt.length ? <SumCard title="What hurt">{hurt.map((c) => <CompRow key={c.label} c={c} improveLine={improveLine} />)}</SumCard> : null}
       {neutral.length ? <SumCard title="Middle of the range">{neutral.map((c) => <CompRow key={c.label} c={c} improveLine={improveLine} />)}</SumCard> : null}

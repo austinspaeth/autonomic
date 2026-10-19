@@ -156,6 +156,7 @@ export function importUpdates(set: HealthUpdateSet, selected: Set<string> | null
       quality: set.sleep.interrupted ? 'interrupted' : (d.sleep?.quality || 'good'),
       ...(set.sleep.hrLow != null ? { hrLow: set.sleep.hrLow } : {}),
       ...(set.sleep.hrHigh != null ? { hrHigh: set.sleep.hrHigh } : {}),
+      imported: true,
     };
     // Stages describe the imported night; drop any from a previous import.
     if (set.sleep.stages) d.sleep.stages = set.sleep.stages;

@@ -499,6 +499,26 @@ const QID = {
   steps: 'HKQuantityTypeIdentifierStepCount',
   standTime: 'HKQuantityTypeIdentifierAppleStandTime',
 } as const;
+/**
+ * The unit every quantity is READ in, always passed explicitly. Left out, the
+ * library asks HealthKit for the user's preferred unit, which fails (and comes
+ * back empty) for a type whose authorization is not settled; the native side
+ * then converts every sample into a unit that does not fit and HealthKit
+ * raises an Objective-C exception, which no JS catch can reach: the app dies.
+ * It also made body mass arrive in pounds on a US phone, then be converted
+ * from kilograms a second time.
+ */
+const READ_UNIT: Record<string, string> = {
+  [QID.restingHr]: 'count/min',
+  [QID.heartRate]: 'count/min',
+  [QID.hrvSdnn]: 'ms',
+  [QID.respiratoryRate]: 'count/min',
+  [QID.systolic]: 'mmHg',
+  [QID.diastolic]: 'mmHg',
+  [QID.bodyMass]: 'kg',
+  [QID.steps]: 'count',
+  [QID.standTime]: 'min',
+};
 const CID = {
   sleep: 'HKCategoryTypeIdentifierSleepAnalysis',
   mindful: 'HKCategoryTypeIdentifierMindfulSession',
@@ -614,11 +634,17 @@ async function step<T>(name: string, run: () => Promise<T> | undefined): Promise
 }
 
 function makeReal(mod: HkModule): HealthApi {
+  /** Every quantity read goes through here, so none can go out without a unit. */
+  const querySamples = (id: string, opts: Record<string, unknown>) => {
+    const unit = READ_UNIT[id];
+    if (!unit) return Promise.reject(new Error(`no read unit for ${id}`));
+    return mod.queryQuantitySamples?.(id, { ...opts, unit });
+  };
   const dayBounds = (dk: string) => ({ from: dateAt(dk, '00:00'), to: dateAt(dk, '23:59') });
 
   const avgQ = async (id: string, from: Date, to: Date): Promise<number | null> => {
     try {
-      const rows = (await mod.queryQuantitySamples?.(id, { from, to, limit: 500 })) || [];
+      const rows = (await querySamples(id, { from, to, limit: 500 })) || [];
       if (!rows.length) return null;
       return rows.reduce((s, r) => s + r.quantity, 0) / rows.length;
     } catch { return null; }
@@ -639,7 +665,7 @@ function makeReal(mod: HkModule): HealthApi {
       // it. The line then started an hour after bedtime while breathing (a
       // once-per-several-minutes sample) spanned the whole night. The window is
       // one night, so unbounded here is safe; `thinSeries` does the bounding.
-      const rows = (await mod.queryQuantitySamples?.(id, { from, to, limit: 0 })) || [];
+      const rows = (await querySamples(id, { from, to, limit: 0 })) || [];
       const baseMs = base.getTime();
       const pts = rows
         .map((r) => ({ t: Math.round((r.startDate.getTime() - baseMs) / 1000), v: r.quantity }))
@@ -667,7 +693,7 @@ function makeReal(mod: HkModule): HealthApi {
 
   /** Raw per-sample rows (kept: timestamp + provenance), for timestamped imports. */
   const samplesQ = async (id: string, from: Date, to: Date): Promise<readonly QSample[]> => {
-    try { return (await mod.queryQuantitySamples?.(id, { from, to, limit: 500 })) || []; }
+    try { return (await querySamples(id, { from, to, limit: 500 })) || []; }
     catch { return []; }
   };
   const saveQ = async (id: string, unit: string, value: number, start: Date, end: Date) => {
@@ -764,13 +790,13 @@ function makeReal(mod: HkModule): HealthApi {
         // a phone plus a watch write well past that on an active day, which
         // dropped the morning's walking from the minutes and the hourly bars.
         (async () => {
-          try { return (await mod.queryQuantitySamples?.(QID.steps, { from: start, to, limit: 0 })) || []; }
+          try { return (await querySamples(QID.steps, { from: start, to, limit: 0 })) || []; }
           catch { return []; }
         })(),
         // Only for WHEN: the total above stays the statistics query. Only a
         // watch writes stand time, so there is no second device to double.
         (async () => {
-          try { return (await mod.queryQuantitySamples?.(QID.standTime, { from: start, to, limit: 0, unit: 'min' })) || []; }
+          try { return (await querySamples(QID.standTime, { from: start, to, limit: 0, unit: 'min' })) || []; }
           catch { return []; }
         })(),
         // Raw and unthinned: the caller integrates over it. `limit: 0` for the
@@ -778,7 +804,7 @@ function makeReal(mod: HkModule): HealthApi {
         // the NEWEST N and drops the start of the day.
         (async () => {
           try {
-            const rows = (await mod.queryQuantitySamples?.(QID.heartRate, { from: start, to, limit: 0 })) || [];
+            const rows = (await querySamples(QID.heartRate, { from: start, to, limit: 0 })) || [];
             const baseMs = start.getTime();
             return rows
               .map((r) => ({ t: Math.round((r.startDate.getTime() - baseMs) / 1000), bpm: r.quantity }))
@@ -869,7 +895,7 @@ function makeReal(mod: HkModule): HealthApi {
       // Resting HR — one reading each, at its real timestamp.
       step('Resting heart rate');
       try {
-        const rows = (await mod.queryQuantitySamples?.(QID.restingHr, { from, to, limit: LIMIT })) || [];
+        const rows = (await querySamples(QID.restingHr, { from, to, limit: LIMIT })) || [];
         for (const s of rows) {
           out.readings.push({
             type: 'restingHr', time: hhmm(s.startDate), startMs: s.startDate.getTime(),
@@ -883,8 +909,8 @@ function makeReal(mod: HkModule): HealthApi {
       step('Blood pressure');
       try {
         const [sys, dia] = await Promise.all([
-          mod.queryQuantitySamples?.(QID.systolic, { from, to, limit: LIMIT }),
-          mod.queryQuantitySamples?.(QID.diastolic, { from, to, limit: LIMIT }),
+          querySamples(QID.systolic, { from, to, limit: LIMIT }),
+          querySamples(QID.diastolic, { from, to, limit: LIMIT }),
         ]);
         for (const s of sys || []) {
           const m = (dia || []).find((d) => Math.abs(d.startDate.getTime() - s.startDate.getTime()) < 2000);
@@ -959,7 +985,7 @@ function makeReal(mod: HkModule): HealthApi {
         out.workouts = await mapPooled(usable, 4, async (w) => {
           let avgHr: number | null = null; let minHr: number | null = null; let maxHr: number | null = null;
           let hr: readonly QSample[] = [];
-          try { hr = (await mod.queryQuantitySamples?.(QID.heartRate, { from: w.startDate, to: w.endDate, limit: 0 })) || []; } catch { /* HR unavailable */ } // limit 0 = no limit AND ascending; see seriesQ
+          try { hr = (await querySamples(QID.heartRate, { from: w.startDate, to: w.endDate, limit: 0 })) || []; } catch { /* HR unavailable */ } // limit 0 = no limit AND ascending; see seriesQ
           if (hr.length) {
             let sum = 0; let min = Infinity; let max = -Infinity;
             for (const s of hr) { sum += s.quantity; if (s.quantity < min) min = s.quantity; if (s.quantity > max) max = s.quantity; }
@@ -1029,7 +1055,7 @@ function makeReal(mod: HkModule): HealthApi {
           // workout samples every few seconds, so one query covers avg/min/max.
           let avgHr: number | null = null; let minHr: number | null = null; let maxHr: number | null = null;
           let hr: readonly QSample[] = [];
-          try { hr = (await mod.queryQuantitySamples?.(QID.heartRate, { from: w.startDate, to: w.endDate, limit: 0 })) || []; } catch { /* HR unavailable */ } // limit 0 = no limit AND ascending; see seriesQ
+          try { hr = (await querySamples(QID.heartRate, { from: w.startDate, to: w.endDate, limit: 0 })) || []; } catch { /* HR unavailable */ } // limit 0 = no limit AND ascending; see seriesQ
           if (hr.length) {
             let sum = 0; let min = Infinity; let max = -Infinity;
             for (const s of hr) { sum += s.quantity; if (s.quantity < min) min = s.quantity; if (s.quantity > max) max = s.quantity; }

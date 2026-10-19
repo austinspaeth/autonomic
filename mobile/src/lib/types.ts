@@ -32,6 +32,9 @@ export interface SleepRecord {
   hrLow?: string | number;
   hrHigh?: string | number;
   stages?: SleepStages;
+  /** The night came from Apple Health / Health Connect. Lists it under the
+   *  day's imports (lib/health/importLog); a hand correction keeps it. */
+  imported?: boolean;
 }
 
 /**

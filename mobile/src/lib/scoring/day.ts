@@ -248,7 +248,29 @@ export interface ScoreSetResult {
    *  which stamped no coverage: unknown, not zero. */
   structCount: number;
   lastStructCoverageSec: number | null;
+  /** Set when a training reading would have lifted the day further above its
+   *  baseline than `TRAINING_LIFT_MAX` allows: `uncapped` is what the inputs
+   *  blended to, `anchor` what the day scores without the training-only
+   *  components. `score` is then `anchor + TRAINING_LIFT_MAX`. */
+  trainingHeld?: { uncapped: number; anchor: number };
 }
+
+/** The components only a TRAINING (paced) reading can supply. */
+export const TRAINING_ONLY = new Set(['Training HRV', 'Total power', 'pNN50', 'VLF power', 'LF peak']);
+/**
+ * How far a training reading may lift the day above its baseline, in points:
+ * one day band (`SCORE_CATS` are 15 apart).
+ *
+ * THE BASELINE IS THE STATE; TRAINING IS THE PRACTICE. Paced breathing at
+ * resonance is designed to raise RMSSD and total power, the training bands sit
+ * almost on the baseline ones (great from 32 ms vs 34), and a training reading
+ * brings 60 of the 110 weight with it, so a poor morning baseline followed by a
+ * paced session read as a Good day: a 20 ms baseline (Bad) blended up to 77.
+ * Users asked, fairly, which one was their real baseline. Training may still
+ * pull the day DOWN as far as it likes — a poor paced reading is real news —
+ * the same only-lower shape as the personal-baseline rule below.
+ */
+export const TRAINING_LIFT_MAX = 15;
 
 /**
  * Recency-weighted blend of grade POINTS, oldest to newest.
@@ -475,8 +497,17 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
   if (!comps.length) return { score: null, confidence: 0, weightSum: 0, comps: [], ...base };
   const weightSum = comps.reduce((s, c) => s + c.w, 0);
   const sum = comps.reduce((s, c) => s + c.p * c.w, 0);
+  const uncapped = Math.round(sum / weightSum);
+  // Anchor on the baseline: only when the day HAS one and training added to it.
+  let trainingHeld: ScoreSetResult['trainingHeld'];
+  if (basePts != null && comps.some((c) => TRAINING_ONLY.has(c.label))) {
+    const own = comps.filter((c) => !TRAINING_ONLY.has(c.label));
+    const anchor = Math.round(own.reduce((s, c) => s + c.p * c.w, 0) / own.reduce((s, c) => s + c.w, 0));
+    if (uncapped > anchor + TRAINING_LIFT_MAX) trainingHeld = { uncapped, anchor };
+  }
   return {
-    score: Math.round(sum / weightSum),
+    score: trainingHeld ? trainingHeld.anchor + TRAINING_LIFT_MAX : uncapped,
+    ...(trainingHeld ? { trainingHeld } : {}),
     // A percentage of the FULL input set, so a fully logged day reads 100%. The
     // raw weight it is a percentage of stays available as `weightSum`, which is
     // what anything converting a component into points of the final score must

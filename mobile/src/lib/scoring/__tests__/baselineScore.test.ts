@@ -5,7 +5,7 @@
  */
 import type { DayRecord, Entry } from '../../types';
 import { addDays } from '../../dates';
-import { scoreSet } from '../day';
+import { TRAINING_LIFT_MAX, scoreSet } from '../day';
 import { GRADE_PTS } from '../index';
 import {
   PERSONAL_MIN_READINGS, baselineHistory, firstBaselineRmssd, personalBaselineCat, usualBaseline,
@@ -130,5 +130,41 @@ describe('resting heart rate falls back to the baseline reading', () => {
     const rhr = comp(r, 'Resting HR')!;
     expect(rhr.detail.metrics[0].raw).toBe(90);
     expect(rhr.detail.metrics[0].label).toMatch(/baseline/);
+  });
+});
+
+describe('training cannot lift the day far above its baseline', () => {
+  const score = (readings: Entry[]) => scoreSet(readings, day(readings), DK, { [DK]: day(readings) });
+
+  it('holds a strong training session over a poor baseline to one band above it', () => {
+    const b = base(20, '07:30', { avgHr: '72' });
+    const anchor = score([b]).score!;
+    const both = score([b, training({ rmssd: '40' })]);
+    expect(both.trainingHeld).toBeDefined();
+    expect(both.trainingHeld!.anchor).toBe(anchor);
+    expect(both.trainingHeld!.uncapped).toBeGreaterThan(anchor + TRAINING_LIFT_MAX);
+    expect(both.score).toBe(anchor + TRAINING_LIFT_MAX);
+  });
+
+  it('still lets a poor training reading pull the day down', () => {
+    const b = base(40, '07:30', { avgHr: '60' });
+    const alone = score([b]).score!;
+    const both = score([b, training({ rmssd: '15', pnn50: '1', vlowPower: '1500', lowPower: '200', highPower: '100', lfPeak: '0.04' })]);
+    expect(both.trainingHeld).toBeUndefined();
+    expect(both.score!).toBeLessThan(alone);
+  });
+
+  it('leaves a training-only day and a day already near its anchor alone', () => {
+    expect(score([training()]).trainingHeld).toBeUndefined();
+    expect(score([base(40, '07:30', { avgHr: '60' }), training()]).trainingHeld).toBeUndefined();
+  });
+
+  it('does not change confidence', () => {
+    const b = base(20, '07:30', { avgHr: '72' });
+    const t = training({ rmssd: '40' });
+    const both = score([b, t]);
+    const without = scoreSet([b, t], day([b, t]), DK, { [DK]: day([b, t]) });
+    expect(both.confidence).toBe(without.confidence);
+    expect(both.confidence).toBeGreaterThan(score([b]).confidence);
   });
 });

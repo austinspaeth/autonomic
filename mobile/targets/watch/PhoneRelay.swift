@@ -17,10 +17,14 @@ struct SymptomType: Identifiable, Equatable {
  * backgrounded); on every activation we re-queue outbox items that have no
  * outstanding transfer. The phone dedupes by id, so re-delivery is safe.
  *
- * Inbound: applicationContext { pro, age, sex, symptomTypes, pacing } mirrored
- * from the phone — cached in UserDefaults for cold offline launches. `pacing`
- * is today's budget frames, resolved on the phone (see PacingModel): the watch
- * draws them and computes nothing.
+ * Inbound: applicationContext { pro, age, sex, symptomTypes, pacing, score }
+ * mirrored from the phone — cached in UserDefaults for cold offline launches.
+ * `pacing` is today's budget frames, resolved on the phone (see PacingModel):
+ * the watch draws them and computes nothing. `pacing` and `score` are also
+ * copied into the app group for the score/pacing complications. While one of
+ * those is on the face the phone sends the same context as complication user
+ * info (`complication: true`), which wakes this app in the background — see
+ * the `.watchConnectivity` background task in AutonomicWatchApp.
  */
 final class PhoneRelay: NSObject, ObservableObject, WCSessionDelegate {
     static let shared = PhoneRelay()
@@ -133,6 +137,7 @@ final class PhoneRelay: NSObject, ObservableObject, WCSessionDelegate {
         if let a = context["age"] as? Int { defaults.set(a, forKey: "ctx.age") } else { defaults.removeObject(forKey: "ctx.age") }
         if let s = context["sex"] as? String { defaults.set(s, forKey: "ctx.sex") } else { defaults.removeObject(forKey: "ctx.sex") }
         let pacingJson = context["pacing"] as? String
+        ComplicationStore.todayUpdate(pacingJson: pacingJson, scoreJson: context["score"] as? String)
         if let pacingJson { defaults.set(pacingJson, forKey: "ctx.pacing") }
         let parsedPacing = pacingJson.flatMap { Self.parsePacing($0) }
         var parsedSymptoms: [SymptomType]?
@@ -165,6 +170,19 @@ final class PhoneRelay: NSObject, ObservableObject, WCSessionDelegate {
 
     func session(_ session: WCSession, didReceiveUserInfo userInfo: [String: Any] = [:]) {
         if let ack = userInfo["ack"] as? String { handleAck(ack) }
+        // The phone's complication wake-up: the same context, delivered now.
+        if userInfo["complication"] as? Bool == true { applyContext(userInfo) }
+    }
+
+    /// Background wake-up for WatchConnectivity (a complication push): hold the
+    /// app open until the session has handed over what it was woken for.
+    func drainPending() async {
+        guard WCSession.isSupported() else { return }
+        if WCSession.default.activationState != .activated { activate() }
+        for _ in 0..<40 {
+            if WCSession.default.activationState == .activated && !WCSession.default.hasContentPending { return }
+            try? await Task.sleep(nanoseconds: 250_000_000)
+        }
     }
 
     func session(_ session: WCSession, didFinish userInfoTransfer: WCSessionUserInfoTransfer, error: Error?) {

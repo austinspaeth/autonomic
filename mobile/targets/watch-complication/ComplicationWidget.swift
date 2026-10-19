@@ -172,5 +172,8 @@ struct AutonomicComplicationBundle: WidgetBundle {
         AutonomicComplication()
         AutonomicHrComplication()      // HR monitor glance — HrComplication.swift
         AutonomicHrDeltaComplication() // HR delta glance — HrDeltaComplication.swift
+        AutonomicScoreComplication()        // today's score — PacingScoreComplication.swift
+        AutonomicPacingComplication()       // pacing budget — PacingScoreComplication.swift
+        AutonomicScorePacingComplication()  // both, one rectangular slot
     }
 }

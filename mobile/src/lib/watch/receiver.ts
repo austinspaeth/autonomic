@@ -18,7 +18,11 @@
  * changes (entitlement AND local-trial expiry), profile edits, and session
  * activation; deduped so journal churn doesn't spam WCSession. It also carries
  * `pacing` — today's budget frames, handed in by the widget sync (see
- * `setWatchPacing`), which is what the watch's Pacing mode draws.
+ * `setWatchPacing`), which is what the watch's Pacing mode draws, and
+ * `score` — today's Autonomic score off the same payload. The two feed the
+ * score and pacing complications, and while one of them is on the active face
+ * the context is ALSO sent as complication user info, which wakes the watch
+ * app so the face redraws with the app closed (paced by `./complication`).
  */
 import { watchBridge, type WatchUserInfo } from '../../../modules/watch-bridge';
 import { getTier, subscribeTier } from '../../store/tier';
@@ -31,6 +35,10 @@ import { computeScores, profileCtx } from '../scoring';
 import type { Entry } from '../types';
 import { mapWatchPayload } from './payload';
 import { watchPacing, watchPacingKey, type WatchPacing } from './pacing';
+import {
+  COMPLICATION_MIN_GAP_MS, COMPLICATION_RESERVE, complicationKey, shouldPushComplication, watchScore,
+  type ComplicationSent, type WatchScore,
+} from './complication';
 import type { WidgetPayload } from '../widgets';
 
 let started = false;
@@ -38,9 +46,15 @@ let lastContext = '';
 /** Today's pacing frames, pushed in by the widget sync (the one place the
  *  budget is built) so the wrist and the widgets can never disagree. */
 let pacing: WatchPacing | null = null;
+/** Today's score, off the same widget payload as `pacing`. */
+let score: WatchScore | null = null;
+/** The last complication wake-up spent, for `shouldPushComplication`. */
+let complicationSent: ComplicationSent | null = null;
+let complicationRetry: ReturnType<typeof setTimeout> | null = null;
 
 /**
- * Hand the watch the pacing block off a freshly built widget payload.
+ * Hand the watch the pacing block and the score off a freshly built widget
+ * payload.
  *
  * Called from `pushWidgetData` rather than from here: the budget build is the
  * expensive part and it already happens there, on the same triggers (launch,
@@ -49,6 +63,7 @@ let pacing: WatchPacing | null = null;
  */
 export function setWatchPacing(payload: WidgetPayload): void {
   pacing = watchPacing(payload);
+  score = watchScore(payload);
   pushContext();
 }
 
@@ -73,17 +88,46 @@ function pushContext() {
   if (profile?.sex) context.sex = profile.sex;
   // The quick-log symptom list the watch mirrors — id + label in registry order.
   context.symptomTypes = Object.entries(SYMPTOM_TYPES).map(([id, def]) => ({ id, label: def.label }));
-  const key = JSON.stringify(context) + (pacing ? `|${watchPacingKey(pacing)}` : '');
+  const key = JSON.stringify(context)
+    + (pacing ? `|${watchPacingKey(pacing)}` : '')
+    + (score ? `|${JSON.stringify(score)}` : '');
   if (key === lastContext) return; // journal churn — nothing the watch cares about
   lastContext = key;
   // Sent as a JSON string: the frames are the widgets' own shape, decoded on
   // the watch by the same struct the widget target uses.
   if (pacing) context.pacing = JSON.stringify(pacing);
+  if (score) context.score = JSON.stringify(score);
   // sentAt makes each payload unique: WCSession silently skips delivery of an
   // applicationContext identical to the previous one, which strands a watch
   // whose app was installed after the first push. Excluded from the dedupe key.
   context.sentAt = new Date().toISOString();
   bridge.updateContext(context).catch(() => { lastContext = ''; }); // not activated yet — retry on next change
+  pushComplication(bridge, context);
+}
+
+/** Wake the watch for its complications, when one is on the face and the
+ *  change is worth one of the day's metered transfers. */
+function pushComplication(bridge: NonNullable<ReturnType<typeof watchBridge>>, context: Record<string, unknown>) {
+  if (!bridge.transferComplication || (!pacing && !score)) return;
+  const now = new Date();
+  const key = complicationKey(score, pacing, now);
+  if (complicationRetry) { clearTimeout(complicationRetry); complicationRetry = null; }
+  if (!shouldPushComplication(complicationSent, key, now.getTime())) {
+    // Held back by the pacing gap: send the newest snapshot once it opens, or
+    // the last change of a quiet stretch would sit on the phone until the next.
+    const sent = complicationSent;
+    if (sent && sent.remaining >= COMPLICATION_RESERVE) {
+      const wait = sent.at + COMPLICATION_MIN_GAP_MS - now.getTime();
+      complicationRetry = setTimeout(() => { complicationRetry = null; pushComplication(bridge, context); }, Math.max(1000, wait));
+    }
+    return;
+  }
+  bridge.transferComplication({ ...context, complication: true })
+    .then((remaining) => {
+      // -1: no complication on the face, nothing was spent — ask again next time.
+      if (remaining >= 0) complicationSent = { at: now.getTime(), key, remaining };
+    })
+    .catch(() => { /* not activated yet — the next change retries */ });
 }
 
 function receive(info: WatchUserInfo, live = false) {
