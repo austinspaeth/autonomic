@@ -49,6 +49,8 @@ export function SalesView({ dk, range, platform }: { dk: string; range: '7' | '3
     const ps = summarize(l, prevFrom, prevTo);
     const ren = renewals(l, from, dk);
     const renPrev = renewals(l, prevFrom, prevTo);
+    // Every renewal since the first sale, whatever the range: a running total of the whole ledger.
+    const renAll = renewals(l, first, dk);
     // A year ahead: as far as one annual term can put a charge.
     const ahead = renewals(l, addDays(dk, 1), addDays(dk, 365));
     const upcoming = ahead.filter((x) => x.date <= addDays(dk, 30));
@@ -80,12 +82,14 @@ export function SalesView({ dk, range, platform }: { dk: string; range: '7' | '3
     l.churn.forEach((c) => bump(lost, c.date, c.mrr));
     ren.forEach((r) => bump(renew, r.date, r.amount));
     const rev = revenueOf(snap, platform, { from, to: dk, prevFrom, prevTo, deltaOK: prevOK }, days.length);
-    return { rev, books, added, lost, fresh, units, renew, l, ltvMonthly, ltvMixed, from, days, prevOK, book, book30, s, ps, ren, renPrev, upcoming, ahead, ios, android, buckets, inBucket, monthly };
+    return { rev, books, added, lost, fresh, units, renew, l, ltvMonthly, ltvMixed, from, days, prevOK, book, book30, s, ps, ren, renPrev, renAll, upcoming, ahead, ios, android, buckets, inBucket, monthly };
   }, [snap, dk, range, platform]);
 
   const ch = (a: number, b: number): Change => (m.prevOK ? { value: a, base: b } : null);
   const renTotal = m.ren.reduce((t, r) => t + r.amount, 0);
   const renPrevTotal = m.renPrev.reduce((t, r) => t + r.amount, 0);
+  const renAllTotal = m.renAll.reduce((t, r) => t + r.amount, 0);
+  const renBefore = m.renAll.filter((r) => r.date < m.from).reduce((t, r) => t + r.amount, 0);
 
   const netNew = m.book.mrr - m.book30.mrr;
   const [due, setDue] = useState<string | null>(null);
@@ -356,6 +360,27 @@ export function SalesView({ dk, range, platform }: { dk: string; range: '7' | '3
         ...flowCharts(m.renew, '#199e70', $).slice(0, 2),
         { title: 'Coming up, next 30 days', series: Array.from({ length: 30 }, (_, i) => addDays(dk, i + 1)).map((d) => ({ day: d, value: sum(m.ahead.filter((x) => x.date === d)) })), format: $, color: '#5ac8fa' },
       ],
+    },
+    {
+      key: 'renewAll',
+      label: 'Renewed revenue so far',
+      value: $(renAllTotal),
+      change: range === 'all' ? null : { value: renAllTotal, base: renBefore },
+      note: 'Every renewal since the first sale, through the selected date. The range does not cut it; the arrow is how far the range moved it. Estimated: nothing reports a renewal, so each subscription not marked cancelled is assumed to renew on its term.',
+      comparisons: [
+        { label: 'Charges', value: int(m.renAll.length) },
+        { label: 'Per charge', value: m.renAll.length ? $(renAllTotal / m.renAll.length) : '–' },
+        ...(range === 'all' ? [] : [{ label: `On ${shortDate(addDays(m.from, -1))}`, value: $(renBefore) }, { label: 'Added in range', value: $(renAllTotal - renBefore) }]),
+        { label: `After the stores' ${cut}%`, value: $(renAllTotal * (1 - cut / 100)) },
+        { label: 'Since', value: m.l.rows[0] ? shortDate(m.l.rows[0].date) : '–' },
+      ],
+      splits: [
+        { title: 'By plan', parts: PLANS.map((p) => ({ key: p.key, label: p.label, value: m.renAll.filter((r) => r.plan === p.key).reduce((t, r) => t + r.amount, 0), color: p.color })), format: $ },
+        ...(platform === 'all'
+          ? [{ title: 'By store', parts: [{ key: 'I', label: 'iOS', value: m.renAll.filter((r) => r.sale.platform === 'ios').reduce((t, r) => t + r.amount, 0), color: C.ios }, { key: 'A', label: 'Android', value: m.renAll.filter((r) => r.sale.platform === 'android').reduce((t, r) => t + r.amount, 0), color: C.android }], format: $ }]
+          : []),
+      ],
+      chart: { title: 'Renewed so far, on each day', series: daily((i) => m.renAll.filter((r) => r.date <= m.days[i]).reduce((t, r) => t + r.amount, 0)), format: $, color: '#199e70' },
     },
     {
       key: 'churn',

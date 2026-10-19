@@ -27,6 +27,7 @@ import { addDays, dayDate, easternClock, easternDay, shortDate } from '../lib/da
 import { garminShapeLabel, garminWatches, type GarminWatch } from '../lib/usage';
 import { buildPace, TYPICAL_DAY } from '../lib/pace';
 import { int } from '../lib/format';
+import { bookOn, ledger, proRetention } from '../lib/sales';
 import type { PingKind } from '../lib/types';
 import {
   ageNorm,
@@ -469,8 +470,46 @@ const parts = (keys: Key[], counts: Record<string, number>) =>
 
 /* ============================================================ ON <DAY> */
 
+/** Pro retention on the day: the ledger says who is still paying, the open
+ *  route's tier letter says who of them is still in the app. */
+function proRetentionSpec(ix: UsageIndex, ctx: Ctx, day: string, l: ReturnType<typeof ledger>): MetricSpec {
+  const r = proRetention(l, day);
+  const before = proRetention(l, addDays(day, -30)).whole.pct;
+  const proIn = (d: string) => (known(ix, 'open', d) ? entry(ix, 'open', d)?.tiers.P ?? 0 : null);
+  const inApp = (d: string) => {
+    const p = proIn(d);
+    const book = bookOn(l, d).active;
+    return p === null || !book ? null : Math.min(100, (p / book) * 100);
+  };
+  /** Average daily share of the book in the app over the last n days (unknown days left out). */
+  const avgIn = (n: number) => {
+    const vs = Array.from({ length: n }, (_, i) => inApp(addDays(day, -i))).filter((v): v is number => v !== null);
+    return vs.length ? vs.reduce((t, v) => t + v, 0) / vs.length : null;
+  };
+  const lapsed = (n: number) => Array.from({ length: n }, (_, i) => addDays(day, -i)).reduce((t, d) => t + (known(ix, 'lap', d) ? totalOn(ix, 'lap', d) : 0), 0);
+  const surv = (n: number) => r.at[n];
+  const p = proIn(day);
+  return {
+    key: 'proRetention',
+    label: 'Pro retention',
+    value: pct(r.whole.pct),
+    aside: `${int(r.whole.kept)} of ${int(r.whole.started)}`,
+    change: r.whole.pct !== null && before !== null ? { value: r.whole.pct, base: before } : null,
+    note: 'Of every subscription ever started, the share still paying on this day, from the sales ledger (a subscription runs until marked cancelled). D30/60/90 count only subscriptions at least that old. In the app is Pro opens that day against the subscriptions on the book.',
+    comparisons: [
+      ...[30, 60, 90].map((n) => ({ label: `D${n} retention`, value: surv(n).pct === null ? '–' : `${pct(surv(n).pct)} · ${int(surv(n).kept)} of ${int(surv(n).started)}` })),
+      { label: 'vs 30 days earlier', value: pct(before) },
+      { label: 'Pro in the app this day', value: p === null ? '–' : `${int(p)} · ${pct(inApp(day))}` },
+      ...[30, 60, 90].map((n) => ({ label: `Pro in the app, avg day, last ${n}`, value: pct(avgIn(n)) })),
+      ...[30, 60, 90].map((n) => ({ label: `Lapses reported, last ${n} days`, value: int(lapsed(n)) })),
+    ],
+    chart: { title: 'Pro retention over the range', series: series(ctx.days, (d) => proRetention(l, d).whole.pct), format: (v: number) => pct(v), color: '#c98500' },
+  };
+}
+
 function TodaySection({ ix, ctx, isToday, at }: { ix: UsageIndex; ctx: Ctx; isToday: boolean; /** When the counts were read. */ at: number | null }) {
   const day = ctx.last;
+  const { snap } = useData();
   const specs = useMemo<MetricSpec[]>(() => {
     // Coloured even on today, as asked; the note below says why today reads low.
     const d7 = (f: (d: string) => number | null, fmt?: (n: number) => string) => dayDeltas(ix, day, ctx.days, f, false, fmt);
@@ -616,6 +655,7 @@ function TodaySection({ ix, ctx, isToday, at }: { ix: UsageIndex; ctx: Ctx; isTo
         ],
         chart: { ...chart('Over the range', (d) => knownTotal(ix, 'hrv', d)), unknownBefore: ix.firstDay.hrv },
       },
+      proRetentionSpec(ix, ctx, day, ledger(snap?.load?.sales, snap?.load?.churn, ix.platform)),
       {
         key: 'crash',
         label: 'Crashes / errors',
@@ -633,7 +673,7 @@ function TodaySection({ ix, ctx, isToday, at }: { ix: UsageIndex; ctx: Ctx; isTo
         chart: chart('Errors over the range', (d) => faultDay(ix, d).installs, '#e66767'),
       },
     ];
-  }, [ix, ctx, day, isToday, at]);
+  }, [ix, ctx, day, isToday, at, snap]);
 
   const ages = useMemo(() => activeByCohort(ix, day), [ix, day]);
   const [whoMode, setWhoMode] = useState<'basic' | 'expanded' | 'status'>('basic');

@@ -274,3 +274,35 @@ export function ltv(l: Ledger, to: string, scope: 'monthly' | 'mixed') {
     collected: units ? cash / units : null,
   };
 }
+
+/** Whole days from `from` to `to` (both ISO days). */
+const daysBetween = (from: string, to: string) => Math.round((Date.parse(`${to}T12:00:00Z`) - Date.parse(`${from}T12:00:00Z`)) / 86400000);
+
+export type Survival = { started: number; kept: number; pct: number | null };
+
+/**
+ * Pro retention on `day`, read off the ledger. `whole` is every recurring
+ * subscription ever started by that day against the book still live on it
+ * (net of unattached churn, rule THREE). `at[n]` is survival at day n: of the
+ * subscriptions at least n days old, how many had not been cancelled by their
+ * n-th day. A subscription younger than n is left out, never counted as kept.
+ * Unattached churn cannot be pinned on a start date, so it only moves `whole`.
+ */
+export function proRetention(l: Ledger, day: string, ages: number[] = [30, 60, 90]) {
+  let started = 0;
+  const at: Record<number, Survival> = {};
+  ages.forEach((n) => (at[n] = { started: 0, kept: 0, pct: null }));
+  l.rows.forEach((r) => {
+    if (r.refunded || !isRecurring(r.plan) || r.date > day) return;
+    started += r.qty;
+    const age = daysBetween(r.date, day);
+    ages.forEach((n) => {
+      if (age < n) return;
+      at[n].started += r.qty;
+      if (!(r.cancelled && r.cancelled <= addDays(r.date, n))) at[n].kept += r.qty;
+    });
+  });
+  ages.forEach((n) => (at[n].pct = at[n].started ? (at[n].kept / at[n].started) * 100 : null));
+  const live = bookOn(l, day).active;
+  return { whole: { started, kept: live, pct: started ? (live / started) * 100 : null } as Survival, at };
+}
