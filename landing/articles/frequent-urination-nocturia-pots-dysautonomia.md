@@ -8,7 +8,7 @@ keywords: "frequent urination POTS, nocturia POTS, POTS peeing a lot, dysautonom
 date: 2026-10-19
 updated: 2026-10-19
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1523362628745-0c100150b504?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "https://images.unsplash.com/photo-1581310152154-c7cc480bca61?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
 photoAttribution: "Giorgio Trovato / Unsplash"
 tldr: "Frequent urination and nighttime peeing in POTS and dysautonomia usually come from two things working together: an autonomic nervous system that mishandles bladder signals, and fluid that pools in your legs while you are upright, then shifts back when you lie down so your kidneys dump it. Nocturia and the hypovolemic mornings that follow are the classic pattern. Steady salt and fluids, timing drinks, raising the head of the bed, compression, treating any overactive bladder, and ruling out infection or diabetes all help. Burning, fever, blood, inability to urinate, or constant thirst with weight loss need prompt care."
 categories:
