@@ -8,7 +8,7 @@ keywords: "counterpressure maneuvers, physical counterpressure maneuvers POTS, o
 date: 2026-10-17
 updated: 2026-10-17
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1518611012118-696072aa579a?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "https://images.unsplash.com/photo-1552196563-55cd4e45efb3?q=80&w=1326&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
 photoAttribution: "Alora Griffiths / Unsplash"
 tldr: "Counterpressure maneuvers are brief, forceful contractions of your leg, buttock, abdominal or arm muscles that push pooled blood back up toward your heart and raise your blood pressure within seconds. Crossing your legs and tensing, squatting, clenching your buttocks and gripping your hands all work by driving the muscle pump. They are strongest as evidence-based tools for vasovagal (fainting) warning signs, and they help many people with POTS blunt the standing heart-rate spike and lightheadedness while longer-term measures do their work. Use them early, before symptoms peak."
 categories:
