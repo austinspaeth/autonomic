@@ -8,8 +8,8 @@ keywords: "POTS headaches, POTS migraines, dysautonomia headaches, orthostatic h
 date: 2026-10-20
 updated: 2026-10-20
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=1470&auto=format&fit=crop"
-photoAttribution: "Jared Rice / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1714646183974-099d000b6a84?q=80&w=1632&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
+photoAttribution: "Unsplash"
 tldr: "Headaches in POTS and dysautonomia usually come from the same place as the dizziness: when you are upright, blood pools low and cerebral blood flow drops, and your brain and the muscles holding your head up feel it. That produces orthostatic headaches that ease when you lie down. On top of that, migraine is genuinely more common in people with POTS, and the two share autonomic machinery. The practical move is to notice whether your headache tracks being upright, because a posture-locked headache responds to fluids, salt, compression and pacing, while a migraine needs migraine-specific care. A brand-new, severe, or thunderclap headache, a headache that is worse lying down, or one with fever, vision loss or weakness needs prompt medical attention."
 categories:
   - pots
