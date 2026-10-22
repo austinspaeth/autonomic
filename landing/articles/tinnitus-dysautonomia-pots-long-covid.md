@@ -8,7 +8,7 @@ keywords: "tinnitus dysautonomia, tinnitus POTS, tinnitus long covid, ear ringin
 date: 2026-10-22
 updated: 2026-10-22
 author: "Austin Spaeth"
-photoLocation: https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=1760&auto=format&fit=crop
+photoLocation: "https://images.unsplash.com/flagged/photo-1579502604969-74dbfbad1557?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
 photoAttribution: "Jared Rice / Unsplash"
 tldr: "Tinnitus and ear symptoms in POTS, dysautonomia, and long COVID are usually a volume problem, not a damage problem: when the nervous system runs hot, the brain turns up its own auditory gain and you hear ringing, buzzing, or fullness that was always there in the background. Loudness tends to rise on stressed, poorly slept, low-HRV days and settle on calm ones, which is exactly why it is worth tracking. A few patterns do need a clinician: new one-sided tinnitus or hearing loss, sudden hearing loss, and true pulsatile tinnitus that beats in time with your heart."
 categories:
