@@ -1,9 +1,10 @@
 # App Store creative video: "One day, five questions"
 
 Production guide for the live-action video creative assets Apple announced
-for iOS 27 / iPadOS 27 (product page header and search results). Built in
-**Google Flow** with **Nano Banana Pro** (stills) and **Veo 3.1** (motion), with
-real app UI composited onto the phone and watch in post.
+for iOS 27 / iPadOS 27 (product page header and search results). Stills are
+made with **Nano Banana Pro** in **Google Flow**. Motion is image-to-video,
+**Veo 3.1 by default**, with Kling or Seedance per shot where they win (see
+section 4a). Real app UI is composited onto the phone and watch in post.
 
 The concept: we follow one young woman with POTS through a single day, from
 waking up to lights out. Each beat opens on a question she is silently asking
@@ -115,8 +116,8 @@ Somebody without it simply sees a tired woman, which costs nothing.
 **In-group signals, used throughout** (each one says "this was made by
 someone who gets it", and none needs explaining): the pause before standing,
 compression socks, the oversized insulated tumbler, an electrolyte sachet, a
-stool at the sink, legs up the wall in the evening, and a doctor who starts
-with his arms folded.
+stool at the sink, legs up the wall in the evening, and the nerves of walking
+into an appointment expecting not to be believed.
 
 ### The five questions
 
@@ -125,8 +126,8 @@ with his arms folded.
 | 1 | Dawn, in bed | **Am I going to crash today?** | Waking up not knowing what kind of day the body will allow | **Live HRV reading** → **Autonomic Outlook score** |
 | 2 | Midday, kitchen | **Can I manage the dishes?** | Every chore spends energy that's in short supply | **Pacing budget** (on the Apple Watch) |
 | 3 | Afternoon, couch | **Is magnesium even helping?** | Money and hope spent on supplements, with no way to know | **Insights** (biggest change since a start date) |
-| 4 | Afternoon, clinic | **Will my doctor believe me?** | Years of "it's just anxiety" | **POTS stand test result** (heart-rate rise, graded) |
-| 5 | Evening, bed | **Am I actually getting better?** | Recovery is too slow to feel from one day to the next | **Progress** (month trend) |
+| 4 | Afternoon, clinic | **Will my doctor believe me?** | Years of "it's just anxiety" | **POTS stand test result**: a heart-rate rise well past the 30 bpm POTS threshold, graded |
+| 5 | Evening, legs up the wall | **Am I actually getting better?** | Recovery is too slow to feel from one day to the next | **Progress** (the trend over months) |
 
 Why these five: they run from the most immediate fear (today) to the deepest
 one (ever). Together they cover every headline feature: capture, score,
@@ -141,19 +142,43 @@ in my head?"* (swap for #4), *"Can I shower and cook?"* (swap for #2).
 **Copy guardrails** (these match the app's own rules in `CLAUDE.md`):
 
 - Questions only. **No captions that answer them.** The answer is the UI, so
-  we never write a claim like "predicts crashes" or "proves POTS".
+  we never write a claim like "predicts crashes" or "proves POTS". The one
+  other line in the video is the end card's line, which speaks to her rather
+  than making a claim about the app.
 - The app is a journal, not a medical device. Nothing on screen diagnoses
   anything.
 - No prices, no "free", no Pro badge, no paywall, no locks.
 - Pacing is never shown in the red "over budget" state (it should not be the
   first thing a stranger sees). Ahead of pace (gold) is the hero state.
 
-### The loop
+### The ending and the loop
 
-The video ends with her switching off the bedside lamp. The room goes dark,
-the wordmark fades in and out, and then the room fills with dawn. That dawn
-frame matches the opening frame's light and location, so night cuts into
-morning and the loop reads as *the next day*, not as a restart.
+The day ends on the emotional turn. Lying with her legs up the wall, she is
+first defeated, staring at the ceiling. Then she lifts the phone, sees months
+of Progress trending up, and grins in the glow of the screen. Cut to black:
+the Autonomic logo and one supportive line.
+
+The end card is pure black and the video opens on the dawn bedroom, so the
+loop seam is **black → morning**. That reads as *the next day* rather than a
+glitch. It is the one hard cut in the piece that is allowed to be abrupt.
+Fade the end card fully to black ~6 frames before the last frame so the seam
+is clean.
+
+**The end line.** It should answer the feeling of the whole day, not sell a
+feature. My pick:
+
+> **You're not imagining it.**
+
+It pays off the clinic beat ("will my doctor believe me?") and the evening
+beat (is the progress real?), and every POTS patient has been told the
+opposite. Alternates:
+
+- *Your body has been telling you something.*
+- *For the days you can't see the progress.*
+- *See your recovery, one day at a time.*
+
+Apple's rule is "no unverifiable claims", so avoid anything like "Get better
+with Autonomic" or "Know before you crash".
 
 ---
 
@@ -164,25 +189,27 @@ morning and the loop reads as *the next day*, not as a restart.
 | Shot | In → out (s) | Dur | Frame | What happens | Device / screen | On-screen text |
 | --- | --- | --- | --- | --- | --- | --- |
 | **1A** | 0.0 → 2.6 | 2.6 | MCU, eye level, slight side angle | Dawn. Maya sits on the bed edge, palms on the mattress, eyes closed, one slow breath. Socks and tumbler in frame. **Poster frame.** | Phone face-down on nightstand | **Am I going to crash today?** (fades in at 0.3) |
-| **1B** | 2.6 → 4.6 | 2.0 | Over-the-shoulder (OTS), sitting against the headboard | Fingertip resting over the phone's rear camera, phone in both hands in her lap, breathing slowly. | **S1** live HRV reading (dark mode) | (question holds) |
-| **1C** | 4.6 → 6.6 | 2.0 | Slow push-in on the phone in her hands | Her thumb scrolls once. She exhales: an okay day. | **S2** Journal Outlook (score + pacing strip) | (fades out at 6.3) |
-| **2A** | 6.6 → 8.8 | 2.2 | Medium-wide, kitchen | Midday. A sink stacked with dishes. She stands with her tumbler, looks at the pile, shoulders drop. | — | **Can I manage the dishes?** |
-| **2B** | 8.8 → 10.6 | 1.8 | Close-up on her left wrist, her face soft in the background | She raises her wrist and glances at the watch. | **S3** watch pacing (gold, ahead of pace) | (holds) |
-| **2C** | 10.6 → 12.4 | 1.8 | Medium | She pulls a wooden stool to the sink, sits, pushes up her sleeves and starts washing. Small, satisfied half-smile. | — | (fades out at 12.1) |
-| **3A** | 12.4 → 14.0 | 1.6 | Close-up, hands | Couch, afternoon light. She tips one capsule from an amber, unlabelled bottle into her palm and looks at it, unconvinced. | — | **Is magnesium even helping?** |
-| **3B** | 14.0 → 17.0 | 3.0 | OTS on the couch, under a knit throw | She scrolls, stops, and her eyebrows lift slightly. | **S4** Insights: magnesium finding → its chart | (fades out at 16.7) |
-| **4A** | 17.0 → 18.6 | 1.6 | Medium two-shot, exam room | She sits on the exam table in her cardigan. The doctor stands, arms folded, polite and unconvinced. She grips the phone. | Phone in hand, screen not yet visible | **Will my doctor believe me?** |
-| **4B** | 18.6 → 21.0 | 2.4 | 45° from the doctor's side, phone mid-frame | She turns the phone toward him and holds it out. | **S5** POTS stand test result | (holds) |
-| **4C** | 21.0 → 22.6 | 1.6 | Two-shot, rack focus from him to her | He unfolds his arms, leans in and nods slowly. Focus racks to her as she exhales with relief. | (screen out of focus) | (fades out at 22.3) |
-| **5A** | 22.6 → 24.2 | 1.6 | Wide, warm lamp | Evening. She lies across the bed with her legs up the wall, compression socks on, phone held above her face. | Phone overhead, screen not visible | **Am I actually getting better?** |
-| **5B** | 24.2 → 27.2 | 3.0 | High angle from behind her head, looking down at the screen | She scrolls. A small private smile, then she lowers the phone to her chest. | **S6** Progress, month view, score trending up | (fades out at 26.9) |
-| **6** | 27.2 → 30.0 | 2.8 | Wide bedroom, same setup as 1A | She reaches over and clicks off the lamp. Darkness, with the wordmark **Autonomic** at 27.8–28.8. Dawn light rises through the curtains, matching 1A's light, then hard cut to 1A on loop. | — | **Autonomic** (wordmark) |
+| **1B** | 2.6 → 4.4 | 1.8 | Over-the-shoulder (OTS), sitting against the headboard | Fingertip resting over the phone's rear camera, phone in both hands in her lap, breathing slowly. | **S1** live HRV reading (dark mode) | (question holds) |
+| **1C** | 4.4 → 6.4 | 2.0 | Slow push-in on the phone in her hands | Her thumb scrolls once. She exhales: an okay day. | **S2** Journal Outlook (score + pacing strip) | (fades out at 6.1) |
+| **2A** | 6.4 → 8.2 | 1.8 | Medium-wide, kitchen | Midday. A sink stacked with dishes. She stands with her tumbler, looks at the pile, shoulders drop. | — | **Can I manage the dishes?** |
+| **2B** | 8.2 → 10.0 | 1.8 | Close-up on her left wrist, her face soft in the background | She raises her wrist and glances at the watch. | **S3** watch pacing (gold, ahead of pace) | (holds) |
+| **2C** | 10.0 → 11.6 | 1.6 | Medium | Seated on a wooden stool at the sink, sleeves pushed up, washing. Small, satisfied half-smile. | — | (fades out at 11.3) |
+| **3A** | 11.6 → 13.0 | 1.4 | Close-up, hands | Couch, afternoon light. She tips one capsule from an amber, unlabelled bottle into her palm and looks at it, unconvinced. | — | **Is magnesium even helping?** |
+| **3B** | 13.0 → 15.6 | 2.6 | OTS on the couch, under a knit throw | She scrolls, stops, and her eyebrows lift slightly. | **S4** Insights: magnesium finding → its chart | (fades out at 15.3) |
+| **4A** | 15.6 → 17.4 | 1.8 | MCU on her, exam room | She sits on the exam table in her cardigan, worried: biting her lip, thumbs pressing into the phone in her lap, eyes flicking up toward the (offscreen) doctor and back down. | Phone in lap, screen not visible | **Will my doctor believe me?** |
+| **4B** | 17.4 → 20.2 | 2.8 | Phone sharp in the foreground; the doctor soft behind it | She lifts the phone and holds it up toward him. Behind it, out of focus, the doctor leans in toward the screen. | **S5** stand test result, rise well past the 30 bpm threshold | (fades out at 19.9) |
+| **5A** | 20.2 → 21.8 | 1.6 | Wide, side-on, warm lamp | Evening. She lies on her back across the bed with her legs straight up the wall, compression socks on, arms limp at her sides. | — | **Am I actually getting better?** |
+| **5B** | 21.8 → 23.4 | 1.6 | Top-down, directly above her face | Defeated: eyes glassy and fixed on the ceiling, a slow exhale, a tear-track at the corner of one eye. No phone. | — | (holds) |
+| **5C** | 23.4 → 25.8 | 2.4 | OTS from above and behind her head, down onto the screen | She lifts the phone above her chest and scrolls slowly through months of Progress. | **S6** Progress, Year/Month, score climbing | (fades out at 25.5) |
+| **5D** | 25.8 → 27.4 | 1.6 | Same top-down on her face as 5B | The screen's cool glow lights her face from below frame. A slow, disbelieving smile breaks into a real grin. | Phone just out of frame; only its glow | — |
+| **6** | 27.4 → 30.0 | 2.6 | Black | Hard cut to black. The **Autonomic** logo, then the line beneath it. Both fade out to pure black by 29.8. Loop → 1A. | — | Logo + **You're not imagining it.** |
 
 Rhythm: each question gets a **beat of life (no device) → device in hand →
 reaction**. Cut on motion: a lifting wrist, a turning phone, a scrolling
-thumb. Shots run 1.6–3.0 s. If a test viewer says it feels rushed, drop beat
-3 for a 4-question header cut (shift the times up by 4.6 s and stretch the
-other shots).
+thumb. The legs-up sequence is the only beat that gets four shots, because it
+carries the emotional turn. Shots run 1.4–2.8 s, which is at the short end of
+what Apple wants. If a test viewer finds it rushed, drop beat 3 (magnesium)
+from the header. That returns 4.0 s; give it to 1A, 4A, 5B and 5D.
 
 ### Search-results cut: 3:2, 15.0 s
 
@@ -192,16 +219,17 @@ screens big.
 
 | Shot | In → out | Use |
 | --- | --- | --- |
-| 1A | 0.0 → 2.4 | as above (hook + poster) |
-| 1C | 2.4 → 5.0 | the Outlook push-in (skip 1B) |
-| 2A | 5.0 → 6.8 | dishes |
-| 2B | 6.8 → 9.0 | watch pacing |
-| 5A | 9.0 → 10.4 | legs up the wall |
-| 5B | 10.4 → 13.4 | Progress |
-| 6 | 13.4 → 15.0 | lamp off → dawn (wordmark optional at this size) |
+| 1A | 0.0 → 2.2 | as above (hook + poster) |
+| 1C | 2.2 → 4.2 | the Outlook push-in (skip 1B) |
+| 2A | 4.2 → 5.6 | dishes |
+| 2B | 5.6 → 7.4 | watch pacing |
+| 5B | 7.4 → 8.6 | defeated, top-down (carries the question "Am I actually getting better?") |
+| 5C | 8.6 → 10.8 | Progress |
+| 5D | 10.8 → 12.4 | the grin |
+| 6 | 12.4 → 15.0 | logo + line |
 
 For this cut, grab a **second, tighter crop** in the edit wherever the screen
-is small. The 3:2 frame can be punched in up to ~120% on 1C, 2B and 5B and
+is small. The 3:2 frame can be punched in up to ~120% on 1C, 2B and 5C and
 still stay ≥ 1920 px wide.
 
 ### Optional reuse
@@ -221,7 +249,7 @@ Step 2  Wardrobe + props sheets            ──► lock
 Step 3  Doctor character                   ──► lock
 Step 4  Location plates (5 rooms)          ──► lock
 Step 5  Start frame per shot (Nano Banana: character + location refs)
-Step 6  Animate each start frame (Veo 3.1 · Frames to Video · 16:9 · 8 s)
+Step 6  Animate each start frame (image-to-video, 16:9; model per 4a)
 Step 7  Pick the best 2-3 s window of each take
 Step 8  Upscale to 4K in Flow
 Step 9  Record real app UI (simulator) per the screen list
@@ -229,9 +257,59 @@ Step 10 Composite UI onto phone/watch, conform to 30 fps, grade, edit, text
 Step 11 Export header 21:9 + search 3:2, preview in App Store Connect
 ```
 
-Rules that keep it realistic and consistent:
+### 4a. Which video model: Veo, Kling or Seedance?
 
-- **Every Veo shot starts from a Nano Banana still** (Frames to Video). Text
+**Short answer: don't pick one up front. Every shot here starts from a
+still, so the video model is swappable shot by shot.** Consistency lives in
+the Nano Banana start frames, not in the video model, and the grade plus
+film grain in post even out the small look differences between models.
+Decide with a bake-off, not on reputation.
+
+Comparisons as of late 2026 broadly agree on this. They are vendor and blog
+comparisons, so treat them as directional and check the current leaderboards:
+
+| Model | Reputation | What it means for this video |
+| --- | --- | --- |
+| **Veo 3.1** (Flow) | The most consistently praised for photoreal **faces, skin and natural light** in close-ups. Clips run up to 8 s. Its native audio is a big strength. | Most of our shots are intimate close-ups in natural light, which is its home turf. **Its audio advantage is worth nothing here**: we mute everything. |
+| **Kling 3.0** | Rated stronger on **body motion and physics**. Clips up to ~15 s, multi-shot, start + end frames. | Better odds on shots with real movement: **2C** (washing dishes), **5C** (raising the phone overhead), the legs-up wide. |
+| **Seedance 2.0** | Tops some recent image-to-video leaderboards. Very strong **reference control**: many reference images in one generation. | The best fallback when a face drifts. Feed it the character sheet, outfit sheet, location and start frame together. Access varies by region and platform. |
+
+**Do this before generating all 14 shots.** Run the same start frame and the
+same prompt through all three on the four hardest shots:
+
+1. **1B**: fingertip on the phone's rear camera. Hands and phone geometry.
+2. **4B**: phone sharp in the foreground with a face behind it.
+3. **5D**: a top-down face going from defeated to a grin. Face stability
+   under emotion, which is where models most often morph a face into
+   someone else.
+4. **2C**: hands in water. Physics.
+
+Score each take on four things: face held, hands correct, phone stayed rigid
+(it must stay planar-trackable), and natural motion. Use the winner per shot.
+Keep **one model per beat** where you can, so adjacent cuts don't change
+"texture".
+
+**Format and resolution don't decide it either.** All three output 16:9, and
+all three come out at 24 fps, which needs converting to 30 regardless. Each
+will need upscaling to 3840 wide for the header, so resolution is a post
+step whichever you choose. The only hard requirement is a **clean 16:9
+master**: don't let any tool crop or letterbox for you.
+
+If you'd rather not bake off: **Veo 3.1 for everything with a face in close-up,
+Kling 3.0 for 2C and 5C** is the likeliest winning split.
+
+Sources: [3D AI Studio](https://www.3daistudio.com/blog/best-ai-video-generator-2026) ·
+[MagicShot](https://magicshot.ai/blog/kling-vs-veo-vs-seedance-comparison) ·
+[Pixo](https://pixo.video/blog/seedance-vs-veo-vs-kling) ·
+[SeaVidGen](https://seavidgen.com/blog/ai-video-models-comparison-kling-3-seedance-2-sora-2-veo-3)
+
+### 4b. Rules that keep it realistic and consistent
+
+The prompts in section 6 are written for Veo but transfer as-is. Kling and
+Seedance read the same plain-English shot description. Drop the "Ambient room
+tone" line where a model has no audio.
+
+- **Every shot starts from a Nano Banana still** (Frames to Video). Text
   to video alone will drift her face, hair clip and socks from shot to shot.
   Use **Ingredients to Video** only as a fallback, with the character sheet,
   wardrobe sheet and location plate as the three ingredients.
@@ -659,29 +737,30 @@ drift, holding the over-the-shoulder framing.
 
 ---
 
-### 4A: The skeptic (clinic)
+### 4A: Worried (clinic)
 
-**Refs:** `REF_maya_clinic`, `REF_doctor`, `LOC_clinic`
+**Refs:** `REF_maya_clinic`, `LOC_clinic`, `REF_props`
 
 **START FRAME**
 
 ```
-Photorealistic still, 16:9. Inside the reference exam room. The woman, wearing the
-oatmeal cardigan, sits on the edge of the exam table on the crinkled paper, canvas
-tote beside her, holding the sage-cased smartphone in her lap with both hands,
-screen facing down toward her lap. Facing her at a slight angle, the physician from
-the reference stands with his arms folded, polite but unconvinced, head tilted.
-Two-shot, both centred within the middle half of the frame, 35mm, f/2.8, soft
-frosted-window daylight. No readable text, no logos.
+Photorealistic still, 16:9. Inside the reference exam room. Medium close-up of the
+woman, wearing the oatmeal cardigan, sitting on the edge of the exam table on the
+crinkled white paper, canvas tote beside her, centred in frame. She holds the
+sage-cased smartphone in her lap with both hands, screen facing down. Worried:
+lower lip caught between her teeth, brows slightly knitted, shoulders drawn in,
+eyes lowered. Soft frosted-window daylight, the room behind her softly out of
+focus. 50mm, f/2.0, eye level. No readable text, no logos.
 ```
 
 **VEO 3.1**
 
 ```
-The doctor stands with arms folded, listening politely but unconvinced, giving a
-small doubtful nod. The woman looks down at the phone in her lap, her thumbs
-tightening on it, gathering herself, then lifts her eyes to him. Quiet, tense,
-realistic. Camera: locked-off with gentle handheld breathing.
+She sits anxiously on the exam table, thumbs pressing and rubbing the edge of the
+phone in her lap. Her eyes flick up toward someone just off camera to the left,
+hold for a beat, then drop back down; she swallows and takes a small, shaky
+breath, gathering her nerve. Quiet, tense, realistic. Camera: locked-off with
+gentle handheld breathing, very slow push-in.
 [STYLE TAIL]
 ```
 
@@ -691,150 +770,176 @@ realistic. Camera: locked-off with gentle handheld breathing.
 
 **Refs:** `REF_maya_clinic`, `REF_doctor`, `LOC_clinic`, `REF_props`
 
+The screen is the whole point of this shot, so it is framed **around the
+phone**. The phone is sharp in the foreground and square to camera, at about
+35–40% of the frame height so the number reads even in the 3:2 cut. The
+doctor's reaction plays out of focus behind it.
+
 **START FRAME**
 
 ```
-Photorealistic still, 16:9. Camera positioned beside the doctor at 45 degrees. The
-woman on the exam table holds the sage-cased smartphone out toward the doctor at arm's
-length, screen facing him and angled about 30 degrees toward the camera so it is
-clearly visible, centred in frame, a plain uniform light-grey glow. Her expression
-earnest. The doctor's shoulder and folded arm soft in the foreground left. 50mm,
-f/2.0. No readable text, no logos.
+Photorealistic still, 16:9. From the woman's side, slightly behind her right
+shoulder: her right hand holds the sage-cased smartphone up at eye level in the
+foreground, screen facing the camera square-on, sharp, centred in frame and
+filling about 40% of the frame height, a plain uniform light-grey glow. Her
+fingers wrap the edge only, not covering the screen; her cardigan sleeve and
+shoulder soft at the frame edge. Beyond the phone, out of focus, the physician
+from the reference stands facing her, a polite neutral expression. Soft daylight.
+50mm, f/2.0, focus on the phone. No readable text, no logos.
 ```
 
 **VEO 3.1**
 
 ```
-She extends the phone a little further toward the doctor and holds it steady for
-him, her thumb on the bezel edge, not covering the screen. Earnest, hopeful
-expression. In the soft foreground the doctor's folded arm begins to loosen. The
-phone screen stays fully visible and steady. Camera: very slow push toward the
-phone.
+She holds the phone up steadily, screen square to camera and fully visible. In the
+soft-focus background the doctor's expression changes: he lowers his reading glasses
+onto his nose, leans in toward the phone, studies it, and nods slowly twice, now
+serious and engaged. The phone stays rigid and sharp throughout; only the
+background moves. Camera: locked-off, focus held on the phone.
 [STYLE TAIL]
 ```
 
-**Screen:** S5 (light mode).
+**Screen:** S5 (light mode), a rise well past the POTS threshold.
 
----
-
-### 4C: He leans in (clinic)
-
-**Refs:** `REF_maya_clinic`, `REF_doctor`, `LOC_clinic`
-
-**START FRAME**
-
-```
-Photorealistic still, 16:9. Two-shot profile. The doctor, arms now unfolded, leans
-in toward the phone the woman is holding between them, reading glasses lowered onto
-his nose, attentive. The woman sits on the exam table watching his face. The phone
-screen faces away from camera. Both centred within the middle half of the frame.
-Doctor in sharp focus, the woman slightly soft. 50mm, f/2.0, soft daylight.
-No readable text, no logos.
-```
-
-**VEO 3.1**
-
-```
-The doctor studies the phone, then nods slowly twice, his expression changing from
-doubtful to serious and engaged; he points briefly at the screen. Focus racks
-smoothly from the doctor to the woman, whose shoulders drop as she lets out a long
-breath of relief, her eyes glistening slightly. Camera: steady, rack focus from him
-to her.
-[STYLE TAIL]
-```
+> Optional: if you want her relief on screen too, generate an extra 1.2 s
+> **4C**: a close-up of her face as she exhales and her shoulders drop. Take
+> the time from 3B.
 
 ---
 
 ### 5A: Legs up the wall (evening)
 
-**Refs:** `REF_maya`, `LOC_bedroom_night`, `REF_props`
+**Refs:** `REF_maya`, `LOC_bedroom_night`
 
 **START FRAME**
 
 ```
 Photorealistic still, 16:9. The reference bedroom at night, ceramic lamp on, warm
 2700K glow. The woman lies on her back across the bed with her legs raised straight
-up resting against the wall, navy compression socks clearly visible, grey
-sweatshirt, hair spread on the duvet with the claw clip loosened. She holds the
-sage-cased smartphone above her face with both hands, screen facing down toward
-her. Wide shot from the side, the whole figure centred in the middle half of the
-frame, 28mm, f/2.2. No text, no logos.
+up resting flat against the wall, navy compression socks clearly visible, grey
+sweatshirt, hair spread loose on the duvet. Arms limp at her sides, palms up, the
+phone lying face-down on the duvet beside her hand. Wide shot from the side at mattress
+height, the whole figure centred in the middle half of the frame, 28mm, f/2.2.
+No text, no logos.
 ```
 
 **VEO 3.1**
 
 ```
-Lying with her legs up the wall, she holds the phone above her face and scrolls
-slowly with one thumb. Her feet in the compression socks shift gently against the
-wall. Warm lamplight, quiet, still. Camera: very slow lateral slide.
+Lying still with her legs up the wall, she lets out a long, heavy breath; her chest
+falls and her head rolls slightly to face the ceiling. Her socked feet shift once
+against the wall. Warm lamplight, quiet, nothing else moves. Camera: very slow
+lateral slide.
 [STYLE TAIL]
 ```
 
 ---
 
-### 5B: Progress (evening)
+### 5B: Defeated, top-down (evening)
+
+**Refs:** `REF_maya`, `LOC_bedroom_night`
+
+**START FRAME**
+
+```
+Photorealistic still, 16:9. Top-down shot from directly above her face: the woman
+lies on her back on the oatmeal duvet, her face upright in frame and centred,
+filling the middle third, dark hair fanned out around her head, the claw clip
+loosened. Eyes open, glassy, fixed on the ceiling; a single tear-track glistening
+from the outer corner of one eye toward her ear; mouth slack, exhausted and
+defeated, not crying openly. Warm lamplight from one side, the other side of her
+face in soft shadow. 50mm, f/2.0. No text, no logos.
+```
+
+**VEO 3.1**
+
+```
+She stares at the ceiling, blinking slowly once. Her jaw tightens, then releases in
+a slow, shaky exhale. Her eyes stay unfocused and tired. Almost no movement — the
+stillness is the emotion. Camera: perfectly overhead, imperceptibly slow push-in.
+[STYLE TAIL]
+```
+
+---
+
+### 5C: Progress (evening)
 
 **Refs:** `REF_maya`, `LOC_bedroom_night`, `REF_props`
 
 **START FRAME**
 
 ```
-Photorealistic still, 16:9. High angle from just behind and above her head, looking
-down along her: the woman lies on her back on the bed, holding the sage-cased
-smartphone above her face in both hands, the screen facing her and visible to the
-camera at a shallow angle, centred in frame, a plain uniform dark-grey glow. Her
-eyes and the top of her face visible at the bottom edge of frame, soft. Warm lamp
-light from the side. 35mm, f/2.0. No text, no logos.
+Photorealistic still, 16:9. High angle from above and just behind the crown of her
+head, looking down along her body: the woman lies on her back holding the
+sage-cased smartphone above her chest in both hands, screen facing her and visible
+to the camera at a shallow angle, centred in frame and filling about a third of the
+frame width, a plain uniform dark-grey glow. Her forehead and hair soft at the bottom
+edge of frame; her raised legs against the wall blurred in the far background. Warm
+lamp light from the side. 35mm, f/2.0. No text, no logos.
 ```
 
 **VEO 3.1**
 
 ```
-She scrolls slowly once, then stops and holds the phone still, looking at it. A
-small, private smile grows. After a moment she slowly lowers the phone down onto
-her chest and closes her eyes. Camera: steady, a gentle slow pull-back as the phone
-lowers.
+She holds the phone steady above her chest and scrolls slowly once with her right
+thumb on the lower edge of the screen, then stops and holds still, reading. The phone
+stays rigid and fully visible. Camera: steady, very slow push toward the screen.
 [STYLE TAIL]
 ```
 
-**Screen:** S6 (dark mode). Composite only the part of the shot before the
-phone lowers.
+**Screen:** S6 (dark mode).
 
 ---
 
-### 6: Lamp off → dawn (the loop)
+### 5D: The grin (evening)
 
-**Refs:** `LOC_bedroom_night`, `LOC_bedroom_dawn`, `REF_maya`
+**Refs:** `REF_maya`, `LOC_bedroom_night`, and the chosen still from 5B
 
-Build it as **two Veo clips joined through black**:
+Match 5B's framing **exactly**, so the cut reads as the same moment with the
+phone now in her hands. The phone stays **out of frame below her chin**: a
+phone between the camera and her face would block it. All we see of the
+phone is its light.
 
-**6-i START FRAME**: the wide bedroom at night, matching 1A's camera angle.
-She lies in bed under the duvet with her arm reaching to the lamp switch.
-
-**6-i VEO 3.1**
+**START FRAME**
 
 ```
-She reaches out and clicks off the bedside lamp. The room falls into darkness, only
-the faint deep-blue night glow at the curtains remaining. She settles back into the
-pillow. Camera: locked-off.
+Using the reference top-down image, same framing, same woman, same hair, same
+lighting: top-down from directly above her face as she lies on her back, face
+upright and centred. Now a cool blue-white glow from a phone screen just below the
+bottom edge of frame lights her face from beneath, mixing with the warm lamplight
+on one side. The edge of her hand and the corner of the phone just visible at the
+bottom frame edge. Her eyes focused, looking down toward the screen, the tear-track
+still faintly visible, expression beginning to soften. 50mm, f/2.0. No text, no
+logos.
+```
+
+**VEO 3.1**
+
+```
+She looks down at the glowing screen just below frame. Disbelief first — her brows
+lift slightly — then a slow smile breaks across her face and grows into a real,
+open grin; she lets out a small breathless laugh through her nose and her eyes
+glisten. The cool screen glow flickers subtly as she scrolls. Camera: perfectly
+overhead, steady.
 [STYLE TAIL]
 ```
 
-**6-ii**: use **Frames to Video with both a start and an end frame**. Start
-frame: the same dark room (a still from the end of 6-i). End frame:
-`LOC_bedroom_dawn` with her asleep on her side, framed exactly like 1A's
-wide.
+*Keep:* the 1.6 s that runs from soft to full grin. Cut to black **on the
+peak of the grin**, not after it fades.
 
-```
-Time-lapse feel compressed into one smooth shot: the dark bedroom slowly fills with
-cool blue then soft pink dawn light through the sheer curtains as night becomes
-morning. She sleeps, motionless. Camera: perfectly locked-off.
-[STYLE TAIL]
-```
+---
 
-In the edit: 6-i (lamp click) → black (wordmark) → 6-ii (dawn rises) → **cut
-on the loop to 1A**. 1A's light, curtains and nightstand must match the last
-frame of 6-ii. Grade them as a pair.
+### 6: End card
+
+No generation. Built in the edit:
+
+- Hard cut from 5D to pure black (#000).
+- **0.3 s** of black, then the **Autonomic logo** (app icon mark plus wordmark,
+  white) fades in over 10 frames, centred in the hero zone.
+- **0.4 s** later the line fades in beneath it in the question typeface, one
+  size smaller, white at 80%: **You're not imagining it.**
+- Hold to **29.4 s**, then fade both to pure black by **29.8 s**. Hold black
+  to 30.0, then loop to 1A.
 
 ---
 
@@ -870,8 +975,13 @@ every screen is a real recording.
 | **S2** | 1C | Journal top: **Autonomic Outlook** card with score gauge, guidance line, and the **pacing strip** early in the day (green, mostly unspent, "About 2h 10m"-style figure) | Dark | One slow small scroll, timed to her thumb |
 | **S3** | 2B | Watch **pacing view**, **gold / ahead of pace** state, bar past the pace marker, Spent / Budget tiles | Black | Static; the marker may tick |
 | **S4** | 3B | Insights → **Biggest change** card about magnesium, e.g. *"RMSSD is up since you started Magnesium"*; then the **Change details** sheet with the chart and before/after divider | Light | Scroll, stop, sheet rises (≤ 3 s) |
-| **S5** | 4B | **POTS stand test result** with the lying → standing heart-rate chart and the graded rise (a ≥ 30 bpm rise reads clearly) | Light | Static or a tiny settle |
-| **S6** | 5B | **Progress → Month**: Autonomic Score card with a visibly upward trend. Optionally end on the Insights header *"N pts better than day one"* | Dark | One slow scroll |
+| **S5** | 4B | **POTS stand test result** (the results sheet the stand test opens, `PotsResultsSheet` → `ReadingSummary`): the standing rise graded in its warning colour, with the lying → standing trace. Use a real test with a rise **well past 30 bpm (aim for +40 or more)**, so that it reads as "over the line" from the number and its colour alone | Light | Static or a tiny settle |
+| **S6** | 5C | **Progress → Year** (or Month if Year looks flat): the Autonomic Score climbing out of the red/amber into green over months. Optionally end on the Insights header *"N pts better than day one"* | Dark | One slow scroll |
+
+**The threshold has to come from the app's own result.** If the result
+screen draws no 30 bpm line, don't paint one on in post: that would be
+mocked UI, and Apple asks for real UI. Choose a recording where the graded
+number and colour carry it on their own.
 
 Keep the numbers coherent across the day. The morning's budget must be the
 same budget the watch shows at midday, with its spend realistic for that hour.
@@ -941,8 +1051,9 @@ blacks slightly and keep skin true. Film grain over everything, UI included.
   effects; Apple asks for calm.
 - **Copy:** sentence case, exactly as in the table. One question on screen at
   a time.
-- **Wordmark (shot 6):** the Autonomic wordmark, white, centred, 1.0 s,
-  fading in and out of the black.
+- **End card (shot 6):** the logo, then the line beneath it, on pure black.
+  Timings are in shot 6. Leave the store's own app icon and name to the
+  store; this card is a sign-off, not a call to action.
 - **Localisation:** text is a separate layer per language. For en-GB, the
   words are identical.
 
@@ -963,9 +1074,10 @@ blacks slightly and keep skin true. Film grain over everything, UI included.
 | `autonomic_event_16x9_30s.mov` (optional) | full | 3840 × 2160 | 30 | same |
 | Still fallback `autonomic_universal_16x9.png` | best frame (1A or 2B) | 5244 × 2950 | — | PNG, no alpha |
 
-**Loop check:** play the export on repeat 5 times. If you notice the seam,
-fix the 6-ii → 1A match (light, curtain position, grade) or add a 4-frame
-cross-dissolve inside the dark.
+**Loop check:** play the export on repeat 5 times. The seam is black → dawn
+bedroom. It should feel like the next morning. If it jolts, extend the black
+by a few frames and confirm the end card reaches true #000 before the last
+frame.
 
 **Poster check:** freeze frame 0. With no motion and no sound, does it say
 *"this is for someone like me"*? It should be shot 1A with the question
@@ -981,8 +1093,10 @@ already legible (bring the text in by frame 10, not frame 30, if needed).
 - [ ] No price, discount, "free", URL, ©, award badge or other platform's logo.
 - [ ] No locked or paywalled UI and no "Pro" badge visible on any screen.
 - [ ] No over-budget (red) pacing state anywhere.
-- [ ] No caption claims anything; the only text is the questions and the
-      wordmark.
+- [ ] No caption claims anything; the only text is the questions, the logo
+      and the end line.
+- [ ] The stand-test rise in 4B is legible as over the threshold in the 3:2
+      cut at phone size.
 - [ ] Every UI frame is a real recording from the app, not mocked or edited.
 - [ ] Hands: correct finger count in every frame, and no warping phone or
       watch.
