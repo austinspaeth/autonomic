@@ -195,7 +195,7 @@ struct HrComplicationView: View {
             switch family {
             case .accessoryCorner: HrCornerView(state: entry.state)
             case .accessoryRectangular: HrRectangularView(state: entry.state)
-            default: HrCircularView(state: entry.state)
+            default: HrCircularView(state: entry.state).widgetLabel("Heart Rate")
             }
         }
         .containerBackground(.black, for: .widget)

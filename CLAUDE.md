@@ -173,6 +173,22 @@ old web app so old `export.json` files import directly.
   (`src/lib/health/sleepSummary.ts`, pure + tested) instead of 365 per-day reads;
   per-night HR and per-workout HR are the only per-item queries, pooled a few at
   a time, with `onProgress` driving the sheet's status line.
+- **A night is STITCHED, and an imported night can still grow.** Google Health
+  (Fitbit, Pixel Watch) writes one night to Health Connect as several sessions
+  cut wherever the wearer woke, and Android used to file the longest PIECE
+  ("1:27 to 5:56, uninterrupted" for a night that ran to 10:40).
+  `summarizeHcSessions` (`lib/health/sleepSummary.ts`, pure + tested) now runs
+  every session in the window through `summarizeSleep`, per writing app (two
+  apps are never mixed; the one that saw more sleep wins), with a wider gap
+  (`HC_SESSION_GAP_MS`, 3h) because Google still calls a night with a 2½-hour
+  waking one night. Separately, a night used to be final once filed, so a
+  check at 6am froze the night as it stood then: `sleepToFile`
+  (`lib/health/updateSet.ts`) now replaces an `imported` night with a LONGER
+  read, never a night the user typed or corrected (`sleep.edited`, set by the
+  sleep editor and by a confirm sheet whose times were changed).
+  `repairSplitNights` (`lib/health/updates.ts`) re-reads the last 30 days once
+  per install (`sleepStitchRepaired`, flags MMKV) for the nights filed before
+  1.36.
 - **An imported HRV reading only counts if it carries ≥ 4 min of real RR.**
   Health stores are full of short HRV samples (the watch's passive ~1-minute
   background measurement, a truncated Breathe session, another app's RMSSD
@@ -477,6 +493,22 @@ old web app so old `export.json` files import directly.
   trace reads as the app failing rather than as the device declining — and Start
   is DISABLED, the impossible option made unavailable rather than
   tappable-then-refused.
+- **An optical Polar band (360, Verity Sense, OH1) sends beats over Polar's own
+  PMD service, not 0x2A37.** `src/lib/ble/pmd.ts` (pure + tested) is the wire
+  format; `connect(..., { beats: true })` in `ble/manager.ts` reads the PMD
+  features, starts a PPI stream when offered (an H10 offers none and stays on
+  the standard path), retries once at `PMD_MTU` on an MTU refusal, and feeds the
+  intervals through the same `onSample`, dropping 0x2A37's RR while it runs.
+  Only the HRV session asks for beats: PPI slows the band's own HR to 5 s and
+  cancels its workout, so the POTS capture never starts it. PPI takes tens of
+  seconds to deliver, so the session holds Start (`warming`, "Warming up
+  sensor…") until the first beats rather than padding the reading, and gives up
+  after `PPI_GIVE_UP_MS` (`ppiStalled`, its own `NoBeatsNote` copy). Blocker-bit
+  intervals are kept for the artifact correction to judge. The scan is
+  unfiltered and filtered in JS (0x180D, PMD, or a `Polar` name), since a band
+  may not advertise 0x180D. Outcomes ride the fault route by model:
+  `ble.ppi` (event, banded warm-up) and `ble.ppiFail`, listed in both
+  dashboards' event tags. JS only, OTA-able.
 - **A Garmin reading takes its KIND from the phone, not the watch.** The watch
   app records beats and always sends `type: 'hrv'`; whether it was a baseline
   or paced training is chosen on the phone. `beginCollection` arms an intent
@@ -2178,6 +2210,17 @@ old web app so old `export.json` files import directly.
   would split one crash into a signature per path and lose the "3 phones" the
   crash row exists to say. The row is not fatal (no CRASH pill, no push), so
   the Failures tab ranks the CONTEXTS a crash happens in beside the crash.
+  **A JavaScript fatal also says WHICH CODE**, as a third row, `crash.stack`
+  (`diagnostics/stack.ts`, pure + tested): `uncaught.fatal via store @ emit <
+  bump < armBreath`, the app's own function names nearest the throw first,
+  React's frames and builtins dropped, and the React frames' MECHANISM kept as
+  one word (`store` / `effect` / `layout` / `event`). Names only, never
+  offsets. It reads the PROD renderer's frames (`getRootForUpdatedFiber` is the
+  update-depth throw site there), pinned by a test against the shipped
+  renderer file, so re-check the list on a React upgrade. An effect is an
+  anonymous arrow and Hermes cannot name it, so an effect-driven loop reads
+  `via effect @ unknown`; native crashes never get this row (their Error is
+  built at drain time).
   **`metro.config.js` keeps function names through release minification**
   (`keep_fnames`) because the sheet crumb reads `type.name`, and a release
   bundle otherwise says `sheet:u`. The support dump prints the live trail as

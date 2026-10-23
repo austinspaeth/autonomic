@@ -9,14 +9,15 @@
  * to arm their own edit + delete buttons. Importing them from `./forms` there
  * is a require cycle; importing them from here is not.
  */
-import React, { useLayoutEffect, useRef } from 'react';
+import React, { useLayoutEffect, useRef, useState } from 'react';
 import { Text, View } from 'react-native';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
-import { FieldInputs, useFormState } from '../components/Field';
-import { ConfirmDeleteSheet, DaySaveButton } from '../components/ui';
+import { FieldInputs, FieldLabel, useFormState } from '../components/Field';
+import { ConfirmDeleteSheet, DaySaveButton, Segmented } from '../components/ui';
 import { useToast } from '../components/Toast';
 import { usePalette } from '../theme';
-import { entryFields, isDivider, isNumberField } from '../lib/registry';
+import { entryFields, isDivider, isNumberField, READING_TYPES, readingLabel } from '../lib/registry';
+import { isWristHrv, kindOf, kindUndecided, withKind, type HrvKind } from '../lib/hrvKind';
 import { computeScores, profileCtx } from '../lib/scoring';
 import { health, healthAppName } from '../lib/health';
 import { deleteEntry, getState, storeWaveform, upsertEntry } from '../store/store';
@@ -60,6 +61,12 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null,
     initial.period = defaultPeriod(type, dk, Number.isFinite(h) ? h : undefined);
   }
   const [form, set] = useFormState(fields, initial);
+  // A wrist reading's kind is the wearer's answer, not something the phone
+  // chose before it began, so its form can change it. Undecided shows neither
+  // segment chosen, and saving without touching it leaves it undecided.
+  const wrist = arrKey === 'readings' && !!existing && isWristHrv(existing);
+  const [kind, setKind] = useState<HrvKind | null>(null);
+  const shownKind: HrvKind | '' = kind ?? (existing && wrist && !kindUndecided(existing) ? kindOf(existing) : '');
   // A custom type keeps the spelling its owner gave it ("Vitamin C").
   useDeleteButton(controls, existing ? {
     title: `Delete this ${def.userDefined ? def.label : def.label.toLowerCase()}?`,
@@ -87,6 +94,7 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null,
       const rise = String(r.sustainedDelta ?? '').trim();
       r.metThreshold = metThresholdFor(rise === '' ? null : Number(rise), ageFromBirthday(getState().profile.birthday));
     }
+    if (wrist && kind) r = withKind(r, kind);
     r.scores = computeScores(r, scoreCtx());
     // A prefill may carry inline waveform arrays (an imported workout's HR
     // trace) — those go to the sidecar, never into the journal blob.
@@ -113,7 +121,19 @@ export function EntryForm({ typeMap, arrKey, dk, type, existing, prefill = null,
 
   return (
     <View>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>{(existing ? 'Edit ' : '') + def.label}</Text>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>
+        {(existing ? 'Edit ' : '') + (wrist ? (kind ? READING_TYPES[withKind(existing!, kind).type].label : readingLabel(existing!)) : def.label)}
+      </Text>
+      {wrist ? (
+        <View style={{ marginBottom: 16 }}>
+          <FieldLabel>Kind of reading</FieldLabel>
+          <Segmented
+            options={[{ val: 'baseline', label: 'Baseline' }, { val: 'training', label: 'Training' }]}
+            value={shownKind as HrvKind}
+            onChange={setKind}
+          />
+        </View>
+      ) : null}
       <FieldInputs fields={fields} form={form} set={set} />
       <SheetFooter>
         <DaySaveButton dk={dk} title={arrKey === 'activities' && !existing ? 'Save activity' : 'Save'} onPress={save} />

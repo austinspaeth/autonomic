@@ -89,9 +89,10 @@ const minutesOf = (iv: readonly Interval[]): number =>
 /**
  * Summarize one night from raw sleep samples: pick the main sleep session,
  * report its bounds and union-measured minutes. Returns null with no asleep
- * samples at all.
+ * samples at all. `gapMs` is how long a break has to be before the blocks
+ * either side of it are separate sessions.
  */
-export function summarizeSleep(rows: readonly SleepSample[]): SleepSummary | null {
+export function summarizeSleep(rows: readonly SleepSample[], gapMs = SESSION_GAP_MS): SleepSummary | null {
   const asleep = rows.filter((r) => ASLEEP_VALUES.has(r.value));
   const merged = unionIntervals(asleep);
   if (!merged.length) return null;
@@ -101,7 +102,7 @@ export function summarizeSleep(rows: readonly SleepSample[]): SleepSummary | nul
   const sessions: Interval[][] = [];
   for (const i of merged) {
     const cur = sessions[sessions.length - 1];
-    if (cur && i.start - cur[cur.length - 1].end < SESSION_GAP_MS) cur.push(i);
+    if (cur && i.start - cur[cur.length - 1].end < gapMs) cur.push(i);
     else sessions.push([i]);
   }
   const main = sessions.reduce((a, b) => (minutesOf(b) >= minutesOf(a) ? b : a));
@@ -140,6 +141,96 @@ export function summarizeSleep(rows: readonly SleepSample[]): SleepSummary | nul
     interrupted: staged.awake > INTERRUPTED_AWAKE_MIN,
     stages: staged.core + staged.deep + staged.rem > 0 ? staged : null,
     spans,
+  };
+}
+
+/**
+ * One Health Connect sleep session, reduced to what {@link summarizeHcSessions}
+ * needs. `stage` is Health Connect's own constant (1 AWAKE, 2 SLEEPING,
+ * 3 OUT_OF_BED, 4 LIGHT, 5 DEEP, 6 REM, 7 AWAKE_IN_BED).
+ */
+export interface HcSleepSession {
+  startMs: number;
+  endMs: number;
+  /** The writing app's package name; '' when the record carries none. */
+  origin: string;
+  stages: { startMs: number; endMs: number; stage: number }[];
+}
+
+/** Health Connect stage → the HealthKit value `summarizeSleep` reads. Light is
+ *  Apple's "core"; SLEEPING is asleep with no stage. UNKNOWN and OUT_OF_BED
+ *  have no entry and are ignored. */
+const HC_TO_HK: Record<number, number> = { 1: AWAKE, 7: AWAKE, 2: 1, 4: 3, 5: 4, 6: 5 };
+
+/**
+ * Health Connect's session gap is wider than HealthKit's. Google Health
+ * (Fitbit, Pixel Watch) writes ONE night as several sessions, cut wherever the
+ * wearer woke: a night it reported as 12:48am to 11:25am with a 2½-hour waking
+ * reached Health Connect in pieces, and Google itself still calls it one
+ * night. Three hours stitches that and still keeps an evening nap (ending
+ * before 8pm for an 11pm bedtime) out of the night.
+ */
+export const HC_SESSION_GAP_MS = 3 * 60 * 60000;
+
+/**
+ * Summarize the night from every Health Connect session in its window.
+ *
+ * This used to take the longest single session, which is right only when the
+ * night arrives as one record. Split nights arrived as their longest PIECE: a
+ * 1:27am to 10:40am night read as 1:27 to 5:56, "uninterrupted". So the
+ * sessions are now stitched exactly the way iOS stitches samples (union of the
+ * blocks, clustered by gap, the cluster with the most sleep wins).
+ *
+ * Sources are never mixed. Two apps that both track sleep write the same night
+ * twice, and stitching ACROSS them would let one app's late morning extend the
+ * other's night (or double its stages, were the unions not used). Each app's
+ * sessions are summarized on their own and the source that saw the most sleep
+ * is the night, which is the `stepTotalFromRecords` rule for steps.
+ *
+ * Bed and wake are the bounds of that source's sessions around the night
+ * rather than the first and last asleep minute, so the times match the ones
+ * the writing app shows (it opens the night on the first minute in bed).
+ */
+export function summarizeHcSessions(sessions: readonly HcSleepSession[]): SleepSummary | null {
+  const byOrigin = new Map<string, HcSleepSession[]>();
+  for (const s of sessions) {
+    if (!(s.endMs > s.startMs)) continue;
+    const list = byOrigin.get(s.origin);
+    if (list) list.push(s); else byOrigin.set(s.origin, [s]);
+  }
+
+  let best: { summary: SleepSummary; sessions: HcSleepSession[] } | null = null;
+  for (const list of byOrigin.values()) {
+    const rows: SleepSample[] = [];
+    for (const s of list) {
+      const known = s.stages.filter((st) => HC_TO_HK[st.stage] != null && st.endMs > st.startMs);
+      // A session with no usable stages is one asleep block, as it always was.
+      if (!known.length) {
+        rows.push({ value: 1, startDate: new Date(s.startMs), endDate: new Date(s.endMs) });
+        continue;
+      }
+      for (const st of known) {
+        rows.push({ value: HC_TO_HK[st.stage], startDate: new Date(st.startMs), endDate: new Date(st.endMs) });
+      }
+    }
+    const summary = summarizeSleep(rows, HC_SESSION_GAP_MS);
+    if (summary && (!best || summary.minutesAsleep > best.summary.minutesAsleep)) best = { summary, sessions: list };
+  }
+  if (!best) return null;
+
+  const { summary } = best;
+  const sleepStart = summary.bed.getTime();
+  const sleepEnd = summary.wake.getTime();
+  const around = best.sessions.filter((s) => s.startMs < sleepEnd && s.endMs > sleepStart);
+  const bedMs = Math.min(sleepStart, ...around.map((s) => s.startMs));
+  const wakeMs = Math.max(sleepEnd, ...around.map((s) => s.endMs));
+  // Spans are offsets from bed; moving bed earlier moves every one later.
+  const shift = Math.round((sleepStart - bedMs) / 1000);
+  return {
+    ...summary,
+    bed: new Date(bedMs),
+    wake: new Date(wakeMs),
+    spans: shift ? summary.spans.map((sp) => ({ ...sp, s: sp.s + shift })) : summary.spans,
   };
 }
 

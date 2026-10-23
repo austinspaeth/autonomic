@@ -102,6 +102,7 @@ export function WatchSyncSheet({ controls }: { controls: SheetControls }) {
       <HrvResults
         rr={chosen.rr}
         segmentStarts={chosen.segmentStarts}
+        seamGapsMs={chosen.seamGapsMs}
         hrSamples={[]}
         config={st.config}
         durationSec={durationSec}

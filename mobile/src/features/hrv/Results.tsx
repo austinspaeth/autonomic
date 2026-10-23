@@ -39,10 +39,12 @@ const CONFIDENCE_LABEL: Record<'high' | 'fair' | 'low', string> = {
   low: 'Low confidence',
 };
 
-export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, durationSec, startedAtMs, watchFallback, onRetry, controls }: {
+export function HrvResults({ rr, segmentStarts, seamGapsMs, hrSamples, sdnnSamples, config, durationSec, startedAtMs, watchFallback, onRetry, controls }: {
   rr: number[]; hrSamples: { t: number; bpm: number }[]; sdnnSamples?: { t: number; sdnn: number }[];
   /** Indices into `rr` where camera tracking resumed after a dropout. */
   segmentStarts?: number[];
+  /** Time lost at each of those seams, ms — a watch heartbeat series only. */
+  seamGapsMs?: number[];
   config: SessionConfig; durationSec: number;
   /** When the reading actually began (watch-synced / imported readings) — the
    *  entry is stamped with this time and day, not the moment Save is pressed. */
@@ -64,8 +66,8 @@ export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, 
   const ctx = profileCtx(getState().profile);
 
   const result = useMemo(
-    () => computeHrv(rr, { style: config.style, source: config.source, durationSec, segmentStarts }),
-    [rr, segmentStarts, config.style, config.source, durationSec],
+    () => computeHrv(rr, { style: config.style, source: config.source, durationSec, segmentStarts, seamGapsMs }),
+    [rr, segmentStarts, seamGapsMs, config.style, config.source, durationSec],
   );
 
   // The day + time the reading physically happened — never the day the journal
@@ -87,7 +89,10 @@ export function HrvResults({ rr, segmentStarts, hrSamples, sdnnSamples, config, 
       source: config.source, durationSec,
       rrRaw: rr, rrClean: result.rrClean, sampledHr: hrSamples,
     };
-    if (segmentStarts && segmentStarts.length) base.rrSegments = segmentStarts;
+    if (segmentStarts && segmentStarts.length) {
+      base.rrSegments = segmentStarts;
+      if (seamGapsMs?.length === segmentStarts.length) base.rrSeamGaps = seamGapsMs;
+    }
     if (config.source === 'polar' && getState().settings.lastBleDeviceName) {
       base.sourceName = getState().settings.lastBleDeviceName;
     }

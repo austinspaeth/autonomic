@@ -33,6 +33,7 @@ import { initCrashWatcher, initMorningWatcher, syncReminder } from '../src/lib/r
 import { initWidgetSync } from '../src/lib/widgets';
 import { initGiveawaySync } from '../src/store/giveaway';
 import { initBudgetSync } from '../src/store/budget';
+import { repairSplitNights } from '../src/lib/health/updates';
 import { initPressureWatch } from '../src/store/pressure';
 import { initPacingAlertWatcher } from '../src/store/pacingAlerts';
 import { initPacingBackground } from '../src/store/pacingBackground';
@@ -126,6 +127,9 @@ export default function RootLayout() {
     // on launch and on foreground. It never REQUESTS a permission — it reads
     // with whatever grants exist, so this cannot raise a health sheet.
     const budgetSync = initBudgetSync();
+    // Once per install: re-read recent imported nights that were filed early
+    // or as one piece of a split night (see repairSplitNights).
+    repairSplitNights().catch((e) => logError('health.repairSleep', e));
     // Pacing alerts: re-check after every journal change (the health reads
     // above land as journal changes), and keep the background half registered
     // exactly while an alert could fire. The task itself is defined in index.js.

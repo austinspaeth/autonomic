@@ -120,11 +120,14 @@ private struct CircularView: View {
     let state: ComplicationState
 
     var body: some View {
-        if state.active {
-            DeltaText(value: state.liveDelta ?? 0, size: 26)
-        } else {
-            StairsIcon(size: 24)
+        Group {
+            if state.active {
+                DeltaText(value: state.liveDelta ?? 0, size: 26)
+            } else {
+                StairsIcon(size: 24)
+            }
         }
+        .widgetLabel("POTS Episode")
     }
 }
 
@@ -137,18 +140,33 @@ private struct CornerView: View {
                 .widgetCurvesContent()
         } else {
             StairsIcon(size: 20)
+                .widgetLabel("POTS Episode")
         }
     }
 }
 
+/// The one family with room for words, so it says what it is in both states.
 private struct RectangularView: View {
     let state: ComplicationState
 
     var body: some View {
-        if state.active {
-            DeltaText(value: state.liveDelta ?? 0, size: 26)
-        } else {
-            StairsIcon(size: 26)
+        HStack(spacing: 10) {
+            StairsIcon(size: 22)
+            VStack(alignment: .leading, spacing: 1) {
+                Text("POTS EPISODE")
+                    .font(.system(size: 11, weight: .heavy))
+                    .kerning(1.2)
+                    .foregroundStyle(.secondary)
+                if state.active {
+                    DeltaText(value: state.liveDelta ?? 0, size: 24)
+                } else {
+                    Text("Tap to track")
+                        .font(.system(size: 15, weight: .bold))
+                        .lineLimit(1)
+                        .minimumScaleFactor(0.8)
+                }
+            }
+            Spacer(minLength: 0)
         }
     }
 }

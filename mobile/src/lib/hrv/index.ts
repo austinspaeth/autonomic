@@ -180,8 +180,15 @@ export function repairBeatsCounted(rr: number[]): { rr: number[]; repaired: numb
  */
 export function splitSegments(rr: number[], starts?: number[]): number[][] {
   if (!starts || !starts.length) return [rr];
-  const bounds = Array.from(new Set([0, ...starts.filter((i) => i > 0 && i < rr.length)])).sort((a, b) => a - b);
+  const bounds = segmentBounds(rr, starts);
   return bounds.map((s, k) => rr.slice(s, k + 1 < bounds.length ? bounds[k + 1] : rr.length)).filter((s) => s.length > 0);
+}
+
+/** Where each segment {@link splitSegments} returns begins in `rr`, index-aligned
+ *  with its output (every bound is below `rr.length`, so no segment is empty). */
+function segmentBounds(rr: number[], starts?: number[]): number[] {
+  if (!starts || !starts.length) return [0];
+  return Array.from(new Set([0, ...starts.filter((i) => i > 0 && i < rr.length)])).sort((a, b) => a - b);
 }
 
 /**
@@ -373,7 +380,36 @@ const FS = 4; // resample rate (Hz)
 
 export function frequencyDomain(rr: number[]): FrequencyDomain | null {
   if (rr.length < 16) return null;
-  const series = resampleTachogram(rr, FS);
+  return welch(resampleTachogram(rr, FS));
+}
+
+/**
+ * The bands over beats placed on their REAL clock: `t` is each beat's time in
+ * seconds and `rr` the interval ending there. A hole in `t` (a stretch the
+ * sensor lost) is bridged by the resampler's linear interpolation instead of
+ * being spliced shut, so the beats either side keep their true phase. That is
+ * the standard treatment of missing data in a tachogram, and the reason it is
+ * only ever used under {@link BRIDGE_MIN_COVERAGE}: a straight line across a
+ * long hole carries no variability, so the bigger the holes the more the power
+ * is understated.
+ */
+export function frequencyDomainTimed(t: number[], rr: number[]): FrequencyDomain | null {
+  if (rr.length < 16 || t.length !== rr.length) return null;
+  const t0 = t[0];
+  const nSamples = Math.floor((t[t.length - 1] - t0) * FS);
+  const series: number[] = [];
+  let j = 0;
+  for (let i = 0; i < nSamples; i++) {
+    const ts = t0 + i / FS;
+    while (j < t.length - 1 && t[j] < ts) j++;
+    const j0 = Math.max(0, j - 1);
+    const a = t[j0], b = t[j];
+    series.push(b === a ? rr[j] : rr[j0] + ((rr[j] - rr[j0]) * (ts - a)) / (b - a));
+  }
+  return welch(series);
+}
+
+function welch(series: number[]): FrequencyDomain | null {
   if (series.length < 16) return null;
   const detrended = detrend(series);
 
@@ -506,8 +542,13 @@ export interface HrvResult {
   fields: Record<string, string>;
   /** Seconds of usable cardiac data actually behind the numbers. */
   coverageSec: number;
-  /** Longest unbroken stretch — what the frequency bands are gated on. */
+  /** Longest unbroken stretch. */
   longestCleanSec: number;
+  /** What the frequency bands were gated on: `longestCleanSec`, or the whole
+   *  coverage when the record was bridged across its seams. */
+  bandSec: number;
+  /** The bands were computed across the seams on the real clock. */
+  bridged: boolean;
   /** Segment boundaries within `rrClean` (indices where a new segment begins). */
   cleanSegmentStarts: number[];
   segmentsUsed: number;
@@ -543,6 +584,23 @@ const r0 = (v: number) => Math.round(v);
  */
 export const MIN_SEC_LFHF = 120;
 export const MIN_SEC_VLF = 240;
+
+/**
+ * Share of a heartbeat series' own span that its kept beats have to cover
+ * before the bands are computed across its seams (see `seamGapsMs` on
+ * {@link computeHrv}). Below it the record is treated as pieces, as a camera
+ * reading is, and only its longest piece is resolved.
+ *
+ * It exists because the longest-piece rule is priced for a finger that keeps
+ * losing the lens, and charged to an Apple Watch it threw readings away whole:
+ * a Mindfulness session flags a lost beat every minute or two, so five minutes
+ * holding 4m 40s of clean pulse resolved NO frequency metrics at all — no
+ * power distribution, no total power, no VLF — on a record the watch-sync
+ * picker had already labelled "Full metrics" off its summed beats. At 0.8 the
+ * interpolated holes are at most a fifth of the tachogram, and a series that
+ * met the 240 s VLF floor inside a five-minute session always qualifies.
+ */
+export const BRIDGE_MIN_COVERAGE = 0.8;
 
 /** What a record of `sec` seconds of clean beats will be able to resolve.
  *  'full' carries every metric, 'noVlf' loses VLF power (and with it the day
@@ -717,10 +775,17 @@ export function computeHrv(
     style?: string; maxArtifactPct?: number; source?: string; durationSec?: number;
     /** Indices into `rrRaw` where tracking resumed after a dropout. */
     segmentStarts?: number[];
+    /** Real time lost at each seam, in ms, index-aligned with `segmentStarts`.
+     *  Only a source that KNOWS its own clock can say this — a watch heartbeat
+     *  series stamps every beat — and when it is given the bands may be
+     *  computed across the seams rather than over the longest piece (see
+     *  {@link BRIDGE_MIN_COVERAGE}). */
+    seamGapsMs?: number[];
   } = {},
 ): HrvResult {
   const segmented = !!(opts.segmentStarts && opts.segmentStarts.length);
   const rawSegments = splitSegments(rrRaw, opts.segmentStarts);
+  const bounds = segmentBounds(rrRaw, opts.segmentStarts);
 
   // Camera PPG misses and doubles beats optically; repair those before the
   // spike corrector runs. Strap/watch/ECG sources have a true R-peak clock.
@@ -729,7 +794,7 @@ export function computeHrv(
   const { cleaned, repaired } = cleanSegments(rawSegments, opts.source);
   const repairPct = rrRaw.length ? (repaired / rrRaw.length) * 100 : 0;
 
-  const { kept, keptStarts, keptArtifactPct, dropped } = triageSegments(cleaned);
+  const { kept, keptStarts, keptArtifactPct, dropped, keep } = triageSegments(cleaned);
   const clean = kept.flat();
 
   // Artifact rate is charged over the beats the statistics are actually built
@@ -756,10 +821,19 @@ export function computeHrv(
   // The bands need an unbroken stretch: Welch over a tachogram stitched across
   // dropouts reads the seams as spectral content. Use the longest segment.
   const longest = kept.reduce((best, s) => (s.length > best.length ? s : best), [] as number[]);
-  const freq = frequencyDomain(longest);
   const secOf = (s: number[]) => s.reduce((a, x) => a + x, 0) / 1000;
   const coverageSec = secOf(clean);
   const longestCleanSec = secOf(longest);
+  // ...unless the source knows how much time each seam lost, in which case the
+  // kept pieces go back on the real clock and the holes are bridged.
+  const placed = kept.length > 1 && opts.seamGapsMs
+    ? placeOnClock(rawSegments, bounds, cleaned.map((c) => c.clean), keep, opts.segmentStarts!, opts.seamGapsMs)
+    : null;
+  const timed = placed && placed.spanSec > 0 && coverageSec / placed.spanSec >= BRIDGE_MIN_COVERAGE
+    ? frequencyDomainTimed(placed.t, placed.rr) : null;
+  const bridged = !!timed;
+  const freq = timed || frequencyDomain(longest);
+  const bandSec = bridged ? coverageSec : longestCleanSec;
 
   // Camera is the noisiest source, so hold it to a tighter artifact ceiling.
   const maxArt = opts.maxArtifactPct ?? (opts.source === 'camera' ? 15 : 30);
@@ -784,7 +858,7 @@ export function computeHrv(
       // exist. The results card shows no Save anyway button here, correctly.
       ok: false, salvageable: false, reason, artifactPct,
       rrClean: clean, time: time as TimeDomain, freq: freq as FrequencyDomain, fields: {},
-      coverageSec, longestCleanSec, cleanSegmentStarts: keptStarts,
+      coverageSec, longestCleanSec, bandSec, bridged, cleanSegmentStarts: keptStarts,
       segmentsUsed: kept.length, segmentsDropped: dropped, repairPct, confidence: 'low',
     };
   }
@@ -804,14 +878,15 @@ export function computeHrv(
     sns: Number(time.sns.toFixed(1)).toString(),
   };
   // Frequency-domain metrics only when an UNBROKEN stretch is long enough to
-  // resolve them — 120 s of coverage in four fragments resolves nothing.
-  if (longestCleanSec >= MIN_SEC_LFHF) {
+  // resolve them — 120 s of coverage in four fragments resolves nothing. A
+  // bridged record counts as one stretch: that is what bridging means.
+  if (bandSec >= MIN_SEC_LFHF) {
     fields.lowPower = r0(freq.lowPower).toString();
     fields.highPower = r0(freq.highPower).toString();
     fields.lfPeak = r3(freq.lfPeak).toString();
     fields.hfPeak = r3(freq.hfPeak).toString();
   }
-  if (longestCleanSec >= MIN_SEC_VLF) {
+  if (bandSec >= MIN_SEC_VLF) {
     fields.vlowPower = r0(freq.vlowPower).toString();
   }
 
@@ -839,9 +914,37 @@ export function computeHrv(
       && coverageSec >= SALVAGE_MIN_COVERAGE_SEC,
     reason,
     artifactPct, rrClean: clean, time, freq, fields,
-    coverageSec, longestCleanSec, cleanSegmentStarts: keptStarts,
+    coverageSec, longestCleanSec, bandSec, bridged, cleanSegmentStarts: keptStarts,
     segmentsUsed: kept.length, segmentsDropped: dropped, repairPct, confidence,
   };
+}
+
+/**
+ * The kept beats on the real clock: each raw segment starts where the last one
+ * ended plus the time its seam lost, and a dropped segment still advances the
+ * clock (its beats happened, they were just not usable). Times are in seconds
+ * from the first raw beat; `spanSec` runs from the first kept beat to the last.
+ */
+function placeOnClock(
+  rawSegments: number[][], bounds: number[], cleaned: number[][], keep: boolean[],
+  starts: number[], gapsMs: number[],
+): { t: number[]; rr: number[]; spanSec: number } {
+  const gapAt = new Map<number, number>();
+  starts.forEach((idx, i) => { const g = gapsMs[i]; if (isFinite(g) && g > 0) gapAt.set(idx, g); });
+  const t: number[] = [];
+  const rr: number[] = [];
+  let clock = 0;
+  rawSegments.forEach((seg, k) => {
+    if (k > 0) clock += gapAt.get(bounds[k]) ?? 0;
+    if (keep[k]) {
+      let at = clock;
+      for (const v of cleaned[k]) { at += v; t.push(at / 1000); rr.push(v); }
+    }
+    clock += seg.reduce((a, x) => a + x, 0);
+  });
+  // The first beat's interval ends at t[0], so the record began rr[0] earlier.
+  const spanSec = t.length ? t[t.length - 1] - (t[0] - rr[0] / 1000) : 0;
+  return { t, rr, spanSec };
 }
 
 /* ---------- math helpers ---------- */

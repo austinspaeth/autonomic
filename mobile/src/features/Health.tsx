@@ -131,6 +131,9 @@ export function SleepConfirmSheet({ dk, data, controls, onDone }: {
       ...(data.hrHigh != null ? { hrHigh: data.hrHigh } : {}),
       imported: true,
     };
+    // Times changed on the way in are the user's; a fresh confirm is not.
+    if (bed !== data.bed || wake !== data.wake) d.sleep.edited = true;
+    else delete d.sleep.edited;
     // Stages describe the imported night; drop any from a previous import
     // rather than mixing them with the new times.
     if (data.stages) d.sleep.stages = data.stages;

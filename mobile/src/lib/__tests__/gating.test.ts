@@ -28,15 +28,18 @@ describe('hrvCaptureUsedToday', () => {
     ))).toBe(2);
   });
 
-  it('ignores health-imported HRV readings', () => {
+  it('counts an imported reading only when it is a real session', () => {
+    // No RR coverage (an SDNN-only sample) or a one-minute background sample.
     expect(hrvCaptureUsedToday(dayWith(
       reading('hrv', { imported: true, source: 'watch' }),
+      reading('hrv', { imported: true, source: 'watch', durationSec: 60 }),
       reading('hrv', { imported: true, source: 'health' }),
     ))).toBe(0);
+    // A five-minute Mindfulness session taken with the app closed.
     expect(hrvCaptureUsedToday(dayWith(
-      reading('hrv', { imported: true, source: 'watch' }),
+      reading('hrv', { imported: true, source: 'watch', durationSec: 280 }),
       reading('hrv', { source: 'polar' }),
-    ))).toBe(1);
+    ))).toBe(2);
   });
 });
 

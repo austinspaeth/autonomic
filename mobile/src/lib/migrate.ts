@@ -131,6 +131,7 @@ function cleanSleep(v: unknown): SleepRecord {
   if (s.hrLow !== undefined && typeof s.hrLow !== 'string' && typeof s.hrLow !== 'number') delete s.hrLow;
   if (s.hrHigh !== undefined && typeof s.hrHigh !== 'string' && typeof s.hrHigh !== 'number') delete s.hrHigh;
   if (s.imported !== undefined && s.imported !== true) delete s.imported;
+  if (s.edited !== undefined && s.edited !== true) delete s.edited;
   if (s.stages !== undefined) {
     if (isPlainObject(v.stages)) {
       const st = v.stages;

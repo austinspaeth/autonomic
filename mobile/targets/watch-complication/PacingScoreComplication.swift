@@ -317,8 +317,27 @@ private struct MiniPacingBar: View {
 
 // MARK: - Score views
 
+/// The word in a dial's bottom opening, where the pacing tail sits. It is what
+/// tells two dials apart in the face editor, where an unscored day and an
+/// unsynced budget would otherwise be the same empty arc.
+private struct DialCaption: View {
+    let text: String
+    var body: some View {
+        Text(text)
+            .font(.system(size: 8, weight: .bold))
+            .kerning(0.5)
+            .foregroundStyle(DIM)
+            .lineLimit(1)
+            .minimumScaleFactor(0.7)
+            .padding(.horizontal, 12)
+            .padding(.bottom, 3)
+    }
+}
+
 /// 59a: the gauge with the score in the middle, in white; the arc says the grade.
+/// The opening says SCORE, unless the face already prints a label under it.
 private struct ScoreCircular: View {
+    @Environment(\.showsWidgetLabel) private var showsLabel
     let score: ScoreBlock?
     var numberSize: CGFloat = 20
 
@@ -332,6 +351,9 @@ private struct ScoreCircular: View {
                 .foregroundStyle(has ? TEXT : DIM)
                 .lineLimit(1)
                 .minimumScaleFactor(0.7)
+        }
+        .overlay(alignment: .bottom) {
+            if !showsLabel { DialCaption(text: "SCORE") }
         }
     }
 }
@@ -356,7 +378,7 @@ private struct ScoreCorner: View {
             Text("–")
                 .font(hrNumberFont(22))
                 .foregroundStyle(DIM)
-                .widgetLabel { Text("Autonomic") }
+                .widgetLabel { Text("Autonomic Score") }
         }
     }
 }
@@ -366,9 +388,14 @@ private struct ScoreCorner: View {
 /// 59b: the day as an arc filled to what was spent, the tick where an even day
 /// would be by now, and the figure with its tail spoken under it.
 private struct PacingCircular: View {
+    @Environment(\.showsWidgetLabel) private var showsLabel
     let frame: CxPacingFrame?
 
     var body: some View {
+        content.widgetLabel("Pacing")
+    }
+
+    @ViewBuilder private var content: some View {
         if let frame, frame.isDrawable {
             ZStack {
                 DialGauge(fraction: frame.arcFill,
@@ -391,11 +418,22 @@ private struct PacingCircular: View {
                         .padding(.bottom, 3)
                 }
             }
-        } else if frame?.state == "locked" {
-            PacingIdleIcon(frame: frame)
         } else {
-            // Nothing synced: the same empty dial as an unscored day.
-            ScoreCircular(score: nil)
+            // Locked or nothing synced: an empty dial, named, so it can never
+            // pass for the Score glance's own empty dial.
+            ZStack {
+                DialGauge(fraction: 0, color: DIM)
+                if frame?.state == "locked" {
+                    PacingIdleIcon(frame: frame)
+                } else {
+                    Text("–")
+                        .font(hrNumberFont(20))
+                        .foregroundStyle(DIM)
+                }
+            }
+            .overlay(alignment: .bottom) {
+                if !showsLabel { DialCaption(text: "PACING") }
+            }
         }
     }
 }
@@ -585,7 +623,7 @@ struct ScoreComplicationView: View {
         Group {
             switch family {
             case .accessoryCorner: ScoreCorner(score: entry.score)
-            default: ScoreCircular(score: entry.score)
+            default: ScoreCircular(score: entry.score).widgetLabel("Autonomic Score")
             }
         }
         .containerBackground(.black, for: .widget)

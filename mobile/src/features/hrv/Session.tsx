@@ -130,7 +130,9 @@ function SessionCard({ controls }: { controls: SheetControls }) {
   const remain = s.durationSec - s.elapsed;
   const mmss = `${Math.floor(remain / 60)}:${String(remain % 60).padStart(2, '0')}`;
   // The strap connects while this card sits open; don't start until it's live.
-  const strapPending = config.source === 'polar' && !started && !s.connected;
+  // An optical Polar band's beats arrive only after its PPI warm-up (tens of
+  // seconds), so the warm-up is spent here, before the reading, never in it.
+  const strapPending = config.source === 'polar' && !started && (!s.connected || s.warming);
   // ...and never at all on a device that has shown it sends no beat intervals.
   // A reading there is five minutes that end in `Results` declining to save
   // anything, so the button that would spend them is unavailable rather than
@@ -193,7 +195,7 @@ function SessionCard({ controls }: { controls: SheetControls }) {
         <View style={{ width: '100%', marginTop: 14 }}>
           {config.source === 'watch' ? <WatchNote />
             : config.source === 'garmin' ? <GarminNote />
-            : strapUseless ? <NoBeatsNote name={strapName} /> : (
+            : strapUseless ? <NoBeatsNote name={strapName} stalled={s.ppiStalled} /> : (
             <LiveStats
               hr={s.hr} sdnn={s.sdnn} beats={s.beats} artifact={s.artifact}
               hrTrace={s.hrTrace} sdnnTrace={s.sdnnTrace} rrTrace={s.rrTrace}
@@ -330,14 +332,15 @@ function GarminNote() {
  * suggest the reading is half-working when the missing half is the whole
  * measurement.
  */
-function NoBeatsNote({ name }: { name?: string }) {
+function NoBeatsNote({ name, stalled }: { name?: string; stalled?: boolean }) {
   const p = usePalette();
   return (
     <View style={{ backgroundColor: p.sunk, borderRadius: 20, padding: 16, flexDirection: 'row', alignItems: 'center', gap: 13 }}>
       <Icon name="heartPulse" size={38} color={GRADE_COLORS.bad} strokeWidth={1.7} />
       <Text style={{ flex: 1, color: p.textDim, fontSize: 13.5, lineHeight: 20 }}>
-        {name || 'This device'} sends a heart rate but not the beat-to-beat timing HRV
-        is measured from. A chest strap or your phone’s camera will work.
+        {stalled
+          ? `${name || 'Your band'} did not start sending beat timing. Wear it snug against bare skin, close the Polar Flow app, then close this card and try again.`
+          : `${name || 'This device'} sends a heart rate but not the beat-to-beat timing HRV is measured from. A chest strap or your phone’s camera will work.`}
       </Text>
     </View>
   );
@@ -385,7 +388,7 @@ function statusHint(s: SessionSnapshot): Hint | null {
   // never arrive. Only the strap path can reach this (see `rrSupport` in the
   // session store), so it needs no source test.
   if (s.rrSupport === 'absent') {
-    return { tone: GRADE_COLORS.bad, icon: 'triangle', text: 'Heart rate only, no beat data' };
+    return { tone: GRADE_COLORS.bad, icon: 'triangle', text: s.ppiStalled ? 'No beat data from band' : 'Heart rate only, no beat data' };
   }
   if (s.artifact) {
     return {
@@ -398,6 +401,7 @@ function statusHint(s: SessionSnapshot): Hint | null {
     return { tone: GRADE_COLORS.bad, icon: 'triangle', text: 'Pulse lost, cover the lens' };
   }
   if (src === 'polar' && !s.connected) return { tone: GRADE_COLORS.ok, icon: 'triangle', text: 'Connecting to strap…' };
+  if (src === 'polar' && !started && s.warming) return { tone: GRADE_COLORS.ok, icon: 'triangle', text: 'Warming up sensor…' };
   if (src === 'polar' && !started) return { tone: GRADE_COLORS.good, icon: 'check', text: 'Strap connected' };
   return null;
 }

@@ -21,6 +21,7 @@ import { createDebouncedWriter } from '../lib/persist';
 import { logError } from '../lib/diagnostics/errorLog';
 import { migrateLegacyJournal } from '../lib/storeMigration';
 import { stampImportedHrvCoverage } from '../lib/hrvQuality';
+import { fillWatchHrvBands } from '../lib/hrvBands';
 import { markDeclinedKeys } from '../lib/health/declined';
 import { resetFindingMemory } from '../lib/insights/findingMemory';
 import { resetPressureMemory } from '../lib/insights/pressureMemory';
@@ -311,9 +312,12 @@ function loadState(): AppState {
     // Uncached read: this walks the sidecar once and must not evict the entries
     // the Journal is about to render.
     const stampedHrv = stampImportedHrvCoverage(migrated, (id) => readWaveformUncached(id)?.rrRaw);
+    // Apple Watch readings filed before their bands could be resolved across
+    // the series' seams are missing them; the beats are still in the sidecar.
+    const filledBands = fillWatchHrvBands(migrated, readWaveformUncached);
     // If a one-time migration (sleep reframing, waveform extraction, HRV
     // coverage) ran, persist immediately so it can't re-run next launch.
-    if (movedWaveforms || stampedHrv || !(parsed && parsed.meta && parsed.meta.sleepReframed)) {
+    if (movedWaveforms || stampedHrv || filledBands || !(parsed && parsed.meta && parsed.meta.sleepReframed)) {
       try { kv().set(STORAGE_KEY, JSON.stringify(migrated)); } catch { /* keep in memory */ }
     }
     return migrated;
@@ -453,6 +457,9 @@ export function replaceState(parsed: unknown, importName?: string) {
   } catch {
     // waveforms are best-effort — the journal itself is intact without them
   }
+  // The same band repair a launch runs, so an imported journal reads right now
+  // rather than after the next restart.
+  try { fillWatchHrvBands(state, readWaveformUncached); } catch { /* next launch retries */ }
   if (importName) state.meta.lastImport = { name: importName, at: new Date().toISOString() };
   // A retained Insights finding is a claim about the journal it was computed
   // from; letting one coast at the loose bar over a different journal would

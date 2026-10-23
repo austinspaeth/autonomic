@@ -42,7 +42,7 @@ struct HrDeltaComplicationView: View {
             switch family {
             case .accessoryCorner: DeltaCornerView(state: entry.state)
             case .accessoryRectangular: DeltaRectangularView(state: entry.state)
-            default: DeltaCircularView(state: entry.state)
+            default: DeltaCircularView(state: entry.state).widgetLabel("HR Delta")
             }
         }
         .containerBackground(.black, for: .widget)

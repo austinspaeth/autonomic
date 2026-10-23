@@ -25,6 +25,10 @@ export interface WaveformData {
    *  reading is discontinuous there, so it rides with rrRaw rather than in the
    *  journal blob (it's meaningless without it). Absent = one continuous take. */
   rrSegments?: number[];
+  /** Real time lost at each of those seams, ms, index-aligned with
+   *  `rrSegments`. Only a watch heartbeat series knows it (every beat is
+   *  stamped); with it `computeHrv` resolves the bands across the seams. */
+  rrSeamGaps?: number[];
   /** Seconds from the start of the reading/workout/night, and the rate then.
    *  A night's overnight heart-rate curve rides here too (keyed by
    *  {@link sleepWaveformId}), which is why this is `t`-relative rather than
@@ -40,7 +44,18 @@ export interface WaveformData {
   stageSpans?: { s: number; d: number; v: 'deep' | 'rem' | 'core' | 'awake' }[];
 }
 
-export const WAVEFORM_FIELDS = ['rrRaw', 'rrClean', 'rrSegments', 'sampledHr', 'sampledSdnn', 'sampledResp', 'stageSpans'] as const;
+/** An imported heartbeat series as it is kept: the beats, plus its seams and
+ *  what each lost when there were any (absent = one continuous take). */
+export function rrWaveform(r: { rr: number[]; segmentStarts?: number[]; seamGapsMs?: number[] }): WaveformData {
+  const w: WaveformData = { rrRaw: r.rr };
+  if (r.segmentStarts?.length) {
+    w.rrSegments = r.segmentStarts;
+    if (r.seamGapsMs?.length === r.segmentStarts.length) w.rrSeamGaps = r.seamGapsMs;
+  }
+  return w;
+}
+
+export const WAVEFORM_FIELDS = ['rrRaw', 'rrClean', 'rrSegments', 'rrSeamGaps', 'sampledHr', 'sampledSdnn', 'sampledResp', 'stageSpans'] as const;
 
 /**
  * Sidecar key for a night's series (overnight HR, respiratory rate, stage

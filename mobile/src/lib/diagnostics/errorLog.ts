@@ -22,6 +22,7 @@ import { type CrumbTrail, formatWhere } from './crumbs';
 import { describeError } from './env';
 import { MAX_ERRORS, parseErrorLog, pushError, type LoggedError } from './errorBuffer';
 import { describeNativeCrash, parseNativeCrashes, tagForNativeCrash } from './nativeCrash';
+import { formatStack } from './stack';
 
 export type { LoggedError };
 
@@ -52,6 +53,13 @@ function load(): LoggedError[] {
  *  path and lose the "3 phones" the crash row exists to say. */
 export const CRASH_WHERE_TAG = 'crash.where';
 
+/** The tag a JavaScript crash's STACK lands under: which of the app's own
+ *  functions it was thrown from (see ./stack). A sibling of `crash.where`
+ *  rather than part of it, for the same reason: one row per culprit, so the
+ *  Failures tab ranks the code a crash comes from beside the screen it
+ *  happens on. */
+export const CRASH_STACK_TAG = 'crash.stack';
+
 /**
  * Record a failure. `tag` is a stable dotted key naming the site
  * (`store.persist`, `iap.init`, `health.check`) — it's what makes a dump
@@ -66,11 +74,15 @@ export const CRASH_WHERE_TAG = 'crash.where';
  * `dying` says the process will not outlive this call (the uncaught-error
  * hook): the reports are then buffered for the next launch rather than sent,
  * because a request in flight when the process is killed is a report lost.
+ *
+ * `stack` is the thrown error's own stack, and only the uncaught JavaScript
+ * hook passes it: a native crash is wrapped in an Error at DRAIN time, so its
+ * stack would name the drain, not the crash.
  */
 export function logError(
   tag: string,
   err: unknown,
-  opts?: { fatal?: boolean; dying?: boolean; where?: { trail: CrumbTrail; approx: boolean } | null },
+  opts?: { fatal?: boolean; dying?: boolean; where?: { trail: CrumbTrail; approx: boolean } | null; stack?: string },
 ): void {
   try {
     const msg = describeError(err);
@@ -110,6 +122,10 @@ export function logError(
       const line = formatWhere(tag, where?.trail, { approx: !!where?.approx });
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       try { require('../../store/errorReport').reportFault(CRASH_WHERE_TAG, line, false, send); } catch { /* not wired up yet */ }
+      if (opts.stack !== undefined) {
+        // eslint-disable-next-line @typescript-eslint/no-require-imports
+        try { require('../../store/errorReport').reportFault(CRASH_STACK_TAG, formatStack(tag, opts.stack), false, send); } catch { /* not wired up yet */ }
+      }
     }
   } catch { /* logging must never throw */ }
 }
@@ -169,7 +185,9 @@ export function installErrorLogging(): void {
     EU.setGlobalHandler((e, isFatal) => {
       // A fatal here is the process ending: in a release build the default
       // handler we hand it to next tears the app down.
-      logError(isFatal ? 'uncaught.fatal' : 'uncaught', e, { fatal: !!isFatal, dying: !!isFatal });
+      let stack = '';
+      try { stack = String((e as { stack?: unknown } | null)?.stack ?? ''); } catch { /* a getter that throws */ }
+      logError(isFatal ? 'uncaught.fatal' : 'uncaught', e, { fatal: !!isFatal, dying: !!isFatal, stack });
       prev?.(e, isFatal);
     });
   } catch { /* no ErrorUtils here — explicit logError calls still work */ }

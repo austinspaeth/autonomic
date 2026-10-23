@@ -167,6 +167,11 @@ export interface ImportedReading {
   startMs: number; // epoch ms of the sample start, for dedup windows
   fields: Record<string, string>;
   rr?: number[];        // beat-to-beat RR (ms), when derived from a heartbeat series
+  /** The series' seams and the time each lost (see `rrFromSeries`). Stored in
+   *  the waveform sidecar beside `rr`, so the reading can be recomputed with
+   *  the same answer later. */
+  segmentStarts?: number[];
+  seamGapsMs?: number[];
   rrClean?: number[];
   /** How good that series was (src/lib/hrvQuality) — absent means there was no
    *  series to grade, never that it was clean. Drives the "Poor quality" tag on
@@ -270,8 +275,13 @@ export interface WatchHrvSample {
   /** Indices into `rr` where the series resumed after a dropout the watch
    *  flagged. Empty on a continuous take. */
   segmentStarts: number[];
+  /** Real time lost at each of those seams (ms), index-aligned. */
+  seamGapsMs: number[];
   sourceName: string;   // e.g. "Apple Watch"
 }
+
+/** A heartbeat series as RR intervals, with its seams and what each one lost. */
+export type RrSeries = Pick<WatchHrvSample, 'rr' | 'segmentStarts' | 'seamGapsMs'>;
 
 /** Points kept per night after thinning. A night is 320 pixels wide on the
  *  chart; four hundred points is already more resolution than can be drawn,
@@ -463,20 +473,29 @@ const isOwnSample = (rev?: SourceRev): boolean => {
  * a gappy watch reading gets its frequency domain from its longest unbroken
  * stretch, the same as a camera one.
  */
-const rrFromSeries = (hb: HeartbeatSeries): { rr: number[]; segmentStarts: number[] } => {
+const rrFromSeries = (hb: HeartbeatSeries): RrSeries => {
   const beats = hb.heartbeats || [];
   const rr: number[] = [];
   const segmentStarts: number[] = [];
+  // Every beat carries its own timestamp, so the time each seam LOST is known
+  // exactly — which is what lets `computeHrv` put the pieces back on the clock
+  // and resolve the bands across the seams instead of over the longest piece.
+  const seamGapsMs: number[] = [];
   let broken = false; // the next kept interval begins a new segment
+  let lastEnd = 0;    // series time (s) at which the last kept interval ended
   for (let i = 1; i < beats.length; i++) {
     if (beats[i].precededByGap) { broken = true; continue; }
     const dt = (beats[i].timeSinceSeriesStart - beats[i - 1].timeSinceSeriesStart) * 1000;
     if (dt <= 250 || dt >= 2500) { broken = true; continue; }
-    if (broken && rr.length) segmentStarts.push(rr.length);
+    if (broken && rr.length) {
+      segmentStarts.push(rr.length);
+      seamGapsMs.push(Math.max(0, (beats[i - 1].timeSinceSeriesStart - lastEnd) * 1000));
+    }
     broken = false;
     rr.push(dt);
+    lastEnd = beats[i].timeSinceSeriesStart;
   }
-  return { rr, segmentStarts };
+  return { rr, segmentStarts, seamGapsMs };
 };
 
 /** The quality stamp for a sample whose metrics came from a beat series. Only
@@ -864,12 +883,12 @@ function makeReal(mod: HkModule): HealthApi {
       try {
         const series = (await mod.queryHeartbeatSeriesSamples?.({ from, to, limit: 100 })) || [];
         for (const hb of series) {
-          const { rr, segmentStarts } = rrFromSeries(hb);
+          const { rr, segmentStarts, seamGapsMs } = rrFromSeries(hb);
           if (rr.length < 20) continue;
-          const res = computeHrv(rr, { segmentStarts });
+          const res = computeHrv(rr, { segmentStarts, seamGapsMs });
           if (!res.time || !Object.keys(res.fields).length) continue;
           hrvSeriesTimes.push(hb.startDate.getTime());
-          out.push({ type: 'hrv', time: hhmm(hb.startDate), startMs: hb.startDate.getTime(), ownApp: isOwnSample(hb.sourceRevision), fields: res.fields, rr, rrClean: res.rrClean, quality: qualityOf(res) });
+          out.push({ type: 'hrv', time: hhmm(hb.startDate), startMs: hb.startDate.getTime(), ownApp: isOwnSample(hb.sourceRevision), fields: res.fields, rr, segmentStarts, seamGapsMs, rrClean: res.rrClean, quality: qualityOf(res) });
         }
       } catch { /* series unavailable */ }
 
@@ -929,15 +948,15 @@ function makeReal(mod: HkModule): HealthApi {
       try {
         const series = (await mod.queryHeartbeatSeriesSamples?.({ from, to, limit: LIMIT })) || [];
         for (const hb of series) {
-          const { rr, segmentStarts } = rrFromSeries(hb);
+          const { rr, segmentStarts, seamGapsMs } = rrFromSeries(hb);
           if (rr.length < 20) continue;
           if (rr.reduce((s, v) => s + v, 0) < HISTORY_HRV_MIN_MS) continue;
-          const res = computeHrv(rr, { segmentStarts });
+          const res = computeHrv(rr, { segmentStarts, seamGapsMs });
           if (!res.time || !Object.keys(res.fields).length) continue;
           out.readings.push({
             type: 'hrv', time: hhmm(hb.startDate), startMs: hb.startDate.getTime(),
             ownApp: isOwnSample(hb.sourceRevision), dayKey: keyOf(hb.startDate),
-            fields: res.fields, rr, rrClean: res.rrClean, quality: qualityOf(res),
+            fields: res.fields, rr, segmentStarts, seamGapsMs, rrClean: res.rrClean, quality: qualityOf(res),
           });
         }
       } catch { /* heartbeat series unavailable */ }
@@ -1023,13 +1042,14 @@ function makeReal(mod: HkModule): HealthApi {
         const out: WatchHrvSample[] = [];
         for (const hb of series) {
           if (isOwnSample(hb.sourceRevision)) continue;
-          const { rr, segmentStarts } = rrFromSeries(hb);
+          const { rr, segmentStarts, seamGapsMs } = rrFromSeries(hb);
           if (rr.length < 20) continue;
           out.push({
             startMs: hb.startDate.getTime(),
             endMs: hb.endDate.getTime(),
             rr,
             segmentStarts,
+            seamGapsMs,
             sourceName: hb.sourceRevision?.source?.name || 'Apple Watch',
           });
         }

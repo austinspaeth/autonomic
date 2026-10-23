@@ -243,9 +243,72 @@ window.RELEASES = [
     "version": "1.28",
     "date": "2026-09-09",
     "notes": [
-      "NEW FEATURE: Pacing budget. Each morning your own readings set a budget for the day, in minutes of effort you can actually picture. The app tracks what the day spends and shows you where you stand, right on your Outlook card.",
-      "It bills for the things that really cost you. Not just workouts: time on your feet, minutes above your own exertion line, errands, a hot shower, a hard morning. Lying down with your legs up buys minutes back.",
-      "It gets to know you. The budget starts from a careful estimate and fits itself to your history as the days play out, then tells you honestly how often staying under it actually held."
+      "NEW FEATURE: Pacing budget. Your readings set a daily budget in minutes of effort. It counts what really costs you, from workouts to time on your feet, shows where you stand on your Outlook card, and learns your limits.",
+      "A number of performance and UI improvements."
+    ]
+  },
+  {
+    "version": "1.29",
+    "date": "2026-09-18",
+    "notes": [
+      "Your pacing budget pauses itself on a genuinely bad day, and you can unpause it whenever you want to see it anyway. It also no longer stays paused just because your usual days run low.",
+      "Your health data now imports itself. No more approving each item. Tap the pill to see what was added, and remove anything you did not want.",
+      "NEW: Barometric pressure. Your phone can now track air pressure, and if low pressure days affect you, Insights will show you how."
+    ]
+  },
+  {
+    "version": "1.30",
+    "date": "2026-09-25",
+    "notes": [
+      "Baseline and training readings are now separate. Your morning baseline shapes your Outlook and pacing budget, and the app now prompts you for it each morning.",
+      "Better camera readings: clearer guidance while you measure, and plain feedback on what was used and why.",
+      "Insights is easier to read, with cleaner cards and findings you can tap to see the evidence."
+    ]
+  },
+  {
+    "version": "1.31",
+    "date": "2026-09-27",
+    "notes": [
+      "NEW: The Dysautonomia Awareness giveaway. October is Dysautonomia Awareness Month, and every day you take an HRV reading earns an entry, up to 10. Sign up from the card on your Journal. No purchase necessary, and no health data is shared.",
+      "Various bug fixes and performance improvements."
+    ]
+  },
+  {
+    "version": "1.32",
+    "date": "2026-10-01",
+    "notes": [
+      "Improvements to the Garmin experience."
+    ]
+  },
+  {
+    "version": "1.33",
+    "date": "2026-10-11",
+    "notes": [
+      "NEW: Enter a POTS stand test or episode by hand, with a guided walkthrough. No strap or watch needed.",
+      "Choose imperial or metric units in your Profile.",
+      "Insights now compares your best weeks with your hardest ones.",
+      "Triggers can carry a time and a note.",
+      "Easier input fields throughout the app.",
+      "Camera reading improvements."
+    ]
+  },
+  {
+    "version": "1.35",
+    "date": "2026-10-14",
+    "notes": [
+      "NEW: Apple Watch complications for your pacing budget and Autonomic score.",
+      "Improved the algorithm behind your Autonomic score.",
+      "Smoother, more reliable imports from Apple Health and Health Connect.",
+      "Better scrolling performance, plus bug fixes."
+    ]
+  },
+  {
+    "version": "1.36",
+    "date": "2026-10-22",
+    "notes": [
+      "Fixed fragmented sleep on Android: nights split into pieces are now stitched back together.",
+      "Interrupted Apple Watch readings are now stitched back together, so you get every metric, including power.",
+      "Polar 360 and other Polar optical bands now work for HRV readings."
     ]
   }
 ];

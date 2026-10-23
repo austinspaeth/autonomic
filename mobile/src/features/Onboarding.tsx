@@ -53,6 +53,7 @@ import { dayAlreadyHas } from '../lib/health/updateSet';
 import { typesFor } from '../lib/typeCatalog';
 import { computeScores, profileCtx } from '../lib/scoring';
 import { rrCoverageSec } from '../lib/hrvQuality';
+import { rrWaveform } from '../lib/waveforms';
 import { blankDay, getState, mutate, save, storeSleepSeries, storeWaveform, useAppState } from '../store/store';
 import { DevicesScreen } from './Devices';
 import { type SessionConfig } from './hrv/Session';
@@ -156,7 +157,7 @@ async function importHealthHistory(onProgress?: (p: HistoryProgress) => void): P
       }
       // RR series goes to the waveform sidecar, never inline on the entry
       // (rrClean is derived — recomputed on view, not stored).
-      if (r.rr) storeWaveform(entry.id as string, { rrRaw: r.rr });
+      if (r.rr) storeWaveform(entry.id as string, rrWaveform({ ...r, rr: r.rr }));
       entry.scores = computeScores(entry as never, ctx);
       day(r.dayKey).readings.push(entry as never);
       added++;

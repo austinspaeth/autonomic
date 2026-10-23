@@ -4,7 +4,7 @@
  */
 import {
   allItemKeys, buildUpdateSet, dayAlreadyHas, filterDeclined, filterSeen, importFingerprint,
-  sleepItemKey, splitForReview, updateCount, updateSignature, type RawHealthDay,
+  sleepItemKey, sleepToFile, splitForReview, updateCount, updateSignature, type RawHealthDay,
 } from '../updateSet';
 import type { ImportedReading, ImportedWorkout, SleepImport } from '../index';
 import { MED_TYPES } from '../../registry';
@@ -140,9 +140,46 @@ describe('buildUpdateSet', () => {
     expect(set.workouts.map((w) => w.type)).toEqual(['strength']);
   });
 
-  it('withholds sleep once the day has bed and wake', () => {
+  it('withholds sleep once the day has a night the user logged', () => {
     const d = day({ sleep: { bed: '23:00', wake: '06:30', quality: 'good' } });
     expect(buildUpdateSet(DK, d, raw({ sleep: night }), MED_TYPES).sleep).toBeNull();
+  });
+
+  it('finishes an imported night that was read early', () => {
+    // The reported case: filed at 6am as 1:27 to 5:56, the whole night ran to 10:40.
+    const d = day({ sleep: { bed: '01:27', wake: '05:56', quality: 'good', imported: true } });
+    const whole = { ...night, bed: '01:27', wake: '10:40' };
+    expect(buildUpdateSet(DK, d, raw({ sleep: whole }), MED_TYPES).sleep).toBe(whole);
+  });
+});
+
+describe('sleepToFile', () => {
+  const imported = { bed: '01:27', wake: '05:56', quality: 'good' as const, imported: true };
+
+  it('files any night into an empty day', () => {
+    expect(sleepToFile(undefined, night)).toBe(night);
+    expect(sleepToFile({ bed: '', wake: '' }, night)).toBe(night);
+  });
+
+  it('replaces an imported night only with a longer one', () => {
+    expect(sleepToFile(imported, { ...night, bed: '01:27', wake: '10:40' })).not.toBeNull();
+    expect(sleepToFile(imported, { ...night, bed: '02:00', wake: '05:30' })).toBeNull();
+    expect(sleepToFile(imported, { ...night, bed: '01:27', wake: '05:56' })).toBeNull();
+  });
+
+  it('measures a night across midnight', () => {
+    const lateBed = { ...imported, bed: '01:00', wake: '06:00' };
+    expect(sleepToFile(lateBed, { ...night, bed: '23:30', wake: '06:00' })).not.toBeNull();
+  });
+
+  it('never replaces a night the user typed or corrected', () => {
+    const whole = { ...night, bed: '01:27', wake: '10:40' };
+    expect(sleepToFile({ ...imported, imported: undefined }, whole)).toBeNull();
+    expect(sleepToFile({ ...imported, edited: true }, whole)).toBeNull();
+  });
+
+  it('answers null with nothing read', () => {
+    expect(sleepToFile(imported, null)).toBeNull();
   });
 
   it('filterSeen drops exactly the already-shown items', () => {

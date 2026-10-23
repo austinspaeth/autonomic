@@ -69,6 +69,7 @@ export function HealthRrImportSheet({ kind }: { kind: 'breath' | 'unstructured' 
       <HrvResults
         rr={c.rr}
         segmentStarts={c.segmentStarts}
+        seamGapsMs={c.seamGapsMs}
         hrSamples={[]}
         config={config}
         durationSec={durationSec}

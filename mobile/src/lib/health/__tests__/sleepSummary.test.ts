@@ -4,7 +4,7 @@
  * (union, not sum) and naps inside the evening→afternoon query window
  * (main session, not earliest→latest).
  */
-import { groupNights, nightKeyOf, summarizeSleep, SleepSample } from '../sleepSummary';
+import { groupNights, nightKeyOf, summarizeHcSessions, summarizeSleep, type HcSleepSession, SleepSample } from '../sleepSummary';
 
 // HKCategoryValueSleepAnalysis values.
 const IN_BED = 0;
@@ -176,5 +176,75 @@ describe('nightKeyOf', () => {
 
   it('rolls an evening end into the next month', () => {
     expect(nightKeyOf(new Date(2026, 0, 31, 23, 30))).toBe('2026-02-01');
+  });
+});
+
+describe('summarizeHcSessions', () => {
+  // Health Connect stage constants.
+  const HC_AWAKE = 1; const HC_SLEEPING = 2; const HC_LIGHT = 4; const HC_DEEP = 5; const HC_REM = 6;
+  const FITBIT = 'com.google.android.apps.fitness';
+  const ms = (hhmm: string) => at(hhmm).getTime();
+  const session = (start: string, end: string, stages: [number, string, string][] = [], origin = FITBIT): HcSleepSession => ({
+    startMs: ms(start), endMs: ms(end), origin,
+    stages: stages.map(([stage, a, b]) => ({ stage, startMs: ms(a), endMs: ms(b) })),
+  });
+
+  it('stitches a night Google Health wrote in two pieces', () => {
+    // The reported night: 1:27 to 10:40, woken around 6, filed as 1:27 to 5:56.
+    const out = summarizeHcSessions([
+      session('01:27', '05:56', [[HC_LIGHT, '01:27', '03:00'], [HC_DEEP, '03:00', '05:56']]),
+      session('06:20', '10:40', [[HC_REM, '06:20', '08:00'], [HC_LIGHT, '08:00', '10:40']]),
+    ])!;
+    expect(out.bed).toEqual(at('01:27'));
+    expect(out.wake).toEqual(at('10:40'));
+    expect(out.minutesAsleep).toBe(269 + 260);
+    expect(out.stages).toEqual({ core: 93 + 160, deep: 176, rem: 100, awake: 0 });
+  });
+
+  it('stitches across a long waking that is still one night', () => {
+    const out = summarizeHcSessions([
+      session('00:48', '06:06', [[HC_LIGHT, '00:48', '06:06']]),
+      session('08:35', '11:25', [[HC_LIGHT, '08:35', '11:25']]),
+    ])!;
+    expect(out.bed).toEqual(at('00:48'));
+    expect(out.wake).toEqual(at('11:25'));
+  });
+
+  it('keeps an evening nap out of the night', () => {
+    const out = summarizeHcSessions([
+      session('18:30', '19:30'),
+      session('23:30', '07:00'),
+    ])!;
+    expect(out.bed).toEqual(at('23:30'));
+    expect(out.minutesAsleep).toBe(450);
+  });
+
+  it('never mixes two apps, and takes the one that saw more sleep', () => {
+    const out = summarizeHcSessions([
+      session('00:48', '11:25', [[HC_LIGHT, '00:48', '06:06'], [HC_AWAKE, '06:06', '08:35'], [HC_DEEP, '08:35', '11:25']]),
+      session('07:15', '12:09', [], 'com.other.sleep'),
+    ])!;
+    expect(out.bed).toEqual(at('00:48'));
+    expect(out.wake).toEqual(at('11:25'));
+    expect(out.interrupted).toBe(true);
+  });
+
+  it('opens the night on the first minute in bed and moves the spans with it', () => {
+    const out = summarizeHcSessions([
+      session('01:27', '05:56', [[HC_AWAKE, '01:27', '01:40'], [HC_LIGHT, '01:40', '05:56']]),
+    ])!;
+    expect(out.bed).toEqual(at('01:27'));
+    expect(out.spans[0]).toEqual({ s: 13 * 60, d: (5 * 60 + 56 - 100) * 60, v: 'core' });
+  });
+
+  it('reads an unstaged session, or one of only SLEEPING, as one asleep block', () => {
+    expect(summarizeHcSessions([session('23:00', '07:00')])!.stages).toBeNull();
+    const out = summarizeHcSessions([session('23:00', '07:00', [[HC_SLEEPING, '23:00', '07:00']])])!;
+    expect(out.minutesAsleep).toBe(480);
+    expect(out.stages).toBeNull();
+  });
+
+  it('answers null for nothing', () => {
+    expect(summarizeHcSessions([])).toBeNull();
   });
 });

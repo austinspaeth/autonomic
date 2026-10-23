@@ -35,6 +35,9 @@ export interface SleepRecord {
   /** The night came from Apple Health / Health Connect. Lists it under the
    *  day's imports (lib/health/importLog); a hand correction keeps it. */
   imported?: boolean;
+  /** Somebody changed an imported night by hand. A later Health read never
+   *  replaces it (lib/health/updateSet `sleepToFile`). */
+  edited?: boolean;
 }
 
 /**
@@ -70,6 +73,10 @@ export interface LiveHrvExtras {
    *  (welcome backfill / Health sync) rather than captured in-app — drives the
    *  "Apple Watch HRV" / "Imported HRV" label. */
   imported?: boolean;
+  /** True when the reading was filed without being told whether it was a
+   *  baseline or a training reading (a wrist reading the phone did not start),
+   *  false once somebody answered. See lib/hrvKind. */
+  kindOpen?: boolean;
   /** Bluetooth device name at capture time (source 'polar' only) — shown as the Source detail. */
   sourceName?: string;
   rrRaw?: number[];

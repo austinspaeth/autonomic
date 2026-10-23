@@ -27,10 +27,11 @@ import { useSyncExternalStore } from 'react';
 import { AppState, type NativeEventSubscription } from 'react-native';
 import * as Haptics from 'expo-haptics';
 import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
-import { ble } from '../../lib/ble/manager';
+import { ble, type StrapLink } from '../../lib/ble/manager';
 import {
-  noteRrSample, rrSupport, RR_WATCH_START, type RrSupport, type RrWatch,
+  notePpiStarted, notePpiTimeout, noteRrSample, ppiWarming, rrSupport, RR_WATCH_START, type RrSupport, type RrWatch,
 } from '../../lib/ble/rrSupport';
+import { deviceModel, warmupBand, PPI_GIVE_UP_MS } from '../../lib/ble/pmd';
 import { ppg, type PpgSignal } from '../../lib/ppg/camera';
 import {
   TROUBLE_GRACE_SEC, computeHrv, correctArtifacts, hopelessCoverage, isRecovering, liveCoverage, std,
@@ -47,7 +48,7 @@ import {
 import { pingActivation, pingCaptureCompleted, pingCaptureStarted, pingReadingKind } from '../../store/ping';
 import { isFirstBaseline } from '../../lib/ping';
 import { todayKey } from '../../lib/dates';
-import { armGarminIntent } from '../../lib/garmin/intent';
+import { armGarminIntent, armWatchIntent } from '../../lib/garmin/intent';
 
 export interface SessionConfig {
   kind: 'breath' | 'unstructured';
@@ -137,6 +138,15 @@ export interface SessionSnapshot {
    * sources — none of them is a device we discover a capability of.
    */
   rrSupport: RrSupport;
+  /**
+   * An optical Polar band's PPI stream has been started and its first beats
+   * have not arrived (see lib/ble/pmd). Start is held until they do, so the
+   * warm-up happens while the card sits open rather than inside the reading.
+   */
+  warming: boolean;
+  /** That stream never delivered (`PPI_GIVE_UP_MS`). `rrSupport` reads 'absent'
+   *  then too, but the advice differs: this band CAN send beats. */
+  ppiStalled: boolean;
   artifact: boolean;
   signal: PpgSignal;
   /**
@@ -169,7 +179,7 @@ export interface SessionSnapshot {
 const IDLE: SessionSnapshot = {
   status: 'idle', config: null, pattern: parsePattern('4/6'), durationSec: 300,
   breathStartMs: 0, startedAtMs: 0, elapsed: 0, hr: null, sdnn: null, beats: 0, connected: false,
-  rrSupport: 'unknown',
+  rrSupport: 'unknown', warming: false, ppiStalled: false,
   artifact: false, signal: { locked: false, quality: 'none' }, usableSec: 0, stopReason: null, phase: 'in',
   minimized: false, hidden: false, hrTrace: [], sdnnTrace: [], rrTrace: [], result: null,
 };
@@ -202,6 +212,10 @@ let breathTimer: ReturnType<typeof setTimeout> | null = null;
 let appSub: NativeEventSubscription | null = null;
 let bleAlive = false;
 let bleRetry: ReturnType<typeof setTimeout> | null = null;
+/** Gives up on a PPI stream that never delivers (`PPI_GIVE_UP_MS`). */
+let ppiGiveUp: ReturnType<typeof setTimeout> | null = null;
+/** One fault-route report per session per outcome: a reconnect loop would otherwise repeat it. */
+let ppiReported = new Set<string>();
 
 function emit() { listeners.forEach((f) => f()); }
 
@@ -213,6 +227,8 @@ function bump(patch: Partial<SessionSnapshot> = {}) {
     beats: rr.length,
     usableSec: Math.round(judgedSec ?? usableMs / 1000),
     rrSupport: rrSupport(rrWatch),
+    warming: ppiWarming(rrWatch),
+    ppiStalled: !!rrWatch.ppiTimedOut,
     hrTrace: hrSamples.length ? hrSamples.slice(-HR_TRACE).map((s) => s.bpm) : [],
     sdnnTrace: sdnnSamples.length ? sdnnSamples.slice(-SDNN_TRACE).map((s) => s.sdnn) : [],
     rrTrace: rr.length ? rr.slice(-RR_TRACE) : [],
@@ -410,6 +426,7 @@ export function startSession(config: SessionConfig, autoStart?: boolean) {
   rr = []; segmentStarts = []; hrSamples = []; sdnnSamples = []; recentRr = [];
   usableMs = 0; judgedSec = null; lastBeatMs = 0;
   rrWatch = RR_WATCH_START;
+  ppiReported = new Set();
   startedAtMs = 0;
   const now = Date.now();
   snap = {
@@ -497,6 +514,7 @@ function connectStrap() {
           bump({ connected: false });
           if (bleAlive && snap.status !== 'finished') bleRetry = setTimeout(attempt, 2000);
         },
+        { beats: true, onLink: noteStrapLink },
       );
     } catch (e) {
       // A strap that will not pair is the single most common way a reading
@@ -513,6 +531,46 @@ function connectStrap() {
   };
   void attempt();
 }
+
+/**
+ * What the strap told us about how it sends beats. Only an optical Polar band
+ * says anything interesting: a PPI stream that started (warm-up begins, and a
+ * clock to give up on it), its first batch (how long that took), or a start the
+ * band refused. The outcomes go to the fault route by device MODEL, because the
+ * first person to use a new band is usually not somebody we can watch.
+ */
+function noteStrapLink(link: StrapLink) {
+  const model = deviceModel(getState().settings.lastBleDeviceName);
+  const reportOnce = (key: string, send: () => void) => {
+    if (ppiReported.has(key)) return;
+    ppiReported.add(key);
+    send();
+  };
+  if (link.firstBeatsMs != null) {
+    if (ppiGiveUp) { clearTimeout(ppiGiveUp); ppiGiveUp = null; }
+    reportOnce('ok', () => reportEvent(PPI_TAGS.started, `${model} ${warmupBand(link.firstBeatsMs!)}`));
+    return;
+  }
+  if (link.ppi === 'started') {
+    rrWatch = notePpiStarted(rrWatch);
+    if (!rrWatch.rrSeen && !ppiGiveUp) {
+      ppiGiveUp = setTimeout(() => {
+        ppiGiveUp = null;
+        if (rrWatch.rrSeen) return;
+        rrWatch = notePpiTimeout(rrWatch);
+        reportOnce('noframes', () => reportFault(PPI_TAGS.failed, `${model} noframes`));
+        bump();
+      }, PPI_GIVE_UP_MS);
+    }
+  } else if (link.ppi !== 'none' && link.ppi !== 'no-ppi') {
+    reportOnce(link.ppi, () => reportFault(PPI_TAGS.failed, `${model} ${link.ppi}`));
+  }
+  bump({ connected: true });
+}
+
+/** Fault-route tags for the PPI path. `started` is not a failure: both
+ *  dashboards list it among their event tags. */
+export const PPI_TAGS = { started: 'ble.ppi', failed: 'ble.ppiFail' } as const;
 
 /** Start the timer and RR collection. The breathing guide was already running. */
 export function beginCollection() {
@@ -531,6 +589,13 @@ export function beginCollection() {
   if (src === 'garmin' && snap.config) {
     const { kind, style, period } = snap.config;
     armGarminIntent({ kind, style, period, armedAtMs: startedAtMs });
+  }
+  // The Apple Watch's beats come back through Apple Health, and if the
+  // watch-sync card does not file them the Health import will: it claims this
+  // so the reading still lands as the kind chosen here (lib/hrvKind).
+  if (src === 'watch' && snap.config) {
+    const { kind, style, period } = snap.config;
+    armWatchIntent({ kind, style, period, armedAtMs: startedAtMs });
   }
   // A reading has genuinely begun — the counterpart of the completion ping in
   // `finishSession`. Counted in the engine rather than where the card is
@@ -695,6 +760,7 @@ function reportAbandon(reason: SessionStopReason) {
 async function releaseCapture() {
   bleAlive = false;
   if (bleRetry) { clearTimeout(bleRetry); bleRetry = null; }
+  if (ppiGiveUp) { clearTimeout(ppiGiveUp); ppiGiveUp = null; }
   const src = snap.config?.source;
   try {
     if (src === 'polar') await ble().disconnect();

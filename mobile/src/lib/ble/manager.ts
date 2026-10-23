@@ -4,6 +4,11 @@
  * and streams live HR + RR intervals (ms). Also reads battery (0x180F/0x2A19)
  * when exposed. Generic enough for Polar H10 and most straps.
  *
+ * An optical Polar band (360, Verity Sense, OH1) sends its beats over Polar's
+ * own PMD service instead, as a PPI stream: when a caller asks for beats and
+ * the device offers PPI, `connect` starts it and feeds its intervals through
+ * the same `onSample`. See `pmd.ts`.
+ *
  * Guarded so the module can be imported on a device without the native module
  * present (e.g. Expo Go / simulator) without crashing — createBle() returns a
  * stub that reports unavailable.
@@ -12,6 +17,11 @@ import { Platform } from 'react-native';
 import { parseHeartRateMeasurement } from '../hrv';
 import { bluetoothMessage, looksLikeStrap, type BleDevice, type BleDiagnostics, type BleReadiness, type BleScanRecord } from './devices';
 import { androidApiLevel, appInfo, describeError, platformInfo } from '../diagnostics/env';
+import {
+  advertisesPmd, bytesToBase64, parseControlResponse, parsePpiFrame, pmdErrorName, ppiToSample, supportsPpi,
+  PMD_ALREADY_IN_STATE, PMD_CONTROL, PMD_DATA, PMD_INVALID_MTU, PMD_MTU, PMD_OK, PMD_SERVICE, PMD_TYPE_PPI,
+  PPI_START, PPI_STOP,
+} from './pmd';
 
 const HR_SERVICE = '0000180d-0000-1000-8000-00805f9b34fb';
 const HR_MEASUREMENT = '00002a37-0000-1000-8000-00805f9b34fb';
@@ -19,7 +29,31 @@ const BATTERY_SERVICE = '0000180f-0000-1000-8000-00805f9b34fb';
 const BATTERY_LEVEL = '00002a19-0000-1000-8000-00805f9b34fb';
 
 export type { BleDevice, BleDiagnostics, BleReadiness } from './devices';
-export interface HrSample { hr: number; rr: number[] }
+/** `gap`: the first beats after a stream (re)started, so collection marks a
+ *  segment boundary rather than joining them to beats from before a dropout. */
+export interface HrSample { hr: number; rr: number[]; gap?: boolean; blocked?: number }
+
+/**
+ * How the link came up, reported once the device has been asked for beats.
+ * `ppi` is set when a PPI stream was attempted: 'started' (beats will follow
+ * after a warm-up), 'no-ppi' (PMD present, PPI not offered: an H10), or the
+ * reason it could not be started. `firstBeatsMs` arrives in a second report
+ * when the first PPI batch lands, measured from the start command.
+ */
+export interface StrapLink {
+  stream: 'hr' | 'ppi';
+  hasHrService: boolean;
+  ppi: 'none' | 'started' | 'no-ppi' | string;
+  firstBeatsMs?: number;
+}
+
+export interface ConnectOptions {
+  /** The caller wants beat intervals (an HRV reading), not just a pulse.
+   *  Only then is a PPI stream started: it slows the band's own heart rate to
+   *  one update every 5 s and cancels any workout it is recording. */
+  beats?: boolean;
+  onLink?: (link: StrapLink) => void;
+}
 
 /** Long enough to catch a strap advertising on a slow interval, short enough
  *  that someone holding the phone waits it out. */
@@ -39,7 +73,7 @@ export interface BleManagerApi {
   requestPermissions(): Promise<boolean>;
   scan(onFound: (d: BleDevice) => void): Promise<void>;
   stopScan(): void;
-  connect(id: string, onSample: (s: HrSample) => void, onDisconnect: () => void): Promise<void>;
+  connect(id: string, onSample: (s: HrSample) => void, onDisconnect: () => void, opts?: ConnectOptions): Promise<void>;
   readBattery(id: string): Promise<number | null>;
   disconnect(): Promise<void>;
   destroy(): void;
@@ -78,6 +112,10 @@ function advertisesHeartRate(uuids: string[] | null | undefined): boolean {
 
 /** ble-plx `Device` → report row. Keeps the real id/name; `formatDiagnostics`
  *  is the single place that decides what a shared dump may reveal. */
+function advertisesStrap(uuids: string[] | null | undefined, name: string | null | undefined): boolean {
+  return advertisesHeartRate(uuids) || advertisesPmd(uuids) || /^polar\b/i.test(name ?? '');
+}
+
 function toRecord(d: {
   id: string; name?: string | null; localName?: string | null; rssi?: number | null;
   txPowerLevel?: number | null; isConnectable?: boolean | null; serviceUUIDs?: string[] | null;
@@ -92,7 +130,7 @@ function toRecord(d: {
     isConnectable: d.isConnectable ?? null,
     serviceUUIDs: d.serviceUUIDs ?? null,
     heartRate,
-    identified: heartRate || looksLikeStrap(d.name ?? d.localName),
+    identified: heartRate || advertisesPmd(d.serviceUUIDs) || looksLikeStrap(d.name ?? d.localName),
   };
 }
 
@@ -143,6 +181,9 @@ export function createBle(): BleManagerApi {
   let connectedId: string | null = null;
   let monitorSub: { remove: () => void } | null = null;
   let disconnectSub: { remove: () => void } | null = null;
+  let pmdSubs: { remove: () => void }[] = [];
+  /** The PPI stream is running on the connected device, so `disconnect` stops it. */
+  let ppiOn = false;
   // Bumped by every connect()/disconnect(); an in-flight connect that awakes to
   // a different epoch has been superseded and must release whatever it holds.
   let connectEpoch = 0;
@@ -150,8 +191,10 @@ export function createBle(): BleManagerApi {
   const teardown = () => {
     try { monitorSub?.remove(); } catch { /* ignore */ }
     try { disconnectSub?.remove(); } catch { /* ignore */ }
+    for (const sub of pmdSubs) { try { sub.remove(); } catch { /* ignore */ } }
     monitorSub = null;
     disconnectSub = null;
+    pmdSubs = [];
   };
 
   // Resolve with whatever the adapter settles on, and ALWAYS resolve. Waiting
@@ -183,6 +226,74 @@ export function createBle(): BleManagerApi {
     }
     if (done) { try { sub?.remove(); } catch { /* ignore */ } }
   });
+
+  /**
+   * Ask the device for a PPI stream over PMD. Resolves with how that went
+   * (`StrapLink.ppi`); never throws, since a band that will not stream PPI may
+   * still be a perfectly good pulse source. Beats then arrive on `onSample`,
+   * after a warm-up of tens of seconds, and the first batch is reported on
+   * `onLink` with how long it took.
+   */
+  const startPpi = async (
+    device: { id: string; requestMTU: (mtu: number) => Promise<unknown> },
+    epoch: number,
+    onSample: (s: HrSample) => void,
+    onLink: ConnectOptions['onLink'],
+    hasHr: boolean,
+    activate: () => void,
+  ): Promise<string> => {
+    const id = device.id;
+    try {
+      const features = await manager.readCharacteristicForDevice(id, PMD_SERVICE, PMD_CONTROL);
+      if (!features?.value || !supportsPpi(base64ToBytes(features.value))) return 'no-ppi';
+
+      // Control-point answers arrive as indications; one write is in flight at a time.
+      let answer: ((error: number) => void) | null = null;
+      pmdSubs.push(manager.monitorCharacteristicForDevice(id, PMD_SERVICE, PMD_CONTROL, (error, ch) => {
+        if (error || !ch?.value) return;
+        const r = parseControlResponse(base64ToBytes(ch.value));
+        if (r && r.type === PMD_TYPE_PPI && answer) { const a = answer; answer = null; a(r.error); }
+      }));
+
+      let startedAt = 0;
+      let firstSeen = false;
+      pmdSubs.push(manager.monitorCharacteristicForDevice(id, PMD_SERVICE, PMD_DATA, (error, ch) => {
+        if (error || !ch?.value || epoch !== connectEpoch) return;
+        const frame = parsePpiFrame(base64ToBytes(ch.value));
+        if (!frame) return;
+        const { hr, rr, blocked } = ppiToSample(frame);
+        if (!rr.length && !hr) return;
+        const first = !firstSeen && rr.length > 0;
+        if (first) firstSeen = true;
+        onSample({ hr, rr, blocked, ...(first ? { gap: true } : null) });
+        if (first) onLink?.({ stream: 'ppi', hasHrService: hasHr, ppi: 'started', firstBeatsMs: Date.now() - startedAt });
+      }));
+
+      const send = (bytes: Uint8Array) => new Promise<number>((resolve, reject) => {
+        const timer = setTimeout(() => { answer = null; reject(new Error('PMD control point did not answer')); }, 5000);
+        answer = (code) => { clearTimeout(timer); resolve(code); };
+        manager.writeCharacteristicWithResponseForDevice(id, PMD_SERVICE, PMD_CONTROL, bytesToBase64(bytes))
+          .catch((e) => { clearTimeout(timer); answer = null; reject(e); });
+      });
+
+      startedAt = Date.now();
+      let code = await send(PPI_START);
+      // The 64-byte MTU every strap is connected with can be too small for PMD;
+      // ask for Polar's size and try once more rather than for every device.
+      if (code === PMD_INVALID_MTU) {
+        await device.requestMTU(PMD_MTU);
+        startedAt = Date.now();
+        code = await send(PPI_START);
+      }
+      // Left running by a previous connection: it is streaming, which is what we asked for.
+      if (code !== PMD_OK && code !== PMD_ALREADY_IN_STATE) return `refused ${pmdErrorName(code)}`;
+      ppiOn = true;
+      activate();
+      return 'started';
+    } catch (e) {
+      return `error ${describeError(e)}`.slice(0, 80);
+    }
+  };
 
   return {
     available: true,
@@ -219,8 +330,13 @@ export function createBle(): BleManagerApi {
         seen.add(d.id);
         onFound(d);
       };
-      manager.startDeviceScan([HR_SERVICE], { allowDuplicates: false }, (error, device) => {
+      // Unfiltered, then filtered here: an optical Polar band may advertise
+      // its own PMD service, or only its name, rather than 0x180D, and a
+      // service filter would hide it. On iOS a list of services is also an OR
+      // only in theory; filtering in JS behaves the same on both platforms.
+      manager.startDeviceScan(null, { allowDuplicates: false }, (error, device) => {
         if (error || !device) return;
+        if (!advertisesStrap(device.serviceUUIDs, device.name || device.localName)) return;
         emit({ id: device.id, name: device.name || device.localName || 'Unknown strap', rssi: device.rssi || -100 });
       });
       // A strap the OS is already linked to has stopped advertising, so the scan
@@ -230,14 +346,15 @@ export function createBle(): BleManagerApi {
       // already holds. Best-effort: Android only reports these once services
       // have been discovered, so it often returns nothing there.
       try {
-        for (const device of await manager.connectedDevices([HR_SERVICE])) {
+        for (const device of await manager.connectedDevices([HR_SERVICE, PMD_SERVICE])) {
           emit({ id: device.id, name: device.name || device.localName || 'Connected strap', rssi: device.rssi || 0, connected: true });
         }
       } catch { /* ignore — the advertising scan is still running */ }
     },
     stopScan() { try { manager.stopDeviceScan(); } catch { /* ignore */ } },
-    async connect(id, onSample, onDisconnect) {
+    async connect(id, onSample, onDisconnect, opts) {
       const epoch = ++connectEpoch;
+      ppiOn = false; // a dropped link ended the old stream on the band
       manager.stopDeviceScan();
       // Retire the previous link's callbacks first — reconnect retries would
       // otherwise stack live monitor + disconnect listeners per attempt.
@@ -261,11 +378,31 @@ export function createBle(): BleManagerApi {
         teardown();
         onDisconnect();
       });
-      monitorSub = device.monitorCharacteristicForService(HR_SERVICE, HR_MEASUREMENT, (error, ch) => {
-        if (error || !ch?.value) return;
-        const bytes = base64ToBytes(ch.value);
-        onSample(parseHeartRateMeasurement(bytes));
-      });
+      let hasHr = true;
+      let hasPmd = false;
+      try {
+        const uuids = (await device.services()).map((sv) => sv.uuid.toLowerCase());
+        hasHr = uuids.some((u) => u === HR_SERVICE || u === HR_SHORT);
+        hasPmd = uuids.includes(PMD_SERVICE);
+      } catch { /* unreadable: behave as before, standard service only */ }
+      if (await cancelled()) throw new Error('Connection superseded');
+      // While PPI runs, its intervals are the beats: 0x2A37 still gives the
+      // pulse (the connection cue) but its RR, if any, would double-count.
+      let ppiActive = false;
+      if (hasHr) {
+        monitorSub = device.monitorCharacteristicForService(HR_SERVICE, HR_MEASUREMENT, (error, ch) => {
+          if (error || !ch?.value) return;
+          const s = parseHeartRateMeasurement(base64ToBytes(ch.value));
+          onSample(ppiActive ? { hr: s.hr, rr: [] } : s);
+        });
+      }
+      let ppi: StrapLink['ppi'] = 'none';
+      if (opts?.beats && hasPmd) {
+        ppi = await startPpi(device, epoch, onSample, opts.onLink, hasHr, () => { ppiActive = true; });
+        if (await cancelled()) throw new Error('Connection superseded');
+      }
+      if (!hasHr && !ppiActive) throw new Error(`No heart-rate service${hasPmd ? ` (PMD ppi ${ppi})` : ''}`);
+      opts?.onLink?.({ stream: ppiActive ? 'ppi' : 'hr', hasHrService: hasHr, ppi });
     },
     async readBattery(id) {
       try {
@@ -283,6 +420,16 @@ export function createBle(): BleManagerApi {
       teardown();
       const id = connectedId;
       connectedId = null;
+      // Leave the band as we found it: a PPI stream left running keeps its own
+      // heart rate on the slow 5 s cadence. Best-effort, and never waited on
+      // for long — the disconnect below ends it on the band anyway.
+      if (id && ppiOn) {
+        ppiOn = false;
+        await Promise.race([
+          manager.writeCharacteristicWithResponseForDevice(id, PMD_SERVICE, PMD_CONTROL, bytesToBase64(PPI_STOP)).catch(() => {}),
+          new Promise((r) => setTimeout(r, 1000)),
+        ]);
+      }
       if (id) { try { await manager.cancelDeviceConnection(id); } catch { /* ignore */ } }
     },
     destroy() {
@@ -348,7 +495,7 @@ export function createBle(): BleManagerApi {
 
       let connectedError: string | null = null;
       let connected: BleScanRecord[] = [];
-      try { connected = (await manager.connectedDevices([HR_SERVICE])).map(toRecord); }
+      try { connected = (await manager.connectedDevices([HR_SERVICE, PMD_SERVICE])).map(toRecord); }
       catch (e) { connectedError = describeError(e); }
 
       const devices = [...seen.values()].sort((a, b) => Number(b.heartRate) - Number(a.heartRate) || (b.rssi ?? -127) - (a.rssi ?? -127));

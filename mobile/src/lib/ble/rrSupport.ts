@@ -31,6 +31,12 @@ export interface RrWatch {
   measurements: number;
   /** Latched: a single RR interval settles the question for good. */
   rrSeen: boolean;
+  /** A Polar PPI stream was started (see `pmd.ts`). Its beats arrive only
+   *  after a warm-up, and the pulse-only samples before them are expected
+   *  rather than evidence, so none of them counts toward 'absent'. */
+  ppi?: boolean;
+  /** The PPI stream stayed silent past `PPI_GIVE_UP_MS`. */
+  ppiTimedOut?: boolean;
 }
 
 export const RR_WATCH_START: RrWatch = { measurements: 0, rrSeen: false };
@@ -56,11 +62,28 @@ export const NO_RR_MEASUREMENTS = 20;
  */
 export function noteRrSample(w: RrWatch, s: { hr: number; rr: number[] }): RrWatch {
   if (s.rr.length) return w.rrSeen ? w : { ...w, rrSeen: true };
-  if (!s.hr || w.rrSeen) return w;
+  if (!s.hr || w.rrSeen || w.ppi) return w;
   return { ...w, measurements: w.measurements + 1 };
+}
+
+/** A PPI stream is running and its first beats have not arrived yet. */
+export function notePpiStarted(w: RrWatch): RrWatch {
+  return w.ppi ? w : { ...w, ppi: true };
+}
+
+/** The PPI stream never delivered: the device is, for us, one that sends no beats. */
+export function notePpiTimeout(w: RrWatch): RrWatch {
+  return w.rrSeen || w.ppiTimedOut ? w : { ...w, ppiTimedOut: true };
+}
+
+/** Waiting on a PPI warm-up: Start is held until this clears. */
+export function ppiWarming(w: RrWatch): boolean {
+  return !!w.ppi && !w.rrSeen && !w.ppiTimedOut;
 }
 
 export function rrSupport(w: RrWatch): RrSupport {
   if (w.rrSeen) return 'present';
+  if (w.ppiTimedOut) return 'absent';
+  if (w.ppi) return 'unknown';
   return w.measurements >= NO_RR_MEASUREMENTS ? 'absent' : 'unknown';
 }

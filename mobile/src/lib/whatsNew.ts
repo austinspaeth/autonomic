@@ -50,6 +50,15 @@ export function fmtReleaseDate(iso: string): string {
 
 export const RELEASES: Release[] = [
   {
+    version: '1.36',
+    date: '2026-10-22',
+    notes: [
+      'Fixed fragmented sleep on Android: nights split into pieces are now stitched back together.',
+      'Interrupted Apple Watch readings are now stitched back together, so you get every metric, including power.',
+      'Polar 360 and other Polar optical bands now work for HRV readings.',
+    ],
+  },
+  {
     version: '1.35',
     date: '2026-10-14',
     notes: [

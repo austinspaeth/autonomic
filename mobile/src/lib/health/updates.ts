@@ -15,12 +15,14 @@ import { computeScores, profileCtx } from '../scoring';
 import { addDays, todayKey, uid } from '../dates';
 import { typesFor } from '../typeCatalog';
 import { rrCoverageSec } from '../hrvQuality';
+import { rrWaveform } from '../waveforms';
+import { applyIntent, claimWatchIntent } from '../garmin/intent';
 import { logError } from '../diagnostics/errorLog';
 import { deleteEntry, ensureDay, getState, save, storeSleepSeries, storeWaveform, upsertEntry } from '../../store/store';
 import { health, healthAppName, type ImportedMed, type ImportedReading, type ImportedWorkout } from './index';
 import {
   allItemKeys, buildUpdateSet, emptyUpdateSet, filterDeclined, filterSeen, splitForReview,
-  updateCount, updateSignature,
+  sleepToFile, updateCount, updateSignature,
   type HealthUpdateSet, type UpdateMed, type UpdateReading,
 } from './updateSet';
 import { withAuthTimeout } from './askedAuth';
@@ -84,9 +86,10 @@ export async function checkHealthUpdatesLast24h(): Promise<HealthUpdateSet[]> {
   return [yesterday, current].filter((s): s is HealthUpdateSet => !!s && updateCount(s) > 0);
 }
 
-/** What one import wrote: the item count, plus the workout entries themselves
- *  so a single imported workout can be shown as its report (features/HealthUpdates). */
-export interface ImportResult { added: number; workouts: Entry[] }
+/** What one import wrote: the item count, plus the workout entries and the
+ *  beat-backed HRV readings themselves, so a single one can be shown as its
+ *  report (features/HealthUpdates). */
+export interface ImportResult { added: number; workouts: Entry[]; hrv: Entry[] }
 
 /**
  * Write the chosen items into the journal through the normal entry paths.
@@ -103,12 +106,13 @@ export function importUpdates(set: HealthUpdateSet, selected: Set<string> | null
   const note = `From ${healthAppName()}`;
   let added = 0;
   const workouts: Entry[] = [];
+  const hrv: Entry[] = [];
 
   for (const r of set.readings) {
     if (!take(r.key)) continue;
     // healthKey rides on the entry so that deleting it can permanently decline
     // this exact sample (see ./declined + deleteEntry in store).
-    const entry: Entry = { id: uid(), type: r.type, time: r.time, note, source, imported: true, healthKey: r.key, ...r.fields };
+    let entry: Entry = { id: uid(), type: r.type, time: r.time, note, source, imported: true, healthKey: r.key, ...r.fields };
     // RR coverage rides on the entry: it's what decides, forever after, whether
     // this imported reading is long enough to trust (src/lib/hrvQuality.ts).
     if (r.type === 'hrv') {
@@ -123,9 +127,16 @@ export function importUpdates(set: HealthUpdateSet, selected: Set<string> | null
         entry.beatCount = r.quality.beatCount;
       }
     }
-    if (r.rr) storeWaveform(entry.id, { rrRaw: r.rr });
+    // A watch reading has no kind of its own: the session the phone started
+    // for it says (`claimWatchIntent`), and otherwise its card asks.
+    if (r.type === 'hrv' && r.rr && source === 'watch') {
+      const intent = r.startMs != null ? claimWatchIntent(r.startMs) : null;
+      entry = intent ? applyIntent(entry, intent) : { ...entry, kindOpen: true };
+    }
+    if (r.rr) storeWaveform(entry.id, rrWaveform({ ...r, rr: r.rr }));
     entry.scores = computeScores(entry, ctx);
     upsertEntry(set.dk, 'readings', entry);
+    if (r.type === 'hrv' && r.rr) hrv.push(entry);
     added++;
   }
 
@@ -149,11 +160,14 @@ export function importUpdates(set: HealthUpdateSet, selected: Set<string> | null
 
   if (set.sleep && take('sleep')) {
     const d = ensureDay(set.dk);
+    // Replacing a night an earlier check imported: its quality was that read's
+    // verdict, not the user's, so the new read decides it.
+    const kept = d.sleep?.imported ? 'good' : (d.sleep?.quality || 'good');
     d.sleep = {
       ...d.sleep,
       bed: set.sleep.bed,
       wake: set.sleep.wake,
-      quality: set.sleep.interrupted ? 'interrupted' : (d.sleep?.quality || 'good'),
+      quality: set.sleep.interrupted ? 'interrupted' : kept,
       ...(set.sleep.hrLow != null ? { hrLow: set.sleep.hrLow } : {}),
       ...(set.sleep.hrHigh != null ? { hrHigh: set.sleep.hrHigh } : {}),
       imported: true,
@@ -166,7 +180,7 @@ export function importUpdates(set: HealthUpdateSet, selected: Set<string> | null
     added++;
   }
 
-  return { added, workouts };
+  return { added, workouts, hrv };
 }
 
 /**
@@ -198,6 +212,36 @@ export function undoImports(dk: string, keys: readonly string[]): number {
     }
   }
   return removed;
+}
+
+/* ---------- one-time repair of nights read early ---------- */
+
+// Before 1.36 a night was final once filed, and Android filed the longest
+// single Health Connect session rather than the stitched night, so a split
+// night stayed split for good. Today's night heals on the next check now
+// (`sleepToFile`); this walks the recent past ONCE and gives every imported,
+// unedited night the same chance. Never requests a permission.
+const KEY_SLEEP_REPAIRED = 'sleepStitchRepaired';
+const REPAIR_DAYS = 30;
+
+export async function repairSplitNights(): Promise<number> {
+  const api = health();
+  const s = getState();
+  if (!api.available || !s.settings.healthEnabled) return 0;
+  try { if (seenStore()?.getBoolean(KEY_SLEEP_REPAIRED)) return 0; } catch { return 0; }
+  const today = todayKey();
+  let repaired = 0;
+  for (let i = 0; i < REPAIR_DAYS; i++) {
+    const dk = addDays(today, -i);
+    const night = getState().days[dk]?.sleep;
+    if (!night?.imported || night.edited) continue;
+    try {
+      const sleep = sleepToFile(getState().days[dk]?.sleep, await api.readSleep(dk));
+      if (sleep) repaired += importUpdates({ ...emptyUpdateSet(dk), sleep }, null).added;
+    } catch (e) { logError('health.repairSleep', e); }
+  }
+  try { seenStore()?.set(KEY_SLEEP_REPAIRED, true); } catch { /* runs again next launch */ }
+  return repaired;
 }
 
 /* ---------- "already shown" memory ---------- */

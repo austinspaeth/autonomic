@@ -605,9 +605,8 @@ export function protocolCriteria(days: DaysMap, dk: string, protocol: Protocol =
     criteria.push({ key: 'triggers', label, pass: logged === 0, hard: true, broken: logged > 0 });
   }
 
-  // At least one HRV reading captured in-app that day. Health-imported readings
-  // (imported: true) don't count — the requirement is to take a reading, same
-  // definition the freemium allowance uses (hrvCaptureUsedToday).
+  // At least one HRV reading taken that day: in-app, or a real session imported
+  // from the health store (hrvCaptureUsedToday says which imports count).
   if (protocol.hrv.enabled) {
     criteria.push({ key: 'hrv', label: 'Take an HRV reading', pass: hrvCaptureUsedToday(d) > 0 });
   }

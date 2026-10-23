@@ -15,6 +15,8 @@ export interface RrCandidate {
    *  frequency domain must not be computed across the seams. Absent/empty on a
    *  continuous take (an ECG, or a series with no flagged gaps). */
   segmentStarts?: number[];
+  /** Real time lost at each seam (ms), index-aligned with `segmentStarts`. */
+  seamGapsMs?: number[];
   startMs: number;
   endMs: number;
   avgHr: number | null; // ECG-reported average HR, results fallback when RR is too dirty

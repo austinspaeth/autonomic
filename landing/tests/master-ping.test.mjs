@@ -641,8 +641,9 @@ check('and every age band either carries a figure or says why not',
    contrasting once the change ages past the cut. One age, one point per weekly
    cohort, releases drawn over it. */
 check('the trend chart rendered', !!$('pgTrend').querySelector('svg'));
+/* Any release label: which ones fall inside the window moves with the calendar. */
 check('it draws the releases it can reach as rules on the axis',
-  /v1\.2/.test($('pgTrend').textContent), $('pgTrend').textContent.slice(-60));
+  /v1\.\d+/.test($('pgTrend').textContent), $('pgTrend').textContent.slice(-60));
 
 const trendNote = $('pgTrendNote').textContent;
 check('the trend note carries a denominator, never a bare percentage',

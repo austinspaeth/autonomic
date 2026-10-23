@@ -1,5 +1,5 @@
 import {
-  noteRrSample, rrSupport, NO_RR_MEASUREMENTS, RR_WATCH_START, type RrWatch,
+  notePpiStarted, notePpiTimeout, noteRrSample, ppiWarming, rrSupport, NO_RR_MEASUREMENTS, RR_WATCH_START, type RrWatch,
 } from '../rrSupport';
 
 /** A strap's notification: a pulse plus the intervals behind it. */
@@ -57,5 +57,31 @@ describe('rrSupport', () => {
     noteRrSample(w, pulseOnly);
     noteRrSample(w, withRr);
     expect(w).toEqual(before);
+  });
+});
+
+describe('rrSupport on a PPI stream', () => {
+  const ppi = notePpiStarted(RR_WATCH_START);
+
+  it('waits through the warm-up: pulse-only samples are expected, not evidence', () => {
+    const w = feed(NO_RR_MEASUREMENTS * 3, pulseOnly, ppi);
+    expect(rrSupport(w)).toBe('unknown');
+    expect(ppiWarming(w)).toBe(true);
+  });
+
+  it('ends the warm-up on the first interval', () => {
+    const w = noteRrSample(feed(30, pulseOnly, ppi), withRr);
+    expect(rrSupport(w)).toBe('present');
+    expect(ppiWarming(w)).toBe(false);
+  });
+
+  it('reads absent once the stream is given up on', () => {
+    const w = notePpiTimeout(ppi);
+    expect(rrSupport(w)).toBe('absent');
+    expect(ppiWarming(w)).toBe(false);
+  });
+
+  it('never times out a stream that has already delivered', () => {
+    expect(rrSupport(notePpiTimeout(noteRrSample(ppi, withRr)))).toBe('present');
   });
 });

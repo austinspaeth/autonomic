@@ -64,7 +64,7 @@ import {
 import type { AppState as JournalState, Entry } from '../lib/types';
 import { importQualityNote, isPoorImport } from '../lib/hrvQuality';
 import { workoutCurveFor } from '../components/summary';
-import { openWorkoutReport } from './forms';
+import { openReadingReport, openWorkoutReport } from './forms';
 import { getState, useAppState } from '../store/store';
 import { typesFor } from '../lib/typeCatalog';
 import { READING_TYPES } from '../lib/registry';
@@ -287,7 +287,7 @@ export function HealthUpdatePill() {
         // before the pill has said anything — the pill is the receipt for it.
         // Only the readings the app declines to file (poor-quality HRV) wait.
         const { auto, review } = splitForReview(fresh);
-        const { added, workouts } = importUpdates(auto, null);
+        const { added, workouts, hrv } = importUpdates(auto, null);
         // Both lanes are marked seen: a receipt the user dismisses without
         // reading is still a thing they were told, and a review row they
         // ignored is an answer. Settings → Apple Health is the way back.
@@ -305,8 +305,14 @@ export function HealthUpdatePill() {
             // one from the card. Never over a sheet that is already up: a
             // reading in progress is not interrupted for a receipt, and the
             // pill is still there to say what was filed.
-            if (workouts.length === 1 && workoutCurveFor(workouts[0]) && depthRef.current === 0 && AppState.currentState === 'active') {
-              openWorkoutReport(openSheet, workouts[0], fresh.dk, true);
+            //
+            // A beat-backed HRV reading lands on its card the same way, and
+            // takes precedence over a workout: a watch reading may be asking
+            // whether it was a baseline or a training one, and the card is
+            // where that is answered.
+            if (depthRef.current === 0 && AppState.currentState === 'active') {
+              if (hrv.length === 1) openReadingReport(openSheet, hrv[0], fresh.dk);
+              else if (workouts.length === 1 && workoutCurveFor(workouts[0])) openWorkoutReport(openSheet, workouts[0], fresh.dk, true);
             }
           });
         } else {
@@ -577,17 +583,21 @@ export function HealthUpdatesSheet({ sets, controls, onImported }: {
   const finish = (selected: Set<string> | null) => {
     let n = 0;
     const workouts: { entry: Entry; dk: string }[] = [];
+    const hrv: { entry: Entry; dk: string }[] = [];
     for (const s of sets) {
       const res = importUpdates(s, selected);
       n += res.added;
       res.workouts.forEach((entry) => workouts.push({ entry, dk: s.dk }));
+      res.hrv.forEach((entry) => hrv.push({ entry, dk: s.dk }));
     }
     controls.closeAll();
     onImported(n);
     // Importing exactly ONE workout lands on its report, the same as picking a
     // workout from the add-activity import card. More than one and there's no
     // single report to show, so the journal list is the right landing place.
-    if (workouts.length === 1 && workoutCurveFor(workouts[0].entry)) {
+    // One HRV reading lands on its card first, as on the automatic check.
+    if (hrv.length === 1) openReadingReport(openSheet, hrv[0].entry, hrv[0].dk);
+    else if (workouts.length === 1 && workoutCurveFor(workouts[0].entry)) {
       openWorkoutReport(openSheet, workouts[0].entry, workouts[0].dk, true);
     }
   };

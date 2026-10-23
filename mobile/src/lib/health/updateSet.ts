@@ -13,7 +13,9 @@
  * item key, which is what made ticking one tick the other.)
  *
  * What qualifies:
- *  - Sleep: last night's session, only while the day has no bed/wake yet.
+ *  - Sleep: last night's session while the day has no bed/wake yet, or in
+ *    place of an imported night nobody edited when the new read is longer
+ *    (`sleepToFile`).
  *  - Readings: HRV with real beat-to-beat RR covering ≥ 4 minutes, resting HR,
  *    and blood pressure — each deduped against the day's readings.
  *  - Exercises: the day's workouts, one row per session, excluding sessions
@@ -21,7 +23,7 @@
  *  - Medications: doses that match a known med type by name (the platform
  *    read is a stub today — see HealthApi.readMedications).
  */
-import type { DayRecord, TypeDef } from '../types';
+import type { DayRecord, SleepRecord, TypeDef } from '../types';
 import { fmtTime12 } from '../dates';
 import { isPoorImport, type ImportedHrvQuality } from '../hrvQuality';
 import type { ImportedMed, ImportedReading, ImportedWorkout, SleepImport } from './index';
@@ -42,6 +44,12 @@ export interface UpdateReading {
   sub: string;                         // "6:52 AM · 5 min"
   fields: Record<string, string>;      // prefilled entry fields
   rr?: number[];                       // beat-to-beat RR, destined for the sidecar
+  /** HRV only: the series' seams and the time each lost, kept beside `rr`. */
+  segmentStarts?: number[];
+  seamGapsMs?: number[];
+  /** HRV only: when the sample began, which is how a session the phone started
+   *  recognises the reading it was for (garmin/intent). */
+  startMs?: number;
   /** HRV only: how good the beat series behind it was, so the offer can say so
    *  before it is accepted (src/lib/hrvQuality). Absent = nothing to grade. */
   quality?: ImportedHrvQuality;
@@ -66,6 +74,35 @@ export interface HealthUpdateSet {
 
 export function updateCount(set: HealthUpdateSet): number {
   return (set.sleep ? 1 : 0) + set.readings.length + set.workouts.length + set.meds.length;
+}
+
+const clockMin = (hhmm: string): number => {
+  const [h, m] = hhmm.split(':').map(Number);
+  return h * 60 + m;
+};
+/** Bed → wake in minutes, across midnight. */
+const nightSpanMin = (bed: string, wake: string): number => {
+  const mins = clockMin(wake) - clockMin(bed);
+  return mins < 0 ? mins + 1440 : mins;
+};
+
+/**
+ * The night a check should file, or null.
+ *
+ * A night used to be offered only while the day had none, so the first read
+ * was final. That is wrong whenever the first read is early: the check runs
+ * on every foreground, a wearer who looks at their phone at 6am gets the night
+ * as it stood at 6am, and the rest of it (Google Health writes a split night
+ * in pieces) was never filed. So an IMPORTED night is replaced by a later read
+ * that covers more of it. Only longer, so two sources cannot take turns, and
+ * never a night the user typed or corrected: theirs is the answer.
+ */
+export function sleepToFile(existing: SleepRecord | undefined, fresh: SleepImport | null): SleepImport | null {
+  if (!fresh) return null;
+  if (!(existing?.bed && existing?.wake)) return fresh;
+  if (!existing.imported || existing.edited) return null;
+  if (existing.bed === fresh.bed && existing.wake === fresh.wake) return null;
+  return nightSpanMin(fresh.bed, fresh.wake) > nightSpanMin(existing.bed, existing.wake) ? fresh : null;
 }
 
 /** Stable identity of the sleep row (its selection key is just 'sleep'). */
@@ -253,8 +290,8 @@ export function buildUpdateSet(
 
   const out: HealthUpdateSet = { dk, sleep: null, readings: [], workouts: [], meds: [] };
 
-  // Sleep — only while the day has none, so an edited night is never fought over.
-  if (raw.sleep && !(day?.sleep?.bed && day?.sleep?.wake)) out.sleep = raw.sleep;
+  // Sleep — while the day has none, or to finish an imported night read early.
+  out.sleep = sleepToFile(day?.sleep, raw.sleep);
 
   for (const im of raw.imports) {
     if (im.ownApp) continue;
@@ -269,7 +306,8 @@ export function buildUpdateSet(
         key: `hrv-${im.startMs}`, type: 'hrv', time: im.time,
         title: ms != null ? `HRV ${ms} ms` : 'HRV reading',
         sub: `${fmtTime12(im.time)} · ${Math.round(rrTotalMs(im.rr) / 60000)} min`,
-        fields: im.fields, rr: im.rr, quality: im.quality,
+        fields: im.fields, rr: im.rr, segmentStarts: im.segmentStarts, seamGapsMs: im.seamGapsMs,
+        startMs: im.startMs, quality: im.quality,
       });
     } else if (im.type === 'restingHr') {
       // Apple's resting HR is ~one derived sample a day; a same-value or

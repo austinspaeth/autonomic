@@ -416,7 +416,11 @@ function SleepEditFields({ dk, sleep }: { dk: string; sleep: SleepShape }) {
   const setField = (field: string, v: string) => {
     const s = ensureDay(dk).sleep;
     const prevBed = s.bed;
-    (s as never as Record<string, string>)[field] = v;
+    const fields = s as never as Record<string, unknown>;
+    // A corrected import is the user's night now; Health must not replace it.
+    // Compared first: the HR fields commit on blur, changed or not.
+    if (s.imported && String(fields[field] ?? '') !== v) s.edited = true;
+    fields[field] = v;
     // Correcting the window KEEPS the overnight series: it was measured, and
     // the times are what was wrong. The curve is stored as offsets from bed,
     // so a new bedtime shifts every point by the same amount (lossless — what

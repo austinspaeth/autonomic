@@ -13,13 +13,13 @@
  *  - Provenance is `metadata.dataOrigin` (a package name), not a bundle id.
  *  - Queries take ISO strings and are paged via pageToken.
  */
-import type { Entry, SleepStages } from '../types';
+import type { Entry } from '../types';
 import { keyOf } from '../dates';
 import {
   hasAskedAuth, markAskedAuth, markPromptedThisLaunch, markUngrantable, promptedThisLaunch,
   shareAuthRequest, ungrantable, ungrantableScope,
 } from './askedAuth';
-import { INTERRUPTED_AWAKE_MIN, NIGHT_END_HOUR, NIGHT_START_HOUR, nightKeyOf, type StageSpan } from './sleepSummary';
+import { NIGHT_END_HOUR, NIGHT_START_HOUR, nightKeyOf, summarizeHcSessions, type SleepSummary } from './sleepSummary';
 import { thinSeries, type HrPoint, type RespPoint } from '../sleep/night';
 import { activityTypeFromHc, workoutHrSeries } from './workoutMap';
 import { stepTotalFromRecords } from './stepTotal';
@@ -83,12 +83,8 @@ const WRITE_TYPES = [
   'HeartRateVariabilityRmssd', 'HeartRate', 'RestingHeartRate', 'BloodPressure',
 ];
 
-/** Health Connect sleep-stage constants → the app's stage buckets. */
-const STAGE_AWAKE = [1, 7];          // AWAKE, AWAKE_IN_BED
-const STAGE_LIGHT = 4;               // → core (Apple's naming for light sleep)
-const STAGE_DEEP = 5;
-const STAGE_REM = 6;
-const STAGE_UNSPECIFIED = 2;         // SLEEPING — asleep, stage unknown
+/** Health Connect sleep-stage constants live with the pure stitcher
+ *  (`summarizeHcSessions` in ./sleepSummary). */
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const hhmm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -106,9 +102,6 @@ function dateAt(dk: string, time?: string): Date {
 
 const isOwnRecord = (meta?: Metadata): boolean => meta?.dataOrigin === OWN_PACKAGE;
 
-
-const durMs = (s: SleepRecord): number =>
-  new Date(s.endTime).getTime() - new Date(s.startTime).getTime();
 
 export function makeHealthConnect(mod: HcModule): HealthApi {
   let initialized = false;
@@ -167,45 +160,26 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
     try { await mod.insertRecords(records); return true; } catch { return false; }
   };
 
-  /** Longest session wins — the night, not a nap that shared the window. */
-  const mainSession = (sessions: SleepRecord[]): SleepRecord =>
-    sessions.reduce((a, b) => (durMs(b) > durMs(a) ? b : a));
+  /** Every session in the window → the night, stitched (see summarizeHcSessions). */
+  const summarizeSessions = (sessions: SleepRecord[]): SleepSummary | null =>
+    summarizeHcSessions(sessions.map((r) => ({
+      startMs: new Date(r.startTime).getTime(),
+      endMs: new Date(r.endTime).getTime(),
+      origin: r.metadata?.dataOrigin || '',
+      stages: (r.stages || []).map((st) => ({
+        startMs: new Date(st.startTime).getTime(), endMs: new Date(st.endTime).getTime(), stage: st.stage,
+      })),
+    })));
 
   /**
-   * One Health Connect sleep session → the app's night shape, including the
-   * overnight HR range read across it. Stages: light→core (Apple's name for
-   * it); SLEEPING counts as asleep but carries no stage, so a night of only
-   * SLEEPING blocks reports stages: null (mirrors iOS asleepUnspecified).
+   * The stitched night → the app's night shape, including the overnight HR
+   * range read across it. Stages: light→core (Apple's name for it); SLEEPING
+   * counts as asleep but carries no stage, so a night of only SLEEPING blocks
+   * reports stages: null (mirrors iOS asleepUnspecified).
    */
-  async function nightOf(main: SleepRecord): Promise<SleepImport> {
-    const bed = new Date(main.startTime);
-    const wake = new Date(main.endTime);
-
+  async function nightOf(night: SleepSummary): Promise<SleepImport> {
+    const { bed, wake } = night;
     const bedMs = bed.getTime();
-    let deepMin = 0; let remMin = 0; let coreMin = 0; let awakeMin = 0; let unspecMin = 0;
-    // The same blocks, kept as a timeline as well as summed — the hypnogram is
-    // what lets the report say WHEN a stage happened rather than only how much.
-    const spans: StageSpan[] = [];
-    for (const st of main.stages || []) {
-      const startMs = new Date(st.startTime).getTime();
-      const mins = (new Date(st.endTime).getTime() - startMs) / 60000;
-      const span = (v: StageSpan['v']) => spans.push({
-        s: Math.round((startMs - bedMs) / 1000), d: Math.round(mins * 60), v,
-      });
-      if (STAGE_AWAKE.includes(st.stage)) { awakeMin += mins; span('awake'); }
-      else if (st.stage === STAGE_LIGHT) { coreMin += mins; span('core'); }
-      else if (st.stage === STAGE_DEEP) { deepMin += mins; span('deep'); }
-      else if (st.stage === STAGE_REM) { remMin += mins; span('rem'); }
-      else if (st.stage === STAGE_UNSPECIFIED) unspecMin += mins;
-    }
-    spans.sort((a, b) => a.s - b.s);
-    const staged = deepMin + remMin + coreMin > 0;
-    const asleepMin = staged || unspecMin > 0
-      ? deepMin + remMin + coreMin + unspecMin
-      : durMs(main) / 60000;
-    const stages: SleepStages | null = staged
-      ? { deep: Math.round(deepMin), rem: Math.round(remMin), core: Math.round(coreMin), awake: Math.round(awakeMin) }
-      : null;
 
     // The overnight heart-rate curve, kept rather than reduced to min/max on
     // the way past — the iOS side keeps it too, and the report reads the same
@@ -237,12 +211,12 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
       wakeISO: wake.toISOString(),
       hrLow: bpms.length ? Math.round(Math.min(...bpms)) : null,
       hrHigh: bpms.length ? Math.round(Math.max(...bpms)) : null,
-      interrupted: awakeMin > INTERRUPTED_AWAKE_MIN,
-      minutesAsleep: Math.round(asleepMin),
-      stages,
+      interrupted: night.interrupted,
+      minutesAsleep: night.minutesAsleep,
+      stages: night.stages,
       hrSeries: hrSeries.length ? hrSeries : null,
       respSeries: respPts.length ? thinSeries(respPts, NIGHT_SERIES_MAX) : null,
-      spans,
+      spans: night.spans,
     } satisfies SleepImport;
   }
 
@@ -522,9 +496,11 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
       const nights = [...byNight.entries()].sort((a, b) => a[0].localeCompare(b[0]));
       let doneNights = 0;
       for (const [dayKey, group] of nights) {
-        const night = await nightOf(mainSession(group));
+        const summary = summarizeSessions(group);
         doneNights++;
         step('Sleep', doneNights, nights.length);
+        if (!summary) continue;
+        const night = await nightOf(summary);
         if (night.minutesAsleep >= HISTORY_SLEEP_MIN_MIN) out.sleep.push({ ...night, dayKey });
       }
 
@@ -568,14 +544,14 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
 
     async readSleep(dk) {
       // Same window strategy as iOS: the night ending on `dk` starts the prior
-      // evening; query prev-day 18:00 → this-day 14:00 and take the longest
-      // session (so a nap doesn't win).
+      // evening; query prev-day 18:00 → this-day 14:00 and stitch the
+      // sessions into the night (so a split night is whole and a nap doesn't win).
       const [y, m, d] = dk.split('-').map(Number);
       const from = new Date(y, m - 1, d - 1, NIGHT_START_HOUR, 0, 0);
       const to = new Date(y, m - 1, d, NIGHT_END_HOUR, 0, 0);
       const sessions = await readAll<SleepRecord>('SleepSession', from, to);
-      if (!sessions.length) return null;
-      return nightOf(mainSession(sessions));
+      const night = summarizeSessions(sessions);
+      return night ? nightOf(night) : null;
     },
 
     async writeHrvSession({ rmssdMs, avgHr, startISO, durationSec }) {

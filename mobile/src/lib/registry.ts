@@ -10,6 +10,7 @@
  */
 import type { Entry, FieldDef, TypeDef } from './types';
 import { orthoMaxDelta } from './scoring';
+import { undecidedLabel } from './hrvKind';
 import { fieldShown, fieldUnit, fmtDist } from './units';
 
 /** Blood-pressure auto-advance: a value starting with 1 (or, for systolic, 2)
@@ -593,14 +594,15 @@ export function summarizeFields(def: TypeDef | undefined, r: Entry): string {
 
 /** Simplified value shown on the right of a reading row (one thing per type). */
 /**
- * Display name for a reading. Only an HRV auto-imported from Apple Health
- * (welcome-view backfill, `imported`) is shown as "Apple Watch HRV"; an HRV
- * captured through the readings section keeps its registry label (Training /
- * Baseline HRV) even when the watch was the capture source — the summary
- * card's Source row is what says it came from the watch.
+ * Display name for a reading. A wrist reading nobody has called a baseline or
+ * a training reading yet is "Apple Watch HRV" / "Garmin HRV" (lib/hrvKind);
+ * once it is answered, or for anything captured through the readings section,
+ * the registry label applies (Training / Baseline HRV) even when a watch was
+ * the source — the summary card's Source row is what says where it came from.
  */
 export function readingLabel(r: Entry): string {
-  if (r.type === 'hrv' && r.source === 'watch' && r.imported) return 'Apple Watch HRV';
+  const open = undecidedLabel(r);
+  if (open) return open;
   if (r.type === 'hrv' && r.source === 'health' && r.imported) return 'Imported HRV';
   return READING_TYPES[r.type]?.label ?? r.type;
 }

@@ -216,12 +216,15 @@ function receive(msg: GarminMessage) {
   if (mapped.section === 'readings') {
     if (prior) {
       mapped.entry.type = prior.type;
-      for (const k of ['style', 'period'] as const) {
+      for (const k of ['style', 'period', 'kindOpen'] as const) {
         if (prior[k] !== undefined) mapped.entry[k] = prior[k];
       }
     } else {
+      // Started on the watch with no phone session behind it, nobody has said
+      // what kind of reading it was, so its card asks (lib/hrvKind).
       const intent = claimGarminIntent(mapped.entry);
       if (intent) mapped.entry = applyIntent(mapped.entry, intent);
+      else if (mapped.entry.type === 'hrv') mapped.entry = { ...mapped.entry, kindOpen: true };
     }
   }
 

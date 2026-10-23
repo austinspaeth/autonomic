@@ -20,8 +20,14 @@
  * reading.
  *
  * Memory-only on purpose. Losing it (the app killed mid-reading) files the
- * reading as a baseline, which is exactly what happened before — the one
- * outcome that is never worse than today.
+ * reading as an undecided one whose card asks (lib/hrvKind), which is the
+ * answer for any reading the phone did not start.
+ *
+ * The Apple Watch has the same problem by another road: a reading the phone
+ * started can be filed by the Apple Health import rather than by the watch-sync
+ * card (the card was dismissed, the app went away before Health had it), and
+ * it then arrived knowing nothing. So the module holds one intent per wrist,
+ * and the Health import claims the watch's by the sample's start time.
  */
 import type { Entry } from '../types';
 
@@ -57,7 +63,8 @@ export function intentMatches(entry: Entry, intent: GarminIntent): boolean {
  * `avgHr`, which is what the two types read).
  */
 export function applyIntent(entry: Entry, intent: GarminIntent): Entry {
-  const out: Entry = { ...entry };
+  // The phone said what this was, so its card never asks.
+  const out: Entry = { ...entry, kindOpen: false };
   if (intent.kind === 'breath') {
     out.type = 'breathHrv';
     if (intent.style) out.style = intent.style;
@@ -67,6 +74,7 @@ export function applyIntent(entry: Entry, intent: GarminIntent): Entry {
 }
 
 let pending: GarminIntent | null = null;
+let pendingWatch: GarminIntent | null = null;
 
 export function armGarminIntent(intent: GarminIntent) { pending = intent; }
 
@@ -78,5 +86,17 @@ export function claimGarminIntent(entry: Entry): GarminIntent | null {
   return hit;
 }
 
+/** An Apple Watch session the phone started (`beginCollection`). */
+export function armWatchIntent(intent: GarminIntent) { pendingWatch = intent; }
+
+/** The watch session's intent, consumed, when a Health sample that began at
+ *  `startMs` is the reading it was for. */
+export function claimWatchIntent(startMs: number): GarminIntent | null {
+  if (!pendingWatch || !(Math.abs(startMs - pendingWatch.armedAtMs) <= INTENT_WINDOW_MS)) return null;
+  const hit = pendingWatch;
+  pendingWatch = null;
+  return hit;
+}
+
 /** Tests only. */
-export function resetGarminIntent() { pending = null; }
+export function resetGarminIntent() { pending = null; pendingWatch = null; }

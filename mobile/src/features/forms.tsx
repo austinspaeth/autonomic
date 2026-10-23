@@ -37,7 +37,8 @@ import { OrthostaticSession } from './pots/OrthostaticSession';
 // Re-exported so `./forms` stays the one import site for entry editing; they
 // live in their own module to keep the capture sheets out of a require cycle.
 import { confirmDelete, EntryForm, useDeleteButton, type ArrKey } from './EntryForm';
-import { profileCtx } from '../lib/scoring';
+import { computeScores, profileCtx } from '../lib/scoring';
+import { kindUndecided, withKind, type HrvKind } from '../lib/hrvKind';
 import { distText, distToMi, distUnit } from '../lib/units';
 export { confirmDelete, EntryForm };
 export type { ArrKey };
@@ -566,16 +567,7 @@ export function useEntryForms(dk: string) {
     else openSheet((c) => <EntryForm typeMap={typesFor(getState(), 'activities')} arrKey="activities" dk={dk} type={type} existing={existing} controls={c} onSaved={refresh} />);
   };
 
-  const openReadingSummary = (r: Entry) => {
-    if (openPotsLockIfNeeded(openSheet, r, dk)) return;
-    openSheet(
-      () => <ReadingSummarySheet r={r} dk={dk} />,
-      {
-        action: { icon: 'edit', onPress: () => openReadingForm(r.type, r) },
-        destructive: { onPress: () => confirmDelete(openSheet, dk, 'readings', r, READING_TYPES[r.type]?.label || 'reading') },
-      },
-    );
-  };
+  const openReadingSummary = (r: Entry) => openReadingReport(openSheet, r, dk);
 
   // The workout report (HR-over-time with zones + stats), for activities that
   // carry an HR trace. The pencil stacks the normal edit form on top.
@@ -624,6 +616,35 @@ export function useEntryForms(dk: string) {
   return { openReadingForm, openActivityForm, openActivity, openReadingSummary, captureHrv, captureBaseline, pickReading, pickActivity, pickMed, pickSymptom, openMed, openSymptom };
 }
 
+/**
+ * A reading's card: the summary, with the pencil (the edit form, which reads
+ * the LIVE entry so a kind answered on the card is not undone by it) and the
+ * trash. The one opener for the journal row, a watch arrival and a Health
+ * import, so all three carry the same buttons.
+ */
+export function openReadingReport(openSheet: OpenSheet, r: Entry, dk: string): void {
+  if (openPotsLockIfNeeded(openSheet, r, dk)) return;
+  const latest = () => (getState().days[dk]?.readings || []).find((x) => x.id === r.id) || r;
+  openSheet(
+    () => <ReadingSummarySheet r={r} dk={dk} />,
+    {
+      action: { icon: 'edit', onPress: () => {
+        const cur = latest();
+        openSheet((c) => <EntryForm typeMap={READING_TYPES} arrKey="readings" dk={dk} type={cur.type} existing={cur} controls={c} onSaved={() => { /* store change re-renders */ }} />);
+      } },
+      destructive: { onPress: () => confirmDelete(openSheet, dk, 'readings', latest(), READING_TYPES[latest().type]?.label || 'reading') },
+    },
+  );
+}
+
+/** File a wrist reading under the kind its wearer says it was (lib/hrvKind):
+ *  renamed and re-graded, nothing else touched. */
+export function setReadingKind(dk: string, r: Entry, kind: HrvKind): void {
+  const next = withKind(r, kind);
+  next.scores = computeScores(next, profileCtx(getState().profile));
+  upsertEntry(dk, 'readings', next);
+}
+
 export function ReadingSummarySheet({ r, dk }: { r: Entry; dk: string }) {
   const p = usePalette();
   useAppState(); // re-render on edits
@@ -635,6 +656,7 @@ export function ReadingSummarySheet({ r, dk }: { r: Entry; dk: string }) {
       {/* The edit + close pill floats top-right — keep the header text clear of it. */}
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, paddingRight: 100 }}>{readingLabel(live)}</Text>
       <Text style={{ color: p.textDim, fontSize: 14, marginTop: 2, marginBottom: 14, paddingRight: 100 }}>{live.time ? fmtTime12(live.time as string) : ''}</Text>
+      {kindUndecided(live) ? <HrvKindPrompt onPick={(k) => setReadingKind(dk, live, k)} /> : null}
       <ReadingSummary r={live} days={state.days} ctx={ctx} />
       <View style={{ height: 24 }} />
     </ScrollView>
@@ -678,6 +700,27 @@ export function WorkoutSummarySheet({ r, dk, justImported, onEdit }: { r: Entry;
       <WorkoutSummary r={live} days={state.days} ctx={ctx} />
       <View style={{ height: 24 }} />
     </ScrollView>
+  );
+}
+
+/**
+ * The question on an undecided wrist reading's card. It stays until it is
+ * answered; leaving it unanswered is an answer too, and the reading goes on
+ * counting as the baseline it was filed as. The pencil can change it later.
+ */
+function HrvKindPrompt({ onPick }: { onPick: (k: HrvKind) => void }) {
+  const p = usePalette();
+  return (
+    <View style={{ borderWidth: 1, borderColor: p.border, borderRadius: radius.card, backgroundColor: p.surface, marginBottom: 14, padding: 15 }}>
+      <Text style={{ fontSize: 15, fontWeight: '700', color: p.text }}>Was this a baseline or a training reading?</Text>
+      <Text style={{ fontSize: 13, color: p.textDim, marginTop: 3, lineHeight: 17 }}>
+        Baseline is sitting still and breathing normally. Training is paced breathing.
+      </Text>
+      <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
+        <Button title="Baseline" icon="heartPulse" onPress={() => onPick('baseline')} style={{ flex: 1 }} />
+        <Button title="Training" icon="wind" onPress={() => onPick('training')} style={{ flex: 1 }} />
+      </View>
+    </View>
   );
 }
 
