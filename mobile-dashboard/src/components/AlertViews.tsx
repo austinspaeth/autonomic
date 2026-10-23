@@ -327,14 +327,22 @@ function Toast({
 }
 
 /** The live deck, anchored just above the bottom bar (and filter bar). */
-export function ToastStack({ raisedBy = 0 }: { raisedBy?: number }) {
+export function ToastStack({
+  raisedBy = 0,
+  area,
+}: {
+  raisedBy?: number;
+  /** The span to centre over, when it is not the whole window (a phone on its side, beside the alerts panel). */
+  area?: { left: number; width: number };
+}) {
   const insets = useSafeAreaInsets();
   const { history, live, dismiss, dismissAll } = useAlerts();
   const [frontH, setFrontH] = useState(TOAST_H);
   // Centred, and no wider than the app's column on an iPad or a Mac.
   const { width: winW } = useWindowDimensions();
   const wide = useWide();
-  const deckW = Math.min(winW, 444) - 24;
+  const span = area ?? { left: 0, width: winW };
+  const deckW = Math.min(span.width, 444) - 24;
   // Most important first, newest first within a kind (`live` is in arrival
   // order, and the sort is stable).
   const shown = [...live]
@@ -376,7 +384,7 @@ export function ToastStack({ raisedBy = 0 }: { raisedBy?: number }) {
   const behind = Math.min(shown.length - 1, MAX_DEPTH - 1);
   const front = Math.max(TOAST_H, frontH);
   return (
-    <View pointerEvents="box-none" style={[st.deck, { left: (winW - deckW) / 2, width: deckW, bottom, height: front + PEEK * behind + (shown.length > 1 ? 44 : 0) }]}>
+    <View pointerEvents="box-none" style={[st.deck, { left: span.left + (span.width - deckW) / 2, width: deckW, bottom, height: front + PEEK * behind + (shown.length > 1 ? 44 : 0) }]}>
       {shown.length > 1 ? (
         <Animated.View entering={FadeIn.duration(200)} exiting={FadeOut.duration(150)} style={st.closeAllWrap}>
           <Pressable
@@ -408,22 +416,28 @@ const HISTORY_TABS: { key: HistoryTab; label: string }[] = [
   { key: 'download', label: 'New' },
 ];
 
-export function AlertHistory() {
+/**
+ * The alert history, grouped by day. `compact` is the always-open panel on a
+ * phone on its side: today's alerts only, with no day heading over them, in
+ * tighter rows so a good run of them fits in a narrow column.
+ */
+export function AlertHistory({ compact }: { compact?: boolean } = {}) {
   const insets = useSafeAreaInsets();
   const { history, clearHistory } = useAlerts();
   const [open, setOpen] = useState<string | null>(null);
   const [tab, setTab] = useState<HistoryTab>('all');
   const [draft, setDraft] = useState<SubPing | null>(null);
-  const shown = tab === 'all' ? history : history.filter((e) => e.kind === tab);
+  const today = new Date();
+  const dayKey = (d: Date) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+  const todayKey = dayKey(today);
+  const shown = (tab === 'all' ? history : history.filter((e) => e.kind === tab)).filter((e) => !compact || dayKey(new Date(e.at)) === todayKey);
   const groups = new Map<string, AlertEvent[]>();
   shown.forEach((e) => {
-    const d = new Date(e.at);
-    const k = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    const k = dayKey(new Date(e.at));
     (groups.get(k) || groups.set(k, []).get(k)!).push(e);
   });
-  const today = new Date();
   const label = (k: string) => {
-    const t = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    const t = todayKey;
     const y = new Date(today.getTime() - 864e5);
     const yk = `${y.getFullYear()}-${String(y.getMonth() + 1).padStart(2, '0')}-${String(y.getDate()).padStart(2, '0')}`;
     return k === t ? 'Today' : k === yk ? 'Yesterday' : longDate(k);
@@ -440,7 +454,7 @@ export function AlertHistory() {
 
   return (
     <View style={{ flex: 1 }}>
-      <View style={st.tabs}>
+      <View style={compact ? st.tabsCompact : st.tabs}>
         <Segmented options={HISTORY_TABS} value={tab} onChange={setTab} />
       </View>
       {/* The sheet bleeds to the bottom edge, so the list scrolls under the
@@ -448,30 +462,44 @@ export function AlertHistory() {
       <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 + insets.bottom }} showsVerticalScrollIndicator={false}>
         <Animated.View key={tab} entering={FadeIn.duration(180)}>
           {!shown.length ? (
-            <Text style={st.tabEmpty}>{tab === 'sale' ? 'No sales in the history yet.' : 'No new installs in the history yet.'}</Text>
+            <Text style={st.tabEmpty}>
+              {compact
+                ? tab === 'sale'
+                  ? 'No sales yet today.'
+                  : tab === 'all'
+                    ? 'Nothing yet today.'
+                    : 'No new installs yet today.'
+                : tab === 'sale'
+                  ? 'No sales in the history yet.'
+                  : 'No new installs in the history yet.'}
+            </Text>
           ) : null}
             {[...groups.entries()].map(([k, list]) => (
-              <View key={k} style={{ marginBottom: 18 }}>
-                <View style={st.dayHead}>
-                  <Text style={st.dayLabel}>{label(k)}</Text>
-                  <Text style={st.dayCount}>{list.length}</Text>
-                </View>
-                <View style={st.dayCard}>
+              <View key={k} style={{ marginBottom: compact ? 12 : 18 }}>
+                {compact ? null : (
+                  <View style={st.dayHead}>
+                    <Text style={st.dayLabel}>{label(k)}</Text>
+                    <Text style={st.dayCount}>{list.length}</Text>
+                  </View>
+                )}
+                <View style={[st.dayCard, compact && st.dayCardCompact]}>
                   {list.map((e, i) => {
                     const isOpen = open === e.id;
                     return (
                       <Animated.View key={e.id} layout={ROW_EASE}>
                         {i ? <View style={st.sep} /> : null}
-                        <Pressable onPress={() => setOpen(isOpen ? null : e.id)} style={st.hItem}>
-                          <View style={st.toastHead}>
-                            <Icon kind={e.kind} size={30} />
+                        <Pressable onPress={() => setOpen(isOpen ? null : e.id)} style={compact ? st.hItemCompact : st.hItem}>
+                          <View style={[st.toastHead, compact && { gap: 8 }]}>
+                            <Icon kind={e.kind} size={compact ? 22 : 30} />
                             <View style={{ flex: 1, minWidth: 0 }}>
-                              <Text style={st.title}>{e.title}</Text>
-                              <Text style={st.body} numberOfLines={isOpen ? undefined : 1}>
+                              <Text style={compact ? st.titleCompact : st.title} numberOfLines={compact && !isOpen ? 1 : undefined}>
+                                {e.title}
+                              </Text>
+                              <Text style={compact ? st.bodyCompact : st.body} numberOfLines={isOpen ? undefined : 1}>
                                 {e.body}
                               </Text>
                             </View>
-                            <Text style={st.time}>{timeOf(e.at)}</Text>
+                            <Text style={compact ? st.timeCompact : st.time}>{timeOf(e.at)}</Text>
                           </View>
                           {isOpen ? (
                             <Animated.View entering={FadeIn.duration(200)}>
@@ -485,9 +513,11 @@ export function AlertHistory() {
                 </View>
               </View>
             ))}
-            <Pressable onPress={clearHistory} style={({ pressed }) => [st.clear, pressed && { opacity: 0.6 }]}>
-              <Text style={st.clearText}>Clear history</Text>
-            </Pressable>
+            {compact ? null : (
+              <Pressable onPress={clearHistory} style={({ pressed }) => [st.clear, pressed && { opacity: 0.6 }]}>
+                <Text style={st.clearText}>Clear history</Text>
+              </Pressable>
+            )}
         </Animated.View>
       </ScrollView>
       {/* Inside the history, so the sale form rises over it. */}
@@ -549,12 +579,19 @@ const st = StyleSheet.create({
   empty: { flex: 1, alignItems: 'center', justifyContent: 'center', gap: 12, paddingHorizontal: 30 },
   emptyText: { color: C.muted, fontSize: 14, textAlign: 'center', lineHeight: 20 },
   tabs: { marginBottom: 16 },
+  tabsCompact: { marginBottom: 10 },
   tabEmpty: { color: C.muted, fontSize: 14, textAlign: 'center', paddingVertical: 40 },
   dayHead: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'baseline', marginBottom: 8, paddingHorizontal: 4 },
   dayLabel: { color: C.text, fontSize: 15, fontWeight: '700' },
   dayCount: { color: C.muted, fontSize: 12 },
   dayCard: { backgroundColor: 'rgba(255,255,255,0.04)', borderRadius: 18, paddingHorizontal: 12 },
   hItem: { paddingVertical: 12 },
+  hItemCompact: { paddingVertical: 7 },
+  /* No card behind the rows in the panel: they sit straight on it. */
+  dayCardCompact: { backgroundColor: 'transparent', borderRadius: 0, paddingHorizontal: 0 },
+  titleCompact: { color: C.text, fontSize: 13, fontWeight: '700' },
+  bodyCompact: { color: C.dim, fontSize: 11, lineHeight: 14 },
+  timeCompact: { color: C.muted, fontSize: 11 },
   sep: { height: StyleSheet.hairlineWidth, backgroundColor: C.hairline },
   clear: { alignItems: 'center', paddingVertical: 12 },
   clearText: { color: C.down, fontSize: 14, fontWeight: '600' },

@@ -45,8 +45,10 @@ export function Sheet({
 }) {
   const insets = useSafeAreaInsets();
   const { height: winH, width: winW } = useWindowDimensions();
-  /* Wide (iPad, Mac): the same sheet is a panel that slides in from the right
-     over a darkened screen, on a plain ease with no bounce. */
+  /* Wide (iPad, Mac, and a phone on its side, where a card rising from the
+     bottom would have 400 points to rise into): the same sheet is a panel
+     that slides in from the right over a darkened screen, on a plain ease
+     with no bounce. */
   const wide = winW >= WIDE_FROM;
   const wideRef = useRef(wide);
   wideRef.current = wide;
@@ -137,7 +139,7 @@ export function Sheet({
           <Pressable style={StyleSheet.absoluteFill} onPress={close} />
         </Animated.View>
         <View style={s.side} pointerEvents="box-none">
-          <Animated.View style={[s.panel, { width: Math.min(PANEL_W, winW), paddingTop: insets.top + 18, paddingBottom: bleed ? 0 : 24 + insets.bottom }, panel]}>
+          <Animated.View style={[s.panel, { width: Math.min(PANEL_W + insets.right, winW), paddingTop: insets.top + 18, paddingRight: 18 + insets.right, paddingBottom: bleed ? 0 : 24 + insets.bottom }, panel]}>
             <BlurView tint="dark" intensity={80} style={StyleSheet.absoluteFill} />
             <View style={[StyleSheet.absoluteFill, { backgroundColor: GLASS_TINT }]} />
             <View pointerEvents="none" style={s.panelEdge} />
@@ -159,7 +161,7 @@ export function Sheet({
   }
   const ceiling = Math.min(winH * 0.92, winH - insets.top - 8);
   return (
-    <Modal transparent visible animationType="none" onRequestClose={close} statusBarTranslucent>
+    <Modal transparent visible animationType="none" onRequestClose={close} statusBarTranslucent supportedOrientations={['portrait', 'landscape']}>
       <Animated.View style={[StyleSheet.absoluteFill, { backgroundColor: '#000' }, backdrop]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={close} />
       </Animated.View>

@@ -470,8 +470,9 @@ const parts = (keys: Key[], counts: Record<string, number>) =>
 
 /* ============================================================ ON <DAY> */
 
-/** Pro retention on the day: the ledger says who is still paying, the open
- *  route's tier letter says who of them is still in the app. */
+/** Pro retention on the day: of the subscriptions still on the book (the
+ *  ledger), the share that opened the app that day (the open route's tier
+ *  letter). Who is still PAYING is the ledger's survival, kept in the rows. */
 function proRetentionSpec(ix: UsageIndex, ctx: Ctx, day: string, l: ReturnType<typeof ledger>): MetricSpec {
   const r = proRetention(l, day);
   const before = proRetention(l, addDays(day, -30)).whole.pct;
@@ -489,21 +490,24 @@ function proRetentionSpec(ix: UsageIndex, ctx: Ctx, day: string, l: ReturnType<t
   const lapsed = (n: number) => Array.from({ length: n }, (_, i) => addDays(day, -i)).reduce((t, d) => t + (known(ix, 'lap', d) ? totalOn(ix, 'lap', d) : 0), 0);
   const surv = (n: number) => r.at[n];
   const p = proIn(day);
+  const book = bookOn(l, day).active;
+  const now = inApp(day);
+  const prev = inApp(addDays(day, -1));
   return {
     key: 'proRetention',
     label: 'Pro retention',
-    value: pct(r.whole.pct),
-    aside: `${int(r.whole.kept)} of ${int(r.whole.started)}`,
-    change: r.whole.pct !== null && before !== null ? { value: r.whole.pct, base: before } : null,
-    note: 'Of every subscription ever started, the share still paying on this day, from the sales ledger (a subscription runs until marked cancelled). D30/60/90 count only subscriptions at least that old. In the app is Pro opens that day against the subscriptions on the book.',
+    value: pct(now),
+    aside: p === null ? undefined : `${int(p)} of ${int(book)}`,
+    change: now !== null && prev !== null ? { value: now, base: prev } : null,
+    note: 'Of the subscriptions still on the book this day (the sales ledger), the share that opened the app, from the pings: one open per install per day, counted by its Pro tier. Still paying is the ledger alone: of every subscription ever started, the share not yet cancelled. D30/60/90 count only subscriptions at least that old.',
     comparisons: [
+      { label: 'Still paying', value: r.whole.pct === null ? '–' : `${pct(r.whole.pct)} · ${int(r.whole.kept)} of ${int(r.whole.started)}` },
       ...[30, 60, 90].map((n) => ({ label: `D${n} retention`, value: surv(n).pct === null ? '–' : `${pct(surv(n).pct)} · ${int(surv(n).kept)} of ${int(surv(n).started)}` })),
-      { label: 'vs 30 days earlier', value: pct(before) },
-      { label: 'Pro in the app this day', value: p === null ? '–' : `${int(p)} · ${pct(inApp(day))}` },
+      { label: 'Still paying 30 days earlier', value: pct(before) },
       ...[30, 60, 90].map((n) => ({ label: `Pro in the app, avg day, last ${n}`, value: pct(avgIn(n)) })),
       ...[30, 60, 90].map((n) => ({ label: `Lapses reported, last ${n} days`, value: int(lapsed(n)) })),
     ],
-    chart: { title: 'Pro retention over the range', series: series(ctx.days, (d) => proRetention(l, d).whole.pct), format: (v: number) => pct(v), color: '#c98500' },
+    chart: { title: 'Pro in the app over the range', series: series(ctx.days, inApp), format: (v: number) => pct(v), color: '#c98500' },
   };
 }
 

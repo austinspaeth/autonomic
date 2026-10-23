@@ -4,6 +4,10 @@
      ( 🍎 🤖 │ 7D  30D  90D  All )            a phone
      ( 🍎 🤖 │ 7D  30D  90D  All │ ‹ Today › )   wide
 
+   On a phone on its side it is not floating at all: the bottom bar is handed
+   it and draws it at the right end of its own row, a little shorter so the
+   band can hold it.
+
    two round platform toggles and the range control, and on a wide screen the
    date as well, so everything that decides WHAT the board shows is one
    control and the top bar is left to navigation and actions. A platform toggle lights
@@ -18,7 +22,7 @@ import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Path } from 'react-native-svg';
 import type { StoreFilter } from '../lib/store';
-import { useWide, WIDE_FILTER_H, WIDE_FILTER_MARGIN } from '../lib/wide';
+import { useLandscape, useWide, WIDE_FILTER_H, WIDE_FILTER_MARGIN } from '../lib/wide';
 import { C } from '../theme';
 import { BOTTOM_CHROME, SlidingPill } from './ui';
 
@@ -26,6 +30,10 @@ import { BOTTOM_CHROME, SlidingPill } from './ui';
  *  that show it pad their content by this much more. */
 export const FILTER_BAR_HEIGHT = 56;
 export const FILTER_BAR_GAP = 10;
+/** The bar inside the bottom band of a phone on its side. */
+const SIDE_H = 50;
+/** One range's slot there. */
+const SIDE_RANGE_W = 52;
 
 /* Android's robot head (Material Icons "android"), on a 24-unit box. */
 const ANDROID_D =
@@ -63,7 +71,8 @@ export function FilterBar<R extends string>({
 }) {
   const insets = useSafeAreaInsets();
   const wide = useWide();
-  const h = wide ? WIDE_FILTER_H : FILTER_BAR_HEIGHT;
+  const side = useLandscape();
+  const h = wide ? WIDE_FILTER_H : side ? SIDE_H : FILTER_BAR_HEIGHT;
   const inner = h - PAD * 2;
   const roundSize = { width: inner, height: inner, borderRadius: inner / 2 };
   const toggle = (p: 'ios' | 'android') => {
@@ -72,8 +81,8 @@ export function FilterBar<R extends string>({
   };
 
   return (
-    <View pointerEvents="box-none" style={[s.wrap, { height: h, bottom: wide ? insets.bottom + WIDE_FILTER_MARGIN : insets.bottom + BOTTOM_CHROME + FILTER_BAR_GAP }]}>
-      <Glass style={[s.bar, wide ? null : s.capped, { borderRadius: h / 2 }]}>
+    <View pointerEvents="box-none" style={side ? { height: h } : [s.wrap, { height: h, bottom: wide ? insets.bottom + WIDE_FILTER_MARGIN : insets.bottom + BOTTOM_CHROME + FILTER_BAR_GAP }]}>
+      <Glass style={[s.bar, wide || side ? null : s.capped, { borderRadius: h / 2 }]}>
         <Pressable
           onPress={() => toggle('ios')}
           accessibilityLabel="Filter to iOS"
@@ -94,7 +103,7 @@ export function FilterBar<R extends string>({
         </Pressable>
         <View style={s.divider} />
         {/* A phone's ranges share the bar's width; a wide bar is as long as what it holds. */}
-        <View style={[s.ranges, wide ? { flex: 0, width: ranges.length * RANGE_W } : { flex: 1, width: 'auto' }]}>
+        <View style={[s.ranges, wide || side ? { flex: 0, width: ranges.length * (side ? SIDE_RANGE_W : RANGE_W) } : { flex: 1, width: 'auto' }]}>
           <SlidingPill count={ranges.length} index={Math.max(0, ranges.findIndex((o) => o.key === range))} style={s.segPill} />
           {ranges.map((o) => {
             const on = o.key === range;

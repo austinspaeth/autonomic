@@ -16,7 +16,7 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeOut, LinearTransition, useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import * as Haptics from 'expo-haptics';
 import { C, num } from '../theme';
-import { BoardTitle, useBoardWidth } from '../lib/wide';
+import { BoardTitle, NARROW_COLUMN, useBoardWidth } from '../lib/wide';
 import { BarChart, SplitBar, type Part } from './charts';
 import type { Series } from '../lib/metrics';
 import type { PaceModel } from '../lib/pace';
@@ -227,43 +227,61 @@ export function MetricTiles({ specs }: { specs: MetricSpec[] }) {
      screen, and the board under it does not move. */
   if (boardW) {
     const m = specs.find((x) => x.key === open) ?? null;
+    /* A narrow column (a phone on its side, three across) cannot hold two
+       tiles side by side, and the whole grid as ONE item would stand taller
+       than the screen. So each tile is an item of the flow in its own right,
+       full width, and the run of them wraps from column to column. */
+    const narrow = boardW < NARROW_COLUMN;
+    const tile = (x: MetricSpec) => (
+      <View key={x.key} style={[st.tile, narrow ? { width: boardW } : x.wide ? st.full : gridW >= WIDE_GRID ? st.quarter : st.half]}>
+        <Pressable
+          style={({ pressed }) => [st.press, gridW >= WIDE_GRID && st.pressWide, pressed && { opacity: 0.7 }]}
+          onPress={() => {
+            Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
+            setOpen(x.key);
+          }}
+        >
+          <View style={st.head}>
+            <Text style={st.label} numberOfLines={1}>
+              {x.label}
+            </Text>
+          </View>
+          <GrowingValue text={x.value} aside={x.aside} big={false} />
+          <GrowingChange change={x.change} big={false} />
+        </Pressable>
+      </View>
+    );
+    const sheet = (
+      <Sheet visible={!!m} onClose={() => setOpen(null)} title={m?.label} full bleed>
+        {() =>
+          m ? (
+            <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 + insets.bottom }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
+              <GrowingValue text={m.value} aside={m.aside} big />
+              <GrowingChange change={m.change} big />
+              <View style={st.detail}>
+                <Detail m={m} />
+              </View>
+            </ScrollView>
+          ) : null
+        }
+      </Sheet>
+    );
+    if (narrow) {
+      return (
+        <>
+          {boardTitle ? <Text style={[st.boardTitle, { width: boardW }]}>{boardTitle}</Text> : null}
+          {specs.map(tile)}
+          {sheet}
+        </>
+      );
+    }
     return (
       <View style={{ width: boardW, gap: 10 }}>
         {boardTitle ? <Text style={st.boardTitle}>{boardTitle}</Text> : null}
         <View style={st.grid} onLayout={(e) => setGridW(e.nativeEvent.layout.width)}>
-        {specs.map((x) => (
-          <View key={x.key} style={[st.tile, x.wide ? st.full : gridW >= WIDE_GRID ? st.quarter : st.half]}>
-            <Pressable
-              style={({ pressed }) => [st.press, gridW >= WIDE_GRID && st.pressWide, pressed && { opacity: 0.7 }]}
-              onPress={() => {
-                Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
-                setOpen(x.key);
-              }}
-            >
-              <View style={st.head}>
-                <Text style={st.label} numberOfLines={1}>
-                  {x.label}
-                </Text>
-              </View>
-              <GrowingValue text={x.value} aside={x.aside} big={false} />
-              <GrowingChange change={x.change} big={false} />
-            </Pressable>
-          </View>
-        ))}
+          {specs.map(tile)}
         </View>
-        <Sheet visible={!!m} onClose={() => setOpen(null)} title={m?.label} full bleed>
-          {() =>
-            m ? (
-              <ScrollView style={{ flex: 1 }} contentContainerStyle={{ paddingBottom: 24 + insets.bottom }} showsVerticalScrollIndicator={false} keyboardShouldPersistTaps="handled">
-                <GrowingValue text={m.value} aside={m.aside} big />
-                <GrowingChange change={m.change} big />
-                <View style={st.detail}>
-                  <Detail m={m} />
-                </View>
-              </ScrollView>
-            ) : null
-          }
-        </Sheet>
+        {sheet}
       </View>
     );
   }

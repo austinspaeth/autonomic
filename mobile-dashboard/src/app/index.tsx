@@ -12,11 +12,11 @@ import { ActivityIndicator, ScrollView, StyleSheet, Text, useWindowDimensions, V
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { FadeIn, FadeInLeft, FadeInRight } from 'react-native-reanimated';
 import { BottomBar } from '../components/BottomBar';
-import { ToastStack } from '../components/AlertViews';
+import { AlertHistory, ToastStack } from '../components/AlertViews';
 import { BarChart, Chips, WeekdayChart } from '../components/charts';
 import { DateHeader } from '../components/DateHeader';
 import { FILTER_BAR_GAP, FILTER_BAR_HEIGHT, FilterBar } from '../components/FilterBar';
-import { Card, KEYBOARD_SCROLL, Screen, Segmented } from '../components/ui';
+import { BOTTOM_CHROME, Card, KEYBOARD_SCROLL, Screen, Segmented } from '../components/ui';
 import { Sheet } from '../components/Sheet';
 import { glanceSpecs } from '../features/specs';
 import { UsageView } from '../features/UsageView';
@@ -36,7 +36,7 @@ import { pingRows } from '../lib/metrics';
 import { buildIndex } from '../lib/usage';
 import { buildBase, downloadBuckets, summarize, weekdayStats, type Field, type StoreFilter } from '../lib/store';
 import { BOARD, BOARD_GROUPS, openPanel, usePanel, useView, VIEWS, type ViewKey } from '../lib/views';
-import { BOARD_COLUMN_MIN, BOARD_GAP_X, BOARD_GAP_Y, BOARD_GUTTER, BoardTitle, BoardWidth, NAV_H, useWide, WIDE_FILTER_H, WIDE_FILTER_MARGIN } from '../lib/wide';
+import { ALERTS_PANEL_W, BOARD_COLUMN_MIN, BOARD_GAP_X, BOARD_GAP_Y, BOARD_GUTTER, BoardTitle, BoardWidth, CardWidth, LANDSCAPE_COLS, LANDSCAPE_GAP, NAV_H, useLandscape, useWide, WIDE_FILTER_H, WIDE_FILTER_MARGIN } from '../lib/wide';
 import { C } from '../theme';
 
 
@@ -49,7 +49,10 @@ export default function Main() {
   const [glance, setGlance] = useState<GlanceState>({ range: '30', mode: 'period', metric: 'downloads', platform: 'all' });
   const [horizon, setHorizon] = useState<Horizon>('12');
   const patchGlance = useCallback((p: Partial<GlanceState>) => setGlance((g) => ({ ...g, ...p })), []);
-  const dk = picked && picked < today ? picked : today;
+  /* A phone on its side always reads today: it is a glance, with no room
+     for the date control. */
+  const landscape = useLandscape();
+  const dk = !landscape && picked && picked < today ? picked : today;
   const isToday = dk === today;
 
   /* How far back the calendar goes. Usage and errors live in the ping report,
@@ -85,6 +88,7 @@ export default function Main() {
   const wide = useWide();
   const panel = usePanel();
   const insets = useSafeAreaInsets();
+  const { width: winW } = useWindowDimensions();
   const dateEl = dated && !wide ? <DateHeader dk={dk} today={today} earliest={earliest} intensity={intensity} onChange={onChange} /> : null;
   const filterRoom = wide ? WIDE_FILTER_H + WIDE_FILTER_MARGIN + 10 : !filtered ? 0 : FILTER_BAR_HEIGHT + FILTER_BAR_GAP;
 
@@ -165,6 +169,58 @@ export default function Main() {
         </Sheet>
         <ToastStack raisedBy={filterRoom} />
         <BottomBar />
+      </View>
+    );
+  }
+
+  /* A phone on its side. One band at the bottom holds the view and its
+     filter (it always reads today); today's alerts stand in a panel on the
+     right, always open; and
+     the four board views are a strip of three columns that scrolls sideways
+     and never down (`Strip`). The visited views keep a plain list. */
+  if (landscape) {
+    const panelW = ALERTS_PANEL_W + insets.right;
+    const above = insets.bottom + BOTTOM_CHROME;
+    return (
+      <View style={{ flex: 1, backgroundColor: C.bg }}>
+        <View style={[s.sideMain, { right: panelW, bottom: above }]}>
+          {!snap ? (
+            <View style={s.sideCenter}>{errorEl ?? <ActivityIndicator color={C.dim} />}</View>
+          ) : BOARD.includes(view) ? (
+            <Animated.View key={`${view}|${dk}`} entering={(dir > 0 ? FadeInRight : FadeInLeft).duration(220)} style={{ flex: 1 }}>
+              <Strip>
+                {errorEl}
+                {body(view)}
+              </Strip>
+            </Animated.View>
+          ) : (
+            <ScrollView
+              {...KEYBOARD_SCROLL}
+              showsVerticalScrollIndicator={false}
+              contentContainerStyle={{ paddingTop: insets.top + 12, paddingBottom: 24, paddingLeft: 16 + insets.left, paddingRight: 16, gap: 12 }}
+            >
+              {errorEl}
+              <Animated.View key={view} entering={FadeIn.duration(180)} style={{ gap: 12 }}>
+                {body(view)}
+              </Animated.View>
+            </ScrollView>
+          )}
+        </View>
+        {/* Runs to the right edge: a panel of rows can sit under the
+            rounded corner, so it does not keep the safe inset clear. */}
+        <View style={[s.alerts, { width: panelW, bottom: above, paddingTop: insets.top + 12 }]}>
+          <AlertHistory compact />
+        </View>
+        <ToastStack area={{ left: 0, width: winW - panelW }} />
+        <BottomBar
+          filter={
+            view === 'forecast' ? (
+              <FilterBar platform={glance.platform} onPlatform={(platform) => patchGlance({ platform })} ranges={HORIZONS} range={horizon} onRange={setHorizon} />
+            ) : filtered ? (
+              <FilterBar platform={glance.platform} onPlatform={(platform) => patchGlance({ platform })} ranges={RANGES} range={glance.range} onRange={(range) => patchGlance({ range })} />
+            ) : undefined
+          }
+        />
       </View>
     );
   }
@@ -320,6 +376,52 @@ function Board({ body, bottomRoom, reflow, taken }: { body: (key: ViewKey) => Re
   );
 }
 
+/**
+ * A phone on its side: one view's cards as a strip that scrolls SIDEWAYS.
+ * The cards are the view's own, unwrapped (a view returns a fragment), told
+ * the column width through `BoardWidth`, and they flow down a column exactly
+ * as tall as the space above the bottom band, wrapping into the next. Metric
+ * tiles and buttons take a third of the visible width each; a card (a chart,
+ * a table) takes nearly all of it (`CardWidth`), so a chart is never squeezed
+ * into a third of the screen. The rest are a swipe away. Being on the board
+ * also means a metric tile opens as a side panel rather than growing in place
+ * and shoving the flow around.
+ */
+function Strip({ children }: { children: ReactNode }) {
+  const insets = useSafeAreaInsets();
+  const [box, setBox] = useState({ w: 0, h: 0 });
+  const padL = 16 + insets.left;
+  const padR = 16;
+  const visible = box.w - padL - padR;
+  const colW = Math.floor((visible - LANDSCAPE_GAP * (LANDSCAPE_COLS - 1)) / LANDSCAPE_COLS);
+  const top = insets.top + STRIP_PAD;
+  return (
+    <View
+      style={{ flex: 1 }}
+      onLayout={(e) => {
+        const w = Math.round(e.nativeEvent.layout.width);
+        const h = Math.round(e.nativeEvent.layout.height);
+        setBox((b) => (b.w === w && b.h === h ? b : { w, h }));
+      }}
+    >
+      {box.w ? (
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={{ paddingLeft: padL, paddingRight: padR, paddingTop: top }}
+        >
+          <View style={[s.strip, { height: box.h - top - STRIP_PAD }]}>
+            <BoardWidth.Provider value={colW}>
+              <CardWidth.Provider value={visible}>{children}</CardWidth.Provider>
+            </BoardWidth.Provider>
+          </View>
+        </ScrollView>
+      ) : null}
+    </View>
+  );
+}
+const STRIP_PAD = 12;
+
 /** What the Screen pads under its content, besides the floating controls. */
 const BOTTOM_ROOM = 24;
 
@@ -452,6 +554,19 @@ const s_ = StyleSheet.create({
 
 const s = StyleSheet.create({
   stack: { flexDirection: 'column', rowGap: BOARD_GAP_Y },
+  strip: { flexDirection: 'column', flexWrap: 'wrap', alignContent: 'flex-start', columnGap: LANDSCAPE_GAP, rowGap: 12 },
+  sideMain: { position: 'absolute', top: 0, left: 0 },
+  sideCenter: { flex: 1, alignItems: 'center', justifyContent: 'center' },
+  alerts: {
+    position: 'absolute',
+    top: 0,
+    right: 0,
+    paddingLeft: 12,
+    paddingRight: 12,
+    borderLeftWidth: StyleSheet.hairlineWidth,
+    borderLeftColor: 'rgba(255,255,255,0.14)',
+    backgroundColor: '#0b0b0c',
+  },
   board: { flexDirection: 'column', flexWrap: 'wrap', alignContent: 'flex-start', columnGap: BOARD_GAP_X, rowGap: BOARD_GAP_Y },
   sections: { flexDirection: 'row', alignItems: 'flex-start', columnGap: BOARD_GAP_X },
   status: { height: 22, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6 },

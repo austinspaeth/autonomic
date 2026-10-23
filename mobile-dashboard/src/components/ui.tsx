@@ -1,11 +1,11 @@
-import { useEffect, useRef, useState, type ReactNode } from 'react';
+import { useContext, useEffect, useRef, useState, type ReactNode } from 'react';
 import { Platform, Pressable, RefreshControl, ScrollView, StyleSheet, Text, View, type ViewStyle } from 'react-native';
 import { BlurView } from 'expo-blur';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Haptics from 'expo-haptics';
 import { useView } from '../lib/views';
-import { BOARD_GUTTER, BoardWidth, NAV_H, useBoardWidth, useWide } from '../lib/wide';
+import { BOARD_GUTTER, BoardWidth, CardWidth, NAV_H, useBoardWidth, useWide } from '../lib/wide';
 import { C, R, num } from '../theme';
 
 /* Every vertical scroller takes these: dragging the list puts the keyboard
@@ -87,7 +87,10 @@ export function Screen({
         contentContainerStyle={{
           paddingTop: top + 12,
           paddingBottom: bottom + 24,
-          paddingHorizontal: wide ? BOARD_GUTTER : 16,
+          /* On its side a phone's Dynamic Island and rounded corners eat
+             into one end or the other, so the side insets join the gutter. */
+          paddingLeft: (wide ? BOARD_GUTTER : 16) + insets.left,
+          paddingRight: (wide ? BOARD_GUTTER : 16) + insets.right,
           gap: wide ? 16 : 12,
           width: '100%',
         }}
@@ -120,7 +123,7 @@ export function Screen({
         )}
         {topBar ? (
           <>
-            <View style={s.topBar}>{topBar}</View>
+            <View style={[s.topBar, { paddingLeft: 16 + insets.left, paddingRight: 16 + insets.right }]}>{topBar}</View>
             <View style={s.topRule} />
           </>
         ) : null}
@@ -131,8 +134,9 @@ export function Screen({
 
 export function Card({ title, right, children, style }: { title?: string; right?: ReactNode; children: ReactNode; style?: ViewStyle }) {
   const boardW = useBoardWidth();
+  const cardW = useContext(CardWidth);
   return (
-    <View style={[s.card, boardW ? { width: boardW } : null, style]}>
+    <View style={[s.card, boardW ? { width: cardW ?? boardW } : null, style]}>
       {title ? (
         <View style={s.cardHead}>
           <Text style={s.cardTitle}>{title}</Text>

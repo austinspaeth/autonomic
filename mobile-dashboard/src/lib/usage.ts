@@ -766,7 +766,10 @@ export const CAPTURE_TAG = { attempt: 'hrv.attempt', filed: 'hrv.filed', refused
 /** The Garmin pair: a reading that arrived (an event) and one the watch gave up on (a failure).
  *  Mirrors `GARMIN_READING_TAG` / `GARMIN_DIAG_TAG` in the app's lib/garmin/diag.ts. */
 export const GARMIN_TAG = { reading: 'garmin.reading', noSignal: 'garmin.noSignal' } as const;
-const EVENT_TAGS = new Set<string>([CAPTURE_TAG.attempt, CAPTURE_TAG.filed, CAPTURE_TAG.salvaged, GARMIN_TAG.reading]);
+/** An optical Polar band's PPI stream delivering (an event, model + banded warm-up) and
+ *  failing to (a failure). Mirrors `PPI_TAGS` in the app's features/hrv/sessionStore.ts. */
+export const PPI_TAG = { started: 'ble.ppi', failed: 'ble.ppiFail' } as const;
+const EVENT_TAGS = new Set<string>([CAPTURE_TAG.attempt, CAPTURE_TAG.filed, CAPTURE_TAG.salvaged, GARMIN_TAG.reading, PPI_TAG.started]);
 export const isFailure = (f: Pick<Fault, 'tag'>) => !EVENT_TAGS.has(f.tag);
 
 type Split = { n: number; I: number; A: number; U: number };

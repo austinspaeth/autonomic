@@ -9,7 +9,7 @@
  * whenever the window can hold it. The views that are only visited (forecast,
  * links, access codes, raw pings) are side panels, opened from the top bar. */
 import { createContext, useContext } from 'react';
-import { useWindowDimensions } from 'react-native';
+import { Platform, useWindowDimensions } from 'react-native';
 
 /** Narrower than this is a phone, and gets the phone layout untouched. */
 export const WIDE_FROM = 700;
@@ -35,12 +35,40 @@ export const BOARD_COLUMN_MIN = 340;
 export const BoardWidth = createContext<number | null>(null);
 export const useBoardWidth = () => useContext(BoardWidth);
 
+/* A CARD's width on the board, when it differs from a column. A phone on its
+   side lays its metric tiles and buttons out in narrow columns but gives a
+   card (a chart, a table) nearly the whole visible width, or the charts are
+   squeezed to a third of the screen. */
+export const CardWidth = createContext<number | null>(null);
+
 /* A section's title on the board. It is drawn BY the section's first card
    (its metric tiles) rather than as an item of its own, because a title that
    is its own item can be the last thing in a column, with its section
    starting at the top of the next one. */
 export const BoardTitle = createContext<string | null>(null);
 
+/* A phone is never wide, even on its side. Landscape there is 870 points
+   across but only 400 tall, and the board's top bar and floating filter bar
+   would take a third of that before a single card. A phone on its side keeps
+   the phone layout, re-shaped for the short screen (`useLandscape`). */
+const PHONE = Platform.OS === 'ios' && !Platform.isPad;
+
 export function useWide(): boolean {
-  return useWindowDimensions().width >= WIDE_FROM;
+  return !PHONE && useWindowDimensions().width >= WIDE_FROM;
 }
+
+/** A phone on its side: one bottom band holds the date, the view picker and
+ *  the filter; the alerts stand in a panel on the right; and the board's
+ *  views are a strip of three columns that scrolls sideways, never down. */
+export function useLandscape(): boolean {
+  const { width, height } = useWindowDimensions();
+  return PHONE && width > height;
+}
+
+/** Columns of cards across the visible strip, on a phone on its side. */
+export const LANDSCAPE_COLS = 3;
+export const LANDSCAPE_GAP = 12;
+/** The alerts panel there, not counting the safe inset it pads itself by. */
+export const ALERTS_PANEL_W = 240;
+/** A board column narrower than this lists its metric tiles one per row, each its own item of the flow. */
+export const NARROW_COLUMN = 260;

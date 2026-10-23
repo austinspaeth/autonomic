@@ -11,7 +11,7 @@
    is arithmetic over the menu's fixed row sizes, anchored on where the touch
    landed inside the picker, so it never waits on a measurement and cannot be
    thrown off by the menu's own slide-in. */
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { BlurView } from 'expo-blur';
 import { SymbolView } from 'expo-symbols';
 import * as Haptics from 'expo-haptics';
@@ -19,7 +19,7 @@ import { PanResponder, Platform, Pressable, StyleSheet, Text, View } from 'react
 import Animated, { cancelAnimation, Easing, FadeIn, FadeOut, useAnimatedStyle, useSharedValue, withRepeat, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { openPanel, PANELS, setView, usePanel, useView, VIEWS, type ViewKey } from '../lib/views';
-import { NAV_H, useWide } from '../lib/wide';
+import { NAV_H, useLandscape, useWide } from '../lib/wide';
 import { C } from '../theme';
 import { BrandMark } from './BrandMark';
 import { Sheet } from './Sheet';
@@ -38,6 +38,15 @@ const MENU_PAD = 6;
 const ROW_H = 46;
 const ROW_GAP = 4;
 const MENU_H = MENU_PAD * 2 + VIEWS.length * ROW_H + (VIEWS.length - 1) * ROW_GAP;
+/* On a phone on its side the one-column menu is taller than the screen, so
+   it is two columns, filled down the first and then the second. */
+const SIDE_ROWS = Math.ceil(VIEWS.length / 2);
+const SIDE_COL_W = 190;
+const SIDE_MENU_W = MENU_PAD * 2 + SIDE_COL_W * 2 + ROW_GAP;
+/** The menu there: as wide as the picker, which fills the bar, but never narrower than two columns need. */
+const sideMenuW = (pickerW: number) => Math.max(SIDE_MENU_W, pickerW);
+const sideColW = (pickerW: number) => (sideMenuW(pickerW) - MENU_PAD * 2 - ROW_GAP) / 2;
+const SIDE_MENU_H = MENU_PAD * 2 + SIDE_ROWS * ROW_H + (SIDE_ROWS - 1) * ROW_GAP;
 /** How far outside the menu's sides a finger may stray and still hover a row. */
 const SIDE_SLOP = 24;
 
@@ -168,11 +177,22 @@ function Updated() {
   return <Text style={s.updated}>{loading ? 'Updating…' : snap ? `Updated ${ago(snap.at)}` : 'Loading…'}</Text>;
 }
 
-export function BottomBar() {
+export function BottomBar({
+  date,
+  filter,
+}: {
+  /** A phone on its side: the date control, at the left end of the bar. */
+  date?: ReactNode;
+  /** A phone on its side: the filter bar, at the right end. */
+  filter?: ReactNode;
+} = {}) {
   const insets = useSafeAreaInsets();
   const wide = useWide();
+  const landscape = useLandscape();
   const wideRef = useRef(wide);
   wideRef.current = wide;
+  const sideRef = useRef(landscape);
+  sideRef.current = landscape;
   const current = useView();
   const [open, setOpen] = useState(false);
   const [hover, setHover] = useState<ViewKey | null>(null);
@@ -205,16 +225,22 @@ export function BottomBar() {
     show(false);
   };
 
-  /** The row under a page point, or null. Rows run top to bottom in VIEWS order. */
+  /** The row under a page point, or null. Rows run top to bottom in VIEWS
+   *  order (down the first column and then the second, on a phone on its side). */
   const rowAt = (px: number, py: number): ViewKey | null => {
     const p = picker.current;
+    const side = sideRef.current;
+    const menuH = side ? SIDE_MENU_H : MENU_H;
+    const menuW = side ? sideMenuW(p.w) : p.w;
+    const rows = side ? SIDE_ROWS : VIEWS.length;
     // The menu hangs under the picker on a wide screen and rises over it on a phone.
-    const top = wideRef.current ? p.y + PICKER_H + (NAV_H - PICKER_H) / 2 + MENU_GAP : p.y - (BOTTOM_CHROME - PICKER_H) / 2 - MENU_GAP - MENU_H;
-    const bottom = top + MENU_H;
-    if (px < p.x - SIDE_SLOP || px > p.x + p.w + SIDE_SLOP) return null;
+    const top = wideRef.current ? p.y + PICKER_H + (NAV_H - PICKER_H) / 2 + MENU_GAP : p.y - (BOTTOM_CHROME - PICKER_H) / 2 - MENU_GAP - menuH;
+    const bottom = top + menuH;
+    if (px < p.x - SIDE_SLOP || px > p.x + menuW + SIDE_SLOP) return null;
     if (py < top || py > bottom) return null;
-    const i = Math.floor((py - top - MENU_PAD + ROW_GAP / 2) / (ROW_H + ROW_GAP));
-    return VIEWS[Math.max(0, Math.min(VIEWS.length - 1, i))].key;
+    const row = Math.max(0, Math.min(rows - 1, Math.floor((py - top - MENU_PAD + ROW_GAP / 2) / (ROW_H + ROW_GAP))));
+    const col = side && px > p.x + MENU_PAD + sideColW(p.w) + ROW_GAP / 2 ? 1 : 0;
+    return VIEWS[Math.min(VIEWS.length - 1, col * rows + row)].key;
   };
   const onPicker = (px: number, py: number) => {
     const p = picker.current;
@@ -276,7 +302,7 @@ export function BottomBar() {
         picker.current = { ...picker.current, w: width, h: height };
         setPickerBox({ x, w: width });
       }}
-      style={[s.squircle, wide && s.squircleWide, open && s.squircleOpen]}
+      style={[s.squircle, wide && s.squircleWide, landscape && s.squircleSide, open && s.squircleOpen]}
     >
       {/* Untouchable, so every touch lands on the squircle itself and
           locationX/Y are measured from its corner, which rowAt relies on. */}
@@ -317,12 +343,17 @@ export function BottomBar() {
       ) : null}
       {open ? (
         /* The bar's own centred column, so the menu sits over the picker at any width. */
-        <View pointerEvents="box-none" style={[s.menuRail, wide ? { top: menuTop } : { bottom: menuBottom }]}>
-          <View pointerEvents="box-none" style={s.menuColumn}>
+        <View pointerEvents="box-none" style={[s.menuRail, wide ? { top: menuTop } : { bottom: menuBottom }, landscape && { height: SIDE_MENU_H }]}>
+          <View pointerEvents="box-none" style={[s.menuColumn, landscape && { height: SIDE_MENU_H }]}>
             <Animated.View
               entering={wide ? menuInDown : menuIn}
               exiting={menuOut}
-              style={[s.menu, { bottom: 0, left: pickerBox.x, width: pickerBox.w || undefined, height: MENU_H }]}
+              style={[
+                s.menu,
+                landscape
+                  ? [s.menuSide, { bottom: 0, left: pickerBox.x, width: sideMenuW(pickerBox.w), height: SIDE_MENU_H }]
+                  : { bottom: 0, left: pickerBox.x, width: pickerBox.w || undefined, height: MENU_H },
+              ]}
             >
               {Platform.OS === 'ios' ? (
                 <BlurView tint="systemChromeMaterialDark" intensity={90} style={StyleSheet.absoluteFill} />
@@ -333,7 +364,7 @@ export function BottomBar() {
                 const on = v.key === current;
                 const hot = v.key === hover;
                 return (
-                  <Pressable key={v.key} onPress={() => choose(v.key)} style={[s.option, on && s.optionOn, hot && s.optionHot]}>
+                  <Pressable key={v.key} onPress={() => choose(v.key)} style={[s.option, landscape && { width: sideColW(pickerBox.w) }, on && s.optionOn, hot && s.optionHot]}>
                     <Text style={[s.optionText, (on || hot) && { color: C.text }, on && { fontWeight: '700' }]} numberOfLines={1}>
                       {v.label}
                     </Text>
@@ -378,6 +409,16 @@ export function BottomBar() {
             <RefreshButton />
             {plusEl}
           </View>
+        ) : landscape ? (
+          /* On its side: the view and what it is filtered to, side by side
+             from the left, in one band. The alerts are always on screen in their own
+             panel (`AlertsPanel`), so the bell has nothing to open, and
+             adding data is a portrait job. */
+          <View style={[s.bar, { paddingLeft: 18 + insets.left, paddingRight: 18 + insets.right }]}>
+            {date}
+            {pickerEl}
+            {filter}
+          </View>
         ) : (
           <View style={s.bar}>
             {plusEl}
@@ -418,6 +459,8 @@ const s = StyleSheet.create({
   updated: { color: C.muted, fontSize: 12, marginRight: 4 },
   navRule: { width: StyleSheet.hairlineWidth, height: 24, backgroundColor: 'rgba(255,255,255,0.22)' },
   squircleWide: { flex: 0, width: 230 },
+  /* Room for the longest view name beside its chevron, with the filter straight after it. */
+  squircleSide: { flex: 0, width: 220 },
   squircleInner: { position: 'absolute', top: 0, right: 0, bottom: 0, left: 0, alignItems: 'center', justifyContent: 'center' },
   squircleOpen: { backgroundColor: 'rgba(255,255,255,0.10)', borderColor: 'rgba(255,255,255,0.18)' },
   chevron: { position: 'absolute', right: 14, top: 0, bottom: 0, justifyContent: 'center' },
@@ -436,6 +479,8 @@ const s = StyleSheet.create({
     borderColor: 'rgba(255,255,255,0.10)',
     borderWidth: StyleSheet.hairlineWidth,
   },
+  /* Two columns, filled down the first: a column-direction wrap. */
+  menuSide: { flexDirection: 'column', flexWrap: 'wrap', columnGap: ROW_GAP },
   squircleText: { color: C.text, fontSize: 16, fontWeight: '600', textAlign: 'center', paddingHorizontal: 16 },
   option: {
     height: ROW_H,
