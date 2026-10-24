@@ -38,6 +38,7 @@ export function appInfo(): Record<string, string | number | boolean | null> {
     out['update id'] = U?.updateId ?? null;
     out['update channel'] = U?.channel ?? null;
     out['embedded launch'] = U?.isEmbeddedLaunch ?? null;
+    out['ota revision'] = process.env.EXPO_PUBLIC_OTA_REVISION ?? null;
   } catch { /* ignore */ }
   return out;
 }

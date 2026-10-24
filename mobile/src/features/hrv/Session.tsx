@@ -219,37 +219,55 @@ function SessionCard({ controls }: { controls: SheetControls }) {
           </Pressable>
         </View>
       ) : (
-        <SheetFooter>
-          {started ? (
-            <>
-              {/* The user's own door to the tips, beside the one that keeps the
-                  reading — same words as the camera setup card's, since they
-                  open the same card. It ABANDONS rather than finishes:
-                  somebody who says they are having trouble is saying this
-                  reading is no good,
-                  and handing them a results card for it would be the app
-                  disagreeing. Nothing is saved and no completion is counted.
-                  The app raises the same card by itself when the arithmetic
-                  gets there first (`hopelessCoverage`); this is for the case
-                  where the user knows before we do. */}
-              {troubleSource ? (
-                <Button title="Having issues?" variant="ghost" onPress={() => (finished ? controls.closeAll() : void abandonSession('user'))} />
-              ) : null}
-              <Button title="Finish now" variant="primary" onPress={() => (finished ? controls.closeAll() : void finishSession())} />
-            </>
-          ) : (
-            <>
-              <Button title="Cancel" variant="ghost" onPress={() => { endSession(); controls.close(); }} />
-              {/* A 5-minute reading must not start before the strap answers —
-                  nor at all once it has answered with a pulse and nothing else. */}
-              <Button title="Start reading" variant="primary" onPress={beginCollection} disabled={strapPending || strapUseless} />
-            </>
-          )}
-        </SheetFooter>
+        <SessionFooter
+          started={started} finished={finished} trouble={!!troubleSource}
+          blocked={strapPending || strapUseless} controls={controls}
+        />
       )}
     </View>
   );
 }
+
+/**
+ * The card's footer, memoized on primitives. The card re-renders on every
+ * sample, and a footer re-registers itself with the sheet whenever its children
+ * change (see `SheetFooter`), so building the buttons inline queued a second
+ * update per strap notification — the Android "Maximum update depth exceeded"
+ * crash on resuming a backgrounded reading. This changes only when a button does.
+ */
+const SessionFooter = React.memo(function SessionFooter({ started, finished, trouble, blocked, controls }: {
+  started: boolean; finished: boolean; trouble: boolean; blocked: boolean; controls: SheetControls;
+}) {
+  return (
+    <SheetFooter>
+      {started ? (
+        <>
+          {/* The user's own door to the tips, beside the one that keeps the
+              reading — same words as the camera setup card's, since they
+              open the same card. It ABANDONS rather than finishes:
+              somebody who says they are having trouble is saying this
+              reading is no good,
+              and handing them a results card for it would be the app
+              disagreeing. Nothing is saved and no completion is counted.
+              The app raises the same card by itself when the arithmetic
+              gets there first (`hopelessCoverage`); this is for the case
+              where the user knows before we do. */}
+          {trouble ? (
+            <Button title="Having issues?" variant="ghost" onPress={() => (finished ? controls.closeAll() : void abandonSession('user'))} />
+          ) : null}
+          <Button title="Finish now" variant="primary" onPress={() => (finished ? controls.closeAll() : void finishSession())} />
+        </>
+      ) : (
+        <>
+          <Button title="Cancel" variant="ghost" onPress={() => { endSession(); controls.close(); }} />
+          {/* A 5-minute reading must not start before the strap answers —
+              nor at all once it has answered with a pulse and nothing else. */}
+          <Button title="Start reading" variant="primary" onPress={beginCollection} disabled={blocked} />
+        </>
+      )}
+    </SheetFooter>
+  );
+});
 
 /**
  * Minimize (left) and hide (right) flank the reading's own title. They are the

@@ -558,14 +558,26 @@ function sheetName(content: React.ReactNode): string {
   return type.displayName || type.name || '?';
 }
 
-/** Lets a sheet's content register a fixed footer (primary action row). */
+/**
+ * Lets a sheet's content register a fixed footer (primary action row).
+ *
+ * The footer is lifted into the sheet's own state, so registering it is a SECOND
+ * update queued inside the commit of whatever rendered it. That is harmless once
+ * per render and fatal at sample rate: it used to run after EVERY render (no
+ * deps, and a clear-then-set on each one), and the live HRV card re-renders on
+ * every strap notification. On Android a backgrounded reading's notifications
+ * arrive as one back-to-back burst on resume, each commit ended with the footer
+ * update still pending, and after ~50 of them React 19 called it an infinite
+ * loop ("Maximum update depth exceeded", `crash.stack` emit < bump < collect <
+ * monitorListener). So: register only when the children change identity, clear
+ * only on unmount, and a card that re-renders at a high rate must hand this
+ * stable children (`Session.tsx` memoizes its footer for exactly that reason).
+ */
 const SheetContentContext = createContext<{ setFooter: (n: React.ReactNode) => void } | null>(null);
 export function SheetFooter({ children }: { children: React.ReactNode }) {
   const ctx = useContext(SheetContentContext);
-  React.useEffect(() => {
-    ctx?.setFooter(children);
-    return () => ctx?.setFooter(null);
-  });
+  React.useEffect(() => { ctx?.setFooter(children); }, [ctx, children]);
+  React.useEffect(() => () => ctx?.setFooter(null), [ctx]);
   return null;
 }
 

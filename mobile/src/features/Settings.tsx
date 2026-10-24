@@ -40,6 +40,7 @@ import { formatAppDiagnostics } from '../lib/diagnostics/appReport';
 import { SupportCard } from './SupportCard';
 import { disablePressure, enablePressure, usePressureStatus } from '../store/pressure';
 import { isPingExcluded, setPingExcluded } from '../store/ping';
+import { currentOta, versionLabel } from '../lib/otaRevision';
 
 const PRIVACY_URL = 'https://autonomic.care/privacy-policy/';
 const TERMS_URL = 'https://autonomic.care/terms-of-service/';
@@ -124,6 +125,8 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
     );
   };
   const appVer = Constants.expoConfig?.version ?? '1.0.0';
+  // Which OTA on top of the store build this phone runs (lib/otaRevision).
+  const ota = currentOta();
   return (
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Settings</Text>
@@ -162,7 +165,7 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
         </Text>
         <Text style={{ fontSize: 12.5, color: p.textDim, textAlign: 'center', marginTop: 4 }}>- Autonomic team</Text>
         <View style={{ height: 1, backgroundColor: p.border, marginVertical: 16 }} />
-        <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center' }}>{`Autonomic v${appVer}`}</Text>
+        <Text style={{ fontSize: 12, color: p.textDim, textAlign: 'center' }}>{versionLabel(appVer, ota.embedded, ota.revision)}</Text>
         <Text style={{ fontSize: 11, color: p.textDim, textAlign: 'center', marginTop: 16, lineHeight: 16 }}>
           Autonomic is a personal tracking tool, not a medical device. It does not diagnose or treat any condition. Discuss changes to medication, supplements, or your protocol with a clinician.
         </Text>

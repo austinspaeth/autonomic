@@ -25,6 +25,10 @@ concurrency:
   group: eas-update-${{ github.ref }}
   cancel-in-progress: false
 
+# Pushes the `ota/v<version>/<n>` tag that numbers each publish (see below).
+permissions:
+  contents: write
+
 jobs:
   update:
     name: Publish OTA update
@@ -35,6 +39,9 @@ jobs:
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
+        with:
+          # Full history and tags: the OTA revision is counted from both.
+          fetch-depth: 0
 
       - name: Set up Node
         uses: actions/setup-node@v4
@@ -59,14 +66,44 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      # The "∞3" after the version at the foot of Settings (src/lib/otaRevision.ts).
+      # Counted PER VERSION from git tags `ota/v<version>/<n>`, so it starts over
+      # with each store release. Revision 0 is the publish from the commit that
+      # bumped the version, which IS the store build's code and shows nothing;
+      # every later publish is the previous number + 1. A version that already
+      # shipped before these tags existed starts at 1.
+      - name: Number this OTA
+        id: ota
+        run: |
+          VERSION=$(node -p "require('./app.json').expo.version")
+          LAST=$(git tag -l "ota/v$VERSION/*" | sed 's#.*/##' | sort -n | tail -1)
+          if [ -n "$LAST" ]; then
+            REV=$((LAST + 1))
+          else
+            BUMP=$(git log -1 --format=%H -S"\"version\": \"$VERSION\"" -- app.json)
+            if [ "$BUMP" = "$(git rev-parse HEAD)" ]; then REV=0; else REV=1; fi
+          fi
+          echo "version=$VERSION" >> "$GITHUB_OUTPUT"
+          echo "revision=$REV" >> "$GITHUB_OUTPUT"
+          echo "OTA revision for v$VERSION: $REV"
+
       - name: Publish update
         # COMMIT_MESSAGE is passed via env (not string-interpolated into the
         # script) so an arbitrary commit message can't inject shell.
         env:
           COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
           UPDATE_BRANCH: ${{ github.event.inputs.branch || 'production' }}
+          # Inlined into the bundle by Metro (EXPO_PUBLIC_*).
+          EXPO_PUBLIC_OTA_REVISION: ${{ steps.ota.outputs.revision }}
         run: |
           eas update \
             --branch "$UPDATE_BRANCH" \
             --message "${COMMIT_MESSAGE:-Manual update ${{ github.sha }}}" \
             --non-interactive
+
+      # Only after a successful publish, so a failed one does not spend a number.
+      - name: Tag the revision
+        run: |
+          TAG="ota/v${{ steps.ota.outputs.version }}/${{ steps.ota.outputs.revision }}"
+          git tag "$TAG"
+          git push origin "$TAG"
