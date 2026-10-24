@@ -8,7 +8,9 @@
  * is also graded against the user's own usual once five exist.
  */
 import type { DayRecord, Entry } from '../../types';
-import { engagedDayCount, shouldAskForReview, MIN_DAYS_BETWEEN_ASKS } from '../eligibility';
+import {
+  engagedDayCount, shouldAskForReview, trustedHrvCount, MIN_DAYS_BETWEEN_ASKS, ENGAGED_DOOR_INSTALL_DAYS,
+} from '../eligibility';
 
 const day = (over: Partial<DayRecord> = {}): DayRecord => ({
   sleep: { bed: '', wake: '' },
@@ -64,7 +66,8 @@ describe('shouldAskForReview', () => {
   it('asks on a day trending up after enough real use', () => {
     const v = ask();
     expect(v.ok).toBe(true);
-    if (v.ok) expect(v.upturn.score).toBe(80);
+    expect(v.ok && v.door).toBe('upturn');
+    if (v.ok && v.door === 'upturn') expect(v.upturn.score).toBe(80);
   });
 
   it('holds off until the user has logged four days', () => {
@@ -104,5 +107,79 @@ describe('shouldAskForReview', () => {
     const v = ask({ days });
     expect(v.ok).toBe(false);
     if (!v.ok) expect(['downturn', 'no-upturn']).toContain(v.reason);
+  });
+});
+
+/**
+ * Door A: an engaged user is asked on a level day, not only on an upturn.
+ * A flat week at 25 ms scores 60 every day (no upturn, above the floor).
+ */
+describe('shouldAskForReview — door A (engagement)', () => {
+  const flat = (rmssd: number, n = 8): Record<string, DayRecord> => {
+    // n days ending TODAY (K(8)), so today is always one of them.
+    const days: Record<string, DayRecord> = {};
+    for (let i = 9 - n; i <= 8; i++) days[K(i)] = hrvDay(rmssd);
+    return days;
+  };
+  const installed = (daysAgo: number) => NOW - daysAgo * DAY_MS;
+
+  it('asks a Pro user on a level week', () => {
+    expect(ask({ days: flat(25), tier: 'pro' })).toEqual({ ok: true, door: 'engaged', score: 60 });
+  });
+
+  it('asks a non-Pro user once the install is two weeks old, not before', () => {
+    expect(ask({ days: flat(25), tier: 'trial', installedAtMs: installed(ENGAGED_DOOR_INSTALL_DAYS - 1) }))
+      .toEqual({ ok: false, reason: 'no-upturn' });
+    expect(ask({ days: flat(25), tier: 'free', installedAtMs: installed(ENGAGED_DOOR_INSTALL_DAYS) }))
+      .toEqual({ ok: true, door: 'engaged', score: 60 });
+  });
+
+  it('an unknown tier and install time admit nobody through it', () => {
+    expect(ask({ days: flat(25) })).toEqual({ ok: false, reason: 'no-upturn' });
+  });
+
+  it('needs a week of the user’s own entries', () => {
+    expect(ask({ days: flat(25, 6), tier: 'pro' })).toEqual({ ok: false, reason: 'no-upturn' });
+    expect(ask({ days: flat(25, 7), tier: 'pro' }).ok).toBe(true);
+  });
+
+  it('needs five trusted HRV readings, and a short import is not one', () => {
+    const days = flat(25);
+    const water = { water: 1.5, calories: 0, triggers: {}, meals: [] };
+    // Four in-app readings; the other four days hold water and a short imported sample.
+    for (let i = 1; i <= 4; i++) {
+      days[K(i)] = day({ food: water, readings: [hrvR(25, { id: `i${i}`, imported: true, durationSec: 60 })] });
+    }
+    expect(trustedHrvCount(days)).toBe(4);
+    expect(ask({ days, tier: 'pro' })).toEqual({ ok: false, reason: 'no-upturn' });
+  });
+
+  it('is held to the Bad-day floor, strictly: today must be scored and at least 40', () => {
+    expect(ask({ days: flat(20), tier: 'pro' })).toEqual({ ok: false, reason: 'below-floor' });
+    const days = flat(25);
+    days[K(8)] = day({ notes: 'no reading yet' });
+    expect(ask({ days, tier: 'pro' })).toEqual({ ok: false, reason: 'unscored-today' });
+  });
+
+  it('passes through every suppression door B does', () => {
+    const pro = { days: flat(25), tier: 'pro' as const };
+    expect(ask({ ...pro, crashAlertFiredToday: true })).toEqual({ ok: false, reason: 'crash-alert-today' });
+    expect(ask({ ...pro, paywallSeenThisSession: true })).toEqual({ ok: false, reason: 'paywall-this-session' });
+    expect(ask({ ...pro, memory: { askedVersion: '1.20.0' } })).toEqual({ ok: false, reason: 'asked-this-version' });
+    expect(ask({ ...pro, memory: { lastAskedAtMs: NOW - 30 * DAY_MS, askedVersion: '1.19.0' } }))
+      .toEqual({ ok: false, reason: 'asked-recently' });
+  });
+
+  it('never asks during a downturn, however engaged', () => {
+    const days: Record<string, DayRecord> = {};
+    for (let i = 1; i <= 5; i++) days[K(i)] = hrvDay(40);
+    days[K(6)] = hrvDay(30); days[K(7)] = hrvDay(25); days[K(8)] = hrvDay(25);
+    const v = ask({ days, tier: 'pro' });
+    expect(v).toEqual({ ok: false, reason: 'downturn' });
+  });
+
+  it('an upturn still wins the door when both are open', () => {
+    const v = ask({ tier: 'pro' });
+    expect(v.ok && v.door).toBe('upturn');
   });
 });

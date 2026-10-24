@@ -627,12 +627,18 @@ old web app so old `export.json` files import directly.
   on pacing alerts" card under the steps ask while permission is missing. Turning one
   on sends `not` letter `P`. None of this is OTA-able: it needs a native build.
 - **The store review ask is earned, never scheduled.** `src/lib/review/` decides
-  it: `eligibility.ts` is pure (four days holding the user's OWN entries —
-  imported Health rows don't count — plus `detectUpturn`, the mirror of
-  `detectDownturn` in `src/lib/scoring/upturn.ts`), and `index.ts` is the shell
-  (memory in the plaintext `autonomic.flags` MMKV, `expo-store-review`). It asks
-  on a day trending clearly above the user's own recent baseline, NOT on a green
-  day — plenty of people never reach one — but never below a Bad-day floor, never
+  it: `eligibility.ts` is pure, and `index.ts` is the shell (memory in the
+  plaintext `autonomic.flags` MMKV, `expo-store-review`). **Two doors**: door B
+  is four days holding the user's OWN entries (imported Health rows don't count)
+  plus `detectUpturn`, the mirror of `detectDownturn` in
+  `src/lib/scoring/upturn.ts` — a day trending clearly above the user's own
+  recent baseline, NOT a green day. Door A (`engagedDoorOpen`) is ENGAGEMENT:
+  seven own-entry days, five trusted HRV readings, and Pro or a 14-day-old
+  install; it exists because door B alone asked ~5% of installs, and for a
+  chronic illness staying level is the value. Both doors take every suppression
+  below. Door A's Bad-day floor is STRICT — today scored and at least
+  `MIN_TODAY` — because the floor otherwise lives only inside `detectUpturn`
+  and an unscored day is unknown, not safe. Never below a Bad-day floor, never
   during a downturn, never on the day the crash warning fired, and never in a
   session where the paywall came up (`notePaywallSeen()`). Our memory is stricter
   than the OS quota (once per app version, ~120 days apart) because iOS allows

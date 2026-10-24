@@ -27,10 +27,14 @@ import { todayKey } from '../dates';
 import { resolveProtocol } from '../scoring/day';
 import { getState } from '../../store/store';
 import { pingReviewAsked } from '../../store/ping';
+import { getInstalledAtMs, getTier } from '../../store/tier';
 import { shouldAskForReview, type ReviewMemory, type ReviewVerdict } from './eligibility';
 import { profileCtx } from '../scoring';
 
-export { engagedDayCount, shouldAskForReview, MIN_ENGAGED_DAYS, MIN_DAYS_BETWEEN_ASKS } from './eligibility';
+export {
+  engagedDayCount, shouldAskForReview, MIN_ENGAGED_DAYS, MIN_DAYS_BETWEEN_ASKS,
+  ENGAGED_DOOR_DAYS, ENGAGED_DOOR_READINGS, ENGAGED_DOOR_INSTALL_DAYS,
+} from './eligibility';
 export type { ReviewMemory, ReviewVerdict } from './eligibility';
 
 /** TEMP (dev only): bypass every eligibility rule to see the prompt in a dev
@@ -91,6 +95,8 @@ export function reviewVerdict(): ReviewVerdict {
     nowMs: Date.now(),
     crashAlertFiredToday: s.settings.crashAlert?.lastFired === dk,
     paywallSeenThisSession: paywallSeen,
+    tier: getTier(),
+    installedAtMs: getInstalledAtMs(),
   });
 }
 
