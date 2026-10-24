@@ -2258,6 +2258,20 @@ old web app so old `export.json` files import directly.
   `state.hiddenTypes`, only while unused — `typeInUse` guards). Custom defs are
   pure JSON (no summary/detail functions) so they survive export/import. UI code
   must resolve types through `typesFor(state, kind)`, never the raw registry maps.
+  **The clean-day protocol stores type KEYS, and a key can go stale.** The
+  picker lets a built-in be deleted while in use (its past logs are hidden), and
+  adding it back by name creates `custom-…` — so `settings.protocol` named
+  `gaviscon` while every new entry carried `custom-gaviscon`, and Gaviscon
+  logged at 5:22pm read as missed on the Journal and in every export, with no
+  row in the editor to untick. Two guards: `protocolCriteria` (`scoring/day.ts`)
+  counts an entry that resolves to the same NAME as the requirement, in either
+  direction and case-insensitively — safe because two VISIBLE types never share
+  a name (`addCustomType` / `editType` refuse) — and `reconcileProtocol`
+  (`typeResolve.ts`, pure + tested) re-points a stale key at the visible type of
+  the same name or drops it, run by `migrate()` on every load/import and by
+  `addCustomType` / `deleteType`. Trigger requirements are left alone there: an
+  empty list means "no triggers at all", so pruning the last key would widen
+  the rule.
 - **The welcome wizard is three steps: Before you begin → Connect your data →
   Take your first HRV reading.** The first folds the disclaimer and the privacy
   promise into one scrolling view and carries NO acknowledge checkbox — the

@@ -358,6 +358,32 @@ describe('day scoring', () => {
     // Without the custom map it can only fall back to the raw key.
     expect(dayCleanliness(days, '2026-07-02', proto)!.criteria.find((x) => x.key === 'meds:custom-magnesium')!.label).toBe('custom-magnesium');
   });
+  it('a requirement is met by an entry of the same NAME under another key', () => {
+    // The built-in Gaviscon was deleted from the picker and added back by
+    // name, which comes back as a custom key; the protocol still names the
+    // built-in. Gaviscon logged at 5:22pm must not read as missed.
+    const base: Protocol = { ...DEFAULT_PROTOCOL, triggers: { enabled: false, types: [] }, water: { enabled: false, liters: 0 }, sleep: { enabled: false, hours: 0 }, hrv: { enabled: false } };
+    const custom = {
+      meds: { 'custom-gaviscon': { label: 'Gaviscon', icon: 'pill', fields: [], userDefined: true } },
+      activities: { 'custom-yoga': { label: 'yoga / Stretching', icon: 'activity', fields: [], userDefined: true } },
+    };
+    const days: Record<string, DayRecord> = {
+      '2026-10-10': day({ meds: [{ id: '1', type: 'custom-gaviscon', time: '17:22' }] as Entry[] }),
+      '2026-10-11': day({ activities: [{ id: '2', type: 'custom-yoga', time: '11:16' }] as Entry[] }),
+      // The other direction: an entry logged BEFORE the delete carries the
+      // built-in key, and the protocol was re-pointed at the custom one.
+      '2026-10-09': day({ meds: [{ id: '3', type: 'gaviscon' }] as Entry[] }),
+    };
+    const stale: Protocol = { ...base, meds: { enabled: true, types: ['gaviscon'] }, activities: { enabled: true, types: ['yoga'] } };
+    expect(dayCleanliness(days, '2026-10-10', stale, custom)!.criteria.find((x) => x.key === 'meds:gaviscon')!.pass).toBe(true);
+    // Case-insensitive, the same rule the catalog's duplicate check applies.
+    expect(dayCleanliness(days, '2026-10-11', stale, custom)!.criteria.find((x) => x.key === 'activities:yoga')!.pass).toBe(true);
+    const repointed: Protocol = { ...base, meds: { enabled: true, types: ['custom-gaviscon'] } };
+    expect(dayCleanliness(days, '2026-10-09', repointed, custom)!.criteria.find((x) => x.key === 'meds:custom-gaviscon')!.pass).toBe(true);
+    // A different name is a different thing: Melatonin does not satisfy Gaviscon.
+    const other: Record<string, DayRecord> = { '2026-10-10': day({ meds: [{ id: '4', type: 'melatonin' }] as Entry[] }) };
+    expect(dayCleanliness(other, '2026-10-10', stale, custom)!.criteria.find((x) => x.key === 'meds:gaviscon')!.pass).toBe(false);
+  });
   it('daily HRV requirement passes only for an in-app HRV capture', () => {
     const proto: Protocol = { ...DEFAULT_PROTOCOL, triggers: { enabled: false, types: [] }, water: { enabled: false, liters: 0 }, sleep: { enabled: false, hours: 0 }, hrv: { enabled: true } };
     const passOf = (days: Record<string, DayRecord>) => dayCleanliness(days, '2026-07-02', proto)!.criteria.find((x) => x.key === 'hrv')!.pass;
