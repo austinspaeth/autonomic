@@ -164,21 +164,36 @@ glitch. It is the one hard cut in the piece that is allowed to be abrupt.
 Fade the end card fully to black ~6 frames before the last frame so the seam
 is clean.
 
-**The end line.** It should answer the feeling of the whole day, not sell a
-feature. My pick:
+**The end card has three lines, and each has a different job:**
 
-> **You're not imagining it.**
+> **[Autonomic logo]**
+> **Answers for the questions you live with.**
+> POTS · Long COVID · ME/CFS · Dysautonomia
 
-It pays off the clinic beat ("will my doctor believe me?") and the evening
-beat (is the progress real?), and every POTS patient has been told the
-opposite. Alternates:
+- **The line closes the video's own structure.** The video is five questions
+  answered on screen, so the sign-off names that, rather than introducing a
+  new idea in the last two seconds. It is warmer and more natural than
+  "here for your answers", and it makes no medical promise.
+- **The conditions tell a stranger who this is for.** A viewer who doesn't
+  have POTS can't tell from the story alone that long COVID and ME/CFS
+  patients belong here too, and they are half of the store listing's
+  audience (the subtitle is *Pacing for Long COVID & ME/CFS*). Order: POTS
+  first, because the story is about POTS, then the subtitle's two, then the
+  umbrella term. Four is the most that stays readable on one line in the 3:2
+  thumbnail; leave out "post-viral" and "long-haul".
+- **Say "for", never "helps with" or "treats".** Naming the condition a page
+  is for is fine. Saying the app helps with it is an efficacy claim, which is
+  exactly what Apple's "no unverifiable claims" rule and the app's own "not a
+  medical device" line rule out. This card says neither: the line promises
+  answers to questions, and the condition row is a plain list.
 
-- *Your body has been telling you something.*
-- *For the days you can't see the progress.*
-- *See your recovery, one day at a time.*
+Alternates for the middle line, all of which still read as the answer to the
+five questions:
 
-Apple's rule is "no unverifiable claims", so avoid anything like "Get better
-with Autonomic" or "Know before you crash".
+- *For the questions you live with.* (the softest; promises nothing)
+- *Your questions, answered by your own data.* (more concrete, more product)
+- *You're not imagining it.* (the earlier pick: the strongest emotionally,
+  but it doesn't echo the question structure)
 
 ---
 
@@ -201,8 +216,8 @@ with Autonomic" or "Know before you crash".
 | **5A** | 20.2 → 21.8 | 1.6 | Wide, side-on, warm lamp | Evening. She lies on her back across the bed with her legs straight up the wall, compression socks on, arms limp at her sides. | — | **Am I actually getting better?** |
 | **5B** | 21.8 → 23.4 | 1.6 | Top-down, directly above her face | Defeated: eyes glassy and fixed on the ceiling, a slow exhale, a tear-track at the corner of one eye. No phone. | — | (holds) |
 | **5C** | 23.4 → 25.8 | 2.4 | OTS from above and behind her head, down onto the screen | She lifts the phone above her chest and scrolls slowly through months of Progress. | **S6** Progress, Year/Month, score climbing | (fades out at 25.5) |
-| **5D** | 25.8 → 27.4 | 1.6 | Same top-down on her face as 5B | The screen's cool glow lights her face from below frame. A slow, disbelieving smile breaks into a real grin. | Phone just out of frame; only its glow | — |
-| **6** | 27.4 → 30.0 | 2.6 | Black | Hard cut to black. The **Autonomic** logo, then the line beneath it. Both fade out to pure black by 29.8. Loop → 1A. | — | Logo + **You're not imagining it.** |
+| **5D** | 25.8 → 27.0 | 1.2 | Same top-down on her face as 5B | The screen's cool glow lights her face from below frame. A slow, disbelieving smile breaks into a real grin. | Phone just out of frame; only its glow | — |
+| **6** | 27.0 → 30.0 | 3.0 | Black | Hard cut to black. The logo, then the line, then the conditions row, each fading in. All fade out to pure black by 29.8. Loop → 1A. | — | Logo · **Answers for the questions you live with.** · POTS · Long COVID · ME/CFS · Dysautonomia |
 
 Rhythm: each question gets a **beat of life (no device) → device in hand →
 reaction**. Cut on motion: a lifting wrist, a turning phone, a scrolling
@@ -225,8 +240,8 @@ screens big.
 | 2B | 5.6 → 7.4 | watch pacing |
 | 5B | 7.4 → 8.6 | defeated, top-down (carries the question "Am I actually getting better?") |
 | 5C | 8.6 → 10.8 | Progress |
-| 5D | 10.8 → 12.4 | the grin |
-| 6 | 12.4 → 15.0 | logo + line |
+| 5D | 10.8 → 12.0 | the grin |
+| 6 | 12.0 → 15.0 | full end card: logo, line, conditions. The conditions row matters most here, because search is where people are deciding whether an app is for their condition |
 
 For this cut, grab a **second, tighter crop** in the edit wherever the screen
 is small. The 3:2 frame can be punched in up to ~120% on 1C, 2B and 5C and
@@ -924,7 +939,7 @@ overhead, steady.
 [STYLE TAIL]
 ```
 
-*Keep:* the 1.6 s that runs from soft to full grin. Cut to black **on the
+*Keep:* the 1.2 s that runs from soft to full grin. Cut to black **on the
 peak of the grin**, not after it fades.
 
 ---
@@ -934,12 +949,22 @@ peak of the grin**, not after it fades.
 No generation. Built in the edit:
 
 - Hard cut from 5D to pure black (#000).
-- **0.3 s** of black, then the **Autonomic logo** (app icon mark plus wordmark,
-  white) fades in over 10 frames, centred in the hero zone.
-- **0.4 s** later the line fades in beneath it in the question typeface, one
-  size smaller, white at 80%: **You're not imagining it.**
-- Hold to **29.4 s**, then fade both to pure black by **29.8 s**. Hold black
-  to 30.0, then loop to 1A.
+Three lines, stacked and centred in the hero zone:
+
+| Line | Text | Style | In at (header / search) |
+| --- | --- | --- | --- |
+| Logo | App icon mark + **Autonomic** wordmark | White | 27.3 s / 12.3 s |
+| Line | **Answers for the questions you live with.** | The question typeface and size, white | 27.7 s / 12.7 s |
+| Conditions | **POTS · Long COVID · ME/CFS · Dysautonomia** | Same face, about 60% of the line's size, medium weight, white at 70%, letter-spacing +2%, middle dots with a space either side | 28.1 s / 13.1 s |
+
+- Hard cut from 5D to pure black (#000). Each line fades in over 10 frames
+  with the questions' 12 px rise.
+- Hold until **29.4 s** (14.4 s), then fade everything to pure black by
+  **29.8 s** (14.8 s). Hold black to the end, then loop to 1A.
+- The conditions row must fit **on one line** at the 3:2 crop's width. If it
+  wraps, drop "Dysautonomia" before shrinking the text.
+- Leave the conditions row in English for every storefront except where the
+  common name differs. For en-GB, write **PoTS**, as the UK listing does.
 
 ---
 
@@ -1051,7 +1076,8 @@ blacks slightly and keep skin true. Film grain over everything, UI included.
   effects; Apple asks for calm.
 - **Copy:** sentence case, exactly as in the table. One question on screen at
   a time.
-- **End card (shot 6):** the logo, then the line beneath it, on pure black.
+- **End card (shot 6):** the logo, the line and the conditions row, on pure
+  black.
   Timings are in shot 6. Leave the store's own app icon and name to the
   store; this card is a sign-off, not a call to action.
 - **Localisation:** text is a separate layer per language. For en-GB, the
@@ -1093,8 +1119,10 @@ already legible (bring the text in by frame 10, not frame 30, if needed).
 - [ ] No price, discount, "free", URL, ©, award badge or other platform's logo.
 - [ ] No locked or paywalled UI and no "Pro" badge visible on any screen.
 - [ ] No over-budget (red) pacing state anywhere.
-- [ ] No caption claims anything; the only text is the questions, the logo
-      and the end line.
+- [ ] No caption claims anything; the only text is the questions and the end
+      card. The end card says "for", never "helps with" or "treats".
+- [ ] The conditions row sits on one line and is readable in the 3:2 cut at
+      phone size.
 - [ ] The stand-test rise in 4B is legible as over the threshold in the 3:2
       cut at phone size.
 - [ ] Every UI frame is a real recording from the app, not mocked or edited.
