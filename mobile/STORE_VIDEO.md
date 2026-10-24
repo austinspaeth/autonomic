@@ -142,9 +142,9 @@ in my head?"* (swap for #4), *"Can I shower and cook?"* (swap for #2).
 **Copy guardrails** (these match the app's own rules in `CLAUDE.md`):
 
 - Questions only. **No captions that answer them.** The answer is the UI, so
-  we never write a claim like "predicts crashes" or "proves POTS". The one
-  other line in the video is the end card's line, which speaks to her rather
-  than making a claim about the app.
+  we never write a claim like "predicts crashes" or "proves POTS". The only
+  other text is the end card: a line and a list of the conditions the app is
+  for, neither of which claims the app treats anything.
 - The app is a journal, not a medical device. Nothing on screen diagnoses
   anything.
 - No prices, no "free", no Pro badge, no paywall, no locks.
