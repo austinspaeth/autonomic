@@ -1111,6 +1111,90 @@ already legible (bring the text in by frame 10, not frame 30, if needed).
 
 ---
 
+## 8a. Poster frame and the still fallback
+
+**There is no separate fallback photo for a video.** In App Store Connect a
+video creative asset carries a **poster frame**, picked from the video itself
+in Asset Library. The still that shows before playback (and, presumably,
+wherever video doesn't autoplay) is that frame. Apple's help says it *"applies
+to everywhere the asset is used"* and that **poster frames can't be edited
+after the asset is approved**, so choose it before you submit.
+
+- **Header video:** set the poster to ~0.5 s into shot 1A, once the question
+  "Am I going to crash today?" is fully faded in. With no motion and no sound
+  it still says *this is for someone like me*.
+- **Search video:** the same moment, checked at thumbnail size. If the
+  question text is unreadable there, use the 2B watch close-up instead: the
+  pacing bar reads at small sizes.
+
+**A still image is its own asset, not a fallback.** Creative assets are
+optional, and each placement takes either an image or a video. Make the
+stills anyway, as an alternative to test or a quick first version:
+
+| Still | Size | Notes |
+| --- | --- | --- |
+| Header image | 3840 × 1646, JPEG or PNG | Frame 1A with the question |
+| Search image | 1920 × 1280 – 3840 × 2560 (3:2), JPEG or PNG | 1A or 2B |
+| **Universal image** | **5244 × 2950 PNG (16:9)** | **Only a universal asset can serve both placements** (App Store Connect's "Use header asset in search results"), and the spec lists it for images only. So a video needs its own header and search files, which is why section 8 exports two |
+
+No alpha channel in any still. The universal image is 5244 px wide, larger
+than the 4K master, so either take it from an 8K-upscaled frame or re-render
+the start still for 1A in Nano Banana at the higher resolution, then lay the
+text over it.
+
+---
+
+## 8b. TikTok and Instagram cuts
+
+**Size: 1080 × 1920 (9:16), 30 fps, H.264 MP4, sound on.** One file works on
+TikTok, Reels and Stories, and the Instagram feed takes it too.
+
+**It cannot be cropped from the 16:9 master.** A 9:16 frame is less than a
+third of the master's width, and her face, the phone and the text would never
+all fit. Re-generate the shots vertically: Veo 3.1 (and Kling and Seedance)
+output 9:16 natively, from the same character and location references. Make
+new start frames at 9:16; most shots compose more naturally upright anyway
+(phone in hand, legs up the wall, the top-down face).
+
+**Safe zone.** The app's buttons, caption and username cover the edges. The
+numbers below come from each platform's ad guidance (no official figures for
+organic posts exist), so use the strictest of each:
+
+| | Keep clear |
+| --- | --- |
+| Top | 270 px |
+| Bottom | **670 px** (caption, music line, username) |
+| Sides | 120 px, plus the button column on the right edge |
+
+That leaves roughly **x 120–960, y 270–1250**. Put the questions and the
+end card there; faces and screens should sit in it too.
+
+**Cover / grid.** Instagram's profile grid shows a **3:4 centre crop
+(1080 × 1440)** of the cover, so put the cover's subject and text in the
+middle 1440 px. TikTok lets you upload a cover or choose a frame; use the 1A
+moment with the question.
+
+**Make it a different edit, not the same one stretched.** None of Apple's
+rules apply here, but different ones do:
+
+- **Sound on, and the first second has to stop the scroll.** Open on the
+  brace at the bed's edge *with the question already on screen*. Add a short
+  spoken or captioned first-person line if it tests well ("Every morning
+  starts with the same question.").
+- **Length:** 20–40 s. All five questions get room to breathe, and
+  each shot can run its full take.
+- **Burned-in captions** for any speech or voiceover; most people watch
+  muted.
+- **Music:** a business account can only use each platform's commercial
+  sound library. Trending tracks are off limits for brand posts.
+- **No loop requirement**, so the end card can hold longer (3–4 s) and add a
+  call to action in the caption ("Autonomic on the App Store"), not in the
+  video.
+- **Health claims still matter:** both platforms restrict health claims in
+  ads. "For people living with POTS…" is fine; "helps POTS" is not.
+
+---
+
 ## 9. Pre-submission checklist
 
 - [ ] Every face, screen and question sits inside the both-crop area and the
