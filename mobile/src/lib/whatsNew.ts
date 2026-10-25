@@ -50,6 +50,16 @@ export function fmtReleaseDate(iso: string): string {
 
 export const RELEASES: Release[] = [
   {
+    version: '1.37',
+    date: '2026-10-24',
+    notes: [
+      'Your HRV readings now sync reliably to Apple Health and Health Connect, so the other apps you use can see them too.',
+      'Adding and editing your own activity types is now simpler.',
+      'Not sure which bowel movement type to pick? Tap the new ? on the form for a quick guide.',
+      'Various bug fixes and performance improvements.',
+    ],
+  },
+  {
     version: '1.36',
     date: '2026-10-22',
     notes: [

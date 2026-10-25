@@ -7,7 +7,8 @@ import { Pressable, Text, View } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { FieldButton, FieldLabel, TextField, TimeField, onlyNumeric } from '../components/Field';
-import { Button, DaySaveButton, ProgressBar, Segmented } from '../components/ui';
+import { Button, DaySaveButton, HelpDot, ProgressBar, Segmented } from '../components/ui';
+import type { HelpContent } from '../lib/help';
 import { Icon } from '../components/Icon';
 import { GRADE_COLORS, WATER_BLUE, WATER_BLUE_SOFT, fonts, radius, usePalette } from '../theme';
 import { resolveProtocol, waterGoalL } from '../lib/scoring/day';
@@ -207,6 +208,12 @@ function KindGlyph({ kind }: { kind: string }) {
   }
 }
 
+/** The "?" beside the form's title: what the Type and Volume choices mean. */
+const BOWEL_HELP: HelpContent = {
+  what: 'Type is how it looked. Hard is dry lumps. Formed is smooth and soft, the healthy middle. Loose is mushy. Diarrhea is watery. Volume is roughly how much. Small pieces means little pebbles, like deer droppings.',
+  why: 'Dysautonomia often slows or speeds up the gut. Logging the type over time shows your own pattern, and Insights can link it to sleep, food and medications.',
+};
+
 function BowelForm({ dk, existing, controls }: { dk: string; existing: Movement | null; controls: SheetControls }) {
   const p = usePalette();
   const [time, setTime] = useState(existing?.time || defaultTimeFor(dk));
@@ -236,7 +243,10 @@ function BowelForm({ dk, existing, controls }: { dk: string; existing: Movement 
   } : null);
   return (
     <View>
-      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>{(existing ? 'Edit ' : '') + 'Bowel movement'}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 16 }}>
+        <Text style={{ fontSize: 21, fontWeight: '700', color: p.text }}>{(existing ? 'Edit ' : '') + 'Bowel movement'}</Text>
+        <HelpDot title="Bowel movement" text={BOWEL_HELP} />
+      </View>
       <TimeField label="Time" value={time} onChange={setTime} />
       <FieldLabel>Type</FieldLabel>
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginBottom: 14 }}>

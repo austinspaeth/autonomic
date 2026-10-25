@@ -15,6 +15,7 @@
  */
 import type { Entry } from '../types';
 import { keyOf } from '../dates';
+import { logError } from '../diagnostics/errorLog';
 import {
   hasAskedAuth, markAskedAuth, markPromptedThisLaunch, markUngrantable, promptedThisLaunch,
   shareAuthRequest, ungrantable, ungrantableScope,
@@ -155,9 +156,20 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
   const avgOf = (values: number[]): number | null =>
     values.length ? values.reduce((s, v) => s + v, 0) / values.length : null;
 
+  // One insertRecords call per record TYPE. The native side parses a whole
+  // batch with the FIRST record's type (`parseWriteRecords` in
+  // react-native-health-connect), so the HRV session's [RMSSD, HeartRate] pair
+  // read the HeartRate record as an RMSSD one, threw on its missing `time`, and
+  // rejected the batch: every live capture on Android wrote nothing, silently.
   const insert = async (records: Record<string, unknown>[]): Promise<boolean> => {
     if (!records.length || !(await ensureInit())) return false;
-    try { await mod.insertRecords(records); return true; } catch { return false; }
+    const byType = new Map<unknown, Record<string, unknown>[]>();
+    for (const r of records) byType.set(r.recordType, [...(byType.get(r.recordType) || []), r]);
+    let ok = true;
+    for (const [type, batch] of byType) {
+      try { await mod.insertRecords(batch); } catch (e) { ok = false; logError(`hc.write.${String(type)}`, e); }
+    }
+    return ok;
   };
 
   /** Every session in the window → the night, stitched (see summarizeHcSessions). */

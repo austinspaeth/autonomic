@@ -177,8 +177,12 @@ export function HrvResults({ rr, segmentStarts, seamGapsMs, hrSamples, sdnnSampl
   // The morning-reminder offer. Decided ONCE per reading (a re-render must not
   // re-count a skip, and the card must not disappear under the user because a
   // save elsewhere flipped the settings), so the decision is taken on the first
-  // render and the skip is written the same moment.
+  // render and the skip is written the same moment. Only a reading the app
+  // filed earns it: "take one every morning" on top of a refusal, or a reading
+  // the user is being asked to keep, is the wrong sentence at the worst moment,
+  // and neither may spend a reading of the ✕'s countdown.
   const [showNudge, setShowNudge] = useState(() => {
+    if (!enoughData) return false;
     const m = nudgeMemory();
     const d = nudgeDecision(m, !!getState().settings.reminder?.enabled);
     if (d === 'skip') writeNudgeMemory(nudgeSkipped(m));

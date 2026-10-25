@@ -591,7 +591,7 @@ export function useEntryForms(dk: string) {
   // comes first (the day's Apple Workout / exercise sessions, tap to review);
   // "Enter manually" stacks the normal type picker. Without it, straight to
   // the picker.
-  const pickActivityManual = () => openSheet(() => <TypePicker title="Add activity" kind="activities" manageLabel="Add new activity type" onPick={(t) => openActivityForm(t, null)} />);
+  const pickActivityManual = () => openSheet(() => <TypePicker title="Add activity" kind="activities" manageLabel="Add or edit activity types" onPick={(t) => openActivityForm(t, null)} />);
   const openWorkoutImport = (c: WorkoutCandidate) => {
     // The HR trace rides inline on the prefill; the form's save splits it into
     // the waveform sidecar. Saving then pops the workout report.

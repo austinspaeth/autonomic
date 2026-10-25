@@ -18,10 +18,10 @@ import { loadOf, type LoadWeight } from '../lib/budget/load';
 import { useAppState } from '../store/store';
 
 const COPY: Record<TypeKind, { title: string; nameLabel: string; noun: string }> = {
-  activities: { title: 'New activity type', nameLabel: 'Activity name', noun: 'activity' },
-  meds: { title: 'New medication or supplement', nameLabel: 'Name', noun: 'medication' },
-  symptoms: { title: 'New symptom', nameLabel: 'Symptom name', noun: 'symptom' },
-  triggers: { title: 'New trigger', nameLabel: 'Trigger name', noun: 'trigger' },
+  activities: { title: 'Activity types', nameLabel: 'Activity name', noun: 'activity' },
+  meds: { title: 'Medications & supplements', nameLabel: 'Name', noun: 'medication' },
+  symptoms: { title: 'Symptoms', nameLabel: 'Symptom name', noun: 'symptom' },
+  triggers: { title: 'Triggers', nameLabel: 'Trigger name', noun: 'trigger' },
 };
 
 /** Edit card stacked over the manage sheet: rename a type or (for meds) change
