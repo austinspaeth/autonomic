@@ -8,8 +8,8 @@ keywords: "labile blood pressure, blood pressure swings, fluctuating blood press
 date: 2026-10-24
 updated: 2026-10-24
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1723764881665-5b40cea01c9b?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Alex Moliski / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1621525466547-4ac135e85f59?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
+photoAttribution: "Unsplash"
 tldr: "Labile blood pressure means your BP rises and falls more than the usual background variation, often within minutes, because the autonomic reflexes that normally buffer it are not keeping up. In dysautonomia this shows up as drops on standing, dips after meals, adrenaline-driven spikes, and a flatter day-night rhythm. A single odd reading is almost never the story: what matters is the pattern, measured the same way over time, and read alongside your heart rate and symptoms. It is worth understanding and tracking, but on its own it is not a diagnosis."
 categories:
   - pots

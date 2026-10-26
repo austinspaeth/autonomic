@@ -8,7 +8,7 @@ keywords: "respiratory rate, normal respiratory rate, breathing rate, breaths pe
 date: 2026-10-23
 updated: 2026-10-23
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1499750310107-5fef28a66643?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "https://images.unsplash.com/photo-1624292420533-da15fe3a4857?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
 photoAttribution: "Unsplash"
 tldr: "A normal resting respiratory rate for an adult is 12 to 20 breaths per minute, and many healthy people sit between 12 and 16. In long COVID and POTS it often runs faster and shallower than it should, which both reflects and worsens an over-revved nervous system and drags your HRV down. The single most useful number is not any textbook range but your own stable baseline, read over weeks, so that a night which drifts upward stands out."
 categories:

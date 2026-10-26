@@ -8,8 +8,8 @@ keywords: "surgery with POTS, anesthesia POTS, POTS and surgery, dysautonomia an
 date: 2026-10-26
 updated: 2026-10-26
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1606162296115-21a9cf2e685b?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Alexander Grey / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1640876777002-badf6aee5bcc?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
+photoAttribution: "Unsplash"
 tldr: "People with POTS can have surgery safely, but the perioperative period stacks several POTS triggers at once: overnight fasting and dehydration shrink an already low blood volume, lying flat for hours then sitting up invites a big heart-rate spike, and some anesthetic drugs relax blood vessels and worsen pooling. The fixes are mostly simple and worth asking for in advance: generous IV fluids before and during surgery, careful medication timing, slow repositioning, active warming, compression, and a gentle, paced recovery. Share your resting and standing numbers with the team beforehand so they know your normal, and discuss any plan changes with your clinician."
 categories:
   - pots
