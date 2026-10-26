@@ -1,13 +1,25 @@
 /**
- * Access codes: a code the owner hands to somebody, worth N days of full
- * access in the app.
+ * Access codes: a code the owner hands to somebody. Two kinds:
+ *
+ *   - `days` (the original, and what a row with no `kind` is): worth N days of
+ *     full access in the app.
+ *   - `promo`: unlocks the $24.99 year (`com.autonomic.journal.yearly.promo`),
+ *     a product no screen in the app sells any more. Entering one only CHECKS
+ *     it; the code is spent by a second call the phone makes after the store
+ *     confirms the purchase, so a cancelled sheet or a failed payment leaves it
+ *     good to try again.
  *
  *   POST /ping/cde/D082126I-TF-V1.31.0
  *   { "code": "K7WQ-M2XD", "dev": false }
- *   -> 200 { "ok": true, "days": 30 }      the code exists; the app extends its window
+ *   -> 200 { "ok": true, "days": 30 }      a days code; spent, the app extends its window
+ *   -> 200 { "ok": true, "offer": "promo" } a promo code; NOT spent, the app offers the purchase
  *   -> 404 { "ok": false }                 no such code
  *   -> 409 { "ok": false, "used": true }   the code was already redeemed
  *   -> 400 { "ok": false }                 not a code at all
+ *
+ *   { "code": "K7WQ-M2XD", "purchased": true }
+ *   -> 200 { "ok": true }                  a promo code, now spent
+ *   -> 409 / 404                            as above (a days code is never spent this way)
  *
  * Like the giveaway sign-up beside it, THIS IS NOT A PING. It rides the ping
  * function for the plumbing (the install code in the path gives platform and
@@ -82,8 +94,15 @@ const readRedeem = (event) => {
   try { b = JSON.parse(raw); } catch { return null; }
   if (!b || typeof b !== 'object' || Array.isArray(b)) return null;
   const code = normCode(b.code);
-  return code ? { code, dev: b.dev === true } : null;
+  if (!code) return null;
+  const r = { code, dev: b.dev === true };
+  if (b.purchased === true) r.purchased = true;
+  return r;
 };
+
+const KINDS = ['days', 'promo'];
+/** A row's kind; a row written before kinds existed is a days code. */
+const kindOf = (item) => (item?.kind === 'promo' ? 'promo' : 'days');
 
 const isMissing = (err) => err?.name === 'ConditionalCheckFailedException';
 
@@ -101,21 +120,29 @@ const redeemCode = async (ddb, table, r, install, nowMs) => {
     const res = await ddb.send(new GetCommand({ TableName: table, Key: { PK, SK: r.code } }));
     if (!res.Item) return { status: 'missing' };
     if (isUsed(res.Item)) return { status: 'used' };
+    if (kindOf(res.Item) === 'promo') return { status: 'ok', offer: 'promo' };
     const days = normDays(res.Item.days);
     return days ? { status: 'ok', days } : { status: 'missing' };
   };
+  // A promo code is only checked here. It is spent by `purchased`, below,
+  // and a days code is never spent that way.
   if (r.dev) return peek();
+  if (r.purchased) return spendPromo(ddb, table, r, install, nowMs, peek);
   try {
     const res = await ddb.send(new UpdateCommand({
       TableName: table,
       Key: { PK, SK: r.code },
-      ConditionExpression: 'attribute_exists(PK) AND (attribute_not_exists(#n) OR #n = :zero)',
+      // Never a promo row: answering a check must not spend it.
+      ConditionExpression: 'attribute_exists(PK) AND (attribute_not_exists(#n) OR #n = :zero)'
+        + ' AND (attribute_not_exists(#kind) OR #kind <> :promo)',
       UpdateExpression: 'SET #n = :one, #at = :now, #platform = :platform, #version = :version',
       ExpressionAttributeNames: {
         '#n': 'redeemed', '#at': 'redeemedAt', '#platform': 'redeemedPlatform', '#version': 'redeemedVersion',
+        '#kind': 'kind',
       },
       ExpressionAttributeValues: {
         ':zero': 0,
+        ':promo': 'promo',
         ':one': 1,
         ':now': new Date(nowMs).toISOString(),
         ':platform': install.platform || 'U',
@@ -127,9 +154,46 @@ const redeemCode = async (ddb, table, r, install, nowMs) => {
     return days ? { status: 'ok', days } : { status: 'missing' };
   } catch (err) {
     if (!isMissing(err)) throw err;
-    // Refused: either there is no such code or it is spent. Which one is a
-    // different sentence on the card, so look.
+    // Refused: no such code, a spent one, or a promo code (which a check
+    // never spends). Which one is a different answer, so look.
     const now = await peek();
+    if (now.offer) return now;
+    return now.status === 'ok' ? { status: 'used' } : now;
+  }
+};
+
+/**
+ * Spend a promo code once the store has confirmed its purchase. The same
+ * one-winner conditional write as a days code. The phone is the only witness
+ * to the purchase, so this trusts it; the worst a forged call can do is spend
+ * a code, which only stops it being offered again.
+ */
+const spendPromo = async (ddb, table, r, install, nowMs, peek) => {
+  try {
+    await ddb.send(new UpdateCommand({
+      TableName: table,
+      Key: { PK, SK: r.code },
+      ConditionExpression: 'attribute_exists(PK) AND #kind = :promo AND (attribute_not_exists(#n) OR #n = :zero)',
+      UpdateExpression: 'SET #n = :one, #at = :now, #platform = :platform, #version = :version',
+      ExpressionAttributeNames: {
+        '#n': 'redeemed', '#at': 'redeemedAt', '#platform': 'redeemedPlatform', '#version': 'redeemedVersion',
+        '#kind': 'kind',
+      },
+      ExpressionAttributeValues: {
+        ':zero': 0,
+        ':one': 1,
+        ':promo': 'promo',
+        ':now': new Date(nowMs).toISOString(),
+        ':platform': install.platform || 'U',
+        ':version': install.version || null,
+      },
+    }));
+    return { status: 'ok', offer: 'promo' };
+  } catch (err) {
+    if (!isMissing(err)) throw err;
+    const now = await peek();
+    // A days code cannot be spent this way, and says so as "no such code".
+    if (now.status === 'ok' && !now.offer) return { status: 'missing' };
     return now.status === 'ok' ? { status: 'used' } : now;
   }
 };
@@ -140,8 +204,10 @@ const redeemCode = async (ddb, table, r, install, nowMs) => {
  * replacing it would silently change what an already-issued code is worth.
  */
 const createCode = async (ddb, table, payload = {}, nowMs = Date.now()) => {
-  const days = normDays(payload.days);
-  if (!days) return { ok: false, error: `Days must be a whole number from 1 to ${DAYS_MAX}.` };
+  const kind = payload.kind === undefined ? 'days' : payload.kind;
+  if (!KINDS.includes(kind)) return { ok: false, error: 'Unknown kind of code.' };
+  const days = kind === 'promo' ? 0 : normDays(payload.days);
+  if (kind === 'days' && !days) return { ok: false, error: `Days must be a whole number from 1 to ${DAYS_MAX}.` };
   const wanted = typeof payload.code === 'string' ? payload.code.trim() : '';
   let fixed = null;
   if (wanted) {
@@ -155,7 +221,7 @@ const createCode = async (ddb, table, payload = {}, nowMs = Date.now()) => {
   for (let attempt = 0; attempt < 5; attempt += 1) {
     const code = fixed || generateCode();
     const row = {
-      PK, SK: code, entityType: 'CODE', code, days, note,
+      PK, SK: code, entityType: 'CODE', code, kind, days, note,
       createdAt: new Date(nowMs).toISOString(), redeemed: 0,
     };
     try {
@@ -174,6 +240,7 @@ const createCode = async (ddb, table, payload = {}, nowMs = Date.now()) => {
 
 const publicRow = (item) => ({
   code: item.code || item.SK,
+  kind: kindOf(item),
   days: Number(item.days) || 0,
   note: item.note || '',
   createdAt: item.createdAt || null,

@@ -14,7 +14,7 @@
  *   PINGS          { since } -> the mobile app's cohort-ping counters
  *   GIVEAWAY       {} -> every giveaway sign-up (email, entries, install)
  *   CODES          {} -> every access code and whether it has been used
- *   CODE_CREATE    { days, code?, note? } -> a new access code (never edited or deleted)
+ *   CODE_CREATE    { kind?, days, code?, note? } -> a new access code (never edited or deleted); kind "promo" sells the $24.99 year
  *   STORE_VERSIONS { force } -> what is live in the App Store and on Play
  *   PUSH_KEY       -> { configured, publicKey } for background alerts
  *   PUSH_SUBSCRIBE { subscription, ua } -> registers this device

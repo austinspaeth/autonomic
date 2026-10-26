@@ -63,7 +63,7 @@ export const api = {
   /** Every access code and whether it has been used. */
   codes: () => call<{ rows: AccessCode[] }>('CODES'),
   /** A new access code; an empty `code` asks the server to generate one. */
-  createCode: (payload: { days: number; code?: string; note?: string }) =>
+  createCode: (payload: { kind?: 'days' | 'promo'; days: number; code?: string; note?: string }) =>
     call<{ ok: boolean; code?: AccessCode; error?: string }>('CODE_CREATE', payload),
 };
 

@@ -1,5 +1,5 @@
-/* Access codes: days of full access handed to one person at a time, typed into
- * the app by holding Settings → Subscription. New code first, then every code
+/* Access codes: days of full access, or the $24.99/year price, handed to one
+ * person at a time, typed into the app at Settings → Subscription → Redeem a code. New code first, then every code
  * and whether it has been used. A code works once, and is created and never edited or
  * deleted: the grant lives on the phone once redeemed. */
 import * as Clipboard from 'expo-clipboard';
@@ -26,7 +26,13 @@ const PRESETS: { key: Preset; label: string }[] = [
 ];
 const PLATFORMS: Record<string, string> = { I: 'iOS', A: 'Android' };
 
-const lengthOf = (days: number) => (days >= FOREVER ? 'Forever' : `${days} day${days === 1 ? '' : 's'}`);
+const lengthOf = (r: Pick<AccessCode, 'days' | 'kind'>) =>
+  r.kind === 'promo' ? '$24.99/yr' : r.days >= FOREVER ? 'Forever' : `${r.days} day${r.days === 1 ? '' : 's'}`;
+type Kind = 'days' | 'promo';
+const KINDS: { key: Kind; label: string }[] = [
+  { key: 'days', label: 'Free access' },
+  { key: 'promo', label: '$24.99/year' },
+];
 
 export function CodesView() {
   const [rows, setRows] = useState<AccessCode[] | null>(null);
@@ -70,7 +76,7 @@ export function CodesView() {
                 <View style={{ flex: 1, minWidth: 0 }}>
                   <Text style={[s.code, r.used && { color: C.muted }]} numberOfLines={1}>
                     {r.code}
-                    <Text style={s.len}>{`  ${lengthOf(r.days)}`}</Text>
+                    <Text style={s.len}>{`  ${lengthOf(r)}`}</Text>
                   </Text>
                   <Text style={s.sub} numberOfLines={1}>
                     {[
@@ -95,7 +101,7 @@ export function CodesView() {
       </Card>
 
       <Text style={s.hint}>
-        A code adds its days on top of whatever access the phone still has. It works once, then reads as used everywhere, and cannot be changed or revoked.
+        A free-access code adds its days on top of whatever access the phone still has. A $24.99/year code opens that plan's purchase and is only used once the purchase succeeds. Either works once, then reads as used everywhere, and cannot be changed or revoked.
       </Text>
 
       <Sheet visible={adding} onClose={() => setAdding(false)} title="New code">
@@ -116,18 +122,20 @@ export function CodesView() {
 }
 
 function CodeForm({ done }: { done: (made: AccessCode) => void }) {
+  const [kind, setKind] = useState<Kind>('days');
   const [preset, setPreset] = useState<Preset>('30');
   const [custom, setCustom] = useState('');
   const [note, setNote] = useState('');
   const [code, setCode] = useState('');
   const [error, setError] = useState('');
   const days = preset === 'custom' ? Math.round(Number(custom)) : Number(preset);
-  const valid = days >= 1 && days <= FOREVER;
+  const valid = kind === 'promo' || (days >= 1 && days <= FOREVER);
 
   return (
     <View style={{ gap: 14 }}>
-      <Choice label="Length" options={PRESETS} value={preset} onChange={setPreset} />
-      {preset === 'custom' ? <NumberField label="Days" value={custom} onChange={setCustom} decimal={false} hint={`1 to ${FOREVER}`} /> : null}
+      <Choice label="Gives" options={KINDS} value={kind} onChange={setKind} />
+      {kind === 'days' ? <Choice label="Length" options={PRESETS} value={preset} onChange={setPreset} /> : null}
+      {kind === 'days' && preset === 'custom' ? <NumberField label="Days" value={custom} onChange={setCustom} decimal={false} hint={`1 to ${FOREVER}`} /> : null}
       <Field label="Who it is for" value={note} onChange={setNote} placeholder="Optional, only you see it" />
       <Field
         label="Code"
@@ -144,7 +152,7 @@ function CodeForm({ done }: { done: (made: AccessCode) => void }) {
         onPress={async () => {
           setError('');
           try {
-            const r = await api.createCode({ days, code, note });
+            const r = await api.createCode({ kind, days: kind === 'promo' ? 0 : days, code, note });
             if (!r?.ok || !r.code) {
               setError(r?.error || 'Could not create the code.');
               return;

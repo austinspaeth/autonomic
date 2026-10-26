@@ -32,6 +32,7 @@ import { runDailyBackup } from '../src/lib/backup';
 import { initCrashWatcher, initMorningWatcher, syncReminder } from '../src/lib/reminders';
 import { initWidgetSync } from '../src/lib/widgets';
 import { initGiveawaySync } from '../src/store/giveaway';
+import { initAccessCodes } from '../src/store/accessCode';
 import { initBudgetSync } from '../src/store/budget';
 import { repairSplitNights } from '../src/lib/health/updates';
 import { initPressureWatch } from '../src/store/pressure';
@@ -120,6 +121,8 @@ export default function RootLayout() {
     initWidgetSync();
     // Giveaway: once signed up, send a new entry the first time a day earns one.
     initGiveawaySync();
+    // A promo access code is spent only once its $24.99 purchase lands.
+    initAccessCodes();
     // The Insights tab's unseen-findings dot: derive it now and after journal
     // changes, so a new finding lights the tab before the user thinks to look.
     initInsightsBadge();

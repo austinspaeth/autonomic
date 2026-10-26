@@ -143,6 +143,9 @@ export type StoreVersions = { at?: string; ios?: StoreSide; android?: StoreSide;
 /** An access code: days of full access handed to one person, redeemed in the app once. */
 export type AccessCode = {
   code: string;
+  /** 'days' is free access; 'promo' opens the $24.99/year purchase and is
+   *  spent only once that purchase succeeds. */
+  kind?: 'days' | 'promo';
   days: number;
   note: string;
   createdAt: string | null;

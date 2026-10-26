@@ -984,6 +984,7 @@ export function postGiveaway(body: unknown): Promise<boolean> {
 
 export type AccessCodeAnswer =
   | { status: 'ok'; days: number }
+  | { status: 'offer' }         // a promo code: offer the $24.99 year, nothing spent yet
   | { status: 'used' }
   | { status: 'invalid' }
   | { status: 'unreachable' };
@@ -992,13 +993,15 @@ export type AccessCodeAnswer =
  * `POST /ping/cde/{code}`: ask the server what an access code is worth. The
  * body is the code the user typed and nothing else.
  *
- * Four answers and they must stay four: a 409 is a code somebody has already
+ * The answers must stay distinct: a 409 is a code somebody has already
  * redeemed (a code works once, anywhere), a 404 is no such code, and both are
- * different sentences on the card from a request that never got an answer. Like the giveaway it is exempt from `__DEV__` and the
+ * different sentences on the card from a request that never got an answer.
+ * `offer` is a promo code, which the check does NOT spend: it is spent by a
+ * second call with `purchased` once the store confirms the purchase. Like the giveaway it is exempt from `__DEV__` and the
  * exclusion switch (the user asked for it; a dev build is marked instead and
  * does not move the code's count).
  */
-export async function postAccessCode(code: string): Promise<AccessCodeAnswer> {
+export async function postAccessCode(code: string, purchased = false): Promise<AccessCodeAnswer> {
   const url = pingUrl(
     'cde', cohortDate(Date.now()), platformCode(Platform.OS), undefined, tierCode(getTier()), appVersion(),
   );
@@ -1008,13 +1011,15 @@ export async function postAccessCode(code: string): Promise<AccessCodeAnswer> {
     const res = await fetch(url, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ code, dev: __DEV__ }),
+      // `purchased` spends a promo code once the store confirmed the purchase.
+      body: JSON.stringify(purchased ? { code, dev: __DEV__, purchased: true } : { code, dev: __DEV__ }),
       signal: controller.signal,
     });
     if (res.status === 409) return { status: 'used' };
     if (res.status === 404 || res.status === 400) return { status: 'invalid' };
     if (!res.ok) return { status: 'unreachable' };
     const body = await res.json();
+    if (body?.ok === true && body?.offer === 'promo') return { status: 'offer' };
     const days = Math.round(Number(body?.days));
     return body?.ok === true && days > 0 ? { status: 'ok', days } : { status: 'unreachable' };
   } catch {

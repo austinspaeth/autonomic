@@ -1224,7 +1224,10 @@
     <div class="card" style="margin-bottom:14px">
       <header><h2>New code</h2></header>
       <p class="hint">A code adds its days on top of whatever access the phone still has. It works <b>once</b>: after it is redeemed it reads as used everywhere, so a reinstall or a new phone needs a new code from you. <b>A code cannot be changed or revoked once created.</b></p>
+      <p class="hint">A <b>$24.99/year</b> code gives nothing free: entering it opens the purchase of the $24.99 yearly plan (<code>yearly.promo</code>, renewing at that price). It is only used up once that purchase succeeds, so a cancelled payment leaves it good.</p>
       <div class="form-grid" style="max-width:820px">
+        <div class="field"><label for="cdKind">Gives</label>
+          <select id="cdKind"><option value="days">Free access</option><option value="promo">$24.99/year price</option></select></div>
         <div class="field"><label for="cdDays">Days</label>
           <input type="number" id="cdDays" min="1" max="999" step="1" value="30"></div>
         <div class="field"><label>Length</label>
@@ -1250,7 +1253,7 @@
     <div class="card" style="margin-bottom:14px">
       <header><h2>Codes</h2><span class="spacer"></span>
         <button class="btn sm" id="cdRefresh">Refresh</button></header>
-      <p class="hint">A code is <b>used</b> from the moment the app is told it is good, with the platform and build that redeemed it. Dev builds can check a code without spending it.</p>
+      <p class="hint">A free-access code is <b>used</b> from the moment the app is told it is good, a $24.99/year code once its purchase succeeds, each with the platform and build that redeemed it. Dev builds can check a code without spending it.</p>
       <div class="table-scroll" id="cdTable"></div>
     </div>
   </section>

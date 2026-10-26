@@ -8,6 +8,11 @@
  * seen from a sheet), and the three ways it can go wrong are three different
  * sentences, since "that code is wrong" and "we could not ask" call for
  * different next moves.
+ *
+ * A promo code answers with an OFFER instead of a grant: the $24.99 year, with
+ * the price the store returned and a button that goes straight to the store.
+ * Nothing is spent until that purchase lands (../store/accessCode), so backing
+ * out of the store sheet leaves the code good for another try.
  */
 import React, { useState } from 'react';
 import { Text, TextInput, View } from 'react-native';
@@ -18,8 +23,9 @@ import { StoreError, StoreOkNotice } from './Paywall';
 import { redeemAccessCode, type RedeemResult } from '../store/accessCode';
 import { CODE_MAX, grantAddedText, isPlausibleCode } from '../lib/accessCode';
 import { getTrialDaysLeft } from '../store/tier';
+import { PROMO_YEARLY_SKU, priceOf, subscribe, useIap } from '../store/iap';
 
-const FAILURE: Record<Exclude<RedeemResult['status'], 'ok'>, string> = {
+const FAILURE: Record<Exclude<RedeemResult['status'], 'ok' | 'offer'>, string> = {
   used: 'This code has already been used.',
   invalid: 'That code isn\'t valid. Check it and try again.',
   unreachable: 'Couldn\'t check the code. Check your connection and try again.',
@@ -30,11 +36,15 @@ export function AccessCodeSheet({ controls }: { controls: SheetControls }) {
   const [code, setCode] = useState('');
   const [busy, setBusy] = useState(false);
   const [result, setResult] = useState<RedeemResult | null>(null);
+  const { products, purchasing, error, blocked, isPro, activeSku } = useIap();
   const valid = isPlausibleCode(code);
-  const done = result?.status === 'ok';
+  const offer = result?.status === 'offer';
+  const bought = offer && isPro && activeSku === PROMO_YEARLY_SKU;
+  const done = result?.status === 'ok' || bought;
+  const price = priceOf(products.find((x) => x.productId === PROMO_YEARLY_SKU), PROMO_YEARLY_SKU);
 
   const submit = async () => {
-    if (!valid || busy || done) return;
+    if (!valid || busy || done || offer) return;
     setBusy(true);
     setResult(null);
     const r = await redeemAccessCode(code);
@@ -53,7 +63,7 @@ export function AccessCodeSheet({ controls }: { controls: SheetControls }) {
         value={code}
         onChangeText={(v) => { setCode(v); if (!done) setResult(null); }}
         onSubmitEditing={() => { void submit(); }}
-        editable={!busy && !done}
+        editable={!busy && !done && !purchasing}
         placeholder="Access code"
         placeholderTextColor={p.textDim}
         autoCapitalize="characters"
@@ -71,16 +81,29 @@ export function AccessCodeSheet({ controls }: { controls: SheetControls }) {
         }}
       />
 
-      {result && result.status !== 'ok' ? (
+      {result && result.status !== 'ok' && result.status !== 'offer' ? (
         <View style={{ marginBottom: 12 }}><StoreError text={FAILURE[result.status]} /></View>
       ) : null}
       {result?.status === 'ok' ? (
         <View style={{ marginBottom: 12 }}><StoreOkNotice text={grantAddedText(result.days, getTrialDaysLeft())} /></View>
       ) : null}
+      {offer && !bought ? (
+        <Text style={{ color: p.text, fontSize: 14, lineHeight: 21, marginBottom: 14 }}>
+          {`This code unlocks Pro for ${price} a year. That price stays the same for as long as you stay subscribed.`}
+        </Text>
+      ) : null}
+      {offer && !bought && (error || blocked) ? (
+        <View style={{ marginBottom: 12 }}><StoreError text={(error || blocked) as string} /></View>
+      ) : null}
+      {bought ? (
+        <View style={{ marginBottom: 12 }}><StoreOkNotice text="You're subscribed. Thank you!" /></View>
+      ) : null}
 
       {done
         ? <Button title="Done" variant="primary" onPress={controls.close} />
-        : <Button title={busy ? 'Checking…' : 'Apply code'} variant="primary" disabled={!valid || busy} onPress={() => { void submit(); }} />}
+        : offer
+          ? <Button title={purchasing ? 'Starting…' : `Subscribe for ${price}/year`} variant="primary" disabled={purchasing} onPress={() => { void subscribe(PROMO_YEARLY_SKU); }} />
+          : <Button title={busy ? 'Checking…' : 'Apply code'} variant="primary" disabled={!valid || busy} onPress={() => { void submit(); }} />}
       <View style={{ height: 20 }} />
     </View>
   );

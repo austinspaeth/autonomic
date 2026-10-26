@@ -10771,7 +10771,8 @@
   var codes = { data: null, status: 'idle', error: '' };
   var CD_FOREVER = 999;
 
-  function codeLength(days) {
+  function codeLength(days, kind) {
+    if (kind === 'promo') return '$24.99/year';
     return days >= CD_FOREVER ? 'Forever' : days + (days === 1 ? ' day' : ' days');
   }
 
@@ -10805,9 +10806,10 @@
     }
     var rows = d.rows || [];
     var used = rows.filter(function (r) { return r.used; }).length;
-    var forever = rows.filter(function (r) { return r.days >= CD_FOREVER; }).length;
+    var promo = rows.filter(function (r) { return r.kind === 'promo'; }).length;
+    var forever = rows.filter(function (r) { return r.kind !== 'promo' && r.days >= CD_FOREVER; }).length;
     tiles.innerHTML = [
-      tile({ label: 'Codes', value: fmtInt(rows.length), meta: forever + ' forever · ' + (rows.length - forever) + ' timed' }),
+      tile({ label: 'Codes', value: fmtInt(rows.length), meta: forever + ' forever · ' + (rows.length - forever - promo) + ' timed · ' + promo + ' $24.99/yr' }),
       tile({ label: 'Used', value: fmtInt(used), meta: 'redeemed, cannot be entered again' }),
       tile({ label: 'Unused', value: fmtInt(rows.length - used), meta: 'still waiting to be entered' })
     ].join('');
@@ -10816,7 +10818,7 @@
       host.innerHTML = '<div class="empty">No codes yet. Create one above.</div>';
       return;
     }
-    host.innerHTML = '<table><thead><tr><th>Code</th><th>Length</th><th>For</th><th>Status</th>' +
+    host.innerHTML = '<table><thead><tr><th>Code</th><th>Gives</th><th>For</th><th>Status</th>' +
       '<th>Redeemed</th><th>Created</th><th></th></tr></thead><tbody>' +
       rows.map(function (r) {
         var last = r.redeemedAt
@@ -10824,7 +10826,7 @@
             (r.redeemedVersion ? ' ' + r.redeemedVersion : '')
           : '';
         return '<tr><td><code>' + esc(r.code) + '</code></td>' +
-          '<td>' + esc(codeLength(r.days)) + '</td>' +
+          '<td>' + esc(codeLength(r.days, r.kind)) + '</td>' +
           '<td>' + (r.note ? esc(r.note) : '<span class="na">–</span>') + '</td>' +
           '<td>' + (r.used ? '<b>Used</b>' : '<span class="na">Unused</span>') + '</td>' +
           '<td>' + (last ? esc(last) : '<span class="na">–</span>') + '</td>' +
@@ -10836,15 +10838,17 @@
   function codeCreate() {
     var status = document.getElementById('cdStatus');
     var btn = document.getElementById('cdCreate');
+    var kind = document.getElementById('cdKind').value === 'promo' ? 'promo' : 'days';
     var days = Math.round(Number(document.getElementById('cdDays').value));
-    if (!(days >= 1 && days <= CD_FOREVER)) {
+    if (kind === 'days' && !(days >= 1 && days <= CD_FOREVER)) {
       status.textContent = 'Days must be a whole number from 1 to ' + CD_FOREVER + '.';
       return;
     }
     btn.disabled = true;
     status.textContent = 'Creating…';
     window.Api.call('CODE_CREATE', {
-      days: days,
+      kind: kind,
+      days: kind === 'promo' ? 0 : days,
       code: document.getElementById('cdCode').value,
       note: document.getElementById('cdNote').value
     }).then(function (res) {
@@ -10856,7 +10860,7 @@
       if (codes.data) codes.data.rows = [made].concat(codes.data.rows || []);
       document.getElementById('cdCode').value = '';
       document.getElementById('cdNote').value = '';
-      status.textContent = 'Created ' + made.code + ' · ' + codeLength(made.days).toLowerCase();
+      status.textContent = 'Created ' + made.code + ' · ' + codeLength(made.days, made.kind).toLowerCase();
       copyText(made.code).then(function () {
         status.textContent += ' · copied to the clipboard';
       }).catch(function () { /* the code is on screen either way */ });
@@ -11684,6 +11688,13 @@
     if (cdCreate) cdCreate.addEventListener('click', codeCreate);
     var cdRefresh = document.getElementById('cdRefresh');
     if (cdRefresh) cdRefresh.addEventListener('click', function () { codesLoad(true); });
+    var cdKind = document.getElementById('cdKind');
+    if (cdKind) cdKind.addEventListener('change', function () {
+      // A price code is worth no days, so the length controls do nothing.
+      var promo = cdKind.value === 'promo';
+      document.getElementById('cdDays').disabled = promo;
+      document.querySelectorAll('#cdPresets button').forEach(function (b) { b.disabled = promo; });
+    });
     var cdPresets = document.getElementById('cdPresets');
     if (cdPresets) cdPresets.addEventListener('click', function (ev) {
       var b = ev.target.closest('[data-days]');

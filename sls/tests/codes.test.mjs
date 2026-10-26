@@ -31,6 +31,10 @@ const fakeDdb = () => {
       if (name === 'UpdateCommand') {
         const row = rows.get(i.Key.SK);
         if (!row || row.redeemed > 0) throw missing();
+        // The two kind guards codes.js writes into its conditions.
+        const cond = i.ConditionExpression;
+        if (cond.includes('#kind <> :promo') && row.kind === 'promo') throw missing();
+        if (cond.includes('#kind = :promo') && row.kind !== 'promo') throw missing();
         row.redeemed = 1;
         row.redeemedAt = i.ExpressionAttributeValues[':now'];
         row.redeemedPlatform = i.ExpressionAttributeValues[':platform'];
@@ -125,4 +129,43 @@ test('a code is never overwritten, and bad input is refused', async () => {
   assert.equal(ddb.rows.get('FRIEND2026').days, 30);
   assert.equal((await createCode(ddb, 't', { days: 0 })).ok, false);
   assert.equal((await createCode(ddb, 't', { days: 30, code: 'abc' })).ok, false);
+});
+
+test('a promo code is checked, not spent, until the purchase is confirmed', async () => {
+  const ddb = fakeDdb();
+  const made = await createCode(ddb, 't', { kind: 'promo', code: 'PROMO25X' }, 1000);
+  assert.equal(made.ok, true);
+  assert.equal(made.code.kind, 'promo');
+  const install = { platform: 'I', version: '1.37.0' };
+  const check = readRedeem(post({ code: 'promo25x' }));
+  assert.deepEqual(await redeemCode(ddb, 't', check, install, 2000), { status: 'ok', offer: 'promo' });
+  // Checked twice (a cancelled sheet, then a second try): still good.
+  assert.deepEqual(await redeemCode(ddb, 't', check, install, 3000), { status: 'ok', offer: 'promo' });
+  assert.equal(ddb.rows.get('PROMO25X').redeemed, 0);
+
+  const bought = readRedeem(post({ code: 'PROMO25X', purchased: true }));
+  assert.equal(bought.purchased, true);
+  assert.deepEqual(await redeemCode(ddb, 't', bought, install, 4000), { status: 'ok', offer: 'promo' });
+  assert.equal(ddb.rows.get('PROMO25X').redeemed, 1);
+  assert.deepEqual(await redeemCode(ddb, 't', check, install, 5000), { status: 'used' });
+  assert.deepEqual(await redeemCode(ddb, 't', bought, install, 5000), { status: 'used' });
+  const { rows } = await listCodes(ddb, 't');
+  assert.equal(rows[0].used, true);
+});
+
+test('a days code cannot be spent by a purchase confirmation', async () => {
+  const ddb = fakeDdb();
+  await createCode(ddb, 't', { days: 30, code: 'DAYS30XX' }, 1000);
+  const bought = readRedeem(post({ code: 'DAYS30XX', purchased: true }));
+  assert.deepEqual(await redeemCode(ddb, 't', bought, { platform: 'A' }, 2000), { status: 'missing' });
+  assert.equal(ddb.rows.get('DAYS30XX').redeemed, 0);
+});
+
+test('kinds are validated; an old row reads as a days code', async () => {
+  const ddb = fakeDdb();
+  assert.equal((await createCode(ddb, 't', { kind: 'gift', days: 5 })).ok, false);
+  assert.equal((await createCode(ddb, 't', { kind: 'promo' })).ok, true);
+  ddb.rows.set('OLDROW11', { PK: 'CODE', SK: 'OLDROW11', code: 'OLDROW11', days: 7, redeemed: 0 });
+  const { rows } = await listCodes(ddb, 't');
+  assert.equal(rows.find((r) => r.code === 'OLDROW11').kind, 'days');
 });

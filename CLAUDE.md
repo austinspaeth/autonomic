@@ -2285,8 +2285,15 @@ old web app so old `export.json` files import directly.
   phone dashboard's Access codes view), and there is **no edit and no delete**:
   the grant lives on the phone once redeemed, so a revoke could only ever look
   like it did more than it does. `normalizeCode` and the lambda's `normCode`
-  are the same rule; move both. JS only, so it ships OTA, but the lambda must
-  be deployed first.
+  are the same rule; move both. **A code has a `kind`**: `days` (above; a row
+  with no kind) or `promo`, which grants nothing and instead offers the $24.99
+  year (`PROMO_YEARLY_SKU`, no longer sold anywhere else) straight from the code
+  sheet. Entering a promo code only CHECKS it; the phone holds it
+  (`promoCodeHeld`) and spends it with a second `purchased: true` call once
+  `onNewPurchase` reports that SKU (`initAccessCodes`, retried on foreground),
+  so a cancelled store sheet leaves it good. A days code can never be spent that
+  way and a check can never spend a promo row (both are conditions on the
+  write). JS only, so it ships OTA, but the lambda must be deployed first.
 - **Units are a DISPLAY preference; the journal never changes unit.**
   `settings.units` (Profile sheet, Imperial by default, never guessed from the
   region) is read through `src/lib/units.ts`. Stored values stay what they

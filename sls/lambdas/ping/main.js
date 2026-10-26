@@ -1413,7 +1413,8 @@ const handleGiveaway = async (event) => {
 
 /**
  * `POST /ping/cde/{code}`: an access code typed into the app. NOT a ping — it
- * answers with the code's length in days, 409 once it is spent, or 404 — so, like the giveaway, its
+ * answers with the code's length in days (or `offer: 'promo'` for a price
+ * code, spent later by `purchased: true`), 409 once it is spent, or 404 — so, like the giveaway, its
  * rules live in their own file. See ./codes.js.
  */
 const handleCode = async (event) => {
@@ -1423,7 +1424,9 @@ const handleCode = async (event) => {
   const r = readRedeem(event);
   if (!r) return json(400, { ok: false });
   const res = await redeemCode(ddb, TABLE, r, install, Date.now());
-  if (res.status === 'ok') return json(200, { ok: true, days: res.days });
+  if (res.status === 'ok') {
+    return json(200, res.offer ? { ok: true, offer: res.offer } : { ok: true, days: res.days });
+  }
   // A code is single-use: 409 is "that one is spent", 404 "there is no such code".
   return res.status === 'used' ? json(409, { ok: false, used: true }) : json(404, { ok: false });
 };

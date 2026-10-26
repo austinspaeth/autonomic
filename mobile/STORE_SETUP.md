@@ -326,8 +326,10 @@ the paywall works when you never actually tested it.
 > $35.99) to free users at 50 / 90 / 365 days since install, and stands until it
 > is dismissed. **Keep this product ACTIVE in both consoles anyway**: existing
 > subscribers renew on it at $24.99, and it stays in `PRO_SKUS` so they are
-> recognised as Pro. Removing it from sale to NEW subscribers is fine. The rest
-> of this part is the record of how it was set up.
+> recognised as Pro. ~~Removing it from sale to NEW subscribers is fine.~~
+> **It must stay purchasable**: a `promo` access code (Settings → Subscription →
+> Redeem a code) sells it to the person holding the code. The rest of this part
+> is the record of how it was set up.
 
 The annual offer card (`src/features/AnnualOffer.tsx`) used to surface a year of
 Pro at half price. The schedule is entirely app-side
