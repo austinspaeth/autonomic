@@ -59,7 +59,9 @@ const ASLEEP_VALUES = new Set([1, 3, 4, 5]);
 const AWAKE = 2;
 
 /** Gap between sleep blocks that splits them into separate sessions (a nap
- *  vs. the night). Ordinary mid-night wakings are far shorter than this. */
+ *  vs. the night). Only UNRECORDED time counts toward it: a stretch the source
+ *  itself labelled Awake is part of its night, however long (see
+ *  {@link summarizeSleep}). */
 const SESSION_GAP_MS = 2 * 60 * 60000;
 
 /** A night only counts as interrupted when time spent awake mid-sleep
@@ -86,6 +88,16 @@ function unionIntervals(rows: readonly SleepSample[]): Interval[] {
 const minutesOf = (iv: readonly Interval[]): number =>
   Math.round(iv.reduce((s, i) => s + (i.end - i.start), 0) / 60000);
 
+/** Milliseconds of [start, end) covered by the disjoint intervals `iv`. */
+function coveredMs(start: number, end: number, iv: readonly Interval[]): number {
+  let ms = 0;
+  for (const i of iv) {
+    const s = Math.max(start, i.start), e = Math.min(end, i.end);
+    if (e > s) ms += e - s;
+  }
+  return ms;
+}
+
 /**
  * Summarize one night from raw sleep samples: pick the main sleep session,
  * report its bounds and union-measured minutes. Returns null with no asleep
@@ -99,10 +111,17 @@ export function summarizeSleep(rows: readonly SleepSample[], gapMs = SESSION_GAP
 
   // Cluster the disjoint sleep blocks into sessions, then keep the one with
   // the most actual sleep — that is the night; shorter clusters are naps.
+  // A gap is measured WITHOUT the time the source recorded as Awake: a bad
+  // night with a 2h20m waking in the middle is one night to Apple Health, which
+  // charted it as one and counted both halves, and splitting it there dropped
+  // the first half and reported 3h of a 6h39m night.
+  const awakeAll = unionIntervals(rows.filter((r) => r.value === AWAKE));
   const sessions: Interval[][] = [];
   for (const i of merged) {
     const cur = sessions[sessions.length - 1];
-    if (cur && i.start - cur[cur.length - 1].end < gapMs) cur.push(i);
+    const prevEnd = cur ? cur[cur.length - 1].end : 0;
+    const unrecorded = cur ? i.start - prevEnd - coveredMs(prevEnd, i.start, awakeAll) : Infinity;
+    if (unrecorded < gapMs) cur.push(i);
     else sessions.push([i]);
   }
   const main = sessions.reduce((a, b) => (minutesOf(b) >= minutesOf(a) ? b : a));

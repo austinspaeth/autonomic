@@ -26,7 +26,7 @@ import { fonts, radius, type as T, usePalette } from '../theme';
 import { SCORE_COLORS, GRADE_LABEL, GRADE_PTS, catFromBands, profileCtx } from '../lib/scoring';
 import {
   OUTLOOK_GUIDE, SCORE_TOTAL_WEIGHT, SCORE_WEIGHTS, TOMORROW, TRAINING_ONLY, TRAINING_LIFT_MAX, SCORE_TIPS, blueZone, protocolCriteria,
-  readingPeriod, resolveProtocol, scoreCat, scoreSet, sleepGrade, sleepHours, streakInfo, streakTier,
+  readingPeriod, resolveProtocol, scoreCat, scoreSet, sleepGrade, sleepHours, stagesForWindow, streakInfo, streakTier,
   type ScoreComp, type ScoreSetResult,
 } from '../lib/scoring/day';
 import { detectDownturn, type Downturn } from '../lib/scoring/downturn';
@@ -684,10 +684,14 @@ const KEY_FIGURES: { label: string; ghost: `${number}%`; delay: number; pick: (a
     // The sleep component carries no raw metric of its own (its detail is the
     // targets copy), so the figure comes from the two functions the component
     // itself is built out of. Hours read "7h 36m" here as everywhere else in the
-    // app, never as a decimal the reader has to convert.
+    // app, never as a decimal the reader has to convert. A staged night shows
+    // time ASLEEP, the number Apple Health / Health Connect headline: bed→wake
+    // on a fragmented night counts hours of waking as sleep. The grade still
+    // reads bed→wake (`sleepGrade`); only the figure changed.
     pick: (all, days, dk) => {
       if (!all.comps.some((c) => c.label === 'Sleep')) return null;
-      const h = sleepHours(days, dk);
+      const st = stagesForWindow(days[dk]?.sleep);
+      const h = st ? (st.core + st.deep + st.rem) / 60 : sleepHours(days, dk);
       return h == null ? null : { text: HOURS(h), unit: null, cat: sleepGrade(days, dk, profileCtx(getState().profile)) };
     },
   },

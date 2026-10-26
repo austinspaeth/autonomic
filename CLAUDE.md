@@ -188,7 +188,13 @@ old web app so old `export.json` files import directly.
   sleep editor and by a confirm sheet whose times were changed).
   `repairSplitNights` (`lib/health/updates.ts`) re-reads the last 30 days once
   per install (`sleepStitchRepaired`, flags MMKV) for the nights filed before
-  1.36.
+  1.36. **iOS split nights too**, at a waking: `summarizeSleep` measured a
+  session gap as everything between asleep blocks, so a 2h20m stretch the watch
+  recorded as Awake cut a 6h39m night in two and filed the bigger half. Only
+  UNRECORDED time counts toward the gap now (Awake is part of the night, both
+  platforms), and the repair runs once more under `sleepStitchRepaired2`. The
+  Journal's Sleep tile shows time ASLEEP for a staged night (`stagesForWindow`);
+  the sleep GRADE still reads bed→wake, deliberately unchanged.
 - **An imported HRV reading only counts if it carries ≥ 4 min of real RR.**
   Health stores are full of short HRV samples (the watch's passive ~1-minute
   background measurement, a truncated Breathe session, another app's RMSSD

@@ -221,7 +221,9 @@ export function undoImports(dk: string, keys: readonly string[]): number {
 // night stayed split for good. Today's night heals on the next check now
 // (`sleepToFile`); this walks the recent past ONCE and gives every imported,
 // unedited night the same chance. Never requests a permission.
-const KEY_SLEEP_REPAIRED = 'sleepStitchRepaired';
+// 1.37 runs it again (new key): a night with a waking of 2h or more that the
+// watch recorded as Awake was split there on iOS too, and filed as one half.
+const KEY_SLEEP_REPAIRED = 'sleepStitchRepaired2';
 const REPAIR_DAYS = 30;
 
 export async function repairSplitNights(): Promise<number> {

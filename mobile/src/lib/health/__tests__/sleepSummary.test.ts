@@ -112,6 +112,31 @@ describe('summarizeSleep', () => {
     expect(out.stages).toBeNull();
   });
 
+  it('keeps a night joined across a long waking the source recorded', () => {
+    // A user's 6h39m night: asleep from 1:45, a 2h20m Awake block, then asleep
+    // to 11:20. Splitting at the waking filed only the second half.
+    const out = summarizeSleep([
+      s(CORE, '01:45', '03:35'),
+      s(AWAKE, '03:35', '05:55'),
+      s(CORE, '05:55', '11:20'),
+    ])!;
+    expect(out.bed).toEqual(at('01:45'));
+    expect(out.wake).toEqual(at('11:20'));
+    expect(out.minutesAsleep).toBe(110 + 325);
+    expect(out.stages).toEqual({ core: 435, deep: 0, rem: 0, awake: 140 });
+    expect(out.interrupted).toBe(true);
+  });
+
+  it('still splits at a long stretch nothing recorded', () => {
+    const out = summarizeSleep([
+      s(CORE, '01:45', '03:35'),
+      s(AWAKE, '03:35', '04:00'),    // a short waking, then the watch came off
+      s(CORE, '06:00', '11:20'),
+    ])!;
+    expect(out.bed).toEqual(at('06:00'));
+    expect(out.minutesAsleep).toBe(320);
+  });
+
   it('excludes a nap from stage minutes', () => {
     const out = summarizeSleep([
       s(CORE, '19:00', '19:30'),     // staged evening nap
