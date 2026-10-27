@@ -1,0 +1,690 @@
+{
+  "name": "Last week of the giveaway",
+  "created": "2026-10-26",
+  "numberFrom": 20,
+  "notes": "Seven slideshows for the week of October 26, the last week of the giveaway (ends Oct 31). Two new: the giveaway push (20, best posted early in the week while there are the most entries left to earn) and the app sell, \"Answers for the questions you live with\" (21). Five carried over unposted from the good days set, keeping their numbers: tips 2, 3 and 4, harder than cardio, and the dictionary’s volume 2.",
+  "account": {
+    "handle": "POTSDad",
+    "sound": "original sound - POTSDad"
+  },
+  "style": {
+    "type": "bold",
+    "signature": "POTSDad"
+  },
+  "creatives": [
+    {
+      "id": "c1",
+      "name": "Last week of the giveaway",
+      "title": "Last week to win an Apple Watch, and I'm giving away all of this 🩵",
+      "goal": "Urgency. Every prize gets its own slide, then how to still get entries in before Oct 31.",
+      "caption": "It's the last week of my Dysautonomia Awareness Month giveaway 🩵 Up for grabs: an Apple Watch Series 12 (iPhone grand prize), a Polar H10 (Android grand prize), 4 Coospo heart-rate straps, 10 boxes of LMNT and 25 free years of Autonomic Pro. How to enter: download Autonomic (free on iOS & Android, link in bio), sign up on the giveaway card in the Journal, and take an HRV reading each morning. Your phone's camera works. One entry per day you take a reading, up to 10, through Oct 31. Tag a friend who needs this for a bonus entry 👇 Winners drawn Nov 1. US residents 18+, no purchase necessary. Your health data stays on your phone. Not affiliated with TikTok, Apple, Polar, Coospo or LMNT. #giveaway #pots #longcovid #dysautonomia #dysautonomiaawarenessmonth",
+      "stats": {
+        "likes": "18.4K",
+        "comments": "2,106",
+        "saves": "7,930",
+        "shares": "4,215"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "text": [
+            "One week left, enter now for some *awesome prizes* :ribbon:"
+          ],
+          "img": {
+            "src": "img/c1s1.jpg",
+            "pos": "center 60%",
+            "source": "mine",
+            "shows": "You at the kitchen table behind every prize piled up: the Apple Watch box, the Polar H10, the four Coospo straps, the LMNT boxes. Excited, arms out like \"all of this\".",
+            "frame": "You and the pile in the lower two thirds; the hook sits across the top."
+          },
+          "copyAt": "top",
+          "textY": 18,
+          "overlay": 67
+        },
+        {
+          "layout": "photo",
+          "text": [
+            "An *Apple Watch Series 12.*",
+            ""
+          ],
+          "img": {
+            "src": "img/c1s2.jpg",
+            "pos": "35% 72%",
+            "source": "unsplash",
+            "zoom": 1.8,
+            "shows": "Apple Watch on a plain light surface, shot straight down.",
+            "frame": "Watch in the top half; the copy covers the bottom."
+          },
+          "overlay": 0,
+          "textSize": 1.34,
+          "textY": -400
+        },
+        {
+          "layout": "photo",
+          "text": [
+            "Prize 2: a *Polar H10* chest strap.",
+            ""
+          ],
+          "img": {
+            "src": "img/c1s3.jpg",
+            "pos": "50% 50%",
+            "source": "graphic",
+            "credit": "Product photo: Gopher Sport",
+            "shows": "The Polar H10 strap, product shot on white.",
+            "frame": "Product shot on a tall white canvas, strap in the top half; the copy covers the bottom under the dark wash."
+          },
+          "overlay": 19,
+          "textSize": 1.15,
+          "textY": 145
+        },
+        {
+          "layout": "photo",
+          "text": [
+            "Prize 3: *4 Coospo* heart-rate straps.",
+            ""
+          ],
+          "img": {
+            "src": "img/c1s4.jpg",
+            "pos": "50% 0%",
+            "source": "graphic",
+            "shows": "A Coospo chest strap, product shot on white.",
+            "frame": "Product shot on a tall white canvas, strap in the top half; the copy covers the bottom.",
+            "credit": "Product photo: Coospo",
+            "zoom": 1.56
+          },
+          "overlay": 32,
+          "textSize": 1.17,
+          "textY": 159
+        },
+        {
+          "layout": "photo",
+          "text": [
+            "Prize 4: *10 boxes of LMNT.*",
+            ""
+          ],
+          "img": {
+            "src": "img/c1s5.jpg",
+            "pos": "50% 0%",
+            "source": "graphic",
+            "shows": "An LMNT Watermelon Salt box and stick pack, product shot on white.",
+            "frame": "Product shot on a tall white canvas, box in the top half; the copy covers the bottom.",
+            "credit": "Product photo: LMNT (via Discount Depot Mart)",
+            "zoom": 1.24
+          },
+          "overlay": 14,
+          "textSize": 1.22,
+          "textY": 130
+        },
+        {
+          "layout": "photo",
+          "text": [
+            "To enter: download the Autonomic App and take an *HRV reading* each morning.",
+            "Every day left is one more entry. You can use your phone's camear, an HRV strap, and Apple Watch, or a Garmin."
+          ],
+          "img": {
+            "src": "",
+            "pos": "center 35%",
+            "source": "mine",
+            "shows": "You taking a camera reading: fingertip over the phone’s lens, sitting on the couch in the morning.",
+            "frame": "Portrait. Hands and phone in the top half; the copy covers the bottom."
+          },
+          "textSize": 0.92
+        },
+        {
+          "layout": "photo",
+          "cta": true,
+          "text": [
+            "Ends *Oct 31.* Tag a friend who needs this 👇"
+          ],
+          "fine": "US residents 18+. No purchase necessary. Winners drawn Nov 1. Not affiliated with TikTok, Apple, Polar, Coospo or LMNT.",
+          "img": {
+            "src": "img/c1s7.png",
+            "pos": "63% 0%",
+            "source": "graphic",
+            "zoom": 1.43,
+            "shows": "Prize graphic: Apple Watch and Polar H10 from the site, three LMNT boxes, ribbon behind.",
+            "frame": "Prizes sit in the band between the logo row and the headline."
+          },
+          "textY": 318,
+          "overlay": 52
+        }
+      ],
+      "music": {
+        "mood": "Bright and building, still warm",
+        "notes": "This is the last-week push, so it can have more lift than the launch post: a hand-clap or upbeat acoustic pop track that builds a little with each prize. Stop short of countdown or game-show energy.",
+        "bpm": "100-120",
+        "search": [
+          "upbeat acoustic pop",
+          "happy claps",
+          "feel good build"
+        ],
+        "file": "audio/c1.mp3",
+        "fileName": "alexgrohl-confident-killing-time-131557.mp3"
+      }
+    },
+    {
+      "id": "c2",
+      "name": "Answers for the questions you live with",
+      "title": "The 5 questions every POTS patient asks every single day",
+      "goal": "Sell the app hard. Each question is one people ask themselves every day, and each answer is a real screen.",
+      "caption": "Answers for the questions you live with 🩵 I asked myself these every day for years, so I built Autonomic to answer them from my own numbers: HRV, heart rate, sleep and symptoms. Free on iOS & Android (link in bio). Your phone's camera is enough to start, and every feature is free for 14 days. Your data never leaves your phone. Which question do you ask most? 👇 #pots #dysautonomia #longcovid #mecfs #chronicillness #hrv #pacing",
+      "stats": {
+        "likes": "41.2K",
+        "comments": "3,560",
+        "saves": "15.8K",
+        "shares": "6,940"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "text": [
+            "5 questions I asked myself *every single day* with POTS.",
+            "And an app I built that answers them."
+          ],
+          "img": {
+            "src": "",
+            "pos": "center 35%",
+            "source": "mine",
+            "shows": "You sitting on the edge of the bed in the morning, phone in hand, looking at it. Tired but not staged.",
+            "frame": "Face in the upper third; the hook across the middle under a dark wash."
+          },
+          "textSize": 0.9
+        },
+        {
+          "layout": "phone",
+          "text": [
+            "1. Is today going to be a *good day?*",
+            "One score every morning, from my own HRV, sleep and heart rate."
+          ],
+          "img": {
+            "src": "img/c2s2.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "The Journal home: Outlook card with the Autonomic score, pacing strip and key figures.",
+            "frame": "Raw full-height screenshot from the top."
+          },
+          "phoneX": -82,
+          "phoneSize": 0.81,
+          "phoneY": -140
+        },
+        {
+          "layout": "phone",
+          "text": [
+            "2. How much can I do *before I crash?*",
+            "A pacing budget in minutes, fitted to me. It warns me before I go over."
+          ],
+          "img": {
+            "src": "img/c2s3.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "The Journal home with the pacing strip (1h 21m left of 3h 35m).",
+            "frame": "Raw full-height screenshot; the strip in the top two thirds."
+          },
+          "phoneX": -82,
+          "phoneSize": 0.81,
+          "phoneY": -140
+        },
+        {
+          "layout": "phone",
+          "text": [
+            "3. Is it really this bad, or am I *overreacting?*",
+            "12 weeks of stand tests, on one chart. Proof I can hand my doctor."
+          ],
+          "img": {
+            "src": "img/c2s4.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "Progress, POTS section: 12 weeks of stand tests, 12 of 12 over the threshold.",
+            "frame": "Raw full-height screenshot, the chart in the top two thirds."
+          },
+          "phoneX": -82,
+          "phoneSize": 0.81,
+          "phoneY": -140
+        },
+        {
+          "layout": "phone",
+          "text": [
+            "4. Is anything I take *actually helping?*",
+            "It checks my meds, supplements and habits against my own numbers."
+          ],
+          "img": {
+            "src": "",
+            "pos": "center top",
+            "source": "app",
+            "shows": "NEW SCREENSHOT NEEDED: the Insights tab with a correlation row like \"Magnesium days show higher RMSSD\", or the Biggest change card.",
+            "frame": "Raw full-height screenshot, the finding in the top two thirds."
+          },
+          "phoneX": -82,
+          "phoneSize": 0.81,
+          "phoneY": -140
+        },
+        {
+          "layout": "phone",
+          "text": [
+            "5. Am I *about to crash?*",
+            "When my numbers start sliding, it tells me. Usually days before I feel it."
+          ],
+          "img": {
+            "src": "img/c2s6.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "Your HRV trend dropping over several days.",
+            "frame": "Raw full-height screenshot, the falling line in the top two thirds."
+          },
+          "phoneX": -82,
+          "phoneSize": 0.81,
+          "phoneY": -140
+        },
+        {
+          "layout": "phone",
+          "cta": true,
+          "text": [
+            "*Answers for the questions you live with.*",
+            "Free to download, link in bio."
+          ],
+          "fine": "Your phone’s camera is enough to start. Every feature free for 14 days. Your data never leaves your phone.",
+          "img": {
+            "src": "img/c2s7.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "The app looking clean: the Journal with the Outlook.",
+            "frame": "Full-height screenshot from the top; move or shrink the phone to show more of it."
+          },
+          "phoneX": -135,
+          "phoneSize": 0.72,
+          "phoneY": -34
+        }
+      ],
+      "music": {
+        "mood": "Confident, hopeful, building",
+        "notes": "A modern track with momentum: soft piano or synth that opens up on question 1 and lands on the last slide. This is the sell, so it can feel like a reveal, but keep it sincere rather than salesy.",
+        "bpm": "90-110",
+        "search": [
+          "inspiring piano build",
+          "hopeful cinematic pop",
+          "uplifting minimal beat"
+        ]
+      }
+    },
+    {
+      "id": "c3",
+      "name": "Tip 2: legs up the wall",
+      "title": "POTS tip #2: put your legs up the wall for 10 minutes",
+      "goal": "Second single tip. Something people can do tonight.",
+      "caption": "POTS tip #2. Ten minutes, zero equipment 🩵 Not medical advice, ask your doctor what's right for you. #pots #potstips #dysautonomia #pacing #spoonie",
+      "stats": {
+        "likes": "33.9K",
+        "comments": "742",
+        "saves": "18.2K",
+        "shares": "3,415"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "text": [
+            "POTS tip #2:",
+            "*Legs up the wall.* 10 minutes. That's the whole tip."
+          ],
+          "img": {
+            "src": "",
+            "pos": "center",
+            "source": "unsplash",
+            "search": "legs up the wall pose",
+            "shows": "Someone lying on the floor with their legs up a plain wall, shot from the side or showing legs only. No face.",
+            "frame": "Legs and wall fill the frame; the tip sits over the darkened middle."
+          }
+        },
+        {
+          "layout": "photo",
+          "text": [
+            "Gravity pulls blood into my legs all day.",
+            "For ten minutes, *I make it work for me.*"
+          ],
+          "fine": "Not medical advice. Ask your doctor what's right for you.",
+          "img": {
+            "src": "",
+            "pos": "center 30%",
+            "source": "unsplash",
+            "search": "feet up resting wall socks",
+            "shows": "Feet in socks resting high on a wall, soft indoor light. No face.",
+            "frame": "Feet in the top third; copy across the lower half."
+          }
+        },
+        {
+          "layout": "phone",
+          "cta": true,
+          "text": [
+            "In the app I built, resting like this *buys back time* on my pacing budget.",
+            "Link in bio. 🩵"
+          ],
+          "img": {
+            "src": "img/c3s3.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "The Journal home with the pacing strip (1h 21m left of 3h 35m). Better: a day with a legs-up entry logged, so the strip shows minutes bought back.",
+            "frame": "Pacing strip level with the copy."
+          },
+          "phoneSize": 0.82,
+          "phoneX": -86
+        }
+      ],
+      "music": {
+        "mood": "Calm morning, light and clean",
+        "notes": "Same sound family as tip #1 so the series is recognisable. Slow and restful: this one is about lying down.",
+        "bpm": "70-85",
+        "search": [
+          "soft morning lofi",
+          "calm ambient rest",
+          "gentle piano light"
+        ]
+      },
+      "number": 10
+    },
+    {
+      "id": "c4",
+      "name": "Harder than cardio",
+      "title": "Things that spike my heart rate more than a workout",
+      "goal": "Funny list that doubles as awareness. Ends on proof.",
+      "caption": "I am not out of shape, my nervous system is just dramatic 😅🩵 #pots #dysautonomia #chronicillnesshumor #longcovid #spoonie",
+      "stats": {
+        "likes": "71.3K",
+        "comments": "3,960",
+        "saves": "8,117",
+        "shares": "9,480"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "text": [
+            "Things that spike my heart rate *more than a workout.*"
+          ],
+          "img": {
+            "src": "",
+            "pos": "center 65%",
+            "source": "unsplash",
+            "search": "laundry basket folded clothes",
+            "shows": "A laundry basket half folded, sitting on a bed or couch. No people.",
+            "frame": "Basket in the lower half, hook above it."
+          },
+          "copyAt": "top"
+        },
+        {
+          "layout": "list",
+          "kicker": "Harder than cardio",
+          "text": [
+            "1. Standing in line",
+            "2. A hot shower",
+            "3. Folding laundry",
+            "4. Tying a tiny shoe",
+            "5. The stairs. Just the stairs."
+          ],
+          "img": {
+            "src": "",
+            "pos": "center",
+            "source": "unsplash",
+            "search": "staircase minimal",
+            "shows": "A plain indoor staircase, looking up.",
+            "frame": "Darkened about 85% under the list."
+          }
+        },
+        {
+          "layout": "phone",
+          "cta": true,
+          "text": [
+            "I'm not out of shape. *I have the receipts.*",
+            "Free app in bio to record yours. 🩵"
+          ],
+          "img": {
+            "src": "img/c4s3.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "A POTS Test result: sustained HR rise +45 bpm (bad), the heart rate trace jumping at the stand, baseline 66, peak 118.",
+            "frame": "The +45 and the trace beside the copy."
+          },
+          "phoneX": -109,
+          "phoneSize": 0.92
+        }
+      ],
+      "music": {
+        "mood": "Fake-epic workout energy",
+        "notes": "The joke is the mismatch: gym-montage intensity over folding laundry. An over-the-top motivational or training beat, played straight. Drop to something softer on the last slide if the sound allows.",
+        "bpm": "120-140",
+        "search": [
+          "epic workout motivation",
+          "training montage",
+          "dramatic sports"
+        ]
+      },
+      "number": 11
+    },
+    {
+      "id": "c5",
+      "name": "Tip 3: on a good day, do half",
+      "title": "POTS tip #3: on a good day, do half",
+      "goal": "Third single tip. The pacing one, and the most natural lead into the app.",
+      "caption": "POTS tip #3, and the one that took me longest to learn 🩵 Good days are where crashes are made. #pots #pacing #mecfs #longcovid #dysautonomia",
+      "stats": {
+        "likes": "45.2K",
+        "comments": "1,930",
+        "saves": "24.7K",
+        "shares": "6,208"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "text": [
+            "POTS tip #3:",
+            "On a good day, *do half* of what you think you can."
+          ],
+          "img": {
+            "src": "",
+            "pos": "center",
+            "source": "unsplash",
+            "search": "to do list notebook half crossed off",
+            "shows": "A handwritten to-do list with only the first few items crossed off.",
+            "frame": "List in the lower half; the tip in the space above."
+          },
+          "copyAt": "top"
+        },
+        {
+          "layout": "photo",
+          "text": [
+            "A good day feels like a chance to catch up.",
+            "*That's the trap.* The bill shows up two days later."
+          ],
+          "img": {
+            "src": "",
+            "pos": "center 30%",
+            "source": "unsplash",
+            "search": "messy garage boxes project",
+            "shows": "A half-finished chore: boxes in a garage, a mower on a half-cut lawn. No people.",
+            "frame": "The unfinished job in the top half; copy over the lower half."
+          }
+        },
+        {
+          "layout": "phone",
+          "cta": true,
+          "text": [
+            "So I let my numbers set the limit, *not my mood.*",
+            "The app I built gives me a daily pacing budget. Link in bio. 🩵"
+          ],
+          "img": {
+            "src": "img/c5s3.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "The Journal home: Outlook card and the pacing strip, 1h 21m left of 3h 35m, ahead of pace.",
+            "frame": "Pacing strip level with the copy."
+          },
+          "phoneSize": 0.82,
+          "phoneX": -86
+        }
+      ],
+      "music": {
+        "mood": "Calm morning, light and clean",
+        "notes": "Same sound family as tips #1 and #2. A touch more thoughtful on slide 2, where the trap lands.",
+        "bpm": "80-95",
+        "search": [
+          "soft morning lofi",
+          "thoughtful lofi piano",
+          "calm acoustic"
+        ]
+      },
+      "number": 14
+    },
+    {
+      "id": "c6",
+      "name": "Tip 4: sit down for it",
+      "number": 17,
+      "title": "POTS tip #4: sit down for the things you always stand for",
+      "goal": "Fourth single tip. Cheap, practical, and it leads straight into upright time.",
+      "caption": "POTS tip #4. Nobody hands out medals for standing at the sink 🩵 Not medical advice, ask your doctor what's right for you. #pots #potstips #dysautonomia #pacing #spoonie",
+      "stats": {
+        "likes": "38.6K",
+        "comments": "904",
+        "saves": "21.5K",
+        "shares": "4,120"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "copyAt": "top",
+          "text": [
+            "POTS tip #4:",
+            "*Sit down* for the things you always stand for."
+          ],
+          "img": {
+            "src": "",
+            "pos": "center 65%",
+            "source": "unsplash",
+            "search": "wooden stool kitchen",
+            "shows": "A plain stool at a kitchen counter or sink. No people.",
+            "frame": "Stool in the lower half; the tip sits in the space above it."
+          }
+        },
+        {
+          "layout": "photo",
+          "text": [
+            "Showering. Cooking. Brushing my teeth.",
+            "Standing still is *the hard part.* A stool gives those minutes back."
+          ],
+          "fine": "Not medical advice. Ask your doctor what's right for you.",
+          "img": {
+            "src": "",
+            "pos": "center 30%",
+            "source": "unsplash",
+            "search": "bathroom sink toothbrush morning",
+            "shows": "A bathroom sink with a toothbrush, or a pan on a stove. No face.",
+            "frame": "Subject in the top half; copy across the darkened lower half."
+          }
+        },
+        {
+          "layout": "phone",
+          "cta": true,
+          "phoneSize": 0.82,
+          "phoneX": -86,
+          "text": [
+            "The app I built counts my upright time against *a daily pacing budget.*",
+            "Link in bio. 🩵"
+          ],
+          "img": {
+            "src": "img/c6s3.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "The Journal home: the Outlook card with the Autonomic score, the pacing strip and key figures.",
+            "frame": "Full-height screenshot from the top; the pacing strip level with the copy."
+          }
+        }
+      ],
+      "music": {
+        "mood": "Calm morning, light and clean",
+        "notes": "Same sound family as the other tips so the series is recognisable.",
+        "bpm": "80-95",
+        "search": [
+          "soft morning lofi",
+          "calm acoustic morning",
+          "gentle piano light"
+        ]
+      }
+    },
+    {
+      "id": "c7",
+      "name": "The POTS dictionary, volume 2",
+      "number": 19,
+      "title": "The POTS dictionary, volume 2 📖",
+      "goal": "Sequel to 07, which asked for volume 2 in its caption. Funny and shareable.",
+      "caption": "Volume 2, written by the comments 🩵 Volume 3 is up to you. #pots #dysautonomia #chronicillnesshumor #spoonie #longcovid",
+      "stats": {
+        "likes": "57.9K",
+        "comments": "5,310",
+        "saves": "8,460",
+        "shares": "10.2K"
+      },
+      "slides": [
+        {
+          "layout": "hook",
+          "text": [
+            "The POTS dictionary, *volume 2.*",
+            "You had suggestions."
+          ],
+          "img": {
+            "src": "img/c7s1.jpg",
+            "pos": "70% 50%",
+            "source": "unsplash",
+            "shows": "An open dictionary page shot at an angle, shallow focus, the sharp entries on the right.",
+            "frame": "The in-focus column behind the headline; darkened so the print reads as texture.",
+            "credit": "Unsplash photo 1583361704493-d4d4d1b1d70a (photographer not looked up yet)"
+          },
+          "overlay": 100,
+          "textSize": 1.22,
+          "textY": -100
+        },
+        {
+          "layout": "list",
+          "kicker": "POTS dictionary, vol. 2",
+          "text": [
+            "Tachy: what my heart does when I stand up to get the remote",
+            "Blood pooling: my legs keeping what isn't theirs",
+            "Brain fog: the word for when you can't find the word",
+            "Floor time: a standing appointment, lying down",
+            "Payback: the bill for yesterday's fun"
+          ],
+          "img": {
+            "src": "img/c7s2.jpg",
+            "pos": "center",
+            "source": "unsplash",
+            "shows": "Plain white paper with a fine grain.",
+            "frame": "Texture only, behind the list.",
+            "credit": "Unsplash photo 1604147706283-d7119b5b822c (photographer not looked up yet)"
+          }
+        },
+        {
+          "layout": "phone",
+          "cta": true,
+          "text": [
+            "I log every one of these, so *the patterns stop hiding.*",
+            "Free app I built, link in bio. 🩵"
+          ],
+          "img": {
+            "src": "img/c7s3.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "The Journal's Symptoms list (light headed, palpitations, fatigue, brain fog), Triggers and Hydration.",
+            "frame": "Symptoms card beside the copy."
+          },
+          "phoneX": -98,
+          "phoneSize": 0.82
+        }
+      ],
+      "music": {
+        "mood": "Playful and deadpan",
+        "notes": "Same family as volume 1 so the two read as a series.",
+        "bpm": "100-115",
+        "search": [
+          "quirky comedy",
+          "playful pizzicato",
+          "funny upbeat"
+        ]
+      }
+    }
+  ]
+}

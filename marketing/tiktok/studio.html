@@ -94,6 +94,11 @@ main{padding:40px 40px 140px}
 .c-main{flex:1;min-width:0}
 .c-title{font-size:18px;font-weight:600;letter-spacing:-.01em}
 .c-num{color:var(--sub);font-weight:400;margin-right:10px}
+.c-main > .c-title{display:flex;align-items:center}
+.c-main > .c-title .sl-check{margin-right:12px;flex:none}
+.creative.posted{margin-bottom:22px}
+.creative.posted > :not(.c-head), .creative.posted .c-goal, .creative.posted .c-actions{display:none}
+.creative.posted .c-main > .c-title{color:var(--sub)}
 .c-goal{font-size:13.5px;color:var(--sub);margin-top:3px}
 .c-actions{display:flex;align-items:center;gap:14px}
 .c-prog{display:flex;align-items:center;gap:8px;font-size:12.5px;color:var(--sub)}
@@ -846,7 +851,7 @@ function build() {
     const sec = document.createElement('section');
     sec.className = 'creative';
     sec.innerHTML = `<div class="c-head">
-        <div class="c-main"><div class="c-title"><span class="c-num">${num(ci)}</span>${esc(c.name)}</div><div class="c-goal">${esc(c.goal || '')}</div></div>
+        <div class="c-main"><div class="c-title"><button class="sl-check" data-posted title="Mark as posted"></button><span class="c-num">${num(ci)}</span>${esc(c.name)}</div><div class="c-goal">${esc(c.goal || '')}</div></div>
         <div class="c-actions"><span class="c-prog"><span class="ready" hidden>Ready</span><span data-prog></span><span class="meter"><i></i></span></span>
           <button class="ghost" data-save>${I.download}Export</button></div>
       </div>
@@ -884,6 +889,15 @@ function build() {
       SLIDES.push(entry);
       wire(entry);
     });
+    // Posted creatives collapse to their number and name; remembered per set in localStorage.
+    const pkey = 'posted:' + SET_ID, pid = num(ci), pbox = sec.querySelector('[data-posted]');
+    const showPosted = on => { sec.classList.toggle('posted', on); pbox.classList.toggle('on', on); pbox.title = on ? 'Posted (uncheck to show)' : 'Mark as posted'; };
+    showPosted(LS.get(pkey, []).includes(pid));
+    pbox.onclick = () => {
+      const list = LS.get(pkey, []).filter(x => x !== pid), on = !sec.classList.contains('posted');
+      if (on) list.push(pid);
+      LS.set(pkey, list); showPosted(on);
+    };
     sec.querySelector('[data-save]').onclick = () => saveMany(SLIDES.filter(e => e.c === c), 'creative');
     sec.querySelectorAll('[data-song]').forEach(el => wireSong(el, c, ci));
     sec.querySelectorAll('[data-copy]').forEach(b => b.onclick = () => navigator.clipboard.writeText(c[b.dataset.copy])
