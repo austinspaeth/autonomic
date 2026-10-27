@@ -8,8 +8,8 @@ keywords: "NASA lean test, NASA lean test at home, 10 minute lean test, how to d
 date: 2026-10-27
 updated: 2026-10-27
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1615486511484-92e172cc4fe0?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1666932520939-d0b0e852c3e8?q=80&w=1760&auto=format&fit=crop"
+photoAttribution: "Dmitry Ganin / Unsplash"
 tldr: "You lie down until your readings settle, then stand with only your shoulder blades against a wall and your heels about 6 inches (15 cm) from it, without moving, for ten minutes. Someone records your heart rate, blood pressure and symptoms every minute. A sustained heart rate rise of 30 beats per minute or more (40 or more for ages 12 to 19), without a significant drop in blood pressure, is the pattern clinicians look for in POTS, but a home test is a screen, not a diagnosis. Never do it alone, stop the moment you feel faint, and bring your log to a clinician."
 categories:
   - pots

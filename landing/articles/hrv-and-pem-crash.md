@@ -8,8 +8,8 @@ keywords: "HRV and PEM, HRV before a crash, post-exertional malaise HRV, PEM cra
 date: 2026-10-27
 updated: 2026-10-27
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1517898717281-8e4385a41802?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Kinga Howard / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1567016420071-ec27a7835119?q=80&w=1760&auto=format&fit=crop"
+photoAttribution: "Inside Weather / Unsplash"
 tldr: "HRV will not predict every crash, but it is one of the few signals you can check every morning. In the largest study so far, a morning HRV lower than your usual, together with a resting heart rate higher than your usual, went with worse symptoms later that day. After exertion, HRV in long COVID can stay suppressed for at least 24 hours. During a crash, HRV sometimes rises again while you feel worse, so a higher number is not proof you have recovered. Compare against your own baseline, look at two or three mornings rather than one, and decide in advance what a warning sign changes about your day."
 categories:
   - hrv

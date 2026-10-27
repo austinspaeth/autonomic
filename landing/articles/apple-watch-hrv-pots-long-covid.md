@@ -8,8 +8,8 @@ keywords: "Apple Watch HRV, Apple Watch HRV low, Apple Watch HRV POTS, Apple Wat
 date: 2026-10-27
 updated: 2026-10-27
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1579586337278-3befd40fd17a?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Simon Daoudi / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1485206542366-16d53f333d1c?q=80&w=1760&auto=format&fit=crop"
+photoAttribution: "Tyler Hendy / Unsplash"
 tldr: "Apple Watch reports HRV as SDNN, while most guides, charts and many other wearables use RMSSD, so the numbers are not directly comparable. Background readings are short and taken at irregular times, often in different positions, which matters a great deal in POTS. A low number on its own tells you very little; what matters is how today compares with your own baseline. For a reading you can track, measure at the same time each morning, in the same position, while still, by starting a short Mindfulness session or a longer guided reading."
 categories:
   - hrv
