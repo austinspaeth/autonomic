@@ -8,8 +8,8 @@ keywords: "yoga for POTS, yoga for dysautonomia, yoga orthostatic intolerance, r
 date: 2026-10-27
 updated: 2026-10-27
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1767611125290-f8dbdfe27041?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Margaret Young / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1758599879178-e5be0375dee9?q=80&w=1632&auto=format&fit=crop"
+photoAttribution: "Unsplash"
 tldr: "Yoga can help POTS and dysautonomia, mainly through slow breathing that raises vagal tone (and HRV) and through gentle strengthening of the leg and core muscles that pump blood back to your heart. The catch is positional: the danger with POTS is not the stretching, it's the transitions between lying, sitting, and standing, plus heat. Favor floor-based, supported, and recumbent poses (legs-up-the-wall is a standout), move out of every pose slowly, skip hot yoga and fast flows, and if you have hypermobility or post-exertional malaise, protect your joints and pace first."
 categories:
   - pots
