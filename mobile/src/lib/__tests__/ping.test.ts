@@ -6,6 +6,7 @@ import {
   findingCode,
   isFirstBaseline,
   morningPromptCode,
+  strapCardCode,
   readingKindCode,
   logCode,
   reportCode,
@@ -136,6 +137,7 @@ describe('cohort ping wire format', () => {
   it('names the feature, the finding and the AI report', () => {
     expect(featureCode('milestones')).toBe('M');
     expect(featureCode('protocol')).toBe('P');
+    expect(featureCode('cycle')).toBe('C');
     // The pacing budget, opened by somebody who can read it. The locked half of
     // that same tap is `see` B, and the two must stay separate letters on
     // separate routes: pooled they are only "somebody tapped the strip", which
@@ -189,6 +191,10 @@ describe('cohort ping wire format', () => {
     expect(morningPromptCode('notToday')).toBeUndefined();
     expect(morningPromptCode('closed')).toBe('X');
     expect(morningPromptCode('other')).toBeUndefined();
+    expect(strapCardCode('camera')).toBe('C');
+    expect(strapCardCode('garmin')).toBe('G');
+    expect(strapCardCode('tapped')).toBe('T');
+    expect(strapCardCode('closed')).toBeUndefined();
   });
 
   it('maps a tier onto a letter, and anything unknown onto free', () => {

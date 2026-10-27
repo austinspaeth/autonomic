@@ -83,7 +83,7 @@
 import { AppState as RNAppState, Platform } from 'react-native';
 import { MMKV } from 'react-native-mmkv';
 import {
-  doorCode, easternDay, featureCode, findingCode, logCode, methodCode, morningPromptCode, notifyCode, offerCode,
+  doorCode, easternDay, featureCode, findingCode, logCode, methodCode, morningPromptCode, notifyCode, strapCardCode, offerCode,
   offerFailureBody, pingUrl, planCode, platformCode, readingKindCode, reportCode, resolveCohort, shouldPingDaily,
   surfaceCode, tierCode, type PlanCode,
   type LogKind, type OfferFailureBody, type PingKind, type PotsCode, type PurchaseOutcome,
@@ -129,6 +129,7 @@ const KEY_LAST_FND = 'pingLastFnd';     // + the finding letter
 const KEY_LAST_RPT = 'pingLastRpt';     // + the report letter
 const KEY_LAST_RDG = 'pingLastRdg';     // + the reading-kind letter
 const KEY_LAST_MBP = 'pingLastMbp';     // + the morning-prompt letter
+const KEY_LAST_STP = 'pingLastStp';     // + the strap-card letter
 const KEY_LAST_RVW = 'pingLastRvw';     // ISO date (Eastern) of the last review-ask ping
 /** Written by ./tier.ts on first launch: this install's birthday. */
 const KEY_TRIAL_STARTED = 'trialStartedAt';
@@ -708,7 +709,7 @@ export function pingViewOpened(view: 'insights' | 'progress' | 'pacing'): void {
  * route exists for — and `logCode` returns undefined on purpose for most
  * reading types.
  */
-function pingPerLetter(kind: 'log' | 'use' | 'fnd' | 'rpt' | 'rdg' | 'mbp', base: string, slot: SlotCode | undefined): void {
+function pingPerLetter(kind: 'log' | 'use' | 'fnd' | 'rpt' | 'rdg' | 'mbp' | 'stp', base: string, slot: SlotCode | undefined): void {
   if (!slot) return;
   pingDaily(kind, slotKey(base, slot), slot);
 }
@@ -730,7 +731,7 @@ export function pingLogged(kind: LogKind, type?: string): void {
 /** A feature was used: `'milestones'` (the sheet opened), `'protocol'` (the
  *  clean-day protocol saved) or `'pacing'` (the budget sheet opened by somebody
  *  who can read it — the locked half of that same tap is `pingViewOpened`). */
-export function pingFeature(feature: 'milestones' | 'protocol' | 'pacing' | 'unpause'): void {
+export function pingFeature(feature: 'milestones' | 'protocol' | 'pacing' | 'unpause' | 'cycle'): void {
   pingPerLetter('use', KEY_LAST_USE, featureCode(feature));
 }
 
@@ -762,6 +763,12 @@ export function pingReadingKind(kind: 'hrv' | 'breathHrv', firstBaselineToday: b
  *  today", or closed with the ✕. */
 export function pingMorningPrompt(action: 'shown' | 'take' | 'closed'): void {
   pingPerLetter('mbp', KEY_LAST_MBP, morningPromptCode(action));
+}
+
+/** The strap suggestion card: shown after failed `'camera'` or `'garmin'`
+ *  readings, or its Amazon link `'tapped'`. */
+export function pingStrapCard(action: 'camera' | 'garmin' | 'tapped'): void {
+  pingPerLetter('stp', KEY_LAST_STP, strapCardCode(action));
 }
 
 /**

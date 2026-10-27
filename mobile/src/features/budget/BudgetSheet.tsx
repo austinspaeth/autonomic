@@ -23,9 +23,9 @@ import { useNotificationPermission } from '../Reminders';
 import { Icon } from '../../components/Icon';
 import { Button } from '../../components/ui';
 import { hexA } from '../../lib/color';
-import { SCORE_COLORS } from '../../lib/scoring';
+import { SCORE_COLORS, profileCtx } from '../../lib/scoring';
 import { CAUTION_GOLD, fonts, usePalette } from '../../theme';
-import { fmtDateLong, todayKey } from '../../lib/dates';
+import { addDays, fmtDateLong, todayKey } from '../../lib/dates';
 import { clock, hm, type BudgetView, type SpendRow } from '../../lib/budget';
 import { EXERTION_RUN_MIN } from '../../lib/budget/alerts';
 import { LEARN_DAYS } from '../../lib/budget/baseline';
@@ -36,7 +36,11 @@ import { healthAppName } from '../../lib/health';
 import { connectPacingHealth, useStepsMissing } from '../../store/budget';
 import { hideBudgetAgain, showBudgetAnyway } from '../../store/budgetPause';
 import { enablePacingNotifications } from '../../store/pacingAlerts';
-import { useAppState } from '../../store/store';
+import { useAppState, useCycleModel } from '../../store/store';
+import { CycleRing } from '../cycle/CycleRing';
+import { chipLabel } from '../../lib/cycle/copy';
+import { capacityLine, phaseCapacity } from '../../lib/cycle/capacity';
+import { budgetSeries } from '../../lib/budget/series';
 import { BudgetBar } from './Bar';
 import { CELL_H, CELL_RADIUS, FIGURE_SIZE, TILE_FIGURE } from './style';
 import { openSpendSheet } from './SpendSheet';
@@ -561,6 +565,8 @@ function WhyCard({ dk, budget }: { dk: string; budget: BudgetView }) {
         </CardRow>
       ))}
 
+      <CyclePhaseRow dk={dk} />
+
       <View style={{ flexDirection: 'row', alignItems: 'flex-start', gap: 9, paddingTop: 10 }}>
         <Icon name="info" size={14} color={hexA(p.textDim, 0.8)} />
         <Text style={{ flex: 1, fontSize: 12, lineHeight: 17, color: p.textDim }}>
@@ -571,6 +577,38 @@ function WhyCard({ dk, budget }: { dk: string; budget: BudgetView }) {
       </View>
 
     </InsightCard>
+  );
+}
+
+/**
+ * Where the day sits in the cycle, and how this phase has held up in the
+ * person's own record (lib/cycle/capacity), as one row beside the morning's
+ * readings. Context for the size, not an input to it, and nothing at all
+ * without cycle tracking or enough held days to say it.
+ */
+function CyclePhaseRow({ dk }: { dk: string }) {
+  const p = usePalette();
+  const model = useCycleModel();
+  const state = useAppState();
+  const cap = React.useMemo(() => {
+    if (!model?.patternReady) return null;
+    const keys: string[] = [];
+    for (let i = 120; i >= 1; i--) keys.push(addDays(dk, -i));
+    return phaseCapacity(model, budgetSeries(state, keys, profileCtx(state.profile), addDays), dk);
+  }, [model, state, dk]);
+  const label = chipLabel(model, dk);
+  const line = cap ? capacityLine(cap) : null;
+  if (!label || !line) return null;
+  return (
+    <CardRow bg={p.bg} tall>
+      <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, flex: 1, minWidth: 0 }}>
+        <CycleRing model={model} dk={dk} size={22} stroke={2.2} periodColor={p.accent} />
+        <View style={{ flex: 1, minWidth: 0 }}>
+          <Text style={{ fontSize: 14, fontWeight: '700', color: p.text }}>{label}</Text>
+          <Text style={{ fontSize: 12.5, lineHeight: 17, color: p.textDim, marginTop: 2 }}>{line}</Text>
+        </View>
+      </View>
+    </CardRow>
   );
 }
 

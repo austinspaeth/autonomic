@@ -295,12 +295,17 @@ functions:
       #        B a later baseline / T training)
       #   mbp  the morning baseline prompt card (S shown / T take reading /
       #        N not today / X closed)
+      #   stp  the strap suggestion card (C shown after camera failures /
+      #        G shown after Garmin failures / T Amazon link tapped)
       - httpApi:
           method: GET
           path: /ping/rdg/{cohort}
       - httpApi:
           method: GET
           path: /ping/mbp/{cohort}
+      - httpApi:
+          method: GET
+          path: /ping/stp/{cohort}
       # The store review prompt was REQUESTED. Not "shown": neither store says
       # whether the sheet appeared. No letter; whole-route daily cap like /open.
       - httpApi:

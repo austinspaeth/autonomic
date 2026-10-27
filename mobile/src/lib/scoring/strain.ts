@@ -47,6 +47,7 @@ import { dayScore } from '../trends/metrics';
 import { keyRange, metricSeries } from '../trends/series';
 import { pick, shift } from './baseline';
 import { gutDay, isOffDay } from '../digestion';
+import { groupOf, inGroup, matchGroupFor, phaseFor, type PhaseGroup } from '../cycle/ambient';
 
 export type StrainSignalId =
   | 'hrRecovery' | 'legsUpHr' | 'restingHr' | 'sleepingHr'
@@ -97,6 +98,9 @@ const EXERTION_DAYS = 5;
 /** Today scoring at or above this is an Excellent day; never a day to be told
  *  to rest, and the card would sit directly under a green Outlook saying so. */
 export const SCORE_CEILING = 85;
+/** How far back a PHASE-MATCHED baseline looks (see `cycleBaseKeys`). */
+export const CYCLE_BASELINE_DAYS = 120;
+const SAME_PHASE = ' That is against the same days of your past cycles, so your cycle alone does not explain it.';
 
 /** Combined weight required to fire, alongside two distinct signals. */
 const MIN_WEIGHT = 3;
@@ -147,6 +151,15 @@ export function detectStrain(days: DaysMap, dk: string, ctx: ScoreContext = {}):
   const recentKeys = keys.slice(-RECENT_DAYS);
   const baseKeys = keys.slice(0, keys.length - RECENT_DAYS);
 
+  // With cycle-aware tracking on, the heart-rate markers and the symptom load
+  // are compared with the SAME PHASES of past cycles: resting and overnight
+  // heart rate rise a few beats in the luteal phase and symptoms gather before
+  // a period, so a 42-day baseline made mostly of other phases fires this card
+  // on a schedule. Matched days come from a longer window and must clear the
+  // same coverage bars; a marker that cannot be matched compares as before.
+  const cycleKeys = cycleBaseKeys(dk, recentKeys);
+  const allKeys = cycleKeys ? keyRange(dk, RECENT_DAYS + CYCLE_BASELINE_DAYS, addDays) : keys;
+
   const signals: StrainSignal[] = [];
   const push = (s: StrainSignal) => { signals.push(s); };
 
@@ -185,30 +198,38 @@ export function detectStrain(days: DaysMap, dk: string, ctx: ScoreContext = {}):
   /* ---------- resting and overnight heart rate ---------- */
   // Both come from the shared trend extractors, so "what is this day's resting
   // heart rate" is answered the same way here, in Progress and in the widgets.
-  const series = metricSeries(days, keys, ['restingHr', 'sleepingHr'], ctx);
-  const split = (id: 'restingHr' | 'sleepingHr') => {
+  const series = metricSeries(days, allKeys, ['restingHr', 'sleepingHr'], ctx);
+  const present = (xs: (number | null)[]) => xs.filter((v): v is number => v != null);
+  const hrShift = (id: 'restingHr' | 'sleepingHr') => {
     const s = series[id];
-    const present = (xs: (number | null)[]) => xs.filter((v): v is number => v != null);
-    return { recent: present(s.slice(-RECENT_DAYS)), base: present(s.slice(0, s.length - RECENT_DAYS)) };
+    const recent = present(s.slice(-RECENT_DAYS));
+    if (cycleKeys) {
+      const matched = present(allKeys.map((k, i) => (cycleKeys.has(k) ? s[i] : null)));
+      const m = shift(recent, matched, 3, 10);
+      if (m) return { ...m, matched: true };
+    }
+    const n = s.length;
+    const plain = shift(recent, present(s.slice(n - RECENT_DAYS - BASELINE_DAYS, n - RECENT_DAYS)), 3, 10);
+    return plain ? { ...plain, matched: false } : null;
   };
 
-  const rhr = (() => { const { recent, base } = split('restingHr'); return shift(recent, base, 3, 10); })();
+  const rhr = hrShift('restingHr');
   if (rhr && rhr.delta >= HR_RISE) {
     push({
       id: 'restingHr', kind: 'marker', weight: rhr.delta >= HR_RISE_BIG ? 2 : 1,
       label: 'Resting heart rate', value: `${Math.round(rhr.r)} bpm`,
       phrase: `your resting heart rate is up ${bpm(rhr.delta)}`,
-      detail: `Resting around ${bpm(rhr.r)} this week, against ${bpm(rhr.b)} over the weeks before it. A sustained rise with nothing obvious behind it is one of the ways an infection, a poor stretch of sleep or accumulated load shows up first.`,
+      detail: `Resting around ${bpm(rhr.r)} this week, against ${bpm(rhr.b)} ${rhr.matched ? 'at this point in your past cycles' : 'over the weeks before it'}. A sustained rise with nothing obvious behind it is one of the ways an infection, a poor stretch of sleep or accumulated load shows up first.${rhr.matched ? SAME_PHASE : ''}`,
     });
   }
 
-  const shr = (() => { const { recent, base } = split('sleepingHr'); return shift(recent, base, 3, 10); })();
+  const shr = hrShift('sleepingHr');
   if (shr && shr.delta >= HR_RISE) {
     push({
       id: 'sleepingHr', kind: 'marker', weight: shr.delta >= HR_RISE_BIG ? 2 : 1,
       label: 'Overnight heart rate', value: `${Math.round(shr.r)} bpm`,
       phrase: `your overnight heart rate is up ${bpm(shr.delta)}`,
-      detail: `Your nights have been bottoming out around ${bpm(shr.r)}, against ${bpm(shr.b)} normally. How far your rate settles overnight is a picture of how much recovery the night actually bought.`,
+      detail: `Your nights have been bottoming out around ${bpm(shr.r)}, against ${bpm(shr.b)} ${shr.matched ? 'at this point in your past cycles' : 'normally'}. How far your rate settles overnight is a picture of how much recovery the night actually bought.${shr.matched ? SAME_PHASE : ''}`,
     });
   }
 
@@ -222,14 +243,16 @@ export function detectStrain(days: DaysMap, dk: string, ctx: ScoreContext = {}):
     if (r.type === 'standTest') return num(r.sustainedDelta) ?? num(r.peakDelta);
     return null;
   };
-  const ortho = shift(pick(days, recentKeys, 'readings', orthoOf), pick(days, baseKeys, 'readings', orthoOf), 1, 3);
+  const orthoRecent = pick(days, recentKeys, 'readings', orthoOf);
+  const orthoMatched = cycleKeys ? shift(orthoRecent, pick(days, [...cycleKeys], 'readings', orthoOf), 1, 3) : null;
+  const ortho = orthoMatched ?? shift(orthoRecent, pick(days, baseKeys, 'readings', orthoOf), 1, 3);
   if (ortho && ortho.delta >= ORTHO_RISE) {
     const big = ortho.delta >= ORTHO_RISE_BIG || ortho.r >= ORTHO_HIGH;
     push({
       id: 'orthostatic', kind: 'marker', weight: big ? 2 : 1,
       label: 'Standing heart-rate rise', value: `+${Math.round(ortho.r)} bpm`,
       phrase: `your standing heart-rate rise is up ${bpm(ortho.delta)}`,
-      detail: `Standing has been costing about ${bpm(ortho.r)} lately, against ${bpm(ortho.b)} across your earlier tests. A widening rise usually tracks blood volume, sleep and load rather than anything new.`,
+      detail: `Standing has been costing about ${bpm(ortho.r)} lately, against ${bpm(ortho.b)} across your earlier tests${orthoMatched ? ' at this point in your cycle' : ''}. A widening rise usually tracks blood volume, sleep and load rather than anything new.${orthoMatched ? SAME_PHASE : ''}`,
     });
   }
 
@@ -249,7 +272,9 @@ export function detectStrain(days: DaysMap, dk: string, ctx: ScoreContext = {}):
     return { total, logged };
   };
   const sr = symptomsOn(recentKeys);
-  const sb = symptomsOn(baseKeys);
+  const sbMatched = cycleKeys ? symptomsOn([...cycleKeys]) : null;
+  const symMatched = !!sbMatched && sbMatched.logged >= 21;
+  const sb = symMatched ? sbMatched! : symptomsOn(baseKeys);
   if (sr.logged >= 4 && sb.logged >= 21) {
     const expected = (sb.total / sb.logged) * sr.logged;
     const extra = sr.total - expected;
@@ -260,7 +285,7 @@ export function detectStrain(days: DaysMap, dk: string, ctx: ScoreContext = {}):
         weight: mult >= SYMPTOM_MULT_BIG && extra >= SYMPTOM_EXTRA_BIG ? 2 : 1,
         label: 'Symptoms logged', value: `${sr.total} in ${RECENT_DAYS} days`,
         phrase: `you have logged ${Math.round(extra)} more symptom${Math.round(extra) === 1 ? '' : 's'} than usual`,
-        detail: `${sr.total} symptom entries this week against about ${Math.round(expected)} in a normal week of yours. You logged them, so this is the one signal here you already know about; it is included because it corroborates the measurements.`,
+        detail: `${sr.total} symptom entries this week against about ${Math.round(expected)} in a ${symMatched ? 'week like this one in your past cycles' : 'normal week of yours'}. You logged them, so this is the one signal here you already know about; it is included because it corroborates the measurements.${symMatched ? SAME_PHASE : ''}`,
       });
     }
   }
@@ -348,4 +373,25 @@ export function detectStrain(days: DaysMap, dk: string, ctx: ScoreContext = {}):
     readout: { value: `${ranked.length} markers off`, sub: `over the last ${RECENT_DAYS} days` },
     factors: ranked.map((s) => ({ label: s.label, value: s.value, detail: s.detail })),
   };
+}
+
+/**
+ * The baseline days that share a phase with the recent window, from the longer
+ * cycle window, or null when cycle-matching does not apply (tracking off, no
+ * pattern yet, or today's phase unknown). A recent week usually spans two
+ * phases (late luteal into premenstrual), so every group the week touched is
+ * matched, not just today's.
+ */
+function cycleBaseKeys(dk: string, recentKeys: string[]): Set<string> | null {
+  if (!matchGroupFor(dk)) return null;
+  const groups = new Set<PhaseGroup>();
+  recentKeys.forEach((k) => { const ph = phaseFor(k); if (ph?.phase) groups.add(groupOf(ph.phase)); });
+  if (!groups.size) return null;
+  const out = new Set<string>();
+  const first = recentKeys[0];
+  for (let i = 1; i <= CYCLE_BASELINE_DAYS; i++) {
+    const k = addDays(first, -i);
+    for (const g of groups) if (inGroup(k, g)) { out.add(k); break; }
+  }
+  return out.size ? out : null;
 }

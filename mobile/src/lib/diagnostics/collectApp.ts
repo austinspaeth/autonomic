@@ -94,7 +94,7 @@ const kb = (bytes: number | null): string | null =>
 function journalRows(s: AppState): Rows {
   const keys = Object.keys(s.days).sort();
   let readings = 0, activities = 0, meds = 0, symptoms = 0, movements = 0, meals = 0;
-  let hrv = 0, hrvTrusted = 0, imported = 0, sleepNights = 0, staged = 0, water = 0, loadDays = 0;
+  let hrv = 0, hrvTrusted = 0, imported = 0, sleepNights = 0, staged = 0, water = 0, loadDays = 0, cycleDays = 0;
   for (const k of keys) {
     const d = s.days[k];
     readings += d.readings?.length ?? 0;
@@ -106,6 +106,7 @@ function journalRows(s: AppState): Rows {
     if (d.food?.water) water++;
     if (d.sleep?.bed || d.sleep?.wake) sleepNights++;
     if (d.load?.readAt) loadDays++;
+    if (d.cycle) cycleDays++;
     if (d.sleep?.stages) staged++;
     const hrvRows = (d.readings ?? []).filter((r) => r.type === 'hrv');
     hrv += hrvRows.length;
@@ -137,6 +138,7 @@ function journalRows(s: AppState): Rows {
     // "the pacing budget is wrong" are different support questions and this is
     // the only row that tells them apart.
     'days with load read': loadDays,
+    'cycle days logged': cycleDays,
     ...pacingReadRows(s, keys),
     'imported entries': imported,
   };
@@ -194,6 +196,10 @@ function settingsRows(s: AppState): Rows {
     'profile fields set': ['sex', 'birthday', 'height', 'weight']
       .filter((k) => (prof as unknown as Record<string, string | undefined>)[k]).join(', ') || 'none',
     onboarded: s.meta?.onboarded ? daysAgo(s.meta.onboarded) : 'no',
+    // On or off, never the MODE: "Pregnant" is a disclosure, and a support
+    // email is not where anybody chose to make one.
+    'cycle tracking': !st.cycle ? 'never set up' : st.cycle.enabled ? 'on' : 'off',
+    'cycle sync': st.cycle?.enabled ? st.cycle.healthSync !== false : null,
   };
 }
 

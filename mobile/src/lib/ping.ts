@@ -102,6 +102,7 @@ export type PingKind =
   | 'rpt'                           // built an AI report
   | 'rdg'                           // an HRV reading completed, by KIND
   | 'mbp'                           // the morning baseline prompt card
+  | 'stp'                           // the strap suggestion card: shown (by sensor) · Amazon tapped
   | 'rvw'                           // the store review prompt was REQUESTED
   | 'gvw'                           // the giveaway sign-up (POST, carries an email; NOT a counter)
   | 'cde';                          // an access code redeemed (POST, answers with its days; NOT a counter)
@@ -330,14 +331,21 @@ export function logCode(kind: LogKind | string | undefined, type?: string): LogC
  * a large share of the days somebody opens the budget are days they had to
  * unpause it first, the suppressors are firing on days that are simply this
  * person's normal.
+ *
+ * `C` is cycle-aware tracking TURNED ON (the setup sheet finished, or the
+ * Settings switch). Fired once per enabling, and it is the ONLY thing the app
+ * ever says about the cycle feature: no phase, no flow, no mode, nothing logged
+ * there. A headcount of people who chose it, which is all a feature this
+ * sensitive should be measured by.
  */
-export type FeatureCode = 'M' | 'P' | 'B' | 'U';
+export type FeatureCode = 'M' | 'P' | 'B' | 'U' | 'C';
 
 export function featureCode(feature: string | undefined): FeatureCode | undefined {
   if (feature === 'milestones') return 'M';
   if (feature === 'protocol') return 'P';
   if (feature === 'pacing') return 'B';
   if (feature === 'unpause') return 'U';
+  if (feature === 'cycle') return 'C';
   return undefined;
 }
 
@@ -430,6 +438,21 @@ export function morningPromptCode(action: string | undefined): MorningPromptCode
 }
 
 /**
+ * The strap suggestion card (`features/hrv/StrapSuggestion.tsx`): `C` shown
+ * after failed camera readings, `G` after failed Garmin readings, `T` its
+ * Amazon link tapped. One route for one card, the `mbp` shape: each letter is
+ * capped on its own, so each is a headcount.
+ */
+export type StrapCardCode = 'C' | 'G' | 'T';
+
+export function strapCardCode(action: string | undefined): StrapCardCode | undefined {
+  if (action === 'camera') return 'C';
+  if (action === 'garmin') return 'G';
+  if (action === 'tapped') return 'T';
+  return undefined;
+}
+
+/**
  * Which subscription product: `Y` yearly, `M` monthly, `P` the promo year the
  * annual card sells, `F` the founder year. Carried by all three subscriber
  * routes (`sub`, `rst`, `lap`), so new, restored and lapsed read against each
@@ -463,7 +486,7 @@ export function planCode(sku: string | undefined): PlanCode | undefined {
 export type SlotCode =
   | MethodCode | SurfaceCode | NotifyCode | PotsCode | ViewCode | OfferCode
   | LogCode | FeatureCode | FindingCode | ReportCode | PlanCode
-  | ReadingKindCode | MorningPromptCode;
+  | ReadingKindCode | MorningPromptCode | StrapCardCode;
 
 /**
  * What this install could do at the moment it pinged: `F` free, `T` trial (the

@@ -41,20 +41,25 @@ function dayColor(k: string): string | null {
   return scoreCat(all.score).color;
 }
 
-export function Calendar({ current, onPick, controls, title = 'Select date', showToday = true }: {
-  current: string; onPick: (k: string) => void; controls: SheetControls;
-  /** What the picker is choosing, when it isn't just "a date" — the Progress
-   *  custom range opens two of these and they must not both say the same thing. */
-  title?: string;
-  /** "Jump to Today" belongs to the Journal's own day picker; a range endpoint
-   *  has no such shortcut worth a full-width button. */
-  showToday?: boolean;
+/**
+ * The month grid every calendar in the app draws: month nav over a 7-column
+ * grid of squircle cells. The Journal's day picker colours each cell by its
+ * score; the cycle history colours it by phase. Lifted out of `Calendar` so
+ * the two cannot drift into different calendars.
+ */
+export function MonthGrid({ view, setView, renderDay, ahead = 0 }: {
+  view: Date; setView: (d: Date) => void;
+  /** Months past the current one the nav may reach (the cycle history shows a
+   *  predicted period that falls next month). */
+  ahead?: number;
+  /** One cell's content, for a real day. The cell itself (size, padding) is
+   *  the grid's. */
+  renderDay: (dk: string, dn: number) => React.ReactNode;
 }) {
   const p = usePalette();
-  const [view, setView] = useState(() => { const d = dateFromKey(current); d.setDate(1); return d; });
   const now = new Date();
-  const tk = todayKey();
-  const atCurMonth = view.getFullYear() > now.getFullYear() || (view.getFullYear() === now.getFullYear() && view.getMonth() >= now.getMonth());
+  const limit = new Date(now.getFullYear(), now.getMonth() + ahead, 1);
+  const atCurMonth = view.getFullYear() > limit.getFullYear() || (view.getFullYear() === limit.getFullYear() && view.getMonth() >= limit.getMonth());
   const first = new Date(view.getFullYear(), view.getMonth(), 1);
   const startPad = first.getDay();
   const daysInMonth = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
@@ -66,6 +71,46 @@ export function Calendar({ current, onPick, controls, title = 'Select date', sho
   while (cells.length % 7) cells.push(null);
   const weeks: (number | null)[][] = [];
   for (let i = 0; i < cells.length; i += 7) weeks.push(cells.slice(i, i + 7));
+  return (
+    <>
+      {/* Month nav sits fully below the sheet's ✕ pill — the extra top margin
+          keeps the next-month chevron from crowding the close button. */}
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, marginBottom: 12 }}>
+        <Pressable onPress={() => setView(new Date(view.getFullYear(), view.getMonth() - 1, 1))} hitSlop={8}><Icon name="chevronLeft" size={22} color={p.text} /></Pressable>
+        <Text style={{ fontSize: 17, fontWeight: '700', color: p.text }}>{view.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</Text>
+        <Pressable disabled={atCurMonth} onPress={() => setView(new Date(view.getFullYear(), view.getMonth() + 1, 1))} hitSlop={8} style={{ opacity: atCurMonth ? 0.3 : 1 }}><Icon name="chevronRight" size={22} color={p.text} /></Pressable>
+      </View>
+      <View style={{ width: '100%' }}>
+        <View style={{ flexDirection: 'row', width: '100%' }}>
+          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <View key={i} style={{ flex: 1, alignItems: 'center', paddingVertical: 4 }}><Text style={{ fontSize: 11, color: p.textDim, fontWeight: '700' }}>{d}</Text></View>)}
+        </View>
+        {weeks.map((week, wi) => (
+          <View key={wi} style={{ flexDirection: 'row', width: '100%' }}>
+            {week.map((dn, i) => {
+              if (dn == null) return <View key={`e${i}`} style={{ flex: 1, aspectRatio: 1 }} />;
+              const dk = keyOf(new Date(view.getFullYear(), view.getMonth(), dn));
+              return <View key={dk} style={{ flex: 1, aspectRatio: 1, padding: 2 }}>{renderDay(dk, dn)}</View>;
+            })}
+          </View>
+        ))}
+      </View>
+    </>
+  );
+}
+
+export function Calendar({ current, onPick, controls, title = 'Select date', showToday = true }: {
+  current: string; onPick: (k: string) => void; controls: SheetControls;
+  /** What the picker is choosing, when it isn't just "a date" — the Progress
+   *  custom range opens two of these and they must not both say the same thing. */
+  title?: string;
+  /** "Jump to Today" belongs to the Journal's own day picker; a range endpoint
+   *  has no such shortcut worth a full-width button. */
+  showToday?: boolean;
+}) {
+  const p = usePalette();
+  const [view, setView] = useState(() => { const d = dateFromKey(current); d.setDate(1); return d; });
+  const tk = todayKey();
+  const daysInMonth = new Date(view.getFullYear(), view.getMonth() + 1, 0).getDate();
 
   // Each scored cell runs a full scoreSet; cache the month's cell states so
   // month-nav / theme re-renders don't re-score ~31 days. `days` (fresh identity
@@ -85,47 +130,27 @@ export function Calendar({ current, onPick, controls, title = 'Select date', sho
   return (
     <View style={{ width: '100%', maxWidth: 400, alignSelf: 'center' }}>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, lineHeight: 32, marginBottom: 16 }}>{title}</Text>
-      {/* Month nav sits fully below the sheet's ✕ pill — the extra top margin
-          keeps the next-month chevron from crowding the close button. */}
-      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8, marginBottom: 12 }}>
-        <Pressable onPress={() => setView(new Date(view.getFullYear(), view.getMonth() - 1, 1))} hitSlop={8}><Icon name="chevronLeft" size={22} color={p.text} /></Pressable>
-        <Text style={{ fontSize: 17, fontWeight: '700', color: p.text }}>{view.toLocaleDateString(undefined, { month: 'long', year: 'numeric' })}</Text>
-        <Pressable disabled={atCurMonth} onPress={() => setView(new Date(view.getFullYear(), view.getMonth() + 1, 1))} hitSlop={8} style={{ opacity: atCurMonth ? 0.3 : 1 }}><Icon name="chevronRight" size={22} color={p.text} /></Pressable>
-      </View>
-      <View style={{ width: '100%' }}>
-        <View style={{ flexDirection: 'row', width: '100%' }}>
-          {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((d, i) => <View key={i} style={{ flex: 1, alignItems: 'center', paddingVertical: 4 }}><Text style={{ fontSize: 11, color: p.textDim, fontWeight: '700' }}>{d}</Text></View>)}
-        </View>
-        {weeks.map((week, wi) => (
-          <View key={wi} style={{ flexDirection: 'row', width: '100%' }}>
-            {week.map((dn, i) => {
-              if (dn == null) return <View key={`e${i}`} style={{ flex: 1, aspectRatio: 1 }} />;
-              const dk = keyOf(new Date(view.getFullYear(), view.getMonth(), dn));
-              const isSel = dk === current, isFuture = dk > tk;
-              const { has, color } = cellInfo[dk];
-              return (
-                <View key={dk} style={{ flex: 1, aspectRatio: 1, padding: 2 }}>
-                  {/* Squircle cell: tinted with the day's autonomic-outlook color when
-                      scored. Selected day fills the solid outlook color. */}
-                  <Pressable
-                    disabled={isFuture}
-                    onPress={() => { onPick(dk); controls.close(); }}
-                    style={{
-                      flex: 1, borderRadius: 13, alignItems: 'center', justifyContent: 'center', opacity: isFuture ? 0.3 : 1,
-                      backgroundColor: isSel ? (color || p.accent) : color ? hexA(color, 0.16) : 'transparent',
-                      borderWidth: color && !isSel ? 1 : 0,
-                      borderColor: color ? hexA(color, 0.45) : 'transparent',
-                    }}
-                  >
-                    <Text style={{ color: isSel ? '#fff' : color ? color : p.text, fontWeight: isSel || color ? '700' : '400', fontSize: 15 }}>{dn}</Text>
-                    {has && !isSel && !color ? <View style={{ position: 'absolute', bottom: 6, width: 5, height: 5, borderRadius: 3, backgroundColor: p.accent }} /> : null}
-                  </Pressable>
-                </View>
-              );
-            })}
-          </View>
-        ))}
-      </View>
+      <MonthGrid view={view} setView={setView} renderDay={(dk, dn) => {
+        const isSel = dk === current, isFuture = dk > tk;
+        const { has, color } = cellInfo[dk];
+        return (
+          // Squircle cell: tinted with the day's autonomic-outlook color when
+          // scored. Selected day fills the solid outlook color.
+          <Pressable
+            disabled={isFuture}
+            onPress={() => { onPick(dk); controls.close(); }}
+            style={{
+              flex: 1, borderRadius: 13, alignItems: 'center', justifyContent: 'center', opacity: isFuture ? 0.3 : 1,
+              backgroundColor: isSel ? (color || p.accent) : color ? hexA(color, 0.16) : 'transparent',
+              borderWidth: color && !isSel ? 1 : 0,
+              borderColor: color ? hexA(color, 0.45) : 'transparent',
+            }}
+          >
+            <Text style={{ color: isSel ? '#fff' : color ? color : p.text, fontWeight: isSel || color ? '700' : '400', fontSize: 15 }}>{dn}</Text>
+            {has && !isSel && !color ? <View style={{ position: 'absolute', bottom: 6, width: 5, height: 5, borderRadius: 3, backgroundColor: p.accent }} /> : null}
+          </Pressable>
+        );
+      }} />
       {showToday ? (
         <>
           <View style={{ height: 12 }} />

@@ -418,3 +418,31 @@ describe('migrate: day load', () => {
     expect(out.days['2026-09-09'].load).toBeUndefined();
   });
 });
+
+describe('migrate: cycle', () => {
+  it('keeps a logged flow day through a relaunch (the `load` lesson)', () => {
+    const out = migrate({ days: { '2026-10-01': { cycle: { flow: 'heavy', imported: true, healthKey: 'hk:1', junk: 1 } } } });
+    expect(out.days['2026-10-01'].cycle).toEqual({ flow: 'heavy', imported: true, healthKey: 'hk:1' });
+  });
+
+  it('drops an unknown flow rather than guessing one', () => {
+    const out = migrate({ days: { '2026-10-01': { cycle: { flow: 'gushing' } } } });
+    expect(out.days['2026-10-01'].cycle).toBeUndefined();
+  });
+
+  it('keeps known cycle settings and drops an unknown mode', () => {
+    expect(migrate({ settings: { cycle: { enabled: true, mode: 'regular', headsUp: false, setupOn: '2026-10-26' } } }).settings.cycle)
+      .toEqual({ enabled: true, mode: 'regular', headsUp: false, setupOn: '2026-10-26' });
+    expect(migrate({ settings: { cycle: { enabled: true, mode: 'lunar' } } }).settings.cycle).toBeUndefined();
+  });
+
+  it('keeps plausible overnight temperatures at the top level only', () => {
+    const out = migrate({ bodyTemp: { '2026-10-01': { wrist: 35.9, bbt: 98.2 }, bad: { wrist: 36 } } });
+    expect(out.bodyTemp).toEqual({ '2026-10-01': { wrist: 35.9 } });
+  });
+});
+
+it('keeps a plausible typical cycle length and drops anything else', () => {
+  expect(migrate({ settings: { cycle: { enabled: true, mode: 'regular', typicalLength: 29 } } }).settings.cycle?.typicalLength).toBe(29);
+  expect(migrate({ settings: { cycle: { enabled: true, mode: 'regular', typicalLength: 200 } } }).settings.cycle?.typicalLength).toBeUndefined();
+});

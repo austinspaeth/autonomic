@@ -124,7 +124,7 @@ export type Fault = {
 export type PingKind =
   | 'open' | 'sub' | 'rst' | 'lap' | 'act' | 'cap' | 'hrv' | 'sav' | 'pay'
   | 'not' | 'pot' | 'see' | 'err' | 'osh' | 'odm' | 'oac' | 'ofl'
-  | 'log' | 'use' | 'fnd' | 'rpt' | 'rdg' | 'mbp' | 'rvw';
+  | 'log' | 'use' | 'fnd' | 'rpt' | 'rdg' | 'mbp' | 'stp' | 'rvw';
 
 export type PingReport = { since: string; faults: Fault[] } & Partial<Record<PingKind, PingRow[]>>;
 

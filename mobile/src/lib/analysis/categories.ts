@@ -11,12 +11,12 @@ import { budgetSeries } from '../budget/series';
 import { isRestType } from '../budget/load';
 import { SCORE_COLORS, orthoMaxDelta, restingHrBands, sBP } from '../scoring';
 import { scoreCat, sleepHours, streakInfo, type DaysMap } from '../scoring/day';
-import { ACTIVITY_TYPES, MED_TYPES, TRIGGER_TYPES } from '../registry';
+import { ACTIVITY_TYPES, CYCLE_SYMPTOMS, MED_TYPES, SYMPTOM_TYPES, TRIGGER_TYPES } from '../registry';
 import { FORM_CAT, FORM_LABEL, STOOL_FORMS, stoolForm, summarizeGut } from '../digestion';
 import {
   BANDS, CustomRange, Mode, acBandZones, acBandsToZones, acBuckets, acLatestIdx, acMean, acPresent, acRangeLabel,
   acReadVals, acScoreZones, avgRound, bucketViews, bucketWhen, catFromBands, isEvening, isMorning,
-  makeAgg, type BucketView, type ScoreContext,
+  makeAgg, type Bucket, type BucketView, type ScoreContext,
 } from './buckets';
 import type { Series, Zone } from '../../components/charts';
 import { fmtWater, getUnits, waterNum } from '../units';
@@ -723,3 +723,35 @@ export function buildCategories(days: DaysMap, mode: Mode, ctx: ScoreContext, cu
   ];
 }
 
+
+/**
+ * "Cycle symptoms" — the Triggers card's shape for the symptoms that travel
+ * with a cycle (registry CYCLE_SYMPTOMS): how often each showed up in the
+ * range, as bars, with the per-bucket totals charted above them and a row tap
+ * narrowing the chart to that symptom. Null when none were logged in range.
+ */
+export function cycleSymptomsCard(days: DaysMap, buckets: Bucket[], ctx: ScoreContext): AnalysisCard | null {
+  const label = (k: string) => ctx.customTypes?.symptoms?.[k]?.label || SYMPTOM_TYPES[k]?.label;
+  const count: Record<string, number> = {};
+  const byKey: Record<string, (number | null)[]> = {};
+  buckets.forEach((b, bi) => b.days.forEach((dk) => {
+    (days[dk]?.symptoms || []).forEach((e) => {
+      if (!(CYCLE_SYMPTOMS as readonly string[]).includes(e.type) || !label(e.type)) return;
+      count[e.type] = (count[e.type] || 0) + 1;
+      if (!byKey[e.type]) byKey[e.type] = buckets.map(() => 0);
+      byKey[e.type][bi] = (byKey[e.type][bi] || 0) + 1;
+    });
+  }));
+  const rows = Object.entries(count).map(([k, c]) => ({ key: k, name: label(k)!, count: c })).sort((a, b) => b.count - a.count);
+  if (!rows.length) return null;
+  return {
+    title: 'Cycle symptoms',
+    desc: 'How often each cycle symptom showed up in this range.',
+    help: {
+      what: 'Counts of the symptoms that travel with a cycle: cramps, bloating, breast tenderness, headache, mood changes and back pain. The chart totals them per day, week or month; tap a symptom row to narrow the chart to that one, and tap elsewhere to reset.',
+      why: 'Counted over weeks, these show where in your cycle the hard days cluster, which is easier to plan around than to remember. Set it beside the By cycle day chart above. It describes your own log, not a diagnosis.',
+    },
+    bars: [{ label: '', rows }],
+    barBuckets: { totals: buckets.map((_, bi) => rows.reduce((sum, r) => sum + (byKey[r.key][bi] || 0), 0)), byKey },
+  };
+}

@@ -1,4 +1,4 @@
-# Store listing — v1.33.0
+# Store listing — v1.38.0
 
 Copy-paste source for **App Store Connect** and the **Google Play Console**.
 Character counts verified against each store's limits.
@@ -8,7 +8,22 @@ Console *configuration* (products, offers, price changes) is not here — that i
 
 ---
 
-## Submission checklist — 1.33.0
+## Submission checklist — 1.38.0
+
+Cycle impact tracking. A native build on both stores: new Apple Health
+(menstrual flow, spotting, overnight temperature, cycle symptoms) and Health
+Connect (menstruation, intermenstrual bleeding, basal and skin temperature)
+permissions, plus the own-sample delete helper in modules/ecg-health.
+
+- [ ] **Deploy the ping lambda first** (`use` letter C). An older decoder drops the ping.
+- [ ] **What's New** → the 1.38 block below (App Store and the Play variant).
+- [ ] **Description** → both updated with the cycle section and the free/Pro lines.
+- [ ] **App Privacy (ASC)** → Health & Fitness data already declared as not collected; cycle data stays on device, no change needed, but re-check the Health declarations list includes reproductive health.
+- [ ] **Play Data safety / Health Connect declaration** → add Menstruation, Intermenstrual bleeding, Basal body temperature and Skin temperature to the declared Health Connect data types (read; write for the first two) before submitting.
+- [ ] **Name / Subtitle / Keywords / Promotional text / Review notes** → unchanged.
+- [ ] All dev-only `FORCE_*` / sample flags off in the shipped commit (the cycle ones: `FORCE_PHASE_NOTE`, `FORCE_HISTORY_SAMPLE`, `FORCE_CYCLE_CARD` and the forced "Period started?").
+
+## Submission checklist — 1.33.0 (previous)
 
 The live App Store name and subtitle have been "Autonomic: HRV & POTS Tracker" /
 "Pacing for Long COVID & ME/CFS" since the pacing release; this file carried
@@ -167,7 +182,19 @@ there and is wasted here; do **not** add "free", Apple indexes the price
 separately. Next in line if space frees up: `strap`, `vagus`, `garmin` (once
 the watch path is solid).
 
-## What's New (1.33, both stores — 385/4,000 chars)
+## What's New (1.38, App Store — 327/4,000 chars)
+
+NEW - Cycle impact tracking. Log your period or bring your history in from Apple Health, and see how your cycle moves your RMSSD, heart rate, symptoms and daily score. Your scores and warnings now account for it, so a dip before your period is not read as a setback.
+
+And many smaller changes based on your feedback. Thank you!
+
+### Play Store variant (1.38, Android, 329/500 chars)
+
+NEW - Cycle impact tracking. Log your period or bring your history in from Health Connect, and see how your cycle moves your RMSSD, heart rate, symptoms and daily score. Your scores and warnings now account for it, so a dip before your period is not read as a setback.
+
+And many smaller changes based on your feedback. Thank you!
+
+## What's New (1.33, both stores — 385/4,000 chars) — previous
 
 NEW: Enter a POTS stand test or episode by hand, with a guided walkthrough. No strap or watch needed.
 
@@ -275,7 +302,7 @@ Also:
 • Medication doses accept units again
 • Keyboard and Progress scrolling fixes
 
-## Description (3,905/4,000 chars)
+## Description (3,984/4,000 chars)
 
 See your nervous system actually recover.
 
@@ -286,13 +313,17 @@ Built for the long haul: long covid and post viral recovery, POTS and dysautonom
 Free to use, no account, no ads, no tracking. 14 days of full access on install, then the core stays free forever.
 
 
-NEW: YOUR DAILY PACING BUDGET
+NEW: CYCLE IMPACT TRACKING
+
+• Log your period in a tap, or bring a year of history in from Apple Health
+• See how your cycle moves your RMSSD, heart rate, symptoms and daily score
+• Scores and warnings account for your cycle, so a pre-period dip is not read as a crash
+
+
+YOUR DAILY PACING BUDGET
 
 • A budget for today in minutes of effort, fitted to your own readings and history, never a textbook number
 • It counts the whole day, not just what you log: workouts, steps, time on your feet, and minutes above your own exertion line
-• Legs up and breathwork buy minutes back
-• A pace marker shows where you are in the day, so what is left means something at 9am and at 6pm
-• It goes quiet when it should: on a day that reads as a downturn, no number is published at all
 • It tells you how often its estimate held, week by week, and it is on your widgets and your Apple Watch too
 
 
@@ -333,14 +364,14 @@ FIND WHAT HELPS OR HURTS
 YOUR DATA NEVER LEAVES YOUR PHONE
 
 • 100% offline-first: no account, no cloud, no ads. You own your data and can export it anytime
-• Reads HRV, resting HR, sleep, workouts and blood pressure from Apple Health, and writes back only what you ask
+• Reads HRV, resting HR, sleep, workouts, blood pressure and period days from Apple Health, and writes back only what you ask
 
 
 WHAT'S FREE, WHAT'S PRO
 
-Free forever: unlimited live HRV captures, POTS stand tests and episodes, journaling, manual readings, your daily score and outlook, the Apple Watch HR monitor, 14 days of charts and full export.
+Free forever: unlimited live HRV captures, cycle tracking, POTS stand tests and episodes, journaling, manual readings, your daily score and outlook, the Apple Watch HR monitor, 14 days of charts and full export.
 
-Autonomic Pro adds the pacing budget, week / month / year progress, full historical analysis, Insights, POTS results and AI doctor reports. It is $7.99/month or $49.99/year, billed to your Apple ID and renewing automatically until cancelled. Cancel anytime in your App Store settings.
+Autonomic Pro adds the pacing budget, week / month / year progress, full historical analysis, cycle impact charts, Insights, POTS results and AI doctor reports. It is $7.99/month or $49.99/year, billed to your Apple ID and renewing automatically until cancelled. Cancel anytime in your App Store settings.
 
 Terms of Use: https://autonomic.care/terms-of-service/
 Privacy Policy: https://autonomic.care/privacy-policy/
@@ -461,7 +492,7 @@ subscription price is stated in the full description, which is where Play wants
 it. This line trades "symptom journal" for "pacing" and "ME/CFS", the two terms
 this release is worth being found for.
 
-## Full description (3,905/4,000 chars)
+## Full description (3,943/4,000 chars)
 
 See your nervous system actually recover.
 
@@ -472,13 +503,17 @@ Built for the long haul: long covid and post viral recovery, POTS and dysautonom
 Free to use, no account, no ads, no tracking. 14 days of full access on install, then the core stays free forever.
 
 
-NEW: YOUR DAILY PACING BUDGET
+NEW: CYCLE IMPACT TRACKING
+
+• Log your period in a tap, or bring a year of history in from Health Connect
+• See how your cycle moves your RMSSD, heart rate, symptoms and daily score
+• Scores and warnings account for your cycle, so a pre-period dip is not read as a crash
+
+
+YOUR DAILY PACING BUDGET
 
 • A budget for today in minutes of effort, fitted to your own readings and history, never a textbook number
 • It counts the whole day, not just what you log: workouts, steps, time on your feet, and minutes above your own exertion line
-• Legs up and breathwork buy minutes back
-• A pace marker shows where you are in the day, so what is left means something at 9am and at 6pm
-• It goes quiet when it should: on a day that reads as a downturn, no number is published at all
 • It tells you how often its estimate held, week by week, and it is on your home screen widgets too
 
 
@@ -509,7 +544,6 @@ TRACK EVERYTHING, KEEP YOUR STREAK
 • Water, meals and food triggers, meds and supplements, symptoms, activities, sleep, blood pressure, stand tests and digestion
 • Define your own "clean day" (hydration, sleep, meds, triggers) and build a streak, with your longest run and a 30 day consistency rate
 • Tap a night for its full sleep report: stages, overnight heart rate and breathing, and how it compares with recent nights
-• Milestones, so recovery actually adds up
 
 
 FIND WHAT HELPS OR HURTS
@@ -520,14 +554,14 @@ FIND WHAT HELPS OR HURTS
 YOUR DATA NEVER LEAVES YOUR PHONE
 
 • 100% offline-first: no account, no cloud, no ads. You own your data and can export it anytime
-• Reads HRV, resting HR, sleep, workouts and blood pressure from Health Connect, and writes back only what you ask
+• Reads HRV, resting HR, sleep, workouts, blood pressure and period days from Health Connect, and writes back only what you ask
 
 
 WHAT'S FREE, WHAT'S PRO
 
-Free forever: unlimited live HRV captures, POTS stand tests and episodes from a chest strap, journaling, manual readings, your daily Autonomic Score and outlook, 14 days of progress charts, and backup and export.
+Free forever: unlimited live HRV captures, cycle tracking, POTS stand tests and episodes from a chest strap, journaling, manual readings, your daily Autonomic Score and outlook, 14 days of progress charts, and backup and export.
 
-Autonomic Pro adds the pacing budget, week / month / year progress, full historical analysis, Insights, POTS results and AI doctor reports. It is $7.99 per month or $49.99 per year, billed through Google Play. Subscriptions renew automatically until cancelled; manage or cancel anytime in Google Play > Subscriptions.
+Autonomic Pro adds the pacing budget, week / month / year progress, full historical analysis, cycle impact charts, Insights, POTS results and AI doctor reports. It is $7.99 per month or $49.99 per year, billed through Google Play. Subscriptions renew automatically until cancelled; manage or cancel anytime in Google Play > Subscriptions.
 
 IMPORTANT: Autonomic is a personal journal and education tool, not a medical device. It does not diagnose or treat any disease. Always discuss protocol or medication changes with your doctor.
 
@@ -632,8 +666,6 @@ PACING AND ENERGY MANAGEMENT, IN MINUTES
 
 • A budget for today in minutes of effort, fitted to your own readings and history, never a textbook number
 • It counts the whole day, not just what you log: workouts, steps, time on your feet, and minutes above your own exertion line
-• Legs up and breathwork buy minutes back
-• A pace marker shows where you are in the day, so what is left means something at 9am and at 6pm
 • It goes quiet when it should: on a day that reads as a downturn, no number is published at all
 • It tells you how often its estimate held, week by week, and it is on your widgets and your Apple Watch too
 
@@ -718,8 +750,6 @@ PACING AND ENERGY MANAGEMENT, IN MINUTES
 
 • A budget for today in minutes of effort, fitted to your own readings and history, never a textbook number
 • It counts the whole day, not just what you log: workouts, steps, time on your feet, and minutes above your own exertion line
-• Legs up and breathwork buy minutes back
-• A pace marker shows where you are in the day, so what is left means something at 9am and at 6pm
 • It goes quiet when it should: on a day that reads as a downturn, no number is published at all
 • It tells you how often its estimate held, week by week, and it is on your home screen widgets too
 

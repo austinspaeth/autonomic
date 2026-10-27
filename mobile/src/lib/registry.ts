@@ -433,20 +433,29 @@ export const MED_TYPES: Record<string, TypeDef> = {
 };
 
 const symptom = (label: string, fields?: FieldDef[]): TypeDef => ({ label, icon: 'alert', fields: fields || [] });
+/** A symptom offered only while cycle-aware tracking is on (TypeDef.cycle). */
+const cycleSymptom = (label: string): TypeDef => ({ ...symptom(label), cycle: true });
+/** The quick-pick symptoms on the cycle entry card, in the order the card
+ *  shows them. Bloating and headache are ordinary symptoms that also travel
+ *  with a cycle, so they are listed here without being cycle-only. */
+export const CYCLE_SYMPTOMS = ['cramps', 'bloating', 'breastTenderness', 'headache', 'moodChanges', 'backPain'] as const;
 /** Alphabetical by label; pickers render in this insertion order. Covers the
  *  common POTS / long-COVID / MCAS symptom set. */
 export const SYMPTOM_TYPES: Record<string, TypeDef> = {
   adrenalineSurge: symptom('Adrenaline surge'),
   anxiety: symptom('Anxiety'),
+  backPain: cycleSymptom('Back pain'),
   bloating: symptom('Bloating'),
   bloodPooling: symptom('Blood pooling'),
   blurredVision: symptom('Blurred vision'),
   brainFog: symptom('Brain fog'),
+  breastTenderness: cycleSymptom('Breast tenderness'),
   chestPain: symptom('Chest pain / tightness'),
   chills: symptom('Chills'),
   coatHanger: symptom('Coat hanger pain'),
   coldExtremities: symptom('Cold hands / feet'),
   congestion: symptom('Congestion / runny nose'),
+  cramps: cycleSymptom('Cramps'),
   earRinging: symptom('Ear ringing'),
   sweating: symptom('Excess sweating'),
   syncope: symptom('Fainting'),
@@ -471,6 +480,7 @@ export const SYMPTOM_TYPES: Record<string, TypeDef> = {
   insomnia: symptom('Insomnia / poor sleep'),
   jointPain: symptom('Joint pain'),
   lightHeaded: symptom('Light Headed/Dizzy'),
+  moodChanges: cycleSymptom('Mood changes'),
   muscleFatigue: symptom('Muscle fatigue', [
     { type: 'select', key: 'part', label: 'Body part', options: ['All', 'Arms', 'Legs', 'Core', 'Back', 'Neck'] },
   ]),

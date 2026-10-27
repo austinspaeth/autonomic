@@ -87,3 +87,15 @@ describe('pillSummary', () => {
     expect(pillSummary(rows, new Set(['gone']))).toBeNull();
   });
 });
+
+describe('cycle', () => {
+  it('lists an imported period day as a fact, not a removable row', () => {
+    const day = { readings: [], activities: [], meds: [], symptoms: [], sleep: { bed: '', wake: '' }, food: { water: 0, calories: 0, triggers: {}, meals: [] }, digestion: { movements: [] }, cycle: { flow: 'heavy' as const, imported: true } };
+    const rows = importedRows(day, () => '');
+    expect(rows).toEqual([expect.objectContaining({ key: 'cycle', kind: 'cycle', noun: 'period', title: 'Heavy flow', removable: false })]);
+  });
+  it('does not list a period day logged here', () => {
+    const day = { readings: [], activities: [], meds: [], symptoms: [], sleep: { bed: '', wake: '' }, food: { water: 0, calories: 0, triggers: {}, meals: [] }, digestion: { movements: [] }, cycle: { flow: 'heavy' as const } };
+    expect(importedRows(day, () => '')).toEqual([]);
+  });
+});

@@ -25,6 +25,7 @@
     { label: 'Daily journal: sleep, meds, symptoms, triggers, hydration' },
     { label: 'Manual readings: BP, resting heart rate, episodes' },
     { label: 'Daily autonomic score & outlook' },
+    { label: 'Cycle tracking, with scores that account for your cycle' },
     { label: 'Unlimited live HRV capture, from a chest strap or your camera' },
     { label: 'POTS stand tests & episode captures' },
     { label: 'Apple Watch heart-rate monitor', only: 'iPhone' },
@@ -34,6 +35,7 @@
     { label: 'Progress charts', free: '14 days', pro: 'All views' },
     { label: 'Daily pacing budget' },
     { label: 'Full historical metric analysis' },
+    { label: 'How your cycle moves your numbers' },
     { label: 'POTS test & episode results' },
     { label: 'AI insights & doctor reports' }
   ];
@@ -839,6 +841,52 @@
   </div>
 </section>
 
+<!-- ============ FEATURE: CYCLE IMPACT ============
+     The mock is the app's own "Score by cycle day" chart (mobile
+     src/features/cycle/CycleCharts.tsx): faint past cycles, this cycle in its
+     grade colours, the usual pre-period dip boxed, phases across the top. -->
+<section class="section" id="cycle">
+  <div class="wrap feature reverse">
+    <div class="feature-copy">
+      <p class="eyebrow">New · Cycle impact</p>
+      <h2 class="h2">Your cycle, in the numbers you already track.</h2>
+      <p class="lead">HRV falls and heart rate rises in the second half of a cycle, and POTS symptoms often gather before a period. Autonomic lines your days up with your cycle, so a dip you have every month reads as your cycle, not a setback.</p>
+      <ul class="ticks">
+        <li><b>Score by cycle day</b>, this cycle against your last three, with your usual dip marked.</li>
+        <li><b>By phase</b>, how RMSSD, resting heart rate and POTS episodes move from your period to your luteal days.</li>
+        <li><b>Log a period in a tap</b>, or bring a year in from Apple Health or Health Connect. It never leaves your phone.</li>
+      </ul>
+    </div>
+    <div class="feature-art">
+      <div class="card-mock chart-mock">
+        <div class="ch-top"><b>Score by cycle day</b><span>Day 26</span></div>
+        <div class="ch-read"><span style="color:var(--yellow)">This cycle: 61</span><span class="ch-zone" style="background:rgba(255,255,255,.12);color:#fff">In line with your usual dip</span></div>
+        <svg class="ch-svg" viewBox="0 0 320 120" preserveAspectRatio="none" aria-hidden="true">
+          <rect x="30" y="14" width="38" height="96" fill="rgba(224,49,39,.16)" />
+          <rect x="68" y="14" width="66" height="96" fill="rgba(0,0,0,.28)" />
+          <rect x="134" y="14" width="26" height="96" fill="rgba(255,255,255,.15)" />
+          <rect x="160" y="14" width="104" height="96" fill="rgba(255,255,255,.075)" />
+          <line x1="30" y1="36" x2="310" y2="36" stroke="rgba(255,255,255,.06)" />
+          <line x1="30" y1="66" x2="310" y2="66" stroke="rgba(255,255,255,.06)" />
+          <line x1="30" y1="96" x2="310" y2="96" stroke="rgba(255,255,255,.06)" />
+          <rect x="196" y="52" width="70" height="40" rx="6" fill="rgba(255,255,255,.08)" stroke="rgba(255,255,255,.2)" stroke-dasharray="3 3" />
+          <path d="M30 46 C60 44 90 36 120 38 C150 40 175 36 200 44 C220 52 240 74 262 70" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="1.4" />
+          <path d="M30 42 C60 40 90 40 120 34 C150 36 175 40 200 48 C220 58 240 78 262 66" fill="none" stroke="rgba(255,255,255,.18)" stroke-width="1.4" />
+          <defs>
+            <linearGradient id="cyc" x1="0" y1="20" x2="0" y2="96" gradientUnits="userSpaceOnUse">
+              <stop offset="0" stop-color="#4ade80" /><stop offset="0.45" stop-color="#4ade80" /><stop offset="0.45" stop-color="#eab308" /><stop offset="1" stop-color="#eab308" />
+            </linearGradient>
+          </defs>
+          <path d="M30 44 C60 42 90 34 120 36 C150 38 175 38 200 46 C215 54 228 68 244 72" fill="none" stroke="url(#cyc)" stroke-width="3.5" stroke-linecap="round" />
+          <line x1="244" y1="14" x2="244" y2="110" stroke="rgba(255,255,255,.22)" stroke-dasharray="2 3" />
+          <circle cx="244" cy="72" r="4.6" fill="#eab308" stroke="#000" stroke-width="2.4" />
+        </svg>
+        <div class="ch-x"><span>Period</span><span>Ovulation</span><span>Luteal</span></div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ============ APPLE WATCH ============
      The device is a working replica of the watchOS app: every face below is a
      real screen from mobile/targets/watch (ContentView / StandTestViews /
@@ -1400,7 +1448,7 @@
     </div>
     <div class="faq">
       <details><summary>How much does it cost, and is my data private?<span class="fq-i">+</span></summary><p>The app is free to download and your journal is free forever, with no account and no ads. Autonomic Pro is {monthly}/month or {yearly}/year and unlocks the deep-analysis tools. Every install opens with {pricing.trialDays} days of Pro, no card, so you can try all of it first. Your data is always private: stored on your device, never sold, never sent to a server.</p></details>
-      <details><summary>What’s free, and what needs Pro?<span class="fq-i">+</span></summary><p>Free covers the daily journal, your manual readings, your daily Autonomic Outlook, unlimited live HRV capture with no daily cap, POTS stand tests and episode captures, the Apple Watch heart-rate monitor, backups and export, plus 14 days of charts. Pro adds your daily pacing budget, your full history, Insights, POTS test and episode results, and AI insight and doctor reports. There’s a full breakdown in <a href="#pricing">the pricing table</a>, and the same table lives inside the app.</p></details>
+      <details><summary>What’s free, and what needs Pro?<span class="fq-i">+</span></summary><p>Free covers the daily journal, your manual readings, your daily Autonomic Outlook, unlimited live HRV capture with no daily cap, POTS stand tests and episode captures, cycle tracking, the Apple Watch heart-rate monitor, backups and export, plus 14 days of charts. Pro adds your daily pacing budget, your full history, how your cycle moves your numbers, Insights, POTS test and episode results, and AI insight and doctor reports. There’s a full breakdown in <a href="#pricing">the pricing table</a>, and the same table lives inside the app.</p></details>
       <details><summary>Does it really work offline?<span class="fq-i">+</span></summary><p>Completely. It’s a fully offline app on both iOS and Android. Scoring, trends and reports are computed locally, so it works anywhere, no signal required.</p></details>
       <details><summary>Which conditions is it built for?<span class="fq-i">+</span></summary><p>POTS, dysautonomia, long COVID and post-viral or post-illness recovery, anywhere daily HRV, heart-rate and orthostatic patterns matter.</p></details>
       <details><summary>Is Autonomic available on Android?<span class="fq-i">+</span></summary><p>Yes. Autonomic is available now on both iPhone (App Store) and Android (Google Play), at the same price, with the same private, offline design. One honest difference: the Apple Watch companion app is iPhone-only. On Android the stand test, episode capture and HRV readings all run in the app itself, using a Bluetooth chest strap or your phone’s camera, and it reads your sleep and workouts from Health Connect the way the iPhone build reads Apple Health.</p></details>

@@ -19,7 +19,7 @@
  * with `available: false`. The module is loaded lazily.
  */
 import { Linking, Platform } from 'react-native';
-import type { Entry, SleepStages } from '../types';
+import type { CycleFlow, Entry, SleepStages } from '../types';
 import { computeHrv, type HrvResult } from '../hrv';
 import type { ImportedHrvQuality } from '../hrvQuality';
 import { keyOf } from '../dates';
@@ -27,6 +27,7 @@ import {
   hasAskedAuth, markAskedAuth, markPromptedThisLaunch, promptedThisLaunch, shareAuthRequest,
 } from './askedAuth';
 import { requestEcgAuth } from './ecg';
+import { ecgNative } from '../../../modules/ecg-health';
 import { groupNights, summarizeSleep, type StageSpan } from './sleepSummary';
 import { thinSeries, type HrPoint, type RespPoint } from '../sleep/night';
 import { activityTypeFromHk, workoutHrSeries } from './workoutMap';
@@ -35,7 +36,7 @@ import { activityTypeFromHk, workoutHrSeries } from './workoutMap';
 const OWN_BUNDLE = 'com.autonomic.journal';
 
 /** Which slice of the read set a permission question is about. */
-export type HealthScope = 'all' | 'workouts' | 'steps';
+export type HealthScope = 'all' | 'workouts' | 'steps' | 'cycle';
 /**
  * What we can honestly say about read access.
  *  - `shouldRequest` — the OS still has questions to ask; requesting shows UI.
@@ -134,6 +135,51 @@ export interface HealthApi {
   writeQuantity(kind: 'systolic' | 'diastolic' | 'restingHr', value: number, when: Date): Promise<void>;
   /** Publish an app journal reading to Health. Returns how many samples were written. */
   publishReading(entry: Entry, dk: string): Promise<number>;
+  /**
+   * Menstrual flow, spotting and overnight temperature across a range of days
+   * (src/lib/cycle). Asked for under its OWN permission set (`scope: 'cycle'`),
+   * requested only from the cycle setup and Settings taps, never from a launch
+   * path: cycle data is the most sensitive thing the app reads, and nobody
+   * should meet a sheet asking for it that they did not ask for.
+   */
+  readCycle(fromDk: string, toDk: string): Promise<CycleImport>;
+  /**
+   * Replace THIS APP's flow record for a day with `flow` (null removes it).
+   * Only ever touches samples this app wrote; another app's entry for the same
+   * day is never deleted or overwritten. Returns false when nothing could be
+   * written (no permission, or a binary too old to delete what it wrote — then
+   * only a first write goes out, so an edit can never leave two flows behind).
+   */
+  writeCycleDay(dk: string, flow: CycleFlow | null, opts: { periodStart: boolean; replace: boolean }): Promise<boolean>;
+  /**
+   * Replace THIS APP's cycle-symptom samples for a day with `items` (registry
+   * symptom keys, each at its logged time). Apple Health only: Health Connect
+   * has no symptom records, so the Android implementation writes nothing. Only
+   * the six CYCLE_SYMPTOMS map; anything else is ignored.
+   */
+  writeCycleSymptoms(dk: string, items: { type: string; time?: string }[]): Promise<boolean>;
+}
+
+/** What one cycle read found, one row per day. */
+export interface CycleImport {
+  /** The heaviest flow recorded per day, other apps' and ours. */
+  flows: { dk: string; flow: CycleFlow; key: string; ownApp: boolean }[];
+  /** Overnight temperatures, °C, by the morning they belong to. */
+  temps: { dk: string; wrist?: number; bbt?: number; skin?: number }[];
+}
+
+const FLOW_RANK: Record<CycleFlow, number> = { spotting: 0, light: 1, medium: 2, heavy: 3 };
+/** Per-day reduction both platforms share: the heaviest flow wins, and a day
+ *  holding any sample of ours is ours (it is a write-back, not news). */
+export function heaviestPerDay(rows: { dk: string; flow: CycleFlow; key: string; ownApp: boolean }[]): CycleImport['flows'] {
+  const by = new Map<string, CycleImport['flows'][number]>();
+  for (const r of rows) {
+    const cur = by.get(r.dk);
+    if (!cur) { by.set(r.dk, { ...r }); continue; }
+    if (FLOW_RANK[r.flow] > FLOW_RANK[cur.flow]) by.set(r.dk, { ...r, ownApp: r.ownApp || cur.ownApp });
+    else if (r.ownApp) cur.ownApp = true;
+  }
+  return [...by.values()].sort((a, b) => (a.dk < b.dk ? -1 : 1));
 }
 
 /** What one day's passive load looks like coming off the health store. */
@@ -335,6 +381,9 @@ const stub: HealthApi = {
   async writeHrvSession() { /* no-op */ },
   async writeQuantity() { /* no-op */ },
   async publishReading() { return 0; },
+  async readCycle() { return { flows: [], temps: [] }; },
+  async writeCycleDay() { return false; },
+  async writeCycleSymptoms() { return false; },
 };
 
 let cached: HealthApi | null = null;
@@ -420,7 +469,7 @@ export async function revokeHealthAuth(): Promise<boolean> {
  */
 type SourceRev = { source?: { bundleIdentifier?: string; name?: string } };
 type QSample = { quantity: number; startDate: Date; endDate: Date; uuid?: string; sourceRevision?: SourceRev };
-type CSample = { value: number; startDate: Date; endDate: Date };
+type CSample = { value: number; startDate: Date; endDate: Date; uuid?: string; sourceRevision?: SourceRev; metadata?: Record<string, unknown> };
 type Heartbeat = { timeSinceSeriesStart: number; precededByGap?: boolean };
 type HeartbeatSeries = { startDate: Date; endDate: Date; heartbeats: readonly Heartbeat[]; uuid?: string; sourceRevision?: SourceRev };
 type SaveSample = { quantityType: string; unit: string; quantity: number; startDate: Date; endDate: Date };
@@ -517,6 +566,8 @@ const QID = {
   bodyMass: 'HKQuantityTypeIdentifierBodyMass',
   steps: 'HKQuantityTypeIdentifierStepCount',
   standTime: 'HKQuantityTypeIdentifierAppleStandTime',
+  wristTemp: 'HKQuantityTypeIdentifierAppleSleepingWristTemperature',
+  basalTemp: 'HKQuantityTypeIdentifierBasalBodyTemperature',
 } as const;
 /**
  * The unit every quantity is READ in, always passed explicitly. Left out, the
@@ -537,11 +588,26 @@ const READ_UNIT: Record<string, string> = {
   [QID.bodyMass]: 'kg',
   [QID.steps]: 'count',
   [QID.standTime]: 'min',
+  [QID.wristTemp]: 'degC',
+  [QID.basalTemp]: 'degC',
 };
 const CID = {
   sleep: 'HKCategoryTypeIdentifierSleepAnalysis',
   mindful: 'HKCategoryTypeIdentifierMindfulSession',
+  menstrualFlow: 'HKCategoryTypeIdentifierMenstrualFlow',
+  spotting: 'HKCategoryTypeIdentifierIntermenstrualBleeding',
 } as const;
+/** The cycle symptoms (registry CYCLE_SYMPTOMS) as HealthKit symptom types.
+ *  All take HKCategoryValueSeverity, written as `unspecified` (0) because the
+ *  journal records that a symptom happened, not how bad it was. */
+const SYMPTOM_HK: Record<string, string> = {
+  cramps: 'HKCategoryTypeIdentifierAbdominalCramps',
+  bloating: 'HKCategoryTypeIdentifierBloating',
+  breastTenderness: 'HKCategoryTypeIdentifierBreastPain',
+  headache: 'HKCategoryTypeIdentifierHeadache',
+  backPain: 'HKCategoryTypeIdentifierLowerBackPain',
+  moodChanges: 'HKCategoryTypeIdentifierMoodChanges',
+};
 const CORR = { bloodPressure: 'HKCorrelationTypeIdentifierBloodPressure' } as const;
 const HEARTBEAT_SERIES = 'HKDataTypeIdentifierHeartbeatSeries';
 const WORKOUT_TYPE = 'HKWorkoutTypeIdentifier';
@@ -573,6 +639,16 @@ const CORE_READ_IDS = [
  */
 const STEPS_READ_IDS = [QID.steps, QID.standTime];
 
+/**
+ * Cycle-aware tracking's set, the same arrangement as the steps set above:
+ * its own latch, asked only from a tap (the cycle setup sheet and Settings →
+ * Cycle), and never folded into the core set, whose key is the once-only ask
+ * for every existing install. Wrist temperature needs an Apple Watch Series 8
+ * or later; asking for it on a phone without one costs nothing and reads empty.
+ */
+const CYCLE_READ_IDS = [CID.menstrualFlow, CID.spotting, QID.wristTemp, QID.basalTemp];
+const CYCLE_WRITE_IDS = [CID.menstrualFlow, CID.spotting, ...Object.values(SYMPTOM_HK)];
+
 const READ_IDS = CORE_READ_IDS;
 const WRITE_IDS = [
   QID.hrvSdnn, QID.restingHr, QID.heartRate,
@@ -591,6 +667,8 @@ const WRITE_IDS = [
 const HK_SET_KEY = `hk1:${CORE_READ_IDS.join(',')}|${WRITE_IDS.join(',')}`;
 /** The wider set, with its own latch so asking for it never disturbs the core. */
 const HK_STEPS_SET_KEY = `hk1steps:${[...CORE_READ_IDS, ...STEPS_READ_IDS].join(',')}|${WRITE_IDS.join(',')}`;
+/** The cycle set, with its own latch for the same reason. */
+const HK_CYCLE_SET_KEY = `hk1cycle:${[...CORE_READ_IDS, ...CYCLE_READ_IDS].join(',')}|${[...WRITE_IDS, ...CYCLE_WRITE_IDS].join(',')}`;
 
 /**
  * Has HealthKit been asked about this set yet? The only honest question iOS
@@ -603,6 +681,15 @@ const HK_STEPS_SET_KEY = `hk1steps:${[...CORE_READ_IDS, ...STEPS_READ_IDS].join(
 export function healthKitAsked(scope: 'core' | 'steps'): boolean {
   return hasAskedAuth(scope === 'steps' ? HK_STEPS_SET_KEY : HK_SET_KEY);
 }
+
+/** HKCategoryValueMenstrualFlow → the journal's flow. `unspecified` (1) is
+ *  somebody recording a period day without saying how heavy, filed as medium:
+ *  it must count as a period day, and medium is the one level no rule reads
+ *  anything into (the heavy-flow note counts heavy days only). `none` (5) is
+ *  an explicit "no flow" and imports nothing. */
+const hkFlow = (v: number): CycleFlow | null =>
+  v === 2 ? 'light' : v === 3 ? 'medium' : v === 4 ? 'heavy' : v === 1 ? 'medium' : null;
+const HK_FLOW_VALUE: Record<Exclude<CycleFlow, 'spotting'>, number> = { light: 2, medium: 3, heavy: 4 };
 
 const pad = (n: number) => String(n).padStart(2, '0');
 const hhmm = (d: Date) => `${pad(d.getHours())}:${pad(d.getMinutes())}`;
@@ -710,6 +797,12 @@ function makeReal(mod: HkModule): HealthApi {
     } catch { return null; }
   };
 
+  /** Every sample in a (long) window, unthinned — the cycle read's
+   *  temperatures, one per night across a year. */
+  const samplesQAll = async (id: string, from: Date, to: Date): Promise<readonly QSample[]> => {
+    try { return (await querySamples(id, { from, to, limit: 0 })) || []; }
+    catch { return []; }
+  };
   /** Raw per-sample rows (kept: timestamp + provenance), for timestamped imports. */
   const samplesQ = async (id: string, from: Date, to: Date): Promise<readonly QSample[]> => {
     try { return (await querySamples(id, { from, to, limit: 500 })) || []; }
@@ -727,16 +820,19 @@ function makeReal(mod: HkModule): HealthApi {
       // The pacing budget asks for a WIDER set under its own latch, so the
       // core set's key — and therefore every background path's once-only ask —
       // is untouched by this feature existing.
-      const wide = opts?.scope === 'steps';
-      const readIds = wide ? [...CORE_READ_IDS, ...STEPS_READ_IDS] : CORE_READ_IDS;
-      const setKey = wide ? HK_STEPS_SET_KEY : HK_SET_KEY;
+      const wide = opts?.scope === 'steps' || opts?.scope === 'cycle';
+      const cycle = opts?.scope === 'cycle';
+      const readIds = cycle ? [...CORE_READ_IDS, ...CYCLE_READ_IDS]
+        : wide ? [...CORE_READ_IDS, ...STEPS_READ_IDS] : CORE_READ_IDS;
+      const writeIds = cycle ? [...WRITE_IDS, ...CYCLE_WRITE_IDS] : WRITE_IDS;
+      const setKey = cycle ? HK_CYCLE_SET_KEY : wide ? HK_STEPS_SET_KEY : HK_SET_KEY;
       return shareAuthRequest(async () => {
         try {
           if (mod.isHealthDataAvailable && !(await step('available', () => mod.isHealthDataAvailable!()))) return false;
           // Fully determined (status 2 = unnecessary): a request would present
           // nothing — skip the native round-trip entirely.
           let st = 0;
-          try { st = (await step('status', () => mod.getRequestStatusForAuthorization?.(readIds, WRITE_IDS))) ?? 0; } catch { st = 0; }
+          try { st = (await step('status', () => mod.getRequestStatusForAuthorization?.(readIds, writeIds))) ?? 0; } catch { st = 0; }
           const settled = st === 2;
           if (settled && hasAskedAuth(setKey) && !force) { await ecgAuth(force); return true; }
           // The OS still has something to ask about: a fresh install, a type
@@ -747,7 +843,7 @@ function makeReal(mod: HkModule): HealthApi {
           if (!force && !settled && promptedThisLaunch()) return true;
           if (!settled) markPromptedThisLaunch();
           // v8 order: (read, write).
-          const ok = (await step('request', () => mod.requestAuthorization?.(readIds, WRITE_IDS))) ?? false;
+          const ok = (await step('request', () => mod.requestAuthorization?.(readIds, writeIds))) ?? false;
           if (ok) { markAskedAuth(setKey); if (wide) markAskedAuth(HK_SET_KEY); }
           // ECG sits outside the kingstinct set (local native module) — same
           // step, sequential so the two sheets can't race.
@@ -764,8 +860,9 @@ function makeReal(mod: HkModule): HealthApi {
       // For 'steps' that still answers the one question the pacing ask needs:
       // `shouldRequest` means the sheet has never been shown for them.
       try {
-        const read = scope === 'workouts' ? [WORKOUT_TYPE, QID.heartRate] : scope === 'steps' ? STEPS_READ_IDS : READ_IDS;
-        const write = scope === 'all' ? WRITE_IDS : [];
+        const read = scope === 'workouts' ? [WORKOUT_TYPE, QID.heartRate]
+          : scope === 'steps' ? STEPS_READ_IDS : scope === 'cycle' ? CYCLE_READ_IDS : READ_IDS;
+        const write = scope === 'all' ? WRITE_IDS : scope === 'cycle' ? CYCLE_WRITE_IDS : [];
         const st = await mod.getRequestStatusForAuthorization?.(read, write);
         return st === 1 ? 'shouldRequest' : 'unknown';
       } catch { return 'unknown'; }
@@ -1156,6 +1253,90 @@ function makeReal(mod: HkModule): HealthApi {
       if (!entry) return;
       const [id, unit, v] = entry;
       await saveQ(id, unit, v, when, when);
+    },
+
+    async readCycle(fromDk, toDk) {
+      const from = dateAt(fromDk, '00:00');
+      const to = dateAt(toDk, '23:59');
+      const cats = async (id: string): Promise<readonly CSample[]> => {
+        try { return (await mod.queryCategorySamples?.(id, { from, to, limit: 0 })) || []; } catch { return []; }
+      };
+      const [flowRows, spotRows, wristRows, bbtRows] = await Promise.all([
+        cats(CID.menstrualFlow), cats(CID.spotting),
+        samplesQAll(QID.wristTemp, from, to), samplesQAll(QID.basalTemp, from, to),
+      ]);
+      const rows: CycleImport['flows'] = [];
+      for (const r of flowRows) {
+        const flow = hkFlow(r.value);
+        if (!flow) continue;
+        rows.push({ dk: keyOf(r.startDate), flow, key: `hk:${r.uuid || `${CID.menstrualFlow}:${r.startDate.getTime()}`}`, ownApp: isOwnSample(r.sourceRevision) });
+      }
+      for (const r of spotRows) {
+        rows.push({ dk: keyOf(r.startDate), flow: 'spotting', key: `hk:${r.uuid || `${CID.spotting}:${r.startDate.getTime()}`}`, ownApp: isOwnSample(r.sourceRevision) });
+      }
+      // A night's wrist temperature belongs to the morning it ends on, the
+      // day the sleep record is filed under too.
+      const temps = new Map<string, { dk: string; wrist?: number; bbt?: number }>();
+      const put = (dk: string, k: 'wrist' | 'bbt', v: number) => {
+        if (!Number.isFinite(v) || v < 30 || v > 43) return;
+        const t = temps.get(dk) || { dk };
+        t[k] = Math.round(v * 100) / 100;
+        temps.set(dk, t);
+      };
+      for (const r of wristRows) put(keyOf(r.endDate), 'wrist', r.quantity);
+      for (const r of bbtRows) put(keyOf(r.startDate), 'bbt', r.quantity);
+      return { flows: heaviestPerDay(rows), temps: [...temps.values()].sort((a, b) => (a.dk < b.dk ? -1 : 1)) };
+    },
+
+    async writeCycleDay(dk, flow, { periodStart, replace }) {
+      const start = dateAt(dk, '00:00');
+      const end = new Date(start.getTime() + 24 * 3600 * 1000 - 1000);
+      // kingstinct cannot delete a CATEGORY sample, so replacing our own write
+      // goes through the local ECG module, which only ever deletes objects this
+      // app created. On a binary without it, only a first write goes out: an
+      // edit that could not remove the old sample would leave two flows on one
+      // day in every app that reads Apple Health.
+      const del = ecgNative()?.deleteOwnCategory;
+      if (replace) {
+        if (!del) return false;
+        try {
+          await del(CID.menstrualFlow, start.getTime(), end.getTime());
+          await del(CID.spotting, start.getTime(), end.getTime());
+        } catch { return false; }
+      }
+      if (!flow) return true;
+      try {
+        if (flow === 'spotting') {
+          // HKCategoryValueNotApplicable.
+          await mod.saveCategorySample?.(CID.spotting, 0, { start, end });
+        } else {
+          // HealthKit REQUIRES HKMenstrualCycleStart on every flow sample and
+          // throws without it.
+          await mod.saveCategorySample?.(CID.menstrualFlow, HK_FLOW_VALUE[flow], {
+            start, end, metadata: { HKMenstrualCycleStart: periodStart },
+          });
+        }
+        return true;
+      } catch { return false; }
+    },
+
+    async writeCycleSymptoms(dk, items) {
+      const del = ecgNative()?.deleteOwnCategory;
+      if (!del) return false;
+      const start = dateAt(dk, '00:00');
+      const end = new Date(start.getTime() + 24 * 3600 * 1000 - 1000);
+      try {
+        // Ours only, every mapped type, so an unpicked symptom leaves Apple
+        // Health along with the journal.
+        for (const id of Object.values(SYMPTOM_HK)) await del(id, start.getTime(), end.getTime());
+        for (const it of items) {
+          const id = SYMPTOM_HK[it.type];
+          if (!id) continue;
+          const at = dateAt(dk, it.time || '12:00');
+          await mod.saveCategorySample?.(id, 0, { start: at, end: at });
+        }
+        return true;
+      } catch { return false; }
     },
 
     async publishReading(entry, dk) {

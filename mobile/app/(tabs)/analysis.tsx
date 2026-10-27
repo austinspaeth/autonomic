@@ -9,17 +9,18 @@ import { Icon } from '../../src/components/Icon';
 import { Ghost, HelpDot, ScoreDot } from '../../src/components/ui';
 import { Bars, BpDumbbell, LineChart, MarginColumns, StackedBars, ZonesToggle, useChartsBlur } from '../../src/components/charts';
 import { TAIL_STYLE, fonts, radius, readoutTail, usePalette } from '../../src/theme';
-import { getWaveform, useAppState, useUnits } from '../../src/store/store';
+import { getWaveform, useAppState, useCycleModel, useUnits } from '../../src/store/store';
 import { useTier } from '../../src/store/tier';
+import { CycleProgressCard, cycleProgressReady } from '../../src/features/cycle/CycleProgress';
 import { takeProgressRange, useProgressRangeSignal } from '../../src/store/nav';
 import { LockedOverlay } from '../../src/features/LockedOverlay';
 import { usePaywall } from '../../src/features/Paywall';
 import { pingViewOpened } from '../../src/store/ping';
-import { buildCategories, type AnalysisCard, type BpPeriod, type MarginChart, type OrthoTransition } from '../../src/lib/analysis/categories';
+import { buildCategories, cycleSymptomsCard, type AnalysisCard, type BpPeriod, type MarginChart, type OrthoTransition } from '../../src/lib/analysis/categories';
 import { SCORE_COLORS, profileCtx } from '../../src/lib/scoring';
 import { hexA } from '../../src/lib/color';
 import { resolveProtocol, type DaysMap } from '../../src/lib/scoring/day';
-import { catFromBands, type BucketView, type CustomRange, type Mode } from '../../src/lib/analysis/buckets';
+import { acBuckets, catFromBands, type BucketView, type CustomRange, type Mode } from '../../src/lib/analysis/buckets';
 import { HrvFilterLinks, HrvProgress, HrvProgressSkeleton, type Filt } from '../../src/features/HrvProgress';
 import { SectionSkeleton } from '../../src/features/ProgressSkeleton';
 import { demoDays, hasOwnData } from '../../src/lib/demo';
@@ -903,14 +904,36 @@ const SectionsBody = React.memo(function SectionsBody({ sections, demo, days, mo
   onCardLayout: (sectionId: string, card: string, y: number) => void;
 }) {
   const p = usePalette();
+  const freeTier = useTier() === 'free';
+  const cycleReady = cycleProgressReady(useCycleModel());
   // Stable identity — HrvProgress keys its aggregation memo on `ctx`.
   const ctx = useMemo(() => profileCtx({ sex, height, pacemaker }), [sex, height, pacemaker]);
+  // The Triggers-style "Cycle symptoms" card, over the same buckets as the
+  // range being shown; only while cycle tracking is on.
+  const cycleOn = !!useAppState().settings.cycle?.enabled;
+  const symCard = useMemo(
+    () => (cycleOn ? cycleSymptomsCard(days, acBuckets(days, mode, custom), ctx) : null),
+    [cycleOn, days, mode, custom, ctx],
+  );
+  const showCycle = (cycleReady || !!symCard) && (mode !== 'day' || !freeTier);
   return (
     <>
       {demo ? <DemoBanner text={DEMO_PROGRESS_TEXT} /> : null}
+
       {/* Every category inline as one long document with a titled section. */}
       {sections.map((s, si) => (
-        <View key={s.id} onLayout={(e) => onSectionLayout(s.id, e.nativeEvent.layout.y)} style={{ marginTop: si === 0 ? 0 : 22 }}>
+        <React.Fragment key={s.id}>
+        {/* Cycle-aware tracking: its own section, right above Sleep. Not
+            range-bound, so on the free Day view (the one range a free user sees
+            unmasked) it stays out: it is Pro analysis (see CLAUDE.md). */}
+        {s.id === 'sleep' && showCycle ? (
+          <View onLayout={(e) => onSectionLayout('cycle', e.nativeEvent.layout.y)} style={{ marginTop: 22 }}>
+            <Text style={{ fontSize: SECTION_TITLE_SIZE, fontWeight: '700', color: p.text, marginBottom: 8 }}>Cycle</Text>
+            <CycleProgressCard days={days} ctx={ctx} />
+            {symCard ? <CardView card={symCard} buckets={s.buckets} /> : null}
+          </View>
+        ) : null}
+        <View onLayout={(e) => onSectionLayout(s.id, e.nativeEvent.layout.y)} style={{ marginTop: si === 0 ? 0 : 22 }}>
           {s.id === 'outlook' ? null : s.id === 'hrv' ? (
             // HRV keeps its All/Morning/Evening pills inline with the title —
             // small and right-aligned so they never overrun the container;
@@ -946,7 +969,16 @@ const SectionsBody = React.memo(function SectionsBody({ sections, demo, days, mo
             ))
           )}
         </View>
+        </React.Fragment>
       ))}
+      {/* No Sleep section to sit above: the Cycle section still has a home. */}
+      {showCycle && !sections.some((s) => s.id === 'sleep') ? (
+        <View onLayout={(e) => onSectionLayout('cycle', e.nativeEvent.layout.y)} style={{ marginTop: 22 }}>
+          <Text style={{ fontSize: SECTION_TITLE_SIZE, fontWeight: '700', color: p.text, marginBottom: 8 }}>Cycle</Text>
+          <CycleProgressCard days={days} ctx={ctx} />
+          {symCard && sections[0] ? <CardView card={symCard} buckets={sections[0].buckets} /> : null}
+        </View>
+      ) : null}
     </>
   );
 });

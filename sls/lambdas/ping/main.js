@@ -218,7 +218,7 @@ const KINDS = {
   pay: 'PAY', not: 'NOT', pot: 'POT', see: 'SEE', err: 'ERR',
   osh: 'OSH', odm: 'ODM', oac: 'OAC', ofl: 'OFL',
   log: 'LOG', use: 'USE', fnd: 'FND', rpt: 'RPT',
-  rdg: 'RDG', mbp: 'MBP', rvw: 'RVW',
+  rdg: 'RDG', mbp: 'MBP', stp: 'STP', rvw: 'RVW',
 };
 
 /** The routes whose slot letter is a capture SENSOR. */
@@ -340,7 +340,7 @@ const LOGS = {
  *  is why they are not on SEE; `B` is the pacing budget actually opened, and is
  *  on both routes split by what the tap got (see VIEWS). `U` is the budget
  *  revealed on a day the app had paused it, read against `B`. */
-const FEATURES = { M: 'milestones-opened', P: 'protocol-saved', B: 'pacing-budget-opened', U: 'pacing-budget-unpaused' };
+const FEATURES = { M: 'milestones-opened', P: 'protocol-saved', B: 'pacing-budget-opened', U: 'pacing-budget-unpaused', C: 'cycle-tracking-enabled' };
 
 /**
  * Which subscription product — the SUB / RST / LAP routes, one alphabet across
@@ -372,6 +372,14 @@ const READING_TYPES = { M: 'morning-baseline', B: 'later-baseline', T: 'training
 const MORNING_PROMPT = { S: 'shown', T: 'take-reading', X: 'closed' };
 
 /**
+ * The strap suggestion card, raised after repeated failed readings with a weak
+ * sensor — the STP route. `C` shown after camera failures, `G` after Garmin
+ * failures, `T` its Amazon link tapped. Each letter capped on its own, so each
+ * is a headcount and `T / (C + G)` is the card's click-through.
+ */
+const STRAP_CARD = { C: 'shown-camera', G: 'shown-garmin', T: 'amazon-tapped' };
+
+/**
  * The alphabet each route speaks, or null for the routes that carry no letter.
  *
  * Validated per route rather than globally, because the same slot means
@@ -386,7 +394,7 @@ const ALPHABET = {
   PAY: SURFACES, NOT: NOTIFY, POT: POTS, SEE: VIEWS,
   OSH: OFFERS, ODM: OFFERS, OAC: OFFERS, OFL: OFFER_FAILS,
   LOG: LOGS, USE: FEATURES, FND: FINDINGS, RPT: REPORTS,
-  RDG: READING_TYPES, MBP: MORNING_PROMPT,
+  RDG: READING_TYPES, MBP: MORNING_PROMPT, STP: STRAP_CARD,
   SUB: PLANS, RST: PLANS, LAP: PLANS,
 };
 
@@ -1531,7 +1539,7 @@ const handler = async (event) => {
 
 module.exports = {
   handler, decodeCohort, cohortKey, buildKey, hourKey, easternDay, report, ALPHABET, KINDS,
-  LOGS, FEATURES, FINDINGS, REPORTS, PLANS, READING_TYPES, MORNING_PROMPT, DOORS,
+  LOGS, FEATURES, FINDINGS, REPORTS, PLANS, READING_TYPES, MORNING_PROMPT, STRAP_CARD, DOORS,
   redactFault, safeTag, faultKey, hash8, FAULT_MSG_MAX, FAULT_TTL_DAYS, FAULT_MAX_N,
   readOfferFailure, offerFailKey, OUTCOMES, OFFER_FAIL_TTL_DAYS,
 };

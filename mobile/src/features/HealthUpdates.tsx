@@ -69,6 +69,7 @@ import { getState, useAppState } from '../store/store';
 import { typesFor } from '../lib/typeCatalog';
 import { READING_TYPES } from '../lib/registry';
 import { importedRows, pillSummary, type ImportKind, type ImportRow, type LabelOf } from '../lib/health/importLog';
+import { syncCycleFromHealth } from '../store/cycle';
 import { setPillSlotClaim } from '../store/pillSlot';
 import { fmtTime12, todayKey } from '../lib/dates';
 
@@ -138,6 +139,7 @@ const KIND_LOOK: Record<ImportKind, { icon: IconName; tint: string }> = {
   reading: { icon: 'heartPulse', tint: '#e03127' },
   workout: { icon: 'activity', tint: EXERCISE_GREEN },
   med: { icon: 'pill', tint: MED_GOLD },
+  cycle: { icon: 'droplet', tint: '#e03127' },
 };
 
 /** Labels through the user's own catalog, so a custom type keeps its name. */
@@ -279,10 +281,21 @@ export function HealthUpdatePill() {
       // resolves once the user answers the OS sheet), so any one of them
       // pending would otherwise leave "Checking…" on screen forever.
       const set = await withTimeout(checkHealthUpdates(todayKey()), CHECK_TIMEOUT_MS);
+      // Period days other apps logged, filed by the same check so they get the
+      // same receipt. Only TODAY's can lead the pill (it names one day); older
+      // ones still file, silently, and show in their own day's list.
+      const cycleDays = await syncCycleFromHealth().catch(() => [] as string[]);
+      const cycleToday = cycleDays.includes(todayKey());
       // Items the user was already offered (viewed or dismissed) don't count,
       // and neither does anything they imported and then deleted.
       const fresh = set ? filterDeclined(filterSeen(set, getSeenKeys()), getDeclinedKeys()) : null;
-      if (fresh && updateCount(fresh) > 0) {
+      if ((!fresh || updateCount(fresh) === 0) && cycleToday) {
+        const summary = pillSummary(importedRows(getState().days[todayKey()], labelOfState()), new Set(['cycle']));
+        settle(() => {
+          setFound({ dk: todayKey(), lead: summary?.lead ?? null, more: summary?.more ?? 0, review: [] });
+          setPhase('found');
+        });
+      } else if (fresh && updateCount(fresh) > 0) {
         // Write first, report second. Everything that passes is filed here,
         // before the pill has said anything — the pill is the receipt for it.
         // Only the readings the app declines to file (poor-quality HRV) wait.
@@ -296,6 +309,7 @@ export function HealthUpdatePill() {
           const keys = new Set<string>([
             ...auto.readings.map((r) => r.key), ...auto.workouts.map((w) => w.key), ...auto.meds.map((m) => m.key),
             ...(auto.sleep ? ['sleep'] : []),
+            ...(cycleToday && fresh.dk === todayKey() ? ['cycle'] : []),
           ]);
           const summary = added > 0 ? pillSummary(importedRows(getState().days[fresh.dk], labelOfState()), keys) : null;
           settle(() => {

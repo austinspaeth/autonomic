@@ -2,7 +2,7 @@
   "expo": {
     "name": "Autonomic",
     "slug": "autonomic",
-    "version": "1.37.0",
+    "version": "1.38.0",
     "scheme": "autonomic",
     "orientation": "portrait",
     "icon": "./assets/autonomic-icon.png",
@@ -27,8 +27,8 @@
         "NSBluetoothAlwaysUsageDescription": "Autonomic connects to your heart-rate chest strap to capture beat-to-beat data during HRV readings.",
         "NSCameraUsageDescription": "Autonomic reads your pulse through your fingertip placed over the rear camera and flash during camera HRV readings.",
         "NSMicrophoneUsageDescription": "Autonomic does not record audio. This permission is required by the camera library used for fingertip pulse readings.",
-        "NSHealthShareUsageDescription": "Autonomic reads heart rate, HRV, sleep, steps, stand time, blood pressure, blood oxygen, weight and ECG recordings from Apple Health to prefill your journal and work out your daily pacing budget.",
-        "NSHealthUpdateUsageDescription": "Autonomic can write your captured HRV readings, mindful minutes, weight, blood pressure and blood oxygen back to Apple Health.",
+        "NSHealthShareUsageDescription": "Autonomic reads heart rate, HRV, sleep, steps, stand time, blood pressure, blood oxygen, weight, ECG recordings and, if you turn on cycle tracking, menstrual flow and overnight temperature from Apple Health to prefill your journal, work out your daily pacing budget and account for your cycle.",
+        "NSHealthUpdateUsageDescription": "Autonomic can write your captured HRV readings, mindful minutes, weight, blood pressure, blood oxygen and the period days and cycle symptoms you log back to Apple Health.",
         "NSLocationWhenInUseUsageDescription": "Autonomic does not use your location. This permission is required by the Bluetooth library used to connect to heart-rate chest straps.",
         "UIBackgroundModes": [
           "bluetooth-central"
@@ -107,7 +107,13 @@
         "android.permission.health.WRITE_HEART_RATE",
         "android.permission.health.WRITE_RESTING_HEART_RATE",
         "android.permission.health.WRITE_HEART_RATE_VARIABILITY",
-        "android.permission.health.WRITE_BLOOD_PRESSURE"
+        "android.permission.health.WRITE_BLOOD_PRESSURE",
+        "android.permission.health.READ_MENSTRUATION",
+        "android.permission.health.WRITE_MENSTRUATION",
+        "android.permission.health.READ_INTERMENSTRUAL_BLEEDING",
+        "android.permission.health.WRITE_INTERMENSTRUAL_BLEEDING",
+        "android.permission.health.READ_BASAL_BODY_TEMPERATURE",
+        "android.permission.health.READ_SKIN_TEMPERATURE"
       ],
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO",

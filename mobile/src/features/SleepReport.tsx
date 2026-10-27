@@ -13,6 +13,7 @@
  * empty" rule in that module.
  */
 import React, { useMemo, useState } from 'react';
+import { CyclePhaseNote } from './cycle/PhaseNote';
 import Animated from 'react-native-reanimated';
 import { Pressable, ScrollView, Text, View } from 'react-native';
 import { Section, SectionHead } from '../components/summary';
@@ -122,7 +123,9 @@ export function SleepReportSheet({ dk }: { dk: string }) {
       <Text style={{ color: p.textDim, fontSize: 14, marginTop: 2, marginBottom: 14, paddingRight: 100 }}>
         {`${fmtDateLong(dk)}${byHand ? ' · logged by hand' : ''}`}
       </Text>
-      <SleepReportBody report={report} />
+      {/* Luteal nights run warmer and faster: the person's own numbers, directly
+          under the night's grade, the same place the reading sheets put it. */}
+      <SleepReportBody report={report} afterVerdict={<CyclePhaseNote dk={dk} metric="sleepingHr" />} />
       <View style={{ height: 24 }} />
     </ScrollView>
   );
@@ -130,10 +133,11 @@ export function SleepReportSheet({ dk }: { dk: string }) {
 
 /* ---------- the body ---------- */
 
-export function SleepReportBody({ report }: { report: SleepReport }) {
+export function SleepReportBody({ report, afterVerdict }: { report: SleepReport; afterVerdict?: React.ReactNode }) {
   return (
     <>
       <Verdict report={report} />
+      {afterVerdict}
       <OvernightHr report={report} />
       <NightShape report={report} />
       <Dip report={report} />

@@ -18,6 +18,9 @@ import { Button, useAccordion } from '../components/ui';
 import { AnnualOfferCard } from './AnnualOffer';
 import { FounderOfferCard } from './FounderOffer';
 import { GiveawayCard } from './Giveaway';
+import { HeavyFlowNote } from './cycle/Cycle';
+import { ScoreByCycleDay } from './cycle/CycleCharts';
+import { cycleMetricValue } from '../lib/insights/cycle';
 import { TrendCard } from './TrendCard';
 import { HrvSetup } from './hrv/Setup';
 import { MilestoneProgressCard } from './Milestones';
@@ -47,7 +50,7 @@ import { PromptSheet } from './PromptSheet';
 import { addDays, todayKey } from '../lib/dates';
 import { hexA, mixHex } from '../lib/color';
 import { LEVEL_DELTA, scoreTrend, type ScoreTrend } from '../lib/scoring/scoreTrend';
-import { getState, useAppState, useStore } from '../store/store';
+import { getState, useAppState, useCycleModel, useStore } from '../store/store';
 import { requestInsightsCard, setJournalSectionY } from '../store/nav';
 import { router } from 'expo-router';
 import { readPressure } from '../lib/pressure';
@@ -365,6 +368,7 @@ export function DaySummary({ dk }: { dk: string }) {
           so opening the half-price year made the founder card due underneath
           it. */}
       <FounderOfferCard />
+      <HeavyFlowNote dk={dk} />
       {downturn ? (
         <WarningCard severity={downturn.severity} headline={downturn.headline}
           onPress={() => openSheet(() => <DownturnExplain w={downturn} dk={dk} />)} />
@@ -984,6 +988,14 @@ function RestNote({ text }: { text: string }) {
 /** Sheet behind the warning card when a SCORE downturn fired: the full
  *  explanation, every journal finding that could be driving the slide, an
  *  AI-investigation prompt builder, and a rest/doctor note. */
+function DownturnCycleChart() {
+  const state = useAppState();
+  const model = useCycleModel();
+  const value = useMemo(() => cycleMetricValue('score', state.days, profileCtx(state.profile)), [state.days, state.profile]);
+  if (!model) return null;
+  return <View style={{ marginBottom: 12 }}><ScoreByCycleDay model={model} value={value} /></View>;
+}
+
 function DownturnExplain({ w, dk }: { w: Downturn; dk: string }) {
   const p = usePalette();
   const color = w.severity === 'alert' ? SCORE_COLORS.crash : SCORE_COLORS.bad;
@@ -991,6 +1003,10 @@ function DownturnExplain({ w, dk }: { w: Downturn; dk: string }) {
     <View>
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>Something&apos;s off</Text>
       <WarnTile color={color} value={`Down ${w.drop} points`} sub={`over the last ${w.spanDays} days`} body={w.body} />
+      {/* When the cycle is part of the story, the picture that tells "this
+          happens every month" apart from a setback: this cycle's score against
+          the same days of the last ones, with the usual dip boxed. */}
+      {w.cycle ? <DownturnCycleChart /> : null}
       <SumCard title="What could be driving it">
         {w.factors.length ? (
           w.factors.map((f) => <MetricRow key={f.label} label={f.label} value={f.value} cat={false} explain={f.detail} />)

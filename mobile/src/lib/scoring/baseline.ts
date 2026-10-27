@@ -15,6 +15,7 @@ import { addDays } from '../dates';
 import { isTrustedReading } from '../hrvQuality';
 import type { DaysMap } from './day';
 import type { DayRecord, Entry, ScoreCat } from '../types';
+import { inGroup, matchGroupFor, type PhaseGroup } from '../cycle/ambient';
 
 export interface Shift {
   /** Median of the recent window. */
@@ -119,8 +120,34 @@ export function baselineHistory(days: DaysMap, dk: string, n = PERSONAL_WINDOW_D
   return out;
 }
 
-/** The user's usual baseline RMSSD before `dk`, or null below the reading bar. */
-export function usualBaseline(days: DaysMap, dk: string): { median: number; n: number } | null {
+/** How far back a PHASE-MATCHED usual looks. One phase is a quarter of a
+ *  cycle at most, so 42 days would hold one luteal phase and a half; four
+ *  months holds the last three or four of each. */
+export const CYCLE_WINDOW_DAYS = 120;
+
+/**
+ * The user's usual baseline RMSSD before `dk`, or null below the reading bar.
+ *
+ * With cycle-aware tracking on and a pattern to compare against, the usual is
+ * taken from the SAME PHASE of earlier cycles (src/lib/cycle/ambient). RMSSD
+ * runs lower in the luteal phase for physiological reasons, and measuring a
+ * luteal morning against a usual made mostly of follicular ones marked it down
+ * every month for being in its own phase. The rule the personal grade lives by
+ * is untouched — it can still only LOWER a grade — so a luteal morning that is
+ * low even for a luteal morning is still marked down. Too few same-phase
+ * readings falls back to the whole-cycle usual, never to nothing.
+ */
+export function usualBaseline(days: DaysMap, dk: string): { median: number; n: number; phase?: PhaseGroup } | null {
+  const g = matchGroupFor(dk);
+  if (g) {
+    const h: number[] = [];
+    priorKeys(dk, CYCLE_WINDOW_DAYS).forEach((k) => {
+      if (!inGroup(k, g)) return;
+      const v = firstBaselineRmssd(days[k]);
+      if (v != null) h.push(v);
+    });
+    if (h.length >= PERSONAL_MIN_READINGS) return { median: median(h), n: h.length, phase: g };
+  }
   const h = baselineHistory(days, dk);
   if (h.length < PERSONAL_MIN_READINGS) return null;
   return { median: median(h), n: h.length };

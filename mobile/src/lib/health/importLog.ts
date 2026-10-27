@@ -19,7 +19,7 @@ import { hm } from '../budget/format';
 import { isPoorImport } from '../hrvQuality';
 import { fmtDist } from '../units';
 
-export type ImportKind = 'sleep' | 'reading' | 'workout' | 'med';
+export type ImportKind = 'sleep' | 'reading' | 'workout' | 'med' | 'cycle';
 
 export interface ImportRow {
   /** The entry's `healthKey`, or 'sleep' for the night. Unique within a day. */
@@ -118,6 +118,15 @@ export function importedRows(day: DayRecord | undefined, labelOf: LabelOf): Impo
       title: asleep && asleep > 0 ? `${hm(asleep)} asleep` : 'Last night’s sleep',
       sub: join(`${fmtTime12(s.bed)} to ${fmtTime12(s.wake)}`, s.quality === 'interrupted' && 'interrupted'),
     });
+  }
+
+  // A period day brought in from Apple Health / Health Connect: a field on the
+  // day like the night, so listed as a fact (deleting it is the Cycle card's
+  // job, where it leaves the permanent decline behind).
+  const c = day.cycle;
+  if (c?.imported) {
+    const flow = c.flow === 'spotting' ? 'Spotting' : `${c.flow[0].toUpperCase()}${c.flow.slice(1)} flow`;
+    rows.push({ key: 'cycle', kind: 'cycle', time: '00:00', noun: 'period', removable: false, poor: false, title: flow, sub: 'Cycle' });
   }
 
   return rows.sort((a, b) => b.time.localeCompare(a.time));

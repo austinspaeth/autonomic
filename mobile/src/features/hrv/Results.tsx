@@ -18,6 +18,8 @@ import { reportEvent, reportFault } from '../../store/errorReport';
 import { pingReadingSaved } from '../../store/ping';
 import { troubleSourceFor } from '../../lib/ppg/tips';
 import { TroubleSheet } from './Trouble';
+import { StrapSuggestionSheet } from './StrapSuggestion';
+import { strapSuggestionDue } from '../../store/strapSuggest';
 import { computeScores, profileCtx } from '../../lib/scoring';
 import { getState, storeWaveform, upsertEntry } from '../../store/store';
 import { splitWaveform } from '../../lib/waveforms';
@@ -290,6 +292,12 @@ export function HrvResults({ rr, segmentStarts, seamGapsMs, hrSamples, sdnnSampl
       beats: result.rrClean.length,
       ...shape,
     }));
+    // A repeated camera refusal stacks the strap card over this one, so its ✕
+    // returns to the refusal (and its Save anyway, when there is one).
+    if (config.source === 'camera' && strapSuggestionDue('camera')) {
+      // After this card has risen, so the two do not arrive as one lurch.
+      setTimeout(() => openSheet((c) => <StrapSuggestionSheet sensor="camera" controls={c} onRetry={onRetry} />, { fitContent: true }), 450);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

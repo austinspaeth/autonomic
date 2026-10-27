@@ -31,7 +31,7 @@ const PRIVACY_URL = 'https://autonomic.care/privacy-policy/';
 const VALUE: { icon: IconName; title: string; sub: string }[] = [
   { icon: 'chart', title: 'Your full history', sub: 'Week, month, and year progress views over every number you’ve logged, plus your graded POTS test and episode results.' },
   { icon: 'battery', title: 'A daily pacing budget', sub: 'How much today can take, in minutes of effort, fitted to your own history.' },
-  { icon: 'bulb', title: 'Insights from your own log', sub: 'What is linked to what across your readings, sleep, meds and symptoms, worked out on your phone.' },
+  { icon: 'bulb', title: 'Insights from your own log', sub: 'What is linked to what across your readings, sleep, meds, symptoms and cycle, worked out on your phone.' },
   { icon: 'ai', title: 'AI-ready reports', sub: 'Turn your logged data into deep-dive prompts and doctor-visit summaries.' },
 ];
 
@@ -349,6 +349,7 @@ const SHARED_ROWS: string[] = [
   'Journaling: sleep, meds, symptoms, triggers, hydration',
   'Manual readings: BP, resting heart rate, episodes',
   'Daily autonomic score & outlook',
+  'Cycle tracking, with scores that account for your cycle',
   Platform.OS === 'ios'
     ? 'POTS stand tests & episode captures, on your watch or a strap'
     : 'POTS stand tests & episode captures from a chest strap',
@@ -360,6 +361,7 @@ const PRO_ROWS: { label: string; freeText?: string; proText?: string }[] = [
   { label: 'Progress charts', freeText: '14 days', proText: 'All views' },
   { label: 'Daily pacing budget' },
   { label: 'Full historical metric analysis' },
+  { label: 'How your cycle moves your numbers' },
   { label: 'POTS test & episode results' },
   { label: 'AI insights & doctor reports' },
 ];

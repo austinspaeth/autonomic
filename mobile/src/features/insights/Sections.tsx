@@ -27,7 +27,8 @@ import { Icon, type IconName } from '../../components/Icon';
 import { useSheets, type SheetControls } from '../../components/Sheet';
 import { fonts, usePalette } from '../../theme';
 import { VISIBLE_CORRELATIONS, groupCorrelations } from '../../lib/insights';
-import type { BiggestChange, ConfidencePart, Correlation, DataConfidence, DetailSeries, NoImpactItem, Observation, PressureInsight, WatchItem, WeekBlock, WeeksReport } from '../../lib/insights';
+import type { BiggestChange, ConfidencePart, Correlation, CycleInsight, CycleRow, DataConfidence, DetailSeries, NoImpactItem, Observation, PressureInsight, WatchItem, WeekBlock, WeeksReport } from '../../lib/insights';
+import type { CyclePhase } from '../../lib/cycle';
 import { fmtShort } from '../../lib/dates';
 import { scoreCat } from '../../lib/scoring/day';
 import { pressureHeadline } from '../../lib/insights/pressureCopy';
@@ -726,4 +727,81 @@ export const FOOTER_COPY = 'Everything here is computed on your device from your
 export function InsightsFooter() {
   const p = usePalette();
   return <Text style={[S.FOOTER_TEXT, { color: p.textDim, marginTop: S.FOOTER_TOP, marginBottom: S.FOOTER_BOTTOM }]}>{FOOTER_COPY}</Text>;
+}
+
+/* ---------- your cycle ---------- */
+
+export const CYCLE_TITLE = 'Your cycle';
+
+/**
+ * What each measurement does across the user's cycle (lib/insights/cycle):
+ * the luteal side against the follicular side, one bubble per measurement,
+ * the gap in the metric's own unit. A description, so the numbers wear the
+ * text colour rather than a verdict colour, the rule the weeks card follows.
+ * Learning: the rows as ghosts, with how many cycles are still to come.
+ */
+export function CycleCard({ insight, onLayout }: { insight: CycleInsight; onLayout?: (e: LayoutChangeEvent) => void }) {
+  const p = usePalette();
+  const { openSheet } = useSheets();
+  // Learning: the card says how far it has got and nothing else. No ghost
+  // rows: a metric appears only once there is a number to put beside it.
+  if (insight.kind === 'learning') {
+    const left = insight.need - insight.have;
+    return (
+      <InsightCard title={CYCLE_TITLE} help="cycle" onLayout={onLayout}
+        desc={`Learning · ${insight.have} of ${insight.need} cycles. ${left === 1 ? 'One more full cycle' : `${left} more full cycles`} and your numbers by phase appear here.`} />
+    );
+  }
+  if (!insight.rows.length) return null;
+  return (
+    <InsightCard title={CYCLE_TITLE} help="cycle" onLayout={onLayout}
+      desc={`Your luteal days compared with your follicular days, across ${insight.cycles} cycles.`}>
+      {insight.rows.map((r) => (
+        <CardRow key={r.id} onPress={() => openSheet(() => <CycleRowSheet row={r} cycles={insight.cycles} />)}>
+          <View style={{ flex: 1, minWidth: 0 }}>
+            <Text style={[S.ROW_TITLE, { color: p.text }]}>{r.label}</Text>
+            <Text style={[S.ROW_NOTE, { color: p.textDim }]}>Luteal vs follicular</Text>
+          </View>
+          <Text style={[S.WATCH_VALUE, { color: p.text, fontFamily: fonts.numHeavy, fontVariant: ['tabular-nums'] }]}>{r.text}</Text>
+          <Icon name="chevronRight" size={16} color={p.textDim} />
+        </CardRow>
+      ))}
+    </InsightCard>
+  );
+}
+
+const PHASE_ORDER: [CyclePhase, string][] = [
+  ['menstrual', 'Period'], ['follicular', 'Follicular'], ['ovulatory', 'Ovulation'], ['luteal', 'Luteal'], ['premenstrual', 'Premenstrual'],
+];
+
+/** One measurement by phase: the two sides as tiles, then each phase's median. */
+function CycleRowSheet({ row, cycles }: { row: CycleRow; cycles: number }) {
+  const p = usePalette();
+  const fmt = (v: number) => (row.id === 'symptoms' ? v.toFixed(1) : String(Math.round(v)));
+  return (
+    <View>
+      <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 14 }}>{`${row.label} by phase`}</Text>
+      <View style={{ flexDirection: 'row', gap: 8, marginBottom: 12 }}>
+        <Tile value={fmt(row.follicular)} unit={row.unit} label="Follicular side" />
+        <Tile value={fmt(row.luteal)} unit={row.unit} label="Luteal side" />
+        <Tile value={row.text.split(' ')[0]} unit={row.unit} label="Difference" />
+      </View>
+      <InsightCard title="Median by phase" desc={`Across your last ${cycles} finished cycles.`}>
+        {PHASE_ORDER.map(([ph, label]) => {
+          const st = row.phases[ph];
+          return (
+            <CardRow key={ph}>
+              <Text style={[S.ROW_TITLE, { color: p.text, flex: 1 }]}>{label}</Text>
+              <Text style={[S.WATCH_VALUE, { color: st.median == null ? p.textDim : p.text, fontFamily: fonts.numHeavy, fontVariant: ['tabular-nums'] }]}>
+                {st.median == null ? '–' : `${fmt(st.median)} ${row.unit}`}
+              </Text>
+            </CardRow>
+          );
+        })}
+      </InsightCard>
+      <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 18, marginTop: 4 }}>
+        Linked to your cycle timing, not proven. A description of your own log, not medical advice.
+      </Text>
+    </View>
+  );
 }

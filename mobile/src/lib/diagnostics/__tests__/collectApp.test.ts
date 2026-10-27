@@ -78,13 +78,13 @@ jest.mock('../../../store/store', () => ({
   storageStats: () => ({ journalBytes: 402_000, waveformCount: 12, waveformBytes: 900_000, encrypted: true, orphanWaveforms: 1 }),
   getState: () => ({
     version: 1,
-    settings: { theme: 'dark', reminder: { enabled: true, time: '08:00' }, healthEnabled: true, lastBleDeviceName: 'Polar H10', protocolSetOn: '2026-07-01' },
+    settings: { theme: 'dark', reminder: { enabled: true, time: '08:00' }, healthEnabled: true, lastBleDeviceName: 'Polar H10', protocolSetOn: '2026-07-01', cycle: { enabled: true, mode: 'pregnant' } },
     profile: { sex: 'Female', height: 'SECRET-HEIGHT' },
     customTypes: { meds: { 'custom-mag': {} } },
     hiddenTypes: { symptoms: ['nausea'] },
     meta: { lastUpdated: '2026-08-04T00:00:00.000Z', lastImport: { name: 'secret-name.json', at: '2026-07-20T00:00:00.000Z' }, onboarded: '2026-06-01T00:00:00.000Z' },
     days: {
-      '2026-08-04': { ...DAY, load: { readAt: '2026-08-04T20:00:00.000Z', steps: 14217, hrCoverageMin: 700, stepsVersion: 2 } },
+      '2026-08-04': { ...DAY, cycle: { flow: 'heavy' }, load: { readAt: '2026-08-04T20:00:00.000Z', steps: 14217, hrCoverageMin: 700, stepsVersion: 2 } },
       '2026-07-04': DAY,
     },
   }),
@@ -107,6 +107,15 @@ describe('collectAppDiagnostics', () => {
     expect(text).not.toContain('2026-07-20');
     expect(text).toMatch(/last import\s+\d+ days ago/);
     expect(text).toMatch(/profile fields set\s+sex, height/);
+  });
+
+  it('says cycle tracking is on and counts its days, never the mode or a flow', async () => {
+    const d = await collectAppDiagnostics();
+    const text = formatAppDiagnostics(d);
+    expect(d.settings['cycle tracking']).toBe('on');
+    expect(d.journal['cycle days logged']).toBe(1);
+    expect(text.toLowerCase()).not.toContain('pregnant');
+    expect(text.toLowerCase()).not.toContain('heavy');
   });
 
   it('reports the last read\'s step count, which is the one value it may carry', async () => {

@@ -28,6 +28,8 @@ import { StoreError, StoreOkNotice, usePaywall } from './Paywall';
 import { healthAppName } from '../lib/health';
 import { DevicesScreen } from './Devices';
 import { HealthScreen } from './Health';
+import { CycleSettingsSheet } from './cycle/CycleSettings';
+import { disableCycle } from '../store/cycle';
 import { NotificationsRow } from './Reminders';
 import { showWelcomeAgain } from './Onboarding';
 import { PromptSheet } from './PromptSheet';
@@ -146,6 +148,10 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
       <NotificationsRow />
       {item('bluetooth', 'Devices', 'Heart-rate straps', () => openSheet(() => <DevicesScreen />), !!state.settings.lastBleDeviceId)}
       {item('heart', healthAppName(), 'Read & write health data', () => openSheet(() => <HealthScreen />), !!state.settings.healthEnabled)}
+      {/* Cycle-aware tracking, offered whatever the profile says: profile sex
+          only ever drove the HRV norms. */}
+      {item('droplet', 'Cycle', 'Cycle aware tracking', () => openSheet((c) => <CycleSettingsSheet controls={c} />),
+        state.settings.cycle?.enabled ? { text: 'On', color: '#22c55e' } : undefined)}
       {pressure.available
         ? item('gauge', 'Barometric pressure', 'See if weather changes affect you', () => openSheet((c) => <PressureSettingsSheet controls={c} />, { fitContent: true }),
           pressure.on ? { text: 'On', color: '#22c55e' } : undefined)
@@ -326,6 +332,10 @@ function ProfileSheet({ controls }: { controls: SheetControls }) {
         s.profile = { sex, birthday, weight: weight.trim(), height: height.trim(), ...(pacemaker ? { pacemaker: true } : {}) };
         s.settings.units = units;
         save();
+        // A profile set to Male turns cycle-aware tracking off: the Journal card
+        // and every phase adjustment go with it. The logged days stay, and
+        // Settings → Cycle can still turn it back on.
+        if (sex === 'Male' && s.settings.cycle?.enabled) disableCycle();
         controls.close();
       }} />
       <View style={{ height: 20 }} />
@@ -482,7 +492,20 @@ function ClearDataSheet({ controls }: { controls: SheetControls }) {
  * from a dead button (see CLAUDE.md). They use Alert, which is a native
  * dialog and paints above the Modal, and which this file already uses for the
  * import confirm. */
-async function exportData() {
+/** The export is the whole journal in plain text. When it holds cycle data,
+ *  the most sensitive thing in it, say so before the share sheet opens. */
+function exportData() {
+  const days = getState().days;
+  const hasCycle = Object.keys(days).some((k) => !!days[k]?.cycle);
+  if (!hasCycle) { void writeExport(); return; }
+  Alert.alert(
+    'This file includes your cycle data',
+    'The export is your whole journal as plain text, period days included. Anyone you share it with can read it.',
+    [{ text: 'Cancel', style: 'cancel' }, { text: 'Export', onPress: () => { void writeExport(); } }],
+  );
+}
+
+async function writeExport() {
   const uri = `${FileSystem.cacheDirectory}autonomic-journal-${keyOf(new Date())}.json`;
   try {
     const json = serializeState(true);

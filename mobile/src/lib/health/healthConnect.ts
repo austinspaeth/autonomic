@@ -13,7 +13,7 @@
  *  - Provenance is `metadata.dataOrigin` (a package name), not a bundle id.
  *  - Queries take ISO strings and are paged via pageToken.
  */
-import type { Entry } from '../types';
+import type { CycleFlow, Entry } from '../types';
 import { keyOf } from '../dates';
 import { logError } from '../diagnostics/errorLog';
 import {
@@ -24,9 +24,9 @@ import { NIGHT_END_HOUR, NIGHT_START_HOUR, nightKeyOf, summarizeHcSessions, type
 import { thinSeries, type HrPoint, type RespPoint } from '../sleep/night';
 import { activityTypeFromHc, workoutHrSeries } from './workoutMap';
 import { stepTotalFromRecords } from './stepTotal';
-import { HISTORY_SLEEP_MIN_MIN, NIGHT_SERIES_MAX, emptyHistory } from './index';
+import { HISTORY_SLEEP_MIN_MIN, NIGHT_SERIES_MAX, emptyHistory, heaviestPerDay } from './index';
 import type {
-  HealthApi, HealthDaySamples, ImportedReading, ImportedWorkout, SleepImport,
+  CycleImport, HealthApi, HealthDaySamples, ImportedReading, ImportedWorkout, SleepImport,
 } from './index';
 
 /** This app's Android package — used to skip re-importing our own write-backs. */
@@ -47,6 +47,13 @@ type SleepStageRaw = { startTime: string; endTime: string; stage: number };
 type SleepRecord = { startTime: string; endTime: string; stages?: SleepStageRaw[]; metadata?: Metadata };
 type ExerciseRecord = { startTime: string; endTime: string; exerciseType: number; metadata?: Metadata };
 type DistanceRecord = { startTime: string; endTime: string; distance: { inMeters: number }; metadata?: Metadata };
+type FlowRecord = { time: string; flow?: number; metadata?: Metadata };
+type InstantRecord = { time: string; metadata?: Metadata };
+/** Health Connect's MenstruationPeriod is an interval record; the bridge's
+ *  types call it instantaneous, so both shapes are read. */
+type PeriodRecord = { time?: string; startTime?: string; endTime?: string; metadata?: Metadata };
+type BbtRecord = { time: string; temperature: { inCelsius: number }; metadata?: Metadata };
+type SkinRecord = { startTime: string; endTime: string; deltas?: { time: string; delta: { inCelsius: number } }[]; metadata?: Metadata };
 
 interface HcModule {
   initialize: () => Promise<boolean>;
@@ -63,6 +70,9 @@ interface HcModule {
   aggregateRecord?: (req: { recordType: string; timeRangeFilter: TimeRangeFilter })
     => Promise<Record<string, unknown>>;
   insertRecords: (records: Record<string, unknown>[]) => Promise<string[]>;
+  /** Deletes only records THIS app wrote, whatever the filter says (Health
+   *  Connect enforces that), which is what makes replacing a day's flow safe. */
+  deleteRecordsByTimeRange?: (recordType: string, filter: TimeRangeFilter) => Promise<void>;
   SdkAvailabilityStatus: { SDK_AVAILABLE: number };
 }
 
@@ -83,6 +93,25 @@ const READ_TYPES = [
 const WRITE_TYPES = [
   'HeartRateVariabilityRmssd', 'HeartRate', 'RestingHeartRate', 'BloodPressure',
 ];
+
+/**
+ * Cycle-aware tracking's records, asked for SEPARATELY (`scope: 'cycle'`) and
+ * only from a tap — never added to READ_TYPES, whose joined list is the core
+ * set's once-only ask key: one more type there re-asks every install on its
+ * next launch. Every one needs its android.permission.health.* line in app.json
+ * (READ/WRITE_MENSTRUATION, READ/WRITE_INTERMENSTRUAL_BLEEDING,
+ * READ_BASAL_BODY_TEMPERATURE, READ_SKIN_TEMPERATURE); an undeclared one loops
+ * the consent sheet. SkinTemperature is newer than the rest, so on an older
+ * Health Connect it simply lands in the ungrantable memory.
+ */
+const CYCLE_READ_TYPES = ['MenstruationFlow', 'MenstruationPeriod', 'IntermenstrualBleeding', 'BasalBodyTemperature', 'SkinTemperature'];
+const CYCLE_WRITE_TYPES = ['MenstruationFlow', 'IntermenstrualBleeding'];
+
+/** Health Connect flow constants: 0 unknown, 1 light, 2 medium, 3 heavy. An
+ *  unknown flow is a period day without a level, filed as medium for the
+ *  reason the HealthKit side gives. */
+const hcFlow = (v: number | undefined): CycleFlow => (v === 1 ? 'light' : v === 3 ? 'heavy' : 'medium');
+const HC_FLOW_VALUE: Record<Exclude<CycleFlow, 'spotting'>, number> = { light: 1, medium: 2, heavy: 3 };
 
 /** Health Connect sleep-stage constants live with the pure stitcher
  *  (`summarizeHcSessions` in ./sleepSummary). */
@@ -277,19 +306,26 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
 
     requestAuth(opts) {
       const force = !!opts?.force;
+      // The cycle set is its own request with its own key, so asking for it
+      // never disturbs (or re-asks) the core set.
+      const cycle = opts?.scope === 'cycle';
+      const reads = cycle ? CYCLE_READ_TYPES : READ_TYPES;
+      const writes = cycle ? CYCLE_WRITE_TYPES : WRITE_TYPES;
       return shareAuthRequest(async () => {
         try {
           if (!(await ensureInit())) return false;
           const wanted = [
-            ...READ_TYPES.map((recordType) => ({ accessType: 'read' as const, recordType })),
-            ...WRITE_TYPES.map((recordType) => ({ accessType: 'write' as const, recordType })),
+            ...reads.map((recordType) => ({ accessType: 'read' as const, recordType })),
+            ...writes.map((recordType) => ({ accessType: 'write' as const, recordType })),
           ];
           // Everything already granted: never touch the permission activity.
           let have: { accessType?: string; recordType?: string }[] = [];
           try { have = await mod.getGrantedPermissions(); } catch { /* treat as none */ }
           const has = (w: { accessType: string; recordType: string }) =>
             have.some((g) => g.recordType === w.recordType && g.accessType === w.accessType);
-          const setKey = `hc1:${READ_TYPES.join(',')}|${WRITE_TYPES.join(',')}`;
+          const setKey = cycle
+            ? `hc1cycle:${CYCLE_READ_TYPES.join(',')}|${CYCLE_WRITE_TYPES.join(',')}`
+            : `hc1:${READ_TYPES.join(',')}|${WRITE_TYPES.join(',')}`;
           // Permissions this build has already proven it cannot obtain (not
           // declared in the manifest, or refused) don't count as "left to ask".
           // Without this, one undeclared type re-opens the sheet forever, no
@@ -344,7 +380,8 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
         const has = (recordType: string) => granted.some(
           (g) => g.recordType === recordType && g.accessType === 'read',
         );
-        const need = scope === 'workouts' ? ['ExerciseSession', 'HeartRate'] : scope === 'steps' ? ['Steps'] : READ_TYPES;
+        const need = scope === 'workouts' ? ['ExerciseSession', 'HeartRate']
+          : scope === 'steps' ? ['Steps'] : scope === 'cycle' ? ['MenstruationFlow'] : READ_TYPES;
         return need.every(has) ? 'granted' : 'denied';
       } catch { return 'unknown'; }
     },
@@ -592,6 +629,73 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
       // through publishReading instead.
       if (kind !== 'restingHr') return;
       await insert([{ recordType: 'RestingHeartRate', time: when.toISOString(), beatsPerMinute: Math.round(value) }]);
+    },
+
+    async readCycle(fromDk, toDk): Promise<CycleImport> {
+      const from = dateAt(fromDk, '00:00');
+      const to = dateAt(toDk, '23:59');
+      const [flows, periods, spots, bbts, skins] = await Promise.all([
+        readAll<FlowRecord>('MenstruationFlow', from, to),
+        readAll<PeriodRecord>('MenstruationPeriod', from, to),
+        readAll<InstantRecord>('IntermenstrualBleeding', from, to),
+        readAll<BbtRecord>('BasalBodyTemperature', from, to),
+        readAll<SkinRecord>('SkinTemperature', from, to),
+      ]);
+      const rows: CycleImport['flows'] = [];
+      const keyFor = (type: string, m: Metadata | undefined, t: string) => `hc:${m?.id || `${type}:${t}`}`;
+      for (const r of flows) rows.push({ dk: keyOf(new Date(r.time)), flow: hcFlow(r.flow), key: keyFor('flow', r.metadata, r.time), ownApp: isOwnRecord(r.metadata) });
+      for (const r of spots) rows.push({ dk: keyOf(new Date(r.time)), flow: 'spotting', key: keyFor('spot', r.metadata, r.time), ownApp: isOwnRecord(r.metadata) });
+      // A period record from an app that logs ranges rather than days: every
+      // day it covers is a period day, but a real flow record for a day wins.
+      const flowDays = new Set(rows.map((r) => r.dk));
+      for (const r of periods) {
+        const a = new Date(r.startTime || r.time || '');
+        const b = new Date(r.endTime || r.startTime || r.time || '');
+        if (!Number.isFinite(a.getTime()) || !Number.isFinite(b.getTime())) continue;
+        for (let d = new Date(a); d <= b && rows.length < 5000; d = new Date(d.getTime() + 86400000)) {
+          const dk = keyOf(d);
+          if (flowDays.has(dk)) continue;
+          rows.push({ dk, flow: 'medium', key: keyFor('period', r.metadata, `${r.startTime || r.time}:${dk}`), ownApp: isOwnRecord(r.metadata) });
+        }
+      }
+      const temps = new Map<string, { dk: string; bbt?: number; skin?: number }>();
+      for (const r of bbts) {
+        const v = r.temperature?.inCelsius;
+        if (!Number.isFinite(v) || v < 30 || v > 43) continue;
+        const dk = keyOf(new Date(r.time));
+        temps.set(dk, { ...(temps.get(dk) || { dk }), bbt: Math.round(v * 100) / 100 });
+      }
+      // A night's skin-temperature deltas, averaged, on the morning it ends.
+      for (const r of skins) {
+        const ds = (r.deltas || []).map((x) => x.delta?.inCelsius).filter((v): v is number => Number.isFinite(v));
+        if (!ds.length) continue;
+        const dk = keyOf(new Date(r.endTime));
+        const avg = ds.reduce((a, b) => a + b, 0) / ds.length;
+        temps.set(dk, { ...(temps.get(dk) || { dk }), skin: Math.round(avg * 100) / 100 });
+      }
+      return { flows: heaviestPerDay(rows), temps: [...temps.values()].sort((a, b) => (a.dk < b.dk ? -1 : 1)) };
+    },
+
+    // Health Connect has no symptom record types; nothing to write.
+    async writeCycleSymptoms() { return false; },
+
+    async writeCycleDay(dk, flow, { replace }) {
+      if (!(await ensureInit())) return false;
+      const start = dateAt(dk, '00:00');
+      const end = new Date(start.getTime() + 24 * 3600 * 1000 - 1000);
+      if (replace) {
+        if (!mod.deleteRecordsByTimeRange) return false;
+        try {
+          await mod.deleteRecordsByTimeRange('MenstruationFlow', between(start, end));
+          await mod.deleteRecordsByTimeRange('IntermenstrualBleeding', between(start, end));
+        } catch (e) { logError('hc.write.cycleDelete', e); return false; }
+      }
+      if (!flow) return true;
+      // Noon, so a time-zone shift can never move the record onto a neighbour.
+      const when = dateAt(dk, '12:00').toISOString();
+      return insert([flow === 'spotting'
+        ? { recordType: 'IntermenstrualBleeding', time: when }
+        : { recordType: 'MenstruationFlow', time: when, flow: HC_FLOW_VALUE[flow] }]);
     },
 
     async publishReading(entry: Entry, dk: string) {

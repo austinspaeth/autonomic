@@ -4,6 +4,8 @@
  * a picker opens a form on top; Save closes the whole stack and refreshes.
  */
 import React, { useState } from 'react';
+import { CyclePhaseNote, CyclePhaseTable } from './cycle/PhaseNote';
+import type { CycleRowId } from '../lib/insights/cycle';
 import { ActivityIndicator, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
 import * as ExpoLinking from 'expo-linking';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
@@ -276,20 +278,18 @@ function ReadingPicker({ isToday, onLive, onBaseline, onPick }: {
  *  `prefill` seeds a brand-new entry (e.g. a reading imported from Apple Health)
  *  that is reviewed then saved as new — it is not treated as an edit (no Delete)
  *  and, when `fromHealth`, is not re-published back to Health. */
-/** Indoor-bike bespoke form (conditional Resistance vs interval list).
+/** Indoor-bike bespoke form.
  *  `prefill` seeds a brand-new entry (a workout imported from the health
  *  store), mirroring EntryForm — reviewed then saved as new, never an edit. */
 export function BikeForm({ dk, existing, prefill = null, controls, onSaved }: { dk: string; existing: Entry | null; prefill?: Entry | null; controls: SheetControls; onSaved: (saved?: Entry) => void }) {
   const p = usePalette();
-  const blank: Entry = { id: uid(), type: 'indoorBike', time: defaultTimeFor(dk), note: '', interval: false, intervals: [] as unknown[] };
+  const blank: Entry = { id: uid(), type: 'indoorBike', time: defaultTimeFor(dk), note: '' };
   const init = existing ? (JSON.parse(JSON.stringify(existing)) as Entry) : prefill ? { ...blank, ...prefill } : blank;
   const [time, setTime] = useState((init.time as string) || defaultTimeFor(dk));
   const [num, setNum] = useState<Record<string, string>>({
     duration: (init.duration as string) || '', distance: distText(init.distance), avgHr: (init.avgHr as string) || '',
     maxHr: (init.maxHr as string) || '', minHr: (init.minHr as string) || '', resistance: (init.resistance as string) || '', hr60: (init.hr60 as string) || '',
   });
-  const [interval, setInterval] = useState(!!init.interval);
-  const [intervals, setIntervals] = useState<Record<string, string>[]>(() => ((init.intervals as Record<string, string>[]) || []).map((iv) => ({ length: iv.length || '', resistance: iv.resistance || '', avgHr: iv.avgHr || '', maxHr: iv.maxHr || '' })));
   const [note, setNote] = useState((init.note as string) || '');
   const setN = (k: string, v: string) => setNum((prev) => ({ ...prev, [k]: v }));
 
@@ -297,9 +297,9 @@ export function BikeForm({ dk, existing, prefill = null, controls, onSaved }: { 
     const r: Entry = { ...init, time };
     ['duration', 'distance', 'avgHr', 'maxHr', 'minHr'].forEach((k) => { r[k] = num[k].trim(); });
     r.distance = distToMi(num.distance);
-    r.interval = interval;
-    if (interval) { r.intervals = intervals.map((iv) => ({ length: iv.length.trim(), resistance: iv.resistance.trim(), avgHr: iv.avgHr.trim(), maxHr: iv.maxHr.trim() })); r.resistance = ''; }
-    else { r.resistance = num.resistance.trim(); r.intervals = []; }
+    // Interval training is no longer offered; an older entry keeps its
+    // intervals (carried on `init`) and only resistance is edited here.
+    r.resistance = num.resistance.trim();
     r.hr60 = num.hr60.trim();
     r.note = note.trim();
     // An imported ride's prefill carries the inline HR trace — sidecar it.
@@ -322,38 +322,10 @@ export function BikeForm({ dk, existing, prefill = null, controls, onSaved }: { 
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, marginBottom: 16 }}>{(existing ? 'Edit ' : '') + 'Indoor bike'}</Text>
       <TimeField label="Time" value={time} onChange={setTime} />
       <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-        {[['duration', 'Duration', 'min'], ['distance', 'Distance', distUnit()], ['avgHr', 'Avg HR', 'bpm'], ['maxHr', 'Max HR', 'bpm'], ['minHr', 'Min HR', 'bpm']].map(([k, lbl, unit]) => (
+        {[['duration', 'Duration', 'min'], ['distance', 'Distance', distUnit()], ['avgHr', 'Avg HR', 'bpm'], ['maxHr', 'Max HR', 'bpm'], ['minHr', 'Min HR', 'bpm'], ['hr60', 'HR @60s', 'bpm'], ['resistance', 'Resistance', '']].map(([k, lbl, unit]) => (
           <View key={k} style={{ width: '47%' }}><TextField label={lbl} unit={unit} value={num[k]} onChange={(v) => setN(k, v)} keyboardType="decimal-pad" /></View>
         ))}
       </View>
-      <Pressable onPress={() => setInterval((v) => !v)} style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 8, marginBottom: 8 }}>
-        <View style={{ width: 24, height: 24, borderRadius: 6, borderWidth: 2, borderColor: interval ? p.accent : p.border, backgroundColor: interval ? p.accent : 'transparent', alignItems: 'center', justifyContent: 'center' }}>
-          {interval ? <Icon name="check" size={14} color="#fff" /> : null}
-        </View>
-        <Text style={{ color: p.text, fontSize: 16 }}>Interval training</Text>
-      </Pressable>
-      {interval ? (
-        <View>
-          {intervals.map((iv, i) => (
-            <View key={i} style={{ borderWidth: 1, borderColor: p.border, borderRadius: radius.control, padding: 12, marginBottom: 10 }}>
-              <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-                <Text style={{ fontSize: 14, fontWeight: '700', color: p.textDim }}>{`Interval ${i + 1}`}</Text>
-                <Pressable onPress={() => setIntervals((prev) => prev.filter((_, j) => j !== i))}><Icon name="x" size={16} color={p.textDim} /></Pressable>
-              </View>
-              <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 10 }}>
-                {[['length', 'Length', 'min'], ['resistance', 'Resistance', ''], ['avgHr', 'Avg HR', 'bpm'], ['maxHr', 'Max HR', 'bpm']].map(([k, lbl, unit]) => (
-                  <View key={k} style={{ width: '47%' }}><TextField label={lbl} unit={unit} value={iv[k]} onChange={(v) => setIntervals((prev) => prev.map((x, j) => (j === i ? { ...x, [k]: v } : x)))} keyboardType="decimal-pad" /></View>
-                ))}
-              </View>
-            </View>
-          ))}
-          <Button title="+ Add interval" variant="dashed" onPress={() => setIntervals((prev) => [...prev, { length: '', resistance: '', avgHr: '', maxHr: '' }])} />
-        </View>
-      ) : (
-        <TextField label="Resistance" value={num.resistance} onChange={(v) => setN('resistance', v)} keyboardType="decimal-pad" />
-      )}
-      <View style={{ height: 12 }} />
-      <TextField label="HR after 60 seconds" unit="bpm" value={num.hr60} onChange={(v) => setN('hr60', v)} keyboardType="decimal-pad" />
       <View style={{ height: 1, backgroundColor: p.border, marginVertical: 6, marginBottom: 18 }} />
       <TextField label="Notes" value={note} onChange={setNote} placeholder="Optional note" multiline />
       <SheetFooter>
@@ -657,10 +629,33 @@ export function ReadingSummarySheet({ r, dk }: { r: Entry; dk: string }) {
       <Text style={{ fontSize: 21, fontWeight: '700', color: p.text, paddingRight: 100 }}>{readingLabel(live)}</Text>
       <Text style={{ color: p.textDim, fontSize: 14, marginTop: 2, marginBottom: 14, paddingRight: 100 }}>{live.time ? fmtTime12(live.time as string) : ''}</Text>
       {kindUndecided(live) ? <HrvKindPrompt onPick={(k) => setReadingKind(dk, live, k)} /> : null}
-      <ReadingSummary r={live} days={state.days} ctx={ctx} />
+      {/* Where the day sat in the cycle, and how this measurement has run there
+          in past cycles, directly under the grade it gives context to. */}
+      <ReadingSummary r={live} days={state.days} ctx={ctx} afterGrade={PHASE_METRIC[live.type] ? (
+        <>
+          <CyclePhaseNote dk={dk} metric={PHASE_METRIC[live.type]!} current={phaseCurrent(live)} />
+          {live.type === 'standTest' || live.type === 'orthostatic'
+            ? <CyclePhaseTable metric={PHASE_METRIC[live.type]!} title={live.type === 'standTest' ? 'Stand rise by phase' : 'Episode rise by phase'} />
+            : null}
+        </>
+      ) : null} />
       <View style={{ height: 24 }} />
     </ScrollView>
   );
+}
+
+/** The cycle measurement each reading type is read against. A training reading
+ *  has none: paced breathing moves it for reasons of its own. */
+const PHASE_METRIC: Record<string, CycleRowId | undefined> = {
+  hrv: 'baseline', restingHr: 'restingHr', standTest: 'standRise', orthostatic: 'orthoDelta',
+};
+
+/** This reading's own value for the note, where the entry carries it; else
+ *  undefined and the day's value stands in. */
+function phaseCurrent(r: Entry): number | undefined {
+  const k = r.type === 'hrv' ? 'rmssd' : r.type === 'restingHr' ? 'hr' : r.type === 'standTest' ? 'sustainedDelta' : null;
+  const v = k ? parseFloat(r[k] as string) : NaN;
+  return Number.isFinite(v) ? v : undefined;
 }
 
 /**

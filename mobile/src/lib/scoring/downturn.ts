@@ -17,8 +17,11 @@ import {
 } from './day';
 import { keyRange, metricSeries } from '../trends/series';
 import { gutDay } from '../digestion';
+import { dayScore } from '../trends/metrics';
+import { getCycleModel } from '../cycle/ambient';
+import { cycleDip, type CycleDip } from '../cycle/pattern';
 
-export type DownturnCause = 'triggers' | 'exertion' | 'sleep' | 'digestion' | 'protocol' | 'unexplained';
+export type DownturnCause = 'triggers' | 'exertion' | 'sleep' | 'digestion' | 'protocol' | 'cycle' | 'unexplained';
 
 /** One journal finding that could be driving the slide, for the detail sheet. */
 export interface DownturnFactor { label: string; value: string; detail: string }
@@ -41,6 +44,16 @@ export interface Downturn {
   body: string;
   /** Everything found in the slide window, most likely driver first. */
   factors: DownturnFactor[];
+  /**
+   * How this slide compares with the same window before this person's past
+   * periods (src/lib/cycle/pattern `cycleDip`), when cycle-aware tracking has
+   * a pattern to compare with. It changes WORDS only: severity, the card and
+   * the crash notification fire exactly as they would without it. A slide no
+   * deeper than the usual dip is said to be in line with it (and, when nothing
+   * else in the journal explains it, attributed to the cycle); a deeper one is
+   * said to be deeper, which is the louder sentence, not the quieter one.
+   */
+  cycle?: CycleDip;
 }
 
 const WINDOW = 8; // days examined, ending at dk
@@ -135,6 +148,19 @@ export function detectDownturn(
     });
   }
 
+  // The cycle, when tracking is on and three finished cycles give a dip to
+  // compare with. Ranked after everything the journal can name: a trigger
+  // logged in the slide is still the first thing to point at, and the cycle
+  // only takes the cause when the journal is otherwise clean.
+  const model = getCycleModel();
+  const scoreMemo = new Map<string, number | null>();
+  const scoreOf = (k: string): number | null => {
+    if (!scoreMemo.has(k)) scoreMemo.set(k, days[k] ? dayScore(days[k], k, days, ctx) : null);
+    return scoreMemo.get(k)!;
+  };
+  const dip = model ? cycleDip(model, dk, scoreOf) : null;
+  const typicalDip = dip?.verdict === 'typical';
+
   const cause: DownturnCause =
     trigN > 0 ? 'triggers'
     : heavy >= 2 ? 'exertion'
@@ -143,6 +169,7 @@ export function detectDownturn(
     // salt loss) where a protocol slip is a behavioural one, so it ranks first.
     : looseDays >= 2 ? 'digestion'
     : slipDays >= 2 ? 'protocol'
+    : typicalDip ? 'cycle'
     : 'unexplained';
 
   const severity: Downturn['severity'] = today < 45 || drop >= 25 ? 'alert' : 'watch';
@@ -153,18 +180,26 @@ export function detectDownturn(
     sleep: 'Sleep ran short or interrupted on these nights. An earlier, longer night is the fastest way to turn this around.',
     digestion: `Loose stools on ${looseDays} of these days. That costs fluid and salt, which pulls heart rate up and HRV down, so replace both and rest. If it came on suddenly, you may be fighting something off.`,
     protocol: `Your protocol slipped on ${slipDays} of these days. Getting back to basics usually turns the trend around.`,
+    cycle: `Your score has dipped about this far ${dip?.phase === 'menstrual' ? 'around' : 'before'} each of your last ${dip?.cycles ?? 0} periods, so your cycle timing is the most likely part of this. A dip you expected still costs capacity, so plan a lighter few days and keep up fluids and salt if they help you.`,
     unexplained: 'No triggers logged and your protocol is on track, so this may be stress or sickness building. Your autonomic system can signal illness before symptoms start. Take it easy and rest.',
   };
   const title = cause === 'unexplained'
     ? (severity === 'alert' ? 'You may be crashing or getting sick' : 'Something looks off')
-    : (severity === 'alert' ? 'Heading toward a crash' : 'Trending down');
+    : cause === 'cycle'
+      ? (dip?.phase === 'menstrual' ? 'Your usual dip around your period' : 'Your usual dip before your period')
+      : (severity === 'alert' ? 'Heading toward a crash' : 'Trending down');
 
   // Kept to two lines on the card at 15pt, so the lead clause has to be short:
   // the number and the window are the part the reader can act on.
   const span = `${drop} points over the last ${spanDays} days`;
-  const headline = cause === 'unexplained'
-    ? (severity === 'alert' ? `You may be crashing or getting sick, down ${span}` : `Something looks off, score down ${span}`)
-    : (severity === 'alert' ? `Heading toward a crash, down ${span}` : `Autonomic score trending down ${span}`);
+  const when = dip?.phase === 'menstrual' ? 'around' : 'before';
+  const headline = dip?.verdict === 'deeper'
+    ? `Your score is down more than in your last ${dip.cycles} cycles ${when} a period, ${span}`
+    : cause === 'cycle'
+      ? `Your score usually dips ${when} your period. This one is in line with your last ${dip!.cycles} cycles`
+      : cause === 'unexplained'
+        ? (severity === 'alert' ? `You may be crashing or getting sick, down ${span}` : `Something looks off, score down ${span}`)
+        : (severity === 'alert' ? `Heading toward a crash, down ${span}` : `Autonomic score trending down ${span}`);
 
   // Everything found in the window, ordered by how likely it is the driver
   // (mirrors the cause priority above). Empty when the journal is clean.
@@ -201,5 +236,15 @@ export function detectDownturn(
     });
   });
 
-  return { severity, drop, spanDays, cause, title, headline, body: BODY[cause], factors };
+  if (dip) {
+    factors.push({
+      label: 'Cycle timing',
+      value: dip.verdict === 'deeper' ? 'Deeper than usual' : 'In line',
+      detail: dip.verdict === 'deeper'
+        ? `Down ${dip.drop} points against your own follicular days. In your last ${dip.cycles} cycles the same days dipped ${dip.usualDrop} points on average and ${dip.deepestDrop} at most, so this is more than your cycle usually does.`
+        : `Down ${dip.drop} points against your own follicular days. In your last ${dip.cycles} cycles the same days dipped ${dip.usualDrop} points on average and ${dip.deepestDrop} at most.`,
+    });
+  }
+
+  return { severity, drop, spanDays, cause, title, headline, body: BODY[cause], factors, ...(dip ? { cycle: dip } : {}) };
 }

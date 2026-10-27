@@ -109,6 +109,15 @@ export function subscribeGarminArrivals(fn: ArrivalListener): () => void {
 type DeviceListener = (list: GarminDevice[]) => void;
 const deviceListeners = new Set<DeviceListener>();
 
+type FailureListener = () => void;
+const failureListeners = new Set<FailureListener>();
+
+/** A reading that failed ON THE WRIST (a `diag` message), once per diagnostic. */
+export function subscribeGarminFailures(fn: FailureListener): () => void {
+  failureListeners.add(fn);
+  return () => { failureListeners.delete(fn); };
+}
+
 export function subscribeGarminDevices(fn: DeviceListener): () => void {
   deviceListeners.add(fn);
   return () => { deviceListeners.delete(fn); };
@@ -167,6 +176,7 @@ function receive(msg: GarminMessage) {
       const model = (deviceIdRaw ? devices.find((d) => d.id === deviceIdRaw) : undefined)
         ?? (devices.length === 1 ? devices[0] : undefined);
       reportFault(GARMIN_DIAG_TAG, garminDiagMessage(diag, model?.model || model?.name));
+      failureListeners.forEach((fn) => { try { fn(); } catch { /* a listener must not cost the ack */ } });
     }
     if (deviceIdRaw && diagId) native.ackMessage(deviceIdRaw, diagId).catch(() => {});
     return;

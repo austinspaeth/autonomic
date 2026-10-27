@@ -7,6 +7,9 @@ interface EcgHealthNative {
   isAvailable(): Promise<boolean>;
   requestAuthorization(): Promise<boolean>;
   queryEcg(sinceMs: number, limit: number): Promise<RawEcgSample[]>;
+  /** Delete the category samples of one type THIS APP saved in a window.
+   *  Optional: binaries built before 1.38 do not carry it. */
+  deleteOwnCategory?(typeIdentifier: string, startMs: number, endMs: number): Promise<boolean>;
 }
 
 let mod: EcgHealthNative | null | undefined;

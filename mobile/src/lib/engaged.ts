@@ -26,6 +26,9 @@ export function isEngagedDay(d: DayRecord | undefined): boolean {
   if (d.food && +d.food.water > 0) return true;
   if (d.food?.triggers && Object.values(d.food.triggers).some((n) => n > 0)) return true;
   if (d.notes && d.notes.trim()) return true;
+  // A flow day logged HERE is use; one brought in from Apple Health / Health
+  // Connect is not, the rule `own` applies to every other import.
+  if (d.cycle && !d.cycle.imported) return true;
   return false;
 }
 

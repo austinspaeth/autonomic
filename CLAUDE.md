@@ -62,7 +62,8 @@ old web app so old `export.json` files import directly.
   "version": 1,
   "settings": { "theme": "light" | "dark",
                 "units": "imperial" | "metric",   // display only; undefined = imperial (lib/units)
-                "reminder": { "enabled": true, "time": "08:00" } },  // daily morning nudge; source of truth for the OS schedule
+                "reminder": { "enabled": true, "time": "08:00" },  // daily morning nudge; source of truth for the OS schedule
+                "cycle": { "enabled": true, "mode": "regular" } },  // cycle-aware tracking (lib/cycle); phases are derived, never stored
   "profile": { "sex", "birthday", "weight", "height" },  // age+sex: HRV norm bubbles (lib/hrvNorms), max-HR formula, AI prompts; no score reads it
   "customTypes": { "meds": { "custom-magnesium": { /* pure-JSON TypeDef */ } } },  // user-created types (activities/meds/symptoms/triggers)
   "hiddenTypes": { "symptoms": ["nausea"] },  // built-in types the user deleted (only allowed while unused)
@@ -85,9 +86,11 @@ old web app so old `export.json` files import directly.
       "meds":       [ { "id", "type", "time", "amount", "note" } ],
       "symptoms":   [ { "id", "type", "time", "note", ...fields } ],
       "food":       { "water": 0, "meals": [], "triggers": { "<triggerType>": count } },
-      "digestion":  { "movements": [ { "id", "time", ...fields } ] }
+      "digestion":  { "movements": [ { "id", "time", ...fields } ] },
+      "cycle":      { "flow": "spotting" | "light" | "medium" | "heavy", "imported?", "note?" }  // logged bleeding only
     }
-  }
+  },
+  "bodyTemp": { "YYYY-MM-DD": { "wrist?", "bbt?", "skin?" } }  // overnight °C (skin = delta); top level, never a logged day
 }
 ```
 
@@ -1955,6 +1958,110 @@ old web app so old `export.json` files import directly.
   anything to say; its tap switches to Insights and scrolls to the card
   (`requestInsightsCard`). Copy lives in `insights/pressureCopy.ts`, US units.
   Needs a native build (new module + NSMotionUsageDescription via the plugin).
+- **Cycle-aware tracking is context the whole app reads, not a calendar
+  bolted on** (1.38, `src/lib/cycle/` pure + tested, `src/store/cycle.ts`,
+  `src/features/cycle/`). The thesis: HRV falls and resting / overnight HR rise
+  in the luteal phase and POTS symptoms gather before a period, so without the
+  cycle the app misreads its own users once a month — the downturn card, the
+  strain detector and the personal HRV grade all flagged a pre-period dip as a
+  slide. The journal holds only what was LOGGED (`days[dk].cycle = { flow,
+  imported?, healthKey?, edited?, note? }`, `settings.cycle = { enabled, mode,
+  healthSync?, headsUp?, setupOn? }`, top-level `state.bodyTemp` for overnight
+  temperature — top level for the reason `pressure` is); periods, cycles and
+  phases are DERIVED on every read (`buildCycleModel`), so a corrected day
+  re-draws every phase after it. `cleanCycle` / `cleanCycleSettings` /
+  `cleanBodyTemp` are in `migrate.ts` — the `load` lesson. Rules, each pinned:
+  cycle day 1 is the first day of real flow and **spotting never starts or
+  joins a period**; one unlogged day inside a period is tolerated; a cycle
+  outside 15-60 days is implausible (a logging gap) and kept out of every
+  statistic; **ovulation is counted BACK 14 days from the next period**
+  (`retrospective`), or read off a three-over-six overnight temperature rise
+  (`temperature`, thermometer and wrist never mixed, Health Connect skin
+  temperature kept as a DELTA), and only the cycle in progress uses the
+  forecast (`calendar`, `predicted: true`); an unknown day is null. **The MODE is
+  a promise about what may be claimed**: `regular` forecasts, `irregular` /
+  `perimenopause` read finished cycles only, `contraception` knows bleeding days
+  and nothing else, `pregnant` claims nothing. A forecast needs two finished
+  cycles and a spread under 14 days; a PATTERN needs `PATTERN_MIN_CYCLES` (3).
+  **The model is AMBIENT** (`lib/cycle/ambient.ts`, set in the store's `emit`,
+  the `getUnits()` contract): phase-matched baselines must reach scoring,
+  strain and the sweep through forty `profileCtx` call sites, and threading it
+  would leave the missed surfaces disagreeing. Null (tracking off, a test) means
+  every consumer behaves EXACTLY as before — which is why no existing test
+  moved. What reads it: `usualBaseline` grades a baseline against the SAME
+  phase of past cycles (120-day window, still only-lowers); `detectStrain`
+  matches resting / overnight HR, standing rise and symptom load to the phases
+  the recent week touched; `detectDownturn` carries `cycle` (`cycleDip`) and
+  **changes words only** — a slide no deeper than the same window before past
+  periods is "in line with your last N cycles" (and takes cause `cycle` when the
+  journal is otherwise clean), a deeper one says so louder; severity and the
+  crash notification are untouched. The Insights sweep treats a factor whose ON
+  days cluster in the period / premenstrual window as **cycle-bound** (inside
+  `regimeFactorIds`): ibuprofen for cramps is the cycle wearing a painkiller's
+  name. Surfaces: the chip in the Journal date capsule (`chipLabel`), the Cycle
+  section, the entry card (the bowel form's 2×2 flow grid, cycle symptoms as
+  toggles over ordinary Symptoms entries — `TypeDef.cycle` types are offered
+  only while tracking is on), the history sheet (the Journal's own
+  `MonthGrid`; predicted days outlined never filled, ovulation filled only from
+  temperature), the setup sheet (`WizardBar`), Settings → Cycle (any profile
+  sex), the one-time opt-in card ("Not for me" is flags MMKV, never shown to a
+  Male profile), "Period started?", the heavy-flow note (3 of the last 4
+  cycles, suggests asking about iron), `CyclePhaseNote` beside readings and the
+  sleep report (states the person's own pattern, never "normal" — the no
+  reassurance under a red grade rule), the Insights "Your cycle" card, the
+  Progress "By cycle day" chart, a MENSTRUAL CYCLE report section (one line per
+  CYCLE, every ovulation names its basis; empty and absent with tracking off),
+  and the heads-up notification, whose copy **never names a period or a cycle**
+  (test-pinned) on a PRIVATE Android channel. The ring (`CycleRing`) is the one
+  new visual: neutral white at four strengths, never a hue, because every
+  colour in the app is already a grade. **Health is its own permission set**
+  (`scope: 'cycle'`, `HK_CYCLE_SET_KEY` / `hc1cycle:`, asked only from the setup
+  and Settings taps; Android needs its six `health.*` lines in app.json). Reads
+  file through `planCycleImport` (never over a day logged or edited here, a
+  deleted import tombstoned by key and by day); writes mirror only days logged
+  here, and HealthKit REQUIRES `HKMenstrualCycleStart` on every flow sample.
+  kingstinct cannot delete a category sample, so a replace goes through
+  `deleteOwnCategory` in the local `ecg-health` module (own samples only); a
+  binary without it writes only a first log, never a second competing one.
+  Free: logging, prediction, sync and every detector correction (correctness,
+  not a feature to sell). Pro: the Insights card and the Progress chart.
+  **Privacy**: no ping carries any of it except `use` C (turned on), the support
+  dump says on/off and a day COUNT and never the mode ("Pregnant" is a
+  disclosure), and the export warns before sharing a file that holds it.
+  Native build (permissions + the delete helper). Added on top, same rules:
+  the Cycle card sits right above Sleep with a Beta tag (`CycleSection`; the
+  "Period started?" question lives inside it and `periodPromptLine` treats a
+  logged flow or cycle symptom as the answer); "Cycle impact" (the history
+  sheet) opens on two charts from `lib/cycle/pattern` — `usualDip` drawn as
+  Score by cycle day (this cycle in the score's grade colours) and
+  `phaseColumns` as a metric by phase — with the calendar under them; the
+  same Score by cycle day chart sits in the downturn sheet whenever the
+  downturn carries `cycle`; Progress has an RMSSD-only "Cycle overlay"
+  (`LineChart.phaseBands`, single-day buckets only) and a Cycle section above
+  Sleep (By cycle day + a Triggers-style `cycleSymptomsCard`); stand tests and
+  POTS episodes carry a by-phase table (`standRise` is its own measure); the
+  pacing sheet adds a context row (`lib/cycle/capacity`, held-day spend in this
+  phase against all held days, never an input to the envelope); typical cycle
+  length (setup + Settings) forecasts ONLY until two cycles are logged and
+  never feeds a pattern; the Health read rides the import pill's check, so a
+  period another app logged arrives with a receipt; cycle symptoms mirror to
+  Apple Health (`writeCycleSymptoms`, iOS only — Health Connect has no symptom
+  records).
+- **Repeated failed readings with a weak sensor raise the strap card.**
+  `features/hrv/StrapSuggestion.tsx` (camera and Garmin copy, a drawn Coospo
+  H808S, an Amazon affiliate link `STRAP_AMAZON_URL` opened in the browser,
+  disclosed under the buttons) over `lib/strapSuggest.ts` (pure + tested) +
+  `store/strapSuggest.ts` (flags MMKV). Never a FIRST failure, at most twice
+  ever (the second after a quiet week and a fresh run of failures), never to an
+  install with a strap saved (`settings.lastBleDeviceId`). A failure is a
+  camera refusal (`Results`), a camera or Garmin session stopped by the app or
+  given up on (`SessionHost`, not `early`), or a Garmin `diag` from the wrist
+  (`subscribeGarminFailures`; counted in the background, shown only in the
+  foreground). It stacks `fitContent` OVER the card the failure raised, so its
+  ✕ returns there. Counted on the `stp` ping route (`C` shown after camera
+  failures, `G` after Garmin, `T` Amazon tapped from the button or the product
+  block), per-letter capped; **the lambda must be deployed before a build
+  carrying it ships.**
 - **Home-screen widgets render one shared JSON payload** built by
   `buildWidgetPayload()` (`src/lib/widgets.ts`, pure — unit-tested) and pushed by
   `initWidgetSync()` on launch, debounced journal changes, and foreground. iOS:

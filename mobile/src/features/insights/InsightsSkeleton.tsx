@@ -32,7 +32,7 @@ import Svg, { Circle } from 'react-native-svg';
 import { Ghost, HelpDot } from '../../components/ui';
 import { Icon, type IconName } from '../../components/Icon';
 import { fonts, usePalette } from '../../theme';
-import { CardRow, FOOTER_COPY, InsightCard, NO_IMPACT_DESC, OBS_DESC, WATCH_DESC, WEEKS_DESC, WEEKS_TITLE } from './Sections';
+import { CardRow, FOOTER_COPY, InsightCard, NO_IMPACT_DESC, OBS_DESC, WATCH_DESC, WEEKS_DESC, WEEKS_TITLE, CYCLE_TITLE } from './Sections';
 import * as S from './style';
 import { INSIGHTS_HELP, INSIGHT_MIN_DAYS, type FactorProgress } from '../../lib/insights';
 import { ZERO_HEIGHTS, ZERO_ROWS, type CardHeights, type InsightsShape, type RowHeights } from '../../lib/insights/shape';
@@ -286,6 +286,7 @@ export function InsightsSkeleton({ shape }: { shape: InsightsShape }) {
       {shape.change ? <ChangeGhost height={h.change} /> : null}
 
       {shape.weeks ? <CardGhost title={WEEKS_TITLE} help="weeks" height={shape.weeksHeight || 0} desc={WEEKS_DESC} /> : null}
+      {shape.cycle ? <CardGhost title={CYCLE_TITLE} help="cycle" height={shape.cycleHeight || 0} /> : null}
 
       {shape.correlations > 0 ? (
         <CardGhost title="Correlations" help="correlations" height={h.correlations}>

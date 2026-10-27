@@ -53,6 +53,9 @@ export function dayHasOwnData(d: DayRecord | undefined): boolean {
   if (d.food?.triggers && Object.values(d.food.triggers).some((n) => n > 0)) return true;
   if (d.sleep && (d.sleep.bed || d.sleep.wake)) return true;
   if (d.notes && d.notes.trim()) return true;
+  // Any flow, logged or imported: an imported period is the user's own data
+  // in a way a passive step count is not, and demo data must never sit over it.
+  if (d.cycle) return true;
   // `d.load` is deliberately NOT checked. A step count the phone recorded on
   // its own is not the user logging anything, so it must not retire the demo
   // month or count as "they have started using it".

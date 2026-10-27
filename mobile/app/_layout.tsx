@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { initCycleSync } from '../src/store/cycle';
 import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -141,6 +142,10 @@ export default function RootLayout() {
     // Barometric pressure: one sample on launch and on foreground, read with
     // whatever permission exists. Never prompts (see src/store/pressure).
     initPressureWatch();
+    // Cycle-aware tracking: bring in period days and overnight temperatures
+    // logged in other apps since the last open, while sync is on. Reads with
+    // existing grants only; the cycle permission is only ever asked from a tap.
+    initCycleSync();
     // Pull any published EAS update in the background (preview + production
     // builds alike); a downloaded bundle applies on the next launch.
     (async () => {

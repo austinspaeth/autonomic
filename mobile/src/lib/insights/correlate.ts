@@ -37,6 +37,7 @@
  *
  * Pure: no store, no MMKV, no expo, no React.
  */
+import { getCycleModel } from '../cycle/ambient';
 import { INSIGHT_OUTCOMES, OUTCOME_FAMILY, TREND_METRICS, familyRank, type TrendMetricDef, type TrendMetricId } from '../trends';
 import { laggedColumn, pairs, type DayMatrix } from './matrix';
 import type { FactorDef } from './factors';
@@ -344,12 +345,63 @@ function knownSpan(col: (number | null)[] | undefined): number {
  */
 export function regimeFactorIds(matrix: DayMatrix): Set<string> {
   const out = new Set<string>();
+  const bound = cycleBoundCheck(matrix);
   matrix.defs.forEach((f) => {
     if (f.kind !== 'binary') return;
     const col = matrix.factors[f.id];
-    if (col && isRegimeChange(col)) out.add(f.id);
+    if (col && (isRegimeChange(col) || (bound && bound(col)))) out.add(f.id);
   });
   return out;
+}
+
+/**
+ * Share of a factor's ON days that must fall in the dip window (the period and
+ * the premenstrual days) before it is read as tied to the cycle, and how many
+ * times the journal's own share of such days that has to be.
+ */
+export const CYCLE_BOUND_SHARE = 0.6;
+export const CYCLE_BOUND_LIFT = 2;
+/** ON days with a known phase needed before the rule is asked at all. */
+const CYCLE_BOUND_MIN_ON = 5;
+
+/**
+ * Is a factor TIED TO THE CYCLE? The second way a comparison can be the
+ * calendar in disguise, and the one the regime rule cannot see because the
+ * calendar here repeats.
+ *
+ * Ibuprofen, a heat pack, magnesium for cramps, the cramps themselves: each is
+ * logged mostly on period days, which are exactly the days RMSSD sits lowest
+ * and symptoms run highest for physiological reasons of their own. "Ibuprofen
+ * days show lower RMSSD" passes the correction, the clinical bars and the
+ * within-month check, and it is the cycle wearing a painkiller's name — the
+ * worst kind of false finding, because it reads as advice about a medication.
+ * So a factor whose ON days cluster in the dip window is treated like a regime
+ * change: not tested, and kept off the No detected impact card (the data
+ * cannot separate it from the phase, which is not a null result either).
+ *
+ * Only with cycle-aware tracking on and a pattern to place phases with
+ * (src/lib/cycle/ambient). Off, it is a no-op and the sweep is unchanged.
+ */
+function cycleBoundCheck(matrix: DayMatrix): ((col: (number | null)[]) => boolean) | null {
+  const model = getCycleModel();
+  if (!model?.patternReady) return null;
+  const inDip = matrix.keys.map((k) => {
+    const ph = model.phaseOn(k);
+    if (!ph?.phase || ph.predicted) return null;
+    return ph.phase === 'menstrual' || ph.phase === 'premenstrual';
+  });
+  return (col) => {
+    let on = 0, onDip = 0, known = 0, knownDip = 0;
+    col.forEach((v, i) => {
+      const d = inDip[i];
+      if (v == null || d == null) return;
+      known++; if (d) knownDip++;
+      if (v === 1) { on++; if (d) onDip++; }
+    });
+    if (on < CYCLE_BOUND_MIN_ON || !known || !knownDip) return false;
+    const share = onDip / on;
+    return share >= CYCLE_BOUND_SHARE && share >= CYCLE_BOUND_LIFT * (knownDip / known);
+  };
 }
 
 /**

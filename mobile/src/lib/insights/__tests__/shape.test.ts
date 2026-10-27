@@ -25,6 +25,8 @@ const shape = (over: Partial<InsightsShape> = {}): InsightsShape => ({
   watch: 5,
   weeks: false,
   weeksHeight: 0,
+  cycle: false,
+  cycleHeight: 0,
   heights: { change: 300, correlations: 420, observations: 260, noImpact: 0, watch: 240 },
   rows: { correlations: [74, 74, 74, 74], observations: [96, 118, 96], noImpact: [], watch: [58, 58] },
   ...over,
@@ -173,5 +175,17 @@ describe('the weeks card', () => {
   it('is part of what makes two shapes the same', () => {
     expect(sameShape(shape(), shape({ weeks: true, weeksHeight: 480 }))).toBe(false);
     expect(sameShape(shape({ weeks: true, weeksHeight: 480 }), shape({ weeks: true, weeksHeight: 480.3 }))).toBe(true);
+  });
+});
+
+describe('the cycle card', () => {
+  it('reads a shape stored before the card existed', () => {
+    const { cycle: _c, cycleHeight: _h, ...old } = shape();
+    const out = normalizeShape(old);
+    expect(out?.cycle).toBe(false);
+    expect(out?.cycleHeight).toBe(0);
+  });
+  it('treats a cycle card appearing as a new shape', () => {
+    expect(sameShape(shape(), shape({ cycle: true, cycleHeight: 360 }))).toBe(false);
   });
 });

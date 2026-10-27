@@ -33,6 +33,7 @@ export const DIG_LINES: Line[] = [
   { kind: 'use', L: 'M', label: 'Milestones opened' },
   { kind: 'use', L: 'P', label: 'Protocol saved' },
   { kind: 'use', L: 'B', label: 'Pacing budget opened' },
+  { kind: 'use', L: 'C', label: 'Cycle tracking turned on' },
   { kind: 'fnd', L: 'E', label: 'Early signal opened' },
   { kind: 'fnd', L: 'U', label: 'Unconfirmed pattern opened' },
   { kind: 'fnd', L: 'C', label: 'Biggest change opened' },
@@ -43,4 +44,7 @@ export const DIG_LINES: Line[] = [
   { kind: 'mbp', L: 'S', label: 'Morning card shown' },
   { kind: 'mbp', L: 'T', label: 'Morning card: took reading' },
   { kind: 'mbp', L: 'X', label: 'Morning card closed' },
+  { kind: 'stp', L: 'C', label: 'Strap card shown (camera)' },
+  { kind: 'stp', L: 'G', label: 'Strap card shown (Garmin)' },
+  { kind: 'stp', L: 'T', label: 'Strap card: Amazon tapped' },
 ];

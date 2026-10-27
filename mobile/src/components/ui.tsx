@@ -367,10 +367,12 @@ function DisabledHatch() {
   );
 }
 
-export function Button({ title, onPress, variant = 'default', icon, style, disabled, onLongPress, delayLongPress }: {
+export function Button({ title, onPress, variant = 'default', icon, iconAfter, style, disabled, onLongPress, delayLongPress }: {
   title: string; onPress: () => void; variant?: 'default' | 'primary' | 'ghost' | 'danger' | 'dashed' | 'caution'; style?: StyleProp<ViewStyle>; disabled?: boolean;
   /** Optional glyph before the label; inherits the label's colour. */
   icon?: IconName;
+  /** Optional glyph AFTER the label (e.g. `external` for a link that leaves the app). */
+  iconAfter?: IconName;
   /** Optional hidden affordance (e.g. hold to open diagnostics). */
   onLongPress?: () => void; delayLongPress?: number;
 }) {
@@ -400,6 +402,7 @@ export function Button({ title, onPress, variant = 'default', icon, style, disab
       {disabled ? <DisabledHatch /> : null}
       {icon ? <Icon name={icon} size={17} color={color} /> : null}
       <Text style={{ color, fontSize: 16, fontWeight: '600' }}>{title}</Text>
+      {iconAfter ? <Icon name={iconAfter} size={16} color={color} /> : null}
     </Pressable>
   );
 }
@@ -586,6 +589,21 @@ export function LinkToggle<T extends string>({ options, value, onChange }: {
           </Pressable>
         );
       })}
+    </View>
+  );
+}
+
+/* ---------- Checkbox ---------- */
+/** The square check the log picker uses. It always takes its 24pt, checked or
+ *  not, so a row never shifts when it is chosen. */
+export function Checkbox({ on }: { on: boolean }) {
+  const p = usePalette();
+  return (
+    <View style={{
+      width: 24, height: 24, borderRadius: 7, alignItems: 'center', justifyContent: 'center',
+      borderWidth: 2, borderColor: on ? p.accent : p.border, backgroundColor: on ? p.accent : 'transparent',
+    }}>
+      {on ? <Icon name="check" size={14} color="#fff" /> : null}
     </View>
   );
 }

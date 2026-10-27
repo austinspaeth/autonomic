@@ -24,6 +24,8 @@ import { type DaysMap } from '../lib/scoring/day';
 import { isTrustedReading } from '../lib/hrvQuality';
 import { isNormMetric } from '../lib/hrvNorms';
 import { HrvNormNote } from '../components/HrvNorm';
+import { CycleOverlayRow, OverlayLegend, overlayFills } from './cycle/CycleProgress';
+import { useCycleModel } from '../store/store';
 import {
   acBandZones, acBuckets, acReadVals, bucketViews, isEvening, isMorning, makeAgg, type CustomRange,
   type BucketView, type Mode,
@@ -215,7 +217,9 @@ export function HrvProgress({ days, mode, custom, ctx, filt, onCardLayout }: {
     const snsB = acAgg(buckets, (d) => readAnyHrv(d, 'sns', f));
     const hasBalance = bl.filter((_, i) => pnsB[i] != null && snsB[i] != null).length >= 2;
 
-    return { bl, metricCharts, vlf, lf, hf, hasPower, pnsB, snsB, hasBalance };
+    // Single-day buckets only: the cycle overlay can colour a day, never a week.
+    const dayKeys = buckets.map((b) => (b.start === b.end ? b.start : null));
+    return { bl, metricCharts, vlf, lf, hf, hasPower, pnsB, snsB, hasBalance, dayKeys };
   }, [days, mode, custom, ctx, filt]);
 
   const hasAny = view.metricCharts.length > 0 || view.hasPower;
@@ -240,7 +244,7 @@ export function HrvProgress({ days, mode, custom, ctx, filt, onCardLayout }: {
                 </View>
               ) : null}
               <View onLayout={(e) => onCardLayout?.(m.label, e.nativeEvent.layout.y)}>
-                <MetricSection m={m} structured={structured} unstructured={unstructured} combined={combined} buckets={view.bl} />
+                <MetricSection m={m} structured={structured} unstructured={unstructured} combined={combined} buckets={view.bl} dayKeys={view.dayKeys} />
               </View>
             </React.Fragment>
           ))}
@@ -389,14 +393,19 @@ function SectionHead({ title, help, value, valueColor, value2, pair, suffix, des
  * with the grade-zone gradient instead. The big value is the latest reading,
  * or the bucket under your finger while dragging.
  */
-function MetricSection({ m, structured, unstructured, combined, buckets }: {
+function MetricSection({ m, structured, unstructured, combined, buckets, dayKeys }: {
   m: (typeof METRICS)[number];
   structured: (number | null)[];
   unstructured: (number | null)[];
   combined: (number | null)[];
   buckets: BucketView[];
+  dayKeys: (string | null)[];
 }) {
   const p = usePalette();
+  // The cycle overlay: RMSSD only, and only where each bucket is one day.
+  const cycleModel = useCycleModel();
+  const [overlay, setOverlay] = useState(false);
+  const fills = m.label === 'RMSSD' ? overlayFills(cycleModel, dayKeys) : null;
   const [kind, setKind] = useState<Kind>('both');
   const [showZones, setShowZones] = useState(false);
   const [sel, setSel] = useState<number | null>(null);
@@ -478,10 +487,13 @@ function MetricSection({ m, structured, unstructured, combined, buckets }: {
             hideHeader
             zonesOn={showZones}
             onSelect={setSel}
+            phaseBands={overlay ? fills : null}
           />
+          {overlay && fills ? <OverlayLegend /> : null}
           {/* Age/sex reference, a resting norm, so not beside Training alone:
               paced breathing inflates every one of these by design. */}
           {kind !== 'breath' && isNormMetric(m.u) ? <HrvNormNote metric={m.u} unit={m.unit || ''} /> : null}
+          {fills ? <View style={{ marginTop: 12 }}><CycleOverlayRow on={overlay} onToggle={() => setOverlay((o) => !o)} /></View> : null}
         </>
       )}
     </Section>

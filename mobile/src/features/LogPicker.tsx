@@ -8,10 +8,11 @@
  *    auto-selects it. Checking something already logged today shows an orange
  *    caution but still allows it.
  *  · Edit mode — entered via "Edit … list": search and checkboxes drop away,
- *    every row gains edit + delete actions, and an "Add a new item" row
- *    appears at the top. Deletes confirm inline (irreversible, and allowed
+ *    every row gains edit + delete actions, and the Activity types sheet's
+ *    "New …" add box appears at the top. Deletes confirm inline (irreversible, and allowed
  *    even for types with journal history — the Journal skips orphaned rows);
- *    edit/add open a small card for the name (+ default dose for meds).
+ *    edit (and log mode's create-and-select) open a small card for the name
+ *    (+ default dose for meds).
  *
  * Meds and symptoms log day-array entries; triggers set day.food.triggers[k]
  * and one log per trigger (lib/triggerLogs). Triggers and symptoms then open
@@ -22,7 +23,7 @@ import { Pressable, Text, TextInput, View } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { TextField } from '../components/Field';
-import { Button, DaySaveButton } from '../components/ui';
+import { Button, Checkbox, DaySaveButton } from '../components/ui';
 import { Icon } from '../components/Icon';
 import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
@@ -34,6 +35,7 @@ import { pingLogged } from '../store/ping';
 import { defaultTimeFor, isPastDay, uid } from '../lib/dates';
 import { logTriggers } from '../lib/triggerLogs';
 import { LogGroupCard, logGroupSheetOptions, type LogGroup } from './LogGroupCard';
+import { availableLabel, NewTypeBox, RowAction, TypeSectionLabel } from './TypeManager';
 
 export type LogKind = 'meds' | 'symptoms' | 'triggers';
 
@@ -81,8 +83,7 @@ const CAUTION = '#f97316';
 
 const SPRING = LinearTransition.springify().damping(24).stiffness(260);
 
-/** Shared height for the search bar and the edit-mode "Add a new item" row, so
- *  flipping modes swaps them in place without the list shifting. */
+/** Height of the log-mode search bar. */
 const BAR_H = 46;
 
 /** Fixed row height, tall enough for the edit-mode action buttons (38px), so
@@ -134,39 +135,6 @@ function TypeCard({ kind, typeKey, initialName, onAdded }: {
   );
 }
 
-function Checkbox({ on }: { on: boolean }) {
-  const p = usePalette();
-  return (
-    <View style={{
-      width: 24, height: 24, borderRadius: 7, alignItems: 'center', justifyContent: 'center',
-      borderWidth: 2, borderColor: on ? p.accent : p.border, backgroundColor: on ? p.accent : 'transparent',
-    }}>
-      {on ? <Icon name="check" size={14} color="#fff" /> : null}
-    </View>
-  );
-}
-
-/** Edit/delete circular icon button on an edit-mode row. */
-function RowAction({ icon, label, onPress }: {
-  icon: 'edit' | 'trash'; label: string; onPress: () => void;
-}) {
-  const p = usePalette();
-  return (
-    <Pressable
-      onPress={onPress}
-      hitSlop={6}
-      accessibilityRole="button"
-      accessibilityLabel={label}
-      style={({ pressed }) => [
-        { width: 38, height: 38, borderRadius: 11, borderWidth: 1, borderColor: p.border, backgroundColor: p.surface2, alignItems: 'center', justifyContent: 'center' },
-        pressed && { opacity: 0.6 },
-      ]}
-    >
-      <Icon name={icon} size={16} color={p.textDim} />
-    </Pressable>
-  );
-}
-
 export function LogPickerSheet({ kind, dk, controls }: { kind: LogKind; dk: string; controls: SheetControls }) {
   const p = usePalette();
   const toast = useToast();
@@ -183,7 +151,11 @@ export function LogPickerSheet({ kind, dk, controls }: { kind: LogKind; dk: stri
   const past = isPastDay(dk);
   const typeMap = typesFor(state, kind);
   const q = query.trim();
-  const keys = Object.keys(typeMap);
+  // Cycle symptoms are offered only while cycle-aware tracking is on, unless
+  // one is already logged on this day (it must stay reachable to edit).
+  const cycleOn = !!state.settings.cycle?.enabled;
+  const dayTypes = new Set((state.days[dk]?.[kind === 'triggers' ? 'symptoms' : kind] || []).map((e) => e.type));
+  const keys = Object.keys(typeMap).filter((k) => cycleOn || !typeMap[k].cycle || dayTypes.has(k));
   const results = isEdit || !q ? keys : keys.filter((k) => typeMap[k].label.toLowerCase().includes(q.toLowerCase()));
   const exists = !!q && keys.some((k) => typeMap[k].label.toLowerCase() === q.toLowerCase());
   const count = keys.filter((k) => sel[k]).length;
@@ -277,23 +249,13 @@ export function LogPickerSheet({ kind, dk, controls }: { kind: LogKind; dk: stri
         </Animated.View>
       )}
 
-      {/* add-a-new-item row (edit mode) — swaps in for the search bar with no
-          animation of its own */}
+      {/* add form + list heading (edit mode): the Activity types sheet's own
+          box, so every list in the app is added to the same way. */}
       {isEdit && (
-        <View>
-          <Pressable
-            onPress={() => openAddCard()}
-            style={({ pressed }) => [
-              { height: BAR_H, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1.5, borderStyle: 'dashed', borderColor: 'rgba(224,49,39,0.55)', backgroundColor: 'rgba(0,0,0,0.35)', borderRadius: radius.control, paddingHorizontal: 12, marginBottom: 10 },
-              pressed && { opacity: 0.7 },
-            ]}
-          >
-            <View style={{ width: 28, height: 28, borderRadius: 8, backgroundColor: p.accentSoft, alignItems: 'center', justifyContent: 'center' }}>
-              <Icon name="plus" size={15} color={p.accent} />
-            </View>
-            <Text style={{ flex: 1, color: p.text, fontSize: 15, fontWeight: '600' }}>Add a new item</Text>
-          </Pressable>
-        </View>
+        <Animated.View entering={FadeIn.duration(160)} layout={SPRING}>
+          <NewTypeBox kind={kind} />
+          <TypeSectionLabel>{availableLabel(kind)}</TypeSectionLabel>
+        </Animated.View>
       )}
 
       {/* rows */}

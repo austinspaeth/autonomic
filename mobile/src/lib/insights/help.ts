@@ -15,7 +15,11 @@ import type { HelpContent } from '../help';
 import { LOW_BELOW_HPA } from '../pressure';
 import { fmtPressureGap } from '../units';
 
-export const INSIGHTS_HELP: Record<'change' | 'correlations' | 'early' | 'observations' | 'noImpact' | 'watch' | 'confidence' | 'pressure' | 'weeks', HelpContent> = {
+export const INSIGHTS_HELP: Record<'change' | 'correlations' | 'early' | 'observations' | 'noImpact' | 'watch' | 'confidence' | 'pressure' | 'weeks' | 'cycle', HelpContent> = {
+  cycle: {
+    what: 'Your finished cycles, split in two: the luteal side (from ovulation to your period) against the follicular side (from your period to ovulation). Each row is the gap between the two in that measurement\'s own units, so "-9 ms" means your luteal mornings typically ran 9 ms lower.',
+    why: 'Hormones shift HRV, heart rate and symptoms across a cycle, and knowing your own pattern is what lets Autonomic compare each day with the same point in your past cycles. It describes where your numbers sat, not what caused them, and it is not medical advice.',
+  },
   weeks: {
     what: 'Your journal cut into weeks and ranked by daily score. The highest few are set beside the lowest few, with what each set looked like: your readings, your sleep, how active you were, what you logged.',
     why: 'It is a description of those weeks, not a test of anything. Good weeks tend to sit together and so do hard ones, so everything that changed between the two stretches shows up here at once, and the card cannot say which of it mattered. Read it as a picture of what your better weeks had in them.',

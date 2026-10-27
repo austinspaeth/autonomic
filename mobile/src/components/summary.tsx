@@ -12,6 +12,8 @@
  */
 import React, { useMemo, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
+import Animated from 'react-native-reanimated';
+import Svg, { Path } from 'react-native-svg';
 import { TAIL_STYLE, fonts, radius, readoutTail, usePalette } from '../theme';
 import type { Band, Entry, ScoreCat } from '../lib/types';
 import type { HelpContent } from '../lib/help';
@@ -27,7 +29,8 @@ import { onDay } from '../lib/analysis/buckets';
 import { entryFields, isDivider, READING_TYPES } from '../lib/registry';
 import { standReadingRows } from '../lib/pots/manual';
 import { healthAppName } from '../lib/health';
-import { ageFromBirthday, fmtNum, fmtShort, todayKey } from '../lib/dates';
+import { ageFromBirthday, fmtNum, fmtShort, fmtTime12, todayKey } from '../lib/dates';
+import { isTrustedReading } from '../lib/hrvQuality';
 import { entryDayKey, readingGrade } from '../lib/scoring/readingGrade';
 import { estimatedHrMax, hrZones, timeInZones } from '../lib/workoutZones';
 import type { NormMetric } from '../lib/hrvNorms';
@@ -42,7 +45,7 @@ import { PromptSheet } from '../features/PromptSheet';
 import { BalanceChart, OrthoHrChart, PowerSpectrum, Sparkline, StandHrChart, Tachogram, WorkoutHrChart, ZonesToggle, balanceCat } from './charts';
 import { Icon } from './Icon';
 import { SheetFooter, useSheets, type SheetControls } from './Sheet';
-import { CautionNote, HelpDot, ScoreDot } from './ui';
+import { CautionNote, HelpDot, ScoreDot, useAccordion } from './ui';
 import { fmtDist, paceStr } from '../lib/units';
 
 const hexA = (hex: string, a: number) => {
@@ -471,10 +474,15 @@ function NoteSheet({ initial, onSave, controls }: {
   );
 }
 
-export interface SummaryProps { r: Entry; days: DaysMap; ctx: ScoreContext }
+export interface SummaryProps {
+  r: Entry; days: DaysMap; ctx: ScoreContext;
+  /** Drawn directly under the reading's grade (the cycle phase note). A slot,
+   *  so this component file never imports a feature. */
+  afterGrade?: React.ReactNode;
+}
 
 /* ---------- dispatcher ---------- */
-export function ReadingSummary({ r, days, ctx }: SummaryProps) {
+export function ReadingSummary({ r, days, ctx, afterGrade }: SummaryProps) {
   // The POTS deep dives carry their own bespoke insight buttons.
   const Body = r.type === 'orthostatic' ? OrthostaticSummary
     : r.type === 'standTest' ? StandTestSummary
@@ -486,7 +494,10 @@ export function ReadingSummary({ r, days, ctx }: SummaryProps) {
   const bespoke = r.type === 'orthostatic' || r.type === 'standTest';
   return (
     <ViewedReadingCtx.Provider value={String(r.id)}>
-      <Body r={r} days={days} ctx={ctx} />
+      {/* The HRV summaries draw the slot under their grading row; the rest have
+          no grade row, so it leads. */}
+      {r.type === 'hrv' || r.type === 'breathHrv' ? null : afterGrade}
+      <Body r={r} days={days} ctx={ctx} afterGrade={afterGrade} />
       {bespoke ? null : <ReadingInsightButton r={r} days={days} ctx={ctx} />}
     </ViewedReadingCtx.Provider>
   );
@@ -533,7 +544,7 @@ function traceFor(r: Entry): BeatTrace | null {
  * difference is which RMSSD/HR grade band applies, plus a breathing-style row
  * on the handful of legacy training readings taken on a retired pattern.
  */
-function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHrv' | 'hrv' }) {
+function HrvSummaryBody({ r, days, ctx, type, afterGrade }: SummaryProps & { type: 'breathHrv' | 'hrv' }) {
   const s = computeScores(r, ctx);
   // The day score's own input from this reading, never a second score.
   const dk = useMemo(() => entryDayKey(days, String(r.id)) ?? todayKey(), [days, r.id]);
@@ -582,6 +593,8 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
       <Section cat={grade.counts ? grade.cat : null}>
         <SectionHead title="HRV grading" help={HRV_HELP.reading} />
       </Section>
+      {type === 'breathHrv' ? <TrainingVsBaseline r={r} days={days} dk={dk} /> : null}
+      {afterGrade}
 
       {rr && rr.length > 2 ? (
         <Section>
@@ -702,6 +715,122 @@ function HrvSummaryBody({ r, days, ctx, type }: SummaryProps & { type: 'breathHr
         </Section>
       ) : null}
     </>
+  );
+}
+
+/** The baseline a training reading is read against: the latest trusted
+ *  baseline earlier the same day. Null when there is none, or when training
+ *  did not come out higher, which is the only case the explainer answers. */
+function baselineBefore(r: Entry, days: DaysMap, dk: string): Entry | null {
+  const t = (r.time as string) || '';
+  const prior = (days[dk]?.readings || [])
+    .filter((b) => b.type === 'hrv' && isTrustedReading(b) && ((b.time as string) || '') <= t)
+    .sort((a, b) => ((a.time as string) || '').localeCompare((b.time as string) || ''));
+  const base = prior[prior.length - 1];
+  if (!base) return null;
+  const num = (e: Entry, k: string) => { const x = parseFloat(e[k] as string); return isNaN(x) ? null : x; };
+  const tr = num(r, 'rmssd'), br = num(base, 'rmssd');
+  if (tr != null && br != null) return tr > br ? base : null;
+  const ts = num(r, 'sdnn'), bs = num(base, 'sdnn');
+  return ts != null && bs != null && ts > bs ? base : null;
+}
+
+/** A short stretch of beats around the middle of a reading, as deviations
+ *  from its own mean, so two readings can share one vertical scale. */
+function traceSlice(e: Entry, n = 64): number[] | null {
+  const t = traceFor(e);
+  if (!t) return null;
+  const rr = t.rr.filter((_, i) => !t.dropped[i]);
+  if (rr.length < 8) return null;
+  const start = Math.max(0, Math.floor((rr.length - n) / 2));
+  const seg = rr.slice(start, start + n);
+  const mean = seg.reduce((a, b) => a + b, 0) / seg.length;
+  return seg.map((v) => v - mean);
+}
+
+function MiniTrace({ dev, scale, color }: { dev: number[]; scale: number; color: string }) {
+  const W = 120, H = 26;
+  const d = dev.map((v, i) => {
+    const x = (i / Math.max(1, dev.length - 1)) * W;
+    const y = H / 2 - (v / scale) * (H / 2);
+    return `${i ? 'L' : 'M'}${x.toFixed(1)} ${y.toFixed(1)}`;
+  }).join(' ');
+  return (
+    <Svg width="100%" height={H} viewBox={`0 0 ${W} ${H}`} preserveAspectRatio="none" style={{ overflow: 'visible' }}>
+      <Path d={d} fill="none" stroke={color} strokeWidth={1.6} strokeLinejoin="round" strokeLinecap="round" />
+    </Svg>
+  );
+}
+
+/**
+ * "Why is my training higher than my baseline?" Shown on a training reading
+ * only when it beats the baseline taken before it that day, closed by default.
+ * The two tiles put the numbers side by side and their beat traces on ONE
+ * scale, so the bigger swing under paced breathing is the picture.
+ */
+function TrainingVsBaseline({ r, days, dk }: { r: Entry; days: DaysMap; dk: string }) {
+  const p = usePalette();
+  const [open, setOpen] = useState(false);
+  const base = useMemo(() => baselineBefore(r, days, dk), [r, days, dk]);
+  // The body is always mounted (closed at height 0) so its height is measured
+  // before the first tap and the reveal animates from the first open.
+  const traces = useMemo(() => (base ? [traceSlice(base), traceSlice(r)] : null), [base, r]);
+  const { chevStyle, bodyStyle, onContentLayout, measureStyle } = useAccordion(open, false, { from: 0, to: 180 });
+  if (!base) return null;
+  const scale = traces ? Math.max(1, ...traces.flatMap((t) => (t || []).map(Math.abs))) : 1;
+  const tiles = [
+    { when: 'Before', kind: `Baseline · ${fmtTime12(base.time as string)}`, e: base, tag: p.textDim, num: p.textDim, border: 'transparent', line: p.textFaint },
+    { when: 'After', kind: `Training · ${fmtTime12(r.time as string)}`, e: r, tag: p.accent, num: p.text, border: hexA(p.accent, 0.35), line: p.accent },
+  ];
+  const points = [
+    { t: 'This is expected.', b: 'Training measures how strongly your heart follows your breath, not your resting state.' },
+    { t: 'Baseline is the one to track.', b: 'Trends and your daily score use baseline readings, so compare training with training.' },
+  ];
+  return (
+    <View style={{ backgroundColor: p.surface2, borderColor: p.border, borderWidth: 1, borderRadius: radius.card, marginBottom: 12, overflow: 'hidden' }}>
+      <Pressable onPress={() => setOpen((o) => !o)} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 16 }}>
+        <Text style={{ flex: 1, fontSize: 15.5, fontWeight: '600', lineHeight: 20, color: p.text }}>Why is my training higher than my baseline readings?</Text>
+        <Animated.View style={chevStyle}>
+          <Icon name="chevron" size={16} color={p.textDim} />
+        </Animated.View>
+      </Pressable>
+      <Animated.View style={[{ overflow: 'hidden' }, bodyStyle]}>
+        <View onLayout={onContentLayout} style={[measureStyle, { paddingHorizontal: 14, paddingBottom: 16, gap: 12 }]}>
+          <View style={{ height: 1, backgroundColor: p.hairline }} />
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            {tiles.map((c, i) => (
+              <View key={c.when} style={{ flex: 1, backgroundColor: p.sunk, borderColor: c.border, borderWidth: 1, borderRadius: 14, padding: 12, paddingBottom: 10 }}>
+                <Text style={{ fontSize: 11, fontWeight: '700', letterSpacing: 1, textTransform: 'uppercase', color: c.tag }}>{c.when}</Text>
+                <Text style={{ fontSize: 12.5, color: p.textDim, marginTop: 2 }}>{c.kind}</Text>
+                <Text style={{ marginTop: 10 }}>
+                  <Text style={{ fontSize: 28, fontFamily: fonts.numHeavy, color: c.num, fontVariant: ['tabular-nums'] }}>{c.e.sdnn != null ? String(c.e.sdnn) : '–'}</Text>
+                  <Text style={{ fontSize: 12, color: p.textFaint }}> ms SDNN</Text>
+                </Text>
+                <Text style={{ fontSize: 12, color: p.textDim, marginTop: 4 }}>
+                  RMSSD <Text style={{ fontFamily: fonts.numBold, color: p.text }}>{c.e.rmssd != null ? String(c.e.rmssd) : '–'}</Text> ms
+                </Text>
+                {traces && traces[i] ? (
+                  <View style={{ marginTop: 10 }}><MiniTrace dev={traces[i]!} scale={scale} color={c.line} /></View>
+                ) : null}
+              </View>
+            ))}
+          </View>
+          <Text style={{ fontSize: 14.5, lineHeight: 21, color: p.text }}>
+            Slow breathing is a workout for your baroreflex, the reflex that keeps your blood pressure steady. Each breath pushes your heart rate up and back down, which stretches the gaps between beats, so HRV reads higher. Practice it regularly and that reflex gets stronger, helping your body adjust when your blood pressure shifts, like when you stand up.
+          </Text>
+          <View style={{ gap: 10 }}>
+            {points.map((pt) => (
+              <View key={pt.t} style={{ flexDirection: 'row', gap: 10 }}>
+                <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: p.text, marginTop: 7 }} />
+                <Text style={{ flex: 1, fontSize: 13.5, lineHeight: 20, color: p.textDim }}>
+                  <Text style={{ color: p.text, fontWeight: '600' }}>{pt.t}</Text> {pt.b}
+                </Text>
+              </View>
+            ))}
+          </View>
+        </View>
+      </Animated.View>
+    </View>
   );
 }
 

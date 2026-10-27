@@ -35,6 +35,7 @@ const ROUTES: { key: 'all' | PingKind; label: string }[] = [
   { key: 'rpt', label: 'AI reports' },
   { key: 'rdg', label: 'Reading kinds' },
   { key: 'mbp', label: 'Morning card' },
+  { key: 'stp', label: 'Strap card' },
   { key: 'rvw', label: 'Review asks' },
   { key: 'err', label: 'Failures' },
 ];

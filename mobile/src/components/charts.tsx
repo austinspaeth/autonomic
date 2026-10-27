@@ -552,7 +552,7 @@ export interface Zone { from: number; to: number; color: string }
 
 let lcId = 0;
 
-export function LineChart({ buckets, series, zones, integer, height = 140, target, zonesOn, hideHeader, onSelect, marks, markColor, divider, trendLine }: {
+export function LineChart({ buckets, series, zones, integer, height = 140, target, zonesOn, hideHeader, onSelect, marks, markColor, divider, trendLine, phaseBands }: {
   buckets: { label: string }[]; series: Series[]; zones?: Zone[] | null; integer?: boolean; height?: number; target?: { from: number; to: number; color: string };
   /**
    * Per-bucket highlight painted BEHIND the plot: > 0 shades that bucket, 0 leaves
@@ -563,6 +563,12 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
    */
   marks?: (number | null)[];
   markColor?: string;
+  /**
+   * A fill per bucket, painted behind everything (the cycle overlay): a colour
+   * string, or null to leave the bucket clear. Consecutive buckets with the
+   * same fill merge into one block, the same half-bucket bleed as `marks`.
+   */
+  phaseBands?: (string | null)[] | null;
   /** A dashed vertical rule at a bucket index: where a before/after split sits. */
   divider?: number | null;
   /**
@@ -658,6 +664,20 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
     }
   }
 
+  const bandRuns: { x0: number; x1: number; fill: string }[] = [];
+  if (phaseBands) {
+    let start = -1;
+    for (let i = 0; i <= n; i++) {
+      const f = i < n ? phaseBands[i] ?? null : null;
+      const prev = start >= 0 ? phaseBands[start] : null;
+      if (start >= 0 && f !== prev) {
+        bandRuns.push({ x0: Math.max(padL, xAt(start) - half), x1: Math.min(padL + innerW, xAt(i - 1) + half), fill: prev as string });
+        start = -1;
+      }
+      if (f && start < 0) start = i;
+    }
+  }
+
   // Grade-zone boundaries within range (the interior `.from` edges), for the overlay.
   const zoneLines = zones && showZones
     ? zones.map((z) => z.from).filter((v) => v > min && v < max).map((v, i) => ({ v, color: (zones.find((z) => z.from === v) || zones[0]).color, key: i }))
@@ -687,6 +707,9 @@ export function LineChart({ buckets, series, zones, integer, height = 140, targe
               </LinearGradient>
             </Defs>
           )}
+          {bandRuns.map((b, i) => (
+            <Rect key={`pb${i}`} x={b.x0} y={padT} width={Math.max(1.5, b.x1 - b.x0)} height={H - padT - padB} fill={b.fill} />
+          ))}
           {/* First, so gridlines, the trace and every label sit on top of it. */}
           {markRuns.map(([x0, x1], i) => (
             <Rect key={`mk${i}`} x={x0} y={padT} width={Math.max(1.5, x1 - x0)} height={H - padT - padB} fill={markColor || p.accent} opacity={0.14} />

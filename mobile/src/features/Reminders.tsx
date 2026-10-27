@@ -158,7 +158,7 @@ function PressureAlertRow({ granted }: { granted: boolean }) {
 
 /** One opt-in row in the Notifications view: icon + title/sub + switch, the
  *  same silhouette as the Settings list rows. */
-function NotifRow({ icon, title, sub, on, onToggle }: { icon: IconName; title: string; sub: string; on: boolean; onToggle: () => void }) {
+export function NotifRow({ icon, title, sub, on, onToggle }: { icon: IconName; title: string; sub: string; on: boolean; onToggle: () => void }) {
   const p = usePalette();
   return (
     <Pressable

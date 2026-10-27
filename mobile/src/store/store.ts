@@ -15,7 +15,8 @@
 import { useSyncExternalStore } from 'react';
 import { AppState as RNAppState } from 'react-native';
 import { MMKV } from 'react-native-mmkv';
-import { keyOf } from '../lib/dates';
+import { keyOf, todayKey } from '../lib/dates';
+import { buildCycleModel, getCycleModel as getCycleModelSafe, setCycleModel, type CycleModel } from '../lib/cycle';
 import { SCHEMA_VERSION, assertImportVersion, blankDay, defaultState, isPlainObject, migrate } from '../lib/migrate';
 import { createDebouncedWriter } from '../lib/persist';
 import { logError } from '../lib/diagnostics/errorLog';
@@ -347,8 +348,45 @@ function syncUnits() {
 }
 syncUnits();
 
+/**
+ * Point lib/cycle at a model of the journal as it now stands (see the note in
+ * lib/cycle/ambient on why it is ambient). Rebuilt only when what it reads
+ * changed: the days map (a fresh reference only when a day was touched), the
+ * temperatures, the mode, or the date. Null whenever tracking is off, which is
+ * what makes every consumer behave exactly as it did before the feature.
+ */
+let cycleInputs: unknown[] = [];
+function syncCycle() {
+  const c = state.settings?.cycle;
+  if (!c?.enabled) {
+    if (cycleInputs.length) { setCycleModel(null); cycleInputs = []; }
+    return;
+  }
+  const today = todayKey();
+  const inputs = [state.days, state.bodyTemp, c.mode, today, c.typicalLength];
+  if (inputs.length === cycleInputs.length && inputs.every((v, i) => v === cycleInputs[i])) return;
+  cycleInputs = inputs;
+  try {
+    setCycleModel(buildCycleModel({ days: state.days, temps: state.bodyTemp, mode: c.mode, today, typicalLength: c.typicalLength }));
+  } catch (e) {
+    // A model that cannot be built is NO model, never a half-built one: every
+    // consumer then compares exactly as it did before the feature.
+    setCycleModel(null);
+    logError('cycle.model', e);
+  }
+}
+syncCycle();
+
+/** The model in force, brought up to date first (the date may have turned
+ *  since the last change). Null with tracking off. */
+export function currentCycleModel(): CycleModel | null {
+  syncCycle();
+  return getCycleModelSafe();
+}
+
 function emit() {
   syncUnits();
+  syncCycle();
   snapshotVersion++;
   cachedSnapshot = { state, v: snapshotVersion };
   listeners.forEach((l) => l());
@@ -421,6 +459,8 @@ export function flushSave() {
 try {
   RNAppState.addEventListener('change', (next) => {
     if (next !== 'active') persister.flush();
+    // A morning foreground is a new day for the cycle model's forecast.
+    else syncCycle();
   });
 } catch {
   // no AppState here — flushSave() remains available to callers
@@ -563,6 +603,12 @@ export function useStore<T>(selector: (snap: { state: AppState; v: number }) => 
     () => selector(cachedSnapshot),
     () => selector(cachedSnapshot),
   );
+}
+
+/** The cycle model in force, re-rendering when it is rebuilt. Null with
+ *  cycle-aware tracking off. */
+export function useCycleModel(): CycleModel | null {
+  return useStore(() => getCycleModelSafe());
 }
 
 /** Convenience: re-render on any state change, return the live state. */

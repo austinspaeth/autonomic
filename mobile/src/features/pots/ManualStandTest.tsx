@@ -405,8 +405,9 @@ export function ManualEpisode({ dk, controls, onSaved }: { dk: string; controls:
         <TextField label="HR before" unit="bpm" value={before} onChange={setBefore} keyboardType="numeric" />
         <TextField label="HR after" unit="bpm" value={after} onChange={setAfter} keyboardType="numeric" />
       </View>
-      <View style={{ flexDirection: 'row' }}>
-        <TextField label="HR after 60s" unit="bpm" value={later} onChange={setLater} keyboardType="numeric" />
+      <View style={{ flexDirection: 'row', gap: 10 }}>
+        <TextField label="HR @60s" unit="bpm" value={later} onChange={setLater} keyboardType="numeric" />
+        <View style={{ flex: 1 }} />
       </View>
       <SheetFooter>
         <Button title="Save episode" variant="primary" onPress={save} disabled={b == null || a == null || l == null} />

@@ -20,6 +20,9 @@ import { isRestType } from '../budget/load';
 import { exertionLine } from '../budget/baseline';
 import { typesFor } from '../typeResolve';
 import { gutSummaryLine, summarizeGut } from '../digestion';
+import { getCycleModel } from '../cycle/ambient';
+import { MODE_LABEL } from '../cycle/copy';
+import { findCycleInsight } from '../insights/cycle';
 import { distNum, distText, distUnit, fieldShown, fieldUnit, fmtHeight, fmtWater, fmtWeight, paceStr } from '../units';
 
 export type ReportRange = 'day' | 'week' | 'month' | 'year' | 'all';
@@ -248,6 +251,56 @@ SUMMARY: ${summary}
 ${lines.join('\n')}`;
 }
 
+/**
+ * The menstrual cycle, for the reports and the doctor summary.
+ *
+ * One line per CYCLE rather than per day: a reader maps any other section's
+ * dates onto phases from the cycle starts, and a year of "day 14, follicular"
+ * lines would bury the data that matters. Every ovulation line names its basis,
+ * because an estimate counted back from the next period and one read off a
+ * temperature rise are different strengths of evidence, and a forecast is
+ * never listed at all. The luteal-vs-follicular pattern comes from the same
+ * builder as the Insights card, so the two cannot disagree.
+ */
+function secCycle(state: AppState, keys: string[], ctx: ScoreContext) {
+  const model = getCycleModel();
+  // Tracking off: no section at all (see the renderer).
+  if (!model) return '';
+  if (!keys.length) return '(none recorded)';
+  const from = keys[0], to = keys[keys.length - 1];
+  const cycles = model.cycles.filter((c) => (c.next ?? to) >= from && c.start <= to);
+  if (!cycles.length) return '(none recorded)';
+  const BASIS: Record<string, string> = {
+    temperature: 'from an overnight temperature rise',
+    retrospective: 'estimated, counted back 14 days from the next period',
+  };
+  const lines = cycles.map((c) => {
+    const parts = [
+      `Cycle start (day 1)`,
+      c.length == null ? 'in progress' : c.plausible ? `length ${c.length} days` : `length ${c.length} days (outside 15 to 60, likely unlogged days; excluded from averages)`,
+      `period ${c.period.days} day${c.period.days === 1 ? '' : 's'}`,
+    ];
+    if (c.period.heavyDays) parts.push(`heavy flow on ${c.period.heavyDays} day${c.period.heavyDays === 1 ? '' : 's'}`);
+    const ov = model.ovulation[c.start];
+    if (ov && ov.basis !== 'calendar') parts.push(`ovulation ${ov.dk} (${BASIS[ov.basis]})`);
+    return `[${c.start}] ${parts.join(' | ')}`;
+  });
+  const spotting = keys.filter((k) => state.days[k]?.cycle?.flow === 'spotting');
+  if (spotting.length) lines.push(`Spotting outside a period logged on: ${spotting.join(', ')}`);
+  const st = model.stats;
+  const summary = [
+    `Cycle type chosen by the person: ${MODE_LABEL[model.mode]}`,
+    st.n >= 2 ? `median cycle ${Math.round(st.medianLength!)} days (range ${st.minLength} to ${st.maxLength}, ${st.n} recent cycles)` : '',
+    st.medianPeriod != null ? `median period ${Math.round(st.medianPeriod)} days` : '',
+    st.regular != null ? (st.regular ? 'recent cycles regular (spread 8 days or less)' : 'recent cycles irregular (spread over 8 days)') : '',
+  ].filter(Boolean).join(' | ');
+  const insight = findCycleInsight(model, state.days, ctx);
+  const pattern = insight?.kind === 'ready' && insight.rows.length
+    ? `\nPATTERN ACROSS ${insight.cycles} FINISHED CYCLES (luteal side, ovulation to period, against follicular side, period to ovulation; medians, a description not a test): ${insight.rows.map((r) => `${r.label} ${r.text}`).join('; ')}`
+    : '';
+  return `${summary}${pattern}\n${lines.join('\n')}`;
+}
+
 export function makeSectionRenderer(state: AppState, ctx: ScoreContext) {
   const days = state.days;
   const custom = state.customTypes;
@@ -269,8 +322,17 @@ export function makeSectionRenderer(state: AppState, ctx: ScoreContext) {
     cleanDays: ['CLEAN DAY STATUS', secCleanDays],
     notes: ['DAILY NOTES', (k) => secNotes(days, k)],
     pacing: ['PACING BUDGET (effort minutes)', (k) => secPacing(state, k, ctx)],
+    cycle: ['MENSTRUAL CYCLE', (k) => secCycle(state, k, ctx)],
   };
-  return (keys: string[], list: string[]) => list.map((key) => { const def = DEFS[key]; return def ? `${def[0]}:\n${def[1](keys)}` : ''; }).filter(Boolean).join('\n\n');
+  // A section whose body is EMPTY is left out entirely, title and all: the
+  // cycle section says nothing at all for somebody who never turned it on,
+  // rather than announcing "(none recorded)" about a feature they do not use.
+  return (keys: string[], list: string[]) => list.map((key) => {
+    const def = DEFS[key];
+    if (!def) return '';
+    const body = def[1](keys);
+    return body ? `${def[0]}:\n${body}` : '';
+  }).filter(Boolean).join('\n\n');
 }
 
 export function universalHeader(state: AppState, rangeText: string): string {
@@ -288,22 +350,22 @@ PERIOD ANALYZED: ${rangeText}`;
 export interface ReportCard { id: string; icon: string; title: string; desc: string; sections: string[]; focus: string; context?: string; instructions?: string }
 
 export const REPORT_CARDS: ReportCard[] = [
-  { id: 'overall', icon: 'chart', title: 'Overall Health Report', desc: 'One complete report covering every tracked area, with trends and recommendations.', sections: ['hrv', 'bp', 'rhr', 'sleep', 'activities', 'triggers', 'meds', 'supplements', 'symptoms', 'digestion', 'orthostatic', 'pacing', 'scores', 'cleanDays'], focus: 'Provide a comprehensive, well-structured analysis covering every tracked area of health for this period and how they interact.', instructions: 'Produce one well-organized report that addresses each of these areas as its own clearly labeled section, in this order: (1) HRV and autonomic function; (2) Recovery trajectory and realistic timeline; (3) Triggers and setbacks; (4) Sleep and its next-day impact; (5) Cardiovascular function (BP, resting HR, orthostatic response); (6) POTS and orthostatic patterns; (7) MCAS and histamine patterns; (8) Crash patterns and how to prevent them, including how the pacing budget and the measured daily load behaved in the days before each one; (9) Best days and what made them work; (10) Long COVID recovery position versus research benchmarks. For each area, use the actual numbers, note the trend, and give specific recommendations. Skip any area that has no supporting data rather than speculating. Close with an integrated summary of what is working, what is not, and the top priorities.' },
+  { id: 'overall', icon: 'chart', title: 'Overall Health Report', desc: 'One complete report covering every tracked area, with trends and recommendations.', sections: ['hrv', 'bp', 'rhr', 'sleep', 'activities', 'triggers', 'meds', 'supplements', 'symptoms', 'digestion', 'orthostatic', 'pacing', 'cycle', 'scores', 'cleanDays'], focus: 'Provide a comprehensive, well-structured analysis covering every tracked area of health for this period and how they interact.', instructions: 'Produce one well-organized report that addresses each of these areas as its own clearly labeled section, in this order: (1) HRV and autonomic function; (2) Recovery trajectory and realistic timeline; (3) Triggers and setbacks; (4) Sleep and its next-day impact; (5) Cardiovascular function (BP, resting HR, orthostatic response); (6) POTS and orthostatic patterns; (7) MCAS and histamine patterns; (8) Crash patterns and how to prevent them, including how the pacing budget and the measured daily load behaved in the days before each one; (9) Best days and what made them work; (10) Long COVID recovery position versus research benchmarks; (11) How the menstrual cycle moves these numbers, only if cycle data is present. For each area, use the actual numbers, note the trend, and give specific recommendations. Skip any area that has no supporting data rather than speculating. Close with an integrated summary of what is working, what is not, and the top priorities.' },
   { id: 'hrv', icon: 'heartPulse', title: 'HRV Deep Dive', desc: 'Autonomic analysis: RMSSD, power distribution, frequency peaks.', sections: ['hrv', 'scores'], focus: 'Deep analysis of autonomic nervous system function based on HRV data.', context: 'General reference: the LF (baroreflex) peak is typically targeted around 0.08–0.10 Hz.', instructions: 'Analyze current autonomic function, recovery trajectory, baroreflex training, imbalances. Cite HRV research.' },
   { id: 'trajectory', icon: 'trendUp', title: 'Recovery Trajectory', desc: 'Where you are in recovery and projected timeline.', sections: ['scores', 'hrv', 'rhr', 'sleep', 'symptoms', 'activities', 'cleanDays'], focus: 'Analyze position in long COVID recovery and provide realistic projections.', instructions: 'Position in recovery, markers achieved/needed, realistic timeline, accelerating/slowing factors. Cite recovery research.' },
   { id: 'triggers', icon: 'triangle', title: 'Trigger Analysis', desc: 'Trigger exposures, activities and patterns causing setbacks.', sections: ['triggers', 'activities', 'symptoms', 'digestion', 'hrv', 'scores'], focus: 'Identify specific triggers causing setbacks based on data patterns.', instructions: 'Identify triggers, magnitude, recovery time, compound effects. Cite relevant histamine/MCAS research where the data supports it.' },
   { id: 'sleep', icon: 'moon', title: 'Sleep Impact Report', desc: 'How sleep patterns affect autonomic function.', sections: ['sleep', 'hrv', 'scores'], focus: 'Correlate each night with the next morning HRV and the day score.', instructions: 'Sleep quality patterns, next-day impact, optimal parameters. Cite sleep/HRV research.' },
   { id: 'cardio', icon: 'heart', title: 'Cardiovascular Analysis', desc: 'BP, HR and orthostatic patterns.', sections: ['bp', 'rhr', 'orthostatic', 'activities'], focus: 'Analyze cardiovascular function from BP, HR and orthostatic responses.', instructions: 'BP regulation, HR response, orthostatic function, exercise tolerance. Cite POTS/dysautonomia research.' },
-  { id: 'pots', icon: 'standing', title: 'POTS/Orthostatic Patterns', desc: 'Orthostatic events and POTS severity.', sections: ['orthostatic', 'rhr', 'bp', 'symptoms'], focus: 'Examine orthostatic responses and POTS-related patterns.', context: 'POTS indicators: HR increase >30 bpm standing; asymmetric perfusion.', instructions: 'POTS severity, tolerance trends, triggers, recovery time. Cite POTS research; medication suggestions need a specialist.' },
+  { id: 'pots', icon: 'standing', title: 'POTS/Orthostatic Patterns', desc: 'Orthostatic events and POTS severity.', sections: ['orthostatic', 'rhr', 'bp', 'symptoms', 'cycle'], focus: 'Examine orthostatic responses and POTS-related patterns.', context: 'POTS indicators: HR increase >30 bpm standing; asymmetric perfusion.', instructions: 'POTS severity, tolerance trends, triggers, recovery time. Cite POTS research; medication suggestions need a specialist.' },
   { id: 'mcas', icon: 'cell', title: 'MCAS Pattern Analysis', desc: 'Histamine reactions and MCAS symptom patterns.', sections: ['symptoms', 'triggers', 'digestion', 'meds', 'scores'], focus: 'Identify mast cell activation patterns and triggers.', instructions: 'Reaction frequency/severity, triggers, and any treatment effectiveness visible in the data. Discuss MCAS research; prescriptions need physician guidance.' },
-  { id: 'crash', icon: 'trendDown', title: 'Crash Pattern Analysis', desc: 'What precedes crashes and how to prevent them.', sections: ['scores', 'hrv', 'activities', 'pacing', 'triggers', 'symptoms', 'sleep'], focus: 'Identify what precedes crashes and how to prevent them.', instructions: 'Crash precipitants, warning signs, recovery time, prevention. Cite PEM/pacing research.' },
+  { id: 'crash', icon: 'trendDown', title: 'Crash Pattern Analysis', desc: 'What precedes crashes and how to prevent them.', sections: ['scores', 'hrv', 'activities', 'pacing', 'triggers', 'symptoms', 'sleep', 'cycle'], focus: 'Identify what precedes crashes and how to prevent them.', instructions: 'Crash precipitants, warning signs, recovery time, prevention. Cite PEM/pacing research.' },
   { id: 'bestdays', icon: 'star', title: 'Best Days Analysis', desc: 'What made your best days work.', sections: ['scores', 'sleep', 'triggers', 'activities', 'hrv', 'cleanDays'], focus: 'Determine what made the best days possible and how to replicate them.', instructions: 'Common factors, replicable conditions, a best-day formula. Focus on actionable insights.' },
   { id: 'longcovid', icon: 'virus', title: 'Long COVID Recovery Insights', desc: 'Where you are vs research benchmarks.', sections: ['scores', 'hrv', 'symptoms', 'rhr', 'sleep', 'activities'], focus: 'Position within long COVID recovery research and benchmarks.', instructions: 'Position in spectrum, comparison to trajectories, outlook. Heavily cite 2023–2026 research.' },
   { id: 'doctor', icon: 'clipboard', title: 'Medical Summary For Doctor', desc: 'A print-ready clinical document (PDF) with your data in tables, ready to share with your doctor.', sections: ['hrv', 'bp', 'rhr', 'sleep', 'symptoms', 'digestion', 'orthostatic', 'meds', 'supplements', 'pacing', 'scores'], focus: 'Generate a structured medical summary suitable for sharing with providers.', instructions: 'Summarize recent metrics/trends, persisting symptoms, and notable concerns from the data, plus questions for a physician. Professional tone; do not assert diagnoses not present in the data.' },
 ];
 
 /** Every data section, in a stable order — used by the "Data export only" item. */
-const ALL_SECTION_KEYS = ['scores', 'hrv', 'bp', 'rhr', 'sleep', 'orthostatic', 'activities', 'triggers', 'meds', 'supplements', 'symptoms', 'digestion', 'pacing', 'cleanDays', 'notes'];
+const ALL_SECTION_KEYS = ['scores', 'hrv', 'bp', 'rhr', 'sleep', 'orthostatic', 'activities', 'triggers', 'meds', 'supplements', 'symptoms', 'digestion', 'pacing', 'cycle', 'cleanDays', 'notes'];
 
 /* ---------- all-time rollup ---------- */
 
@@ -432,14 +494,14 @@ FOCUS: Work out what is most likely driving this drop. Examine ALL of the data b
 
 ANALYSIS REQUESTED:
 1. THE SLIDE IN NUMBERS: Describe what actually changed across the slide days versus baseline: HRV (RMSSD, power, frequency balance), resting HR, BP, sleep, symptoms. Use the actual values.
-2. CANDIDATE EXPLANATIONS, RANKED: Evaluate each hypothesis with the evidence for and against it from the data: (a) oncoming illness or infection; (b) trigger exposure, including delayed or cumulative effects from before the window; (c) overexertion or post-exertional response; (d) sleep debt or disrupted sleep; (e) protocol lapses; (f) stress or other unlogged load. Name the most likely explanation and say how confident the data lets you be.
+2. CANDIDATE EXPLANATIONS, RANKED: Evaluate each hypothesis with the evidence for and against it from the data: (a) oncoming illness or infection; (b) trigger exposure, including delayed or cumulative effects from before the window; (c) overexertion or post-exertional response; (d) sleep debt or disrupted sleep; (e) protocol lapses; (f) stress or other unlogged load; (g) where a MENSTRUAL CYCLE section is present, cycle timing, judged against how far the score has dipped at the same point in past cycles. Name the most likely explanation and say how confident the data lets you be.
 3. SICKNESS CHECK: Autonomic shifts often precede symptoms. State which specific markers in this data do or do not look like a prodromal illness pattern (for example rising resting and sleeping HR, falling HRV with no matching load, worsening despite clean behavior).
 4. WHAT TO WATCH: The 2 or 3 measurements over the next 48 to 72 hours that would best confirm or rule out your leading explanation, with the thresholds that would change the verdict.
 5. WHAT TO DO NOW: Concrete rest-first guidance for the next few days, sized to the severity above. Note explicitly when symptoms or readings would warrant contacting a doctor.
 
 DATA FOR PERIOD (${rangeText}):
 
-${render(keys, ['scores', 'hrv', 'rhr', 'bp', 'sleep', 'activities', 'triggers', 'meds', 'supplements', 'symptoms', 'digestion', 'orthostatic', 'cleanDays', 'notes'])}`,
+${render(keys, ['scores', 'hrv', 'rhr', 'bp', 'sleep', 'activities', 'triggers', 'meds', 'supplements', 'symptoms', 'digestion', 'orthostatic', 'cycle', 'cleanDays', 'notes'])}`,
   };
 }
 
@@ -489,7 +551,7 @@ ANALYSIS REQUESTED:
 
 DATA FOR PERIOD (${rangeText}):
 
-${render(keys, ['scores', 'hrv', 'rhr', 'bp', 'sleep', 'activities', 'triggers', 'meds', 'supplements', 'symptoms', 'digestion', 'orthostatic', 'cleanDays', 'notes'])}`,
+${render(keys, ['scores', 'hrv', 'rhr', 'bp', 'sleep', 'activities', 'triggers', 'meds', 'supplements', 'symptoms', 'digestion', 'orthostatic', 'cycle', 'cleanDays', 'notes'])}`,
   };
 }
 
@@ -903,7 +965,7 @@ End your response by reminding the user that this is not a medical diagnosis, an
 export function buildDoctorPrompt(state: AppState, ctx: ScoreContext, range: ReportRange, currentKey: string): string {
   const { keys: allKeys, rangeText } = reportDateRange(range, currentKey, state.days);
   const keys = allKeys.filter((k) => state.days[k]).sort();
-  const sections = ['scores', 'hrv', 'bp', 'rhr', 'orthostatic', 'sleep', 'symptoms', 'digestion', 'meds', 'supplements', 'pacing', 'notes'];
+  const sections = ['scores', 'hrv', 'bp', 'rhr', 'orthostatic', 'sleep', 'symptoms', 'digestion', 'cycle', 'meds', 'supplements', 'pacing', 'notes'];
   const sparse = hasAnyData(state.days, keys) && entryCount(state.days, keys) < 4 ? '\nNOTE: Limited data was logged for this period, so keep the document brief and flag the small sample.\n' : '';
 
   // Self-entered demographics give the clinician context; age is derived from
@@ -926,11 +988,12 @@ DOCUMENT STRUCTURE (each item a titled section; use tables unless noted):
 5. SYMPTOM SUMMARY: A table Symptom | Occurrences | Typical severity | Dates / pattern | Notes, most frequent first.
 6. SLEEP SUMMARY: A table of nightly duration, quality, HR range, and stages when present, plus a one-line period average.
 7. BOWEL HABITS: Include only if bowel movements were logged. A table Measure | Value with rows for movements per tracked day, days with a movement (of days tracked), the form mix by Bristol range (Hard 1 to 2, Formed 3 to 4, Loose 5 to 6, Diarrhea 7), straining (mild and severe counts) and the longest run without one, taken from the SUMMARY line of the bowel movement data. Observations only; do not label the pattern as constipation, diarrhea or any other condition.
-8. MEDICATIONS & SUPPLEMENTS: A table Name | Dose / amount | How often logged | Notes.
-9. ACTIVITY & PACING: Include only if pacing data is present. A table Date | Budget (effort min) | Measured load (effort min) | Margin | Following 2 days | Steps, then one neutral line on how often the day's measured load stayed within the app's fitted budget. State plainly that the budget is a personalized ceiling the app fits from this patient's own history and is not a clinical target or a prescribed activity limit.
-10. TRENDS & TRAJECTORY: A brief objective narrative (3 to 6 sentences) of how the metrics moved across the period, using actual numbers. Observations only, no advice.
-11. QUESTIONS FOR THE VISIT: A short bulleted list of specific, data-grounded questions the patient may want to raise (for example about an orthostatic finding, an HRV trend, or a symptom cluster). Phrase them as the patient's questions, not as clinical recommendations.
-12. METHODOLOGY & LIMITATIONS: A brief closing footnote naming the data source and noting that consumer-device measurements and self-reported symptoms have accuracy limits and are not a substitute for clinical measurement.
+8. MENSTRUAL CYCLE: Include only if cycle data is present. A table Cycle start | Length (days) | Period (days) | Heavy-flow days | Ovulation (with its basis), most recent first, then the median cycle and period length. If the data includes a PATTERN line, add a small table Measure | Luteal vs follicular with its rows, and one neutral sentence that hormonal shifts across the cycle are known to move HRV, heart rate and orthostatic tolerance. Present ovulation estimates as estimates. Observations only: do not characterize the cycle as normal or abnormal and do not suggest a diagnosis.
+9. MEDICATIONS & SUPPLEMENTS: A table Name | Dose / amount | How often logged | Notes.
+10. ACTIVITY & PACING: Include only if pacing data is present. A table Date | Budget (effort min) | Measured load (effort min) | Margin | Following 2 days | Steps, then one neutral line on how often the day's measured load stayed within the app's fitted budget. State plainly that the budget is a personalized ceiling the app fits from this patient's own history and is not a clinical target or a prescribed activity limit.
+11. TRENDS & TRAJECTORY: A brief objective narrative (3 to 6 sentences) of how the metrics moved across the period, using actual numbers. Observations only, no advice.
+12. QUESTIONS FOR THE VISIT: A short bulleted list of specific, data-grounded questions the patient may want to raise (for example about an orthostatic finding, an HRV trend, or a symptom cluster). Phrase them as the patient's questions, not as clinical recommendations.
+13. METHODOLOGY & LIMITATIONS: A brief closing footnote naming the data source and noting that consumer-device measurements and self-reported symptoms have accuracy limits and are not a substitute for clinical measurement.
 
 Omit any section or table row that has no supporting data rather than showing blanks or speculating. Keep the finished document tight enough to print on two to three pages.
 ${sparse}

@@ -217,7 +217,25 @@ let ppiGiveUp: ReturnType<typeof setTimeout> | null = null;
 /** One fault-route report per session per outcome: a reconnect loop would otherwise repeat it. */
 let ppiReported = new Set<string>();
 
-function emit() { listeners.forEach((f) => f()); }
+/**
+ * Views are told about a change at most once per `EMIT_MS`, never once per
+ * sample. Android keeps a strap streaming while the app is in the background
+ * and hands the backlog to JS as a burst on the way back; each notification
+ * used to notify synchronously, every store update is a SyncLane render, and
+ * past 50 nested ones React throws "Maximum update depth exceeded" — the
+ * Android fatal whose trail is always `hrv:running > bg > fg`. `snap` itself
+ * is still rebuilt synchronously, so a reader never sees a stale value; only
+ * the re-render is batched.
+ */
+const EMIT_MS = 50;
+let emitTimer: ReturnType<typeof setTimeout> | null = null;
+function emit() {
+  if (emitTimer) return;
+  emitTimer = setTimeout(() => {
+    emitTimer = null;
+    listeners.forEach((f) => f());
+  }, EMIT_MS);
+}
 
 /** Rebuild the immutable snapshot views read. Called on every change. */
 function bump(patch: Partial<SessionSnapshot> = {}) {

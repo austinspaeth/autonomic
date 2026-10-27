@@ -50,6 +50,13 @@ export function fmtReleaseDate(iso: string): string {
 
 export const RELEASES: Release[] = [
   {
+    version: '1.38',
+    date: '2026-10-26',
+    notes: [
+      'NEW - Cycle impact tracking. Log your period or bring your history in from Apple Health or Health Connect, and see how your cycle moves your RMSSD, heart rate, symptoms and score. Your scores and warnings now account for it too.',
+    ],
+  },
+  {
     version: '1.37',
     date: '2026-10-24',
     notes: [

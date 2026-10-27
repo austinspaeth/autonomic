@@ -34,6 +34,7 @@ import { SleepConfirmSheet } from './Health';
 import { SleepReportSheet } from './SleepReport';
 import { useEntryForms } from './forms';
 import { useDrawers } from './drawers';
+import { CycleOfferCard, CycleSection } from './cycle/Cycle';
 
 export function JournalSections({ dk }: { dk: string }) {
   const p = usePalette();
@@ -45,6 +46,10 @@ export function JournalSections({ dk }: { dk: string }) {
   const day = d || { readings: [], activities: [], meds: [], symptoms: [], sleep: { bed: '', wake: '' }, food: { water: 0, meals: [], triggers: {} }, digestion: { movements: [] } };
   return (
     <>
+      {/* Cycle, right above Sleep: the one-time offer until it is answered,
+          then the Cycle card while tracking is on. */}
+      <CycleOfferCard dk={dk} />
+      <CycleSection dk={dk} />
       <SleepSection dk={dk} />
       {/* Readings */}
       <Card>

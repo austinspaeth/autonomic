@@ -17,6 +17,10 @@ import { MED_TYPES } from './registry';
 import { isPlausibleHpa, type PressureMap } from './pressure';
 import type {
   AppState,
+  BodyTempMap,
+  CycleFlow,
+  CycleMode,
+  CycleRecord,
   DayLoad,
   DayRecord,
   Entry,
@@ -243,6 +247,56 @@ function cleanLoad(v: unknown): DayLoad | undefined {
   };
 }
 
+const CYCLE_FLOWS: readonly CycleFlow[] = ['spotting', 'light', 'medium', 'heavy'];
+const CYCLE_MODES: readonly CycleMode[] = ['regular', 'irregular', 'contraception', 'perimenopause', 'pregnant'];
+
+/**
+ * A day's logged bleeding, kept. Like `load`, this is real health data that a
+ * cleaner which did not know the field would erase on the next launch, so it
+ * is rebuilt field by field: a flow this build does not know drops the record
+ * (no bleeding claimed) rather than guessing one.
+ */
+export function cleanCycle(v: unknown): CycleRecord | undefined {
+  if (!isPlainObject(v)) return undefined;
+  if (!CYCLE_FLOWS.includes(v.flow as CycleFlow)) return undefined;
+  const out: CycleRecord = { flow: v.flow as CycleFlow };
+  if (v.imported === true) out.imported = true;
+  if (typeof v.healthKey === 'string' && v.healthKey) out.healthKey = v.healthKey;
+  if (v.edited === true) out.edited = true;
+  if (typeof v.note === 'string' && v.note) out.note = v.note;
+  return out;
+}
+
+/** The cycle settings, or nothing. A mode this build does not know drops the
+ *  whole block, which reads as "never set up" and offers setup again — safer
+ *  than claiming phases under a promise the user never made. */
+function cleanCycleSettings(v: unknown): AppState['settings']['cycle'] | undefined {
+  if (!isPlainObject(v) || !CYCLE_MODES.includes(v.mode as CycleMode)) return undefined;
+  const out: NonNullable<AppState['settings']['cycle']> = { enabled: v.enabled === true, mode: v.mode as CycleMode };
+  if (typeof v.healthSync === 'boolean') out.healthSync = v.healthSync;
+  if (typeof v.headsUp === 'boolean') out.headsUp = v.headsUp;
+  if (typeof v.setupOn === 'string' && DATE_KEY_RE.test(v.setupOn)) out.setupOn = v.setupOn;
+  if (typeof v.typicalLength === 'number' && Number.isInteger(v.typicalLength) && v.typicalLength >= 15 && v.typicalLength <= 60) out.typicalLength = v.typicalLength;
+  return out;
+}
+
+/** Overnight temperatures (°C). A reading outside what a living body reports
+ *  overnight is a unit mix-up, not a fever, and is dropped. */
+function cleanBodyTemp(v: unknown): BodyTempMap | undefined {
+  if (!isPlainObject(v)) return undefined;
+  const ok = (x: unknown): x is number => typeof x === 'number' && isFinite(x) && x > 30 && x < 43;
+  const out: BodyTempMap = {};
+  for (const [dk, day] of Object.entries(v)) {
+    if (!DATE_KEY_RE.test(dk) || !isPlainObject(day)) continue;
+    const rec: { wrist?: number; bbt?: number; skin?: number } = {};
+    if (ok(day.wrist)) rec.wrist = day.wrist;
+    if (ok(day.bbt)) rec.bbt = day.bbt;
+    if (typeof day.skin === 'number' && isFinite(day.skin) && Math.abs(day.skin) < 5) rec.skin = day.skin;
+    if (Object.keys(rec).length) out[dk] = rec;
+  }
+  return Object.keys(out).length ? out : undefined;
+}
+
 /** A structurally-broken protocol crashes clean-day scoring; if any section is
  *  off-shape, drop the whole thing so the app falls back to its default. */
 function cleanProtocol(v: unknown): Protocol | undefined {
@@ -374,6 +428,11 @@ export function migrate(s: unknown): AppState {
       if (typeof pal.lastFired === 'string' && DATE_KEY_RE.test(pal.lastFired)) settings.pressureAlert.lastFired = pal.lastFired;
     } else delete settings.pressureAlert;
   }
+  if (settings.cycle !== undefined) {
+    const cyc = cleanCycleSettings(settings.cycle);
+    if (cyc) settings.cycle = cyc;
+    else delete settings.cycle;
+  }
 
   const profile: Record<string, unknown> = isPlainObject(src.profile) ? src.profile : {};
   const meta: Record<string, unknown> = isPlainObject(src.meta) ? src.meta : {};
@@ -388,6 +447,7 @@ export function migrate(s: unknown): AppState {
   }
 
   const pressure = cleanPressure(src.pressure);
+  const bodyTemp = cleanBodyTemp(src.bodyTemp);
   const out: AppState = {
     version: SCHEMA_VERSION,
     settings,
@@ -415,6 +475,7 @@ export function migrate(s: unknown): AppState {
     },
     days: {},
     ...(pressure ? { pressure } : {}),
+    ...(bodyTemp ? { bodyTemp } : {}),
   };
 
   // Retire catalog references to the removed upper/lower split. Hidden types
@@ -451,6 +512,7 @@ export function migrate(s: unknown): AppState {
       sleep = { ...sleep, bed: prevBed };
     }
     const load = cleanLoad(d.load);
+    const cycle = cleanCycle(d.cycle);
     out.days[k] = {
       sleep,
       readings: cleanEntries(d.readings),
@@ -461,6 +523,7 @@ export function migrate(s: unknown): AppState {
       digestion: { movements: cleanMovements(isPlainObject(d.digestion) ? d.digestion.movements : undefined) },
       ...(typeof d.notes === 'string' && d.notes ? { notes: d.notes } : {}),
       ...(load ? { load } : {}),
+      ...(cycle ? { cycle } : {}),
     };
   });
   out.meta.sleepReframed = true;

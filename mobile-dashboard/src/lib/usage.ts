@@ -60,7 +60,7 @@ export type UsageIndex = {
 
 export const KINDS: PingKind[] = [
   'open', 'sub', 'rst', 'lap', 'act', 'cap', 'hrv', 'sav', 'pay', 'not', 'pot', 'see', 'err',
-  'osh', 'odm', 'oac', 'ofl', 'log', 'use', 'fnd', 'rpt', 'rdg', 'mbp', 'rvw',
+  'osh', 'odm', 'oac', 'ofl', 'log', 'use', 'fnd', 'rpt', 'rdg', 'mbp', 'stp', 'rvw',
 ];
 
 export const TRIAL_LAST_DAY = 14;

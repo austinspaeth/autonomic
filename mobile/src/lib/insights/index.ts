@@ -45,11 +45,14 @@ import { PRESSURE_FACTOR_ID, buildFactors, factorProgress, type FactorProgress }
 import { lowPressureValue } from '../pressure';
 import { buildDayMatrix } from './matrix';
 import { findWeeks, type WeeksReport } from './weeks';
+import { findCycleInsight, type CycleInsight } from './cycle';
+import { getCycleModel } from '../cycle/ambient';
 import { findObservations, type Observation } from './observations';
 import { changeSinceStart, findWatchItems, overallDirection, type Overall, type SinceStart, type WatchItem } from './watch';
 
 export type { BiggestChange } from './change';
 export type { WeekBlock, WeekRow, WeeksReport } from './weeks';
+export type { CycleInsight, CycleRow } from './cycle';
 export type { DetailSeries } from './detail';
 export { factorPeak, markColumn } from './detail';
 export type { Correlation, NoImpactItem } from './correlate';
@@ -172,6 +175,11 @@ export interface InsightReport {
   /** Best weeks against the hardest ones, described. Null when the weeks were
    *  much alike or the journal is too short to have both. See ./weeks. */
   weeks: WeeksReport | null;
+  /** What each measurement does across the user's cycle (./cycle), or how far
+   *  the pattern has got. Null with cycle-aware tracking off, in a mode with
+   *  no phases, and on the demo. Optional so a cached report from before it
+   *  existed still reads. */
+  cycle?: CycleInsight | null;
   /**
    * The evidence behind each finding, keyed by `Correlation.id` /
    * `BiggestChange.id`: the outcome and factor columns it was computed from.
@@ -391,6 +399,7 @@ export function buildInsights(state: AppState, dk: string, opts: {
     noImpact,
     // The sample month is a welcome, not a history worth ranking weeks of.
     weeks: opts.demo ? null : findWeeks(matrix),
+    cycle: opts.demo ? null : findCycleInsight(getCycleModel(), state.days, ctx),
     detail,
     observations,
     watch,
@@ -416,7 +425,7 @@ export function buildInsights(state: AppState, dk: string, opts: {
  */
 export function emptyReport(dk: string, failed = false): InsightReport {
   return {
-    dk, demo: false, change: null, correlations: [], early: [], progress: [], noImpact: [], weeks: null, detail: {}, observations: [], watch: [], pressure: null,
+    dk, demo: false, change: null, correlations: [], early: [], progress: [], noImpact: [], weeks: null, cycle: null, detail: {}, observations: [], watch: [], pressure: null,
     overall: { direction: 'unknown', label: null, detail: 'not enough to compare yet' },
     since: null,
     confidence: { pct: 0, parts: [], topFix: null, daysLogged: 0 },

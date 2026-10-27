@@ -4514,7 +4514,10 @@
     { kind: 'rpt', slot: 'C', name: 'AI: medical summary for doctor', color: COLOR.green },
     { kind: 'mbp', slot: 'S', name: 'Morning card: shown', color: COLOR.muted },
     { kind: 'mbp', slot: 'T', name: 'Morning card: took the reading', color: COLOR.green },
-    { kind: 'mbp', slot: 'X', name: 'Morning card: closed', color: COLOR.red }
+    { kind: 'mbp', slot: 'X', name: 'Morning card: closed', color: COLOR.red },
+    { kind: 'stp', slot: 'C', name: 'Strap card: shown (camera)', color: COLOR.muted },
+    { kind: 'stp', slot: 'G', name: 'Strap card: shown (Garmin)', color: COLOR.s4 },
+    { kind: 'stp', slot: 'T', name: 'Strap card: Amazon tapped', color: COLOR.green }
   ];
 
   function renderSlotLines(ix, days, lines, chartId, noteId, emptyText) {
@@ -10287,6 +10290,7 @@
     { key: 'rpt', label: 'AI report', color: COLOR.s4, note: 'built an AI report' },
     { key: 'rdg', label: 'Reading kind', color: PC.reading, note: 'morning baseline, later baseline or training' },
     { key: 'mbp', label: 'Morning card', color: COLOR.s5, note: 'shown, took it, closed' },
+    { key: 'stp', label: 'Strap card', color: COLOR.s6, note: 'shown after failed readings, Amazon tapped' },
     { key: 'rvw', label: 'Review asked', color: COLOR.green, note: 'store review prompt requested (not necessarily shown)' }
   ];
 

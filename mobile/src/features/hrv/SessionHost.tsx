@@ -17,7 +17,7 @@
  * blank that card out on its way down.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
@@ -29,9 +29,12 @@ import { HrvSession } from './Session';
 import { HrvResults } from './Results';
 import { openCapture } from './Setup';
 import { TroubleSheet } from './Trouble';
+import { StrapSuggestionSheet } from './StrapSuggestion';
+import { weakSensorFor } from '../../lib/strapSuggest';
+import { strapSuggestionDue } from '../../store/strapSuggest';
 import { GarminSyncSheet } from './GarminSync';
 import { startGarminSync, stopGarminSync } from './garminSyncStore';
-import { garminDevices, subscribeGarminArrivals } from '../../lib/garmin/receiver';
+import { garminDevices, subscribeGarminArrivals, subscribeGarminFailures } from '../../lib/garmin/receiver';
 import { WatchSyncSheet } from './WatchSync';
 import { startWatchSync } from './watchSyncStore';
 import { setPillSlotClaim } from '../../store/pillSlot';
@@ -82,6 +85,21 @@ export function HrvSessionHost() {
     stopGarminSync();
   }), []);
 
+  // A Garmin reading that failed on the WRIST arrives as a diagnostic, never
+  // as a reading, so nothing above sees it. Counted always; the strap card
+  // only opens with the app in front of the user, stacked over whatever is up
+  // (usually the Garmin sync card, which its ✕ returns to).
+  useEffect(() => subscribeGarminFailures(() => {
+    const active = AppState.currentState === 'active';
+    if (!strapSuggestionDue('garmin', active)) return;
+    const s = getSessionSnapshot();
+    const cfg = s.config?.source === 'garmin' ? s.config : null;
+    openSheet((c) => (
+      <StrapSuggestionSheet sensor="garmin" controls={c} onRetry={cfg ? () => retry(cfg) : () => closeAll()} />
+    ), { fitContent: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }), [openSheet, retry]);
+
   useEffect(() => {
     if (status !== 'finished') { handed.current = false; sawSheet.current = false; return; }
     if (handed.current) return;
@@ -115,6 +133,15 @@ export function HrvSessionHost() {
       openSheet((c) => (
         <TroubleSheet config={cfg} stopped={stopped} controls={c} onRetry={() => retry(cfg)} />
       ), { dismissAll: true });
+      // A repeated failure with a weak sensor stacks the strap card OVER the
+      // tips, so its ✕ lands on them. Stopped by the app or given up on by the
+      // user ('Having issues?'); a camera reading finished by hand inside the
+      // grace period ('early') is an abandon, not a failure.
+      const weak = weakSensorFor(cfg.source);
+      if (weak && s.stopReason !== 'early' && strapSuggestionDue(weak)) {
+        // After the tips card has risen, so the two do not arrive as one lurch.
+        setTimeout(() => openSheet((c) => <StrapSuggestionSheet sensor={weak} controls={c} onRetry={() => retry(cfg)} />, { fitContent: true }), 450);
+      }
       return;
     }
 

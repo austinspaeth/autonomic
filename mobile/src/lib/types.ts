@@ -196,7 +196,58 @@ export interface DayRecord {
    *  the journal (not the flags store) because it is the user's own health
    *  data and must ride export/import the way `sleep` does. */
   load?: DayLoad;
+  /** Menstrual bleeding logged (or imported) for this day — see src/lib/cycle.
+   *  Absent means nothing was logged, which is UNKNOWN rather than "no
+   *  period": a phase is derived from the logged days, never stored. */
+  cycle?: CycleRecord;
 }
+
+/** How heavy a day's bleeding was. `spotting` is light bleeding outside a
+ *  period (HealthKit's intermenstrual bleeding); it never starts one. */
+export type CycleFlow = 'spotting' | 'light' | 'medium' | 'heavy';
+
+export interface CycleRecord {
+  flow: CycleFlow;
+  /** Came from Apple Health / Health Connect rather than being logged here. */
+  imported?: boolean;
+  /** The health store's sample id, so a delete can tombstone it. */
+  healthKey?: string;
+  /** Somebody changed an imported day by hand; a later Health read never
+   *  replaces it. */
+  edited?: boolean;
+  /** Free text from the entry card. */
+  note?: string;
+}
+
+/** What the cycle model may claim, chosen in the setup sheet. Each one is a
+ *  different promise about the body behind the data (src/lib/cycle/phase.ts):
+ *  only `regular` predicts, `irregular`/`perimenopause` read finished cycles
+ *  only, `contraception` knows bleeding days and nothing else, `pregnant`
+ *  pauses everything. */
+export type CycleMode = 'regular' | 'irregular' | 'contraception' | 'perimenopause' | 'pregnant';
+
+export interface CycleSettings {
+  enabled: boolean;
+  mode: CycleMode;
+  /** Write what is logged here to Apple Health / Health Connect, and read
+   *  what other apps logged there. Undefined is ON once Health is connected. */
+  healthSync?: boolean;
+  /** The "heads-up before your period" notification. Undefined is ON. */
+  headsUp?: boolean;
+  /** The day the setup sheet was finished, YYYY-MM-DD. */
+  setupOn?: string;
+  /** The cycle length the user says is typical for them, in days. A starting
+   *  point only: it forecasts until two cycles are logged and is never used
+   *  for a pattern (src/lib/cycle/model `predict`). */
+  typicalLength?: number;
+}
+
+/** Overnight temperature by day (src/lib/cycle/temperature.ts), °C. Top level
+ *  for the reason `pressure` is: an automatic reading is not a logged day.
+ *  `wrist` and `bbt` are absolute; `skin` is Health Connect's skin-temperature
+ *  DELTA from the device's own baseline, which is all some wearables report —
+ *  kept as a delta rather than turned into a made-up absolute. */
+export type BodyTempMap = Record<string, { wrist?: number; bbt?: number; skin?: number }>;
 
 /**
  * A day's passive load, read from Apple Health / Health Connect and summarised
@@ -359,6 +410,8 @@ export interface AppState {
      *  sweep has found in this journal, so there is nothing to opt into until
      *  then. `lastFired` is the day key, one a day. */
     pressureAlert?: { enabled: boolean; lastFired?: string };
+    /** Cycle-aware tracking (src/lib/cycle). Undefined = never set up. */
+    cycle?: CycleSettings;
   };
   profile: Profile;
   /** User-defined types layered on top of the registry maps (pure JSON defs). */
@@ -380,6 +433,8 @@ export interface AppState {
   /** Barometer samples by day (lib/pressure). Top level, never on a day record:
    *  an automatic reading is not a day the user logged. */
   pressure?: PressureMap;
+  /** Overnight temperature by day, for the cycle model's ovulation estimate. */
+  bodyTemp?: BodyTempMap;
 }
 
 export type ScoreCat = 'great' | 'good' | 'ok' | 'bad' | 'crash' | 'concerning' | 'warning';
@@ -421,6 +476,10 @@ export interface TypeDef {
   dosage?: string;
   /** True for user-created types (stored in state.customTypes). */
   userDefined?: boolean;
+  /** A cycle symptom (cramps, breast tenderness…). Always resolvable, so a
+   *  logged one keeps its label everywhere, but only OFFERED in the pickers
+   *  while cycle-aware tracking is on (see LogPicker). */
+  cycle?: boolean;
   /** How much a minute of this costs, for the pacing budget. Built-in
    *  activities never carry it — LOAD_TABLE in src/lib/budget/load.ts is the
    *  source for those, so the weights live in one readable table the way the

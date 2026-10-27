@@ -43,6 +43,36 @@ public class EcgHealthModule: Module {
       }
     }
 
+    // Delete the CATEGORY samples of one type that THIS APP saved inside a
+    // window. The kingstinct library can only delete quantity samples, and
+    // replacing a day's menstrual flow (an edit in the journal) needs the old
+    // sample gone first, or every app reading Apple Health sees two flows on
+    // one day. Restricted to HKSource.default() so another app's entry for the
+    // same day is never touched; HealthKit would refuse that anyway.
+    AsyncFunction("deleteOwnCategory") { (typeIdentifier: String, startMs: Double, endMs: Double, promise: Promise) in
+      let id = HKCategoryTypeIdentifier(rawValue: typeIdentifier)
+      guard let type = HKObjectType.categoryType(forIdentifier: id) else {
+        promise.reject("CYCLE_TYPE", "Unknown category type \(typeIdentifier)")
+        return
+      }
+      let window = HKQuery.predicateForSamples(
+        withStart: Date(timeIntervalSince1970: startMs / 1000.0),
+        end: Date(timeIntervalSince1970: endMs / 1000.0),
+        options: []
+      )
+      let ours = HKQuery.predicateForObjects(from: HKSource.default())
+      let predicate = NSCompoundPredicate(andPredicateWithSubpredicates: [window, ours])
+      self.store.deleteObjects(of: type, predicate: predicate) { _, _, error in
+        // "Nothing matched" is success for a replace: there was nothing of
+        // ours to remove.
+        if let error = error as NSError?, error.code != HKError.Code.errorNoData.rawValue {
+          promise.reject("CYCLE_DELETE", error.localizedDescription)
+        } else {
+          promise.resolve(true)
+        }
+      }
+    }
+
     // Query ECG samples recorded at or after `sinceMs` (epoch ms). `limit` caps
     // how many samples are returned, most-recent first.
     AsyncFunction("queryEcg") { (sinceMs: Double, limit: Int, promise: Promise) in
