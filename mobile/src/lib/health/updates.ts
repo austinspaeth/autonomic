@@ -26,6 +26,8 @@ import {
   type HealthUpdateSet, type UpdateMed, type UpdateReading,
 } from './updateSet';
 import { withAuthTimeout } from './askedAuth';
+import { workoutCandidateOf } from './workoutCandidate';
+import { correctedDistance } from './workoutDistance';
 
 export { allItemKeys, emptyUpdateSet, filterDeclined, filterSeen, splitForReview, updateCount, updateSignature };
 export { getDeclinedKeys, markDeclinedKeys } from './declined';
@@ -244,6 +246,49 @@ export async function repairSplitNights(): Promise<number> {
   }
   try { seenStore()?.set(KEY_SLEEP_REPAIRED, true); } catch { /* runs again next launch */ }
   return repaired;
+}
+
+/* ---------- one-time repair of inflated workout distances ---------- */
+
+// Before 1.38.1 an Android workout's distance summed EVERY app's Distance
+// records inside the session, so a Garmin run plus the phone's own step-based
+// distance was filed at nearly twice its length (./workoutDistance). This
+// re-reads each imported Android workout that carries a distance, once, and
+// lowers the ones the corrected read says were inflated. Only distance moves:
+// the rest of the entry, its note and its HR trace are left as they are.
+// Never requests a permission; a launch without Health flags nothing, so it
+// runs on a later one.
+const KEY_DISTANCE_REPAIRED = 'workoutDistanceRepaired';
+const DISTANCE_REPAIR_DAYS = 400;  // the backfill reaches back a year
+
+export async function repairWorkoutDistances(): Promise<number> {
+  if (Platform.OS !== 'android') return 0;
+  const api = health();
+  if (!api.available || !getState().settings.healthEnabled) return 0;
+  try { if (seenStore()?.getBoolean(KEY_DISTANCE_REPAIRED)) return 0; } catch { return 0; }
+  const oldest = addDays(todayKey(), -DISTANCE_REPAIR_DAYS);
+  const days = Object.entries(getState().days)
+    .filter(([dk, d]) => dk >= oldest && (d.activities || []).some(
+      (e) => e.imported && typeof e.healthKey === 'string' && Number(e.distance) > 0))
+    .map(([dk]) => dk);
+  let fixed = 0;
+  for (const dk of days) {
+    try {
+      const fresh = new Map((await api.readWorkouts(dk)).map((w) => [workoutCandidateOf(w).key, w]));
+      for (const e of [...(getState().days[dk]?.activities || [])]) {
+        if (!e.imported || typeof e.healthKey !== 'string') continue;
+        const w = fresh.get(e.healthKey);
+        const distance = w ? correctedDistance(e.distance, w.distanceMi) : null;
+        if (distance == null) continue;
+        const entry: Entry = { ...e, distance };
+        entry.scores = computeScores(entry, profileCtx(getState().profile));
+        upsertEntry(dk, 'activities', entry);
+        fixed++;
+      }
+    } catch (e) { logError('health.repairDistance', e); }
+  }
+  try { seenStore()?.set(KEY_DISTANCE_REPAIRED, true); } catch { /* runs again next launch */ }
+  return fixed;
 }
 
 /* ---------- "already shown" memory ---------- */

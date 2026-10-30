@@ -31,18 +31,38 @@ const PATCH = `    # ${MARKER}: fmt's FMT_CONSTEVAL breaks under newer Clang (Xc
     end
 `;
 
+// Xcode 27 refuses any iOS target below 15.0 outright (an error, not the old
+// warning), and a few pods (ReachabilitySwift, RNSVG's filters) still declare
+// 12.x. Lift them to the app's own floor; nothing at or above it is touched.
+const TARGET_MARKER = 'pod-deployment-target-floor';
+const TARGET_PATCH = `    # ${TARGET_MARKER}: Xcode 27 rejects iOS deployment targets below 15.0.
+    # Injected by plugins/withFmtConstevalFix.js.
+    installer.pods_project.targets.each do |t|
+      t.build_configurations.each do |c|
+        dt = c.build_settings['IPHONEOS_DEPLOYMENT_TARGET']
+        if dt && Gem::Version.new(dt) < Gem::Version.new('15.1')
+          c.build_settings['IPHONEOS_DEPLOYMENT_TARGET'] = '15.1'
+        end
+      end
+    end
+`;
+
 module.exports = function withFmtConstevalFix(config) {
   return withDangerousMod(config, [
     'ios',
     (cfg) => {
       const podfilePath = path.join(cfg.modRequest.platformProjectRoot, 'Podfile');
       let src = fs.readFileSync(podfilePath, 'utf8');
+      const anchor = 'post_install do |installer|';
       if (!src.includes(MARKER)) {
-        const anchor = 'post_install do |installer|';
         if (!src.includes(anchor)) {
           throw new Error('withFmtConstevalFix: no post_install hook found in the generated Podfile');
         }
         src = src.replace(anchor, `${anchor}\n${PATCH}`);
+        fs.writeFileSync(podfilePath, src);
+      }
+      if (!src.includes(TARGET_MARKER) && src.includes(anchor)) {
+        src = src.replace(anchor, `${anchor}\n${TARGET_PATCH}`);
         fs.writeFileSync(podfilePath, src);
       }
       return cfg;

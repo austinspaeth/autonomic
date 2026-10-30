@@ -24,6 +24,7 @@ import { NIGHT_END_HOUR, NIGHT_START_HOUR, nightKeyOf, summarizeHcSessions, type
 import { thinSeries, type HrPoint, type RespPoint } from '../sleep/night';
 import { activityTypeFromHc, workoutHrSeries } from './workoutMap';
 import { stepTotalFromRecords } from './stepTotal';
+import { largestSourceMeters, recordsForSession, sessionOwnMeters } from './workoutDistance';
 import { HISTORY_SLEEP_MIN_MIN, NIGHT_SERIES_MAX, emptyHistory, heaviestPerDay } from './index';
 import type {
   CycleImport, HealthApi, HealthDaySamples, ImportedReading, ImportedWorkout, SleepImport,
@@ -177,7 +178,9 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
     if (!mod.aggregateRecord || !(await ensureInit())) return null;
     try {
       const res = await mod.aggregateRecord({ recordType, timeRangeFilter: between(from, to) });
-      const v = Number(res?.[metric]);
+      // A count is a bare number; a length (Distance's DISTANCE) is an object.
+      const raw = res?.[metric];
+      const v = Number(raw && typeof raw === 'object' ? (raw as { inMeters?: unknown }).inMeters : raw);
       return Number.isFinite(v) ? v : null;
     } catch { return null; }
   }
@@ -264,7 +267,10 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
   /**
    * One exercise session → an ImportedWorkout. Sessions carry no distance or HR
    * of their own, so the Distance and HeartRate records logged while the
-   * session ran are aggregated here. Returns null for zero-length blips.
+   * session ran are read here — the SESSION'S OWN APP's records, never every
+   * app's summed (./workoutDistance: a Garmin run plus the phone's step-based
+   * distance was filed at 18.76 km for a 10.75 km run). Returns null for
+   * zero-length blips.
    */
   async function workoutOf(s: ExerciseRecord): Promise<ImportedWorkout | null> {
     const start = new Date(s.startTime);
@@ -275,11 +281,14 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
       readAll<DistanceRecord>('Distance', start, end),
       readAll<HrRecord>('HeartRate', start, end),
     ]);
-    const meters = dist.reduce((sum, r) => sum + (r.distance?.inMeters || 0), 0);
+    const origin = s.metadata?.dataOrigin;
+    const meters = sessionOwnMeters(dist, origin)
+      ?? (dist.length ? await aggregate('Distance', 'DISTANCE', start, end) : null)
+      ?? largestSourceMeters(dist);
     let avgHr: number | null = null; let minHr: number | null = null; let maxHr: number | null = null;
     let hrSum = 0; let hrN = 0;
     const hrPoints: { ms: number; bpm: number }[] = [];
-    for (const rec of hrRecords) {
+    for (const rec of recordsForSession(hrRecords, origin)) {
       for (const smp of rec.samples || []) {
         hrSum += smp.beatsPerMinute; hrN++;
         if (minHr == null || smp.beatsPerMinute < minHr) minHr = smp.beatsPerMinute;

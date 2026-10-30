@@ -175,7 +175,12 @@ old web app so old `export.json` files import directly.
   in a single `mutate()`. Sleep uses one range query bucketed by `groupNights`
   (`src/lib/health/sleepSummary.ts`, pure + tested) instead of 365 per-day reads;
   per-night HR and per-workout HR are the only per-item queries, pooled a few at
-  a time, with `onProgress` driving the sheet's status line.
+  a time, with `onProgress` driving the sheet's status line. On Android a
+  workout's distance and HR come from the SESSION'S OWN APP's records, never
+  every app's summed (`lib/health/workoutDistance.ts`, pure + tested): a Garmin
+  run plus the phone's step-based distance was filed at 18.76 km for 10.75.
+  `repairWorkoutDistances` (flags `workoutDistanceRepaired`) re-read and
+  LOWERED the inflated ones once; it never raises a distance.
 - **A night is STITCHED, and an imported night can still grow.** Google Health
   (Fitbit, Pixel Watch) writes one night to Health Connect as several sessions
   cut wherever the wearer woke, and Android used to file the longest PIECE
