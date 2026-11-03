@@ -8,8 +8,7 @@ keywords: "melatonin and HRV, melatonin for POTS, melatonin dysautonomia, melato
 date: 2026-11-03
 updated: 2026-11-03
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1519643381401-22c77e60520e?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Kinga Howard / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1686827986095-1982d3cf3dac?q=80&w=2286&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
 tldr: "Melatonin is a hormone that tells your body it is night, not a sedative that knocks you out. For POTS and long COVID sleep, a low dose taken at a consistent time usually beats a big dose taken late, and the clearest benefit to your HRV comes indirectly, through a better night. It can also nudge blood pressure down overnight, which is usually fine and sometimes a reason to go gently. Over-the-counter products vary wildly in actual content, so treat any effect as something to test against your own baseline rather than a given."
 categories:
   - food
