@@ -8,8 +8,7 @@ keywords: "orthostatic load, upright time POTS, orthostatic intolerance, time on
 date: 2026-11-04
 updated: 2026-11-04
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "kike vega / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1769416945759-4660fd121172?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
 tldr: "Orthostatic load is the total gravitational stress of being upright across a day: roughly how upright you are multiplied by how long. In POTS and dysautonomia, every minute on your feet forces your nervous system to defend blood pressure and brain blood flow against pooling, so load accumulates and symptoms track total upright time more closely than how 'busy' you were. Lying flat resets it. You lower load by breaking up standing, reclining for short horizontal rests, keeping legs moving when you must stand, and supporting blood volume, not by white-knuckling through."
 categories:
   - pots
