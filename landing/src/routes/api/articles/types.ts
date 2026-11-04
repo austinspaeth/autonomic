@@ -16,4 +16,7 @@ export type Article = {
   photoAttribution?: string;
   /** Optional Q&A pairs, rendered as a visible FAQ and emitted as FAQPage JSON-LD. */
   faq?: FaqItem[];
+  /** Minutes to read, counted from the body by the articles API. */
+  readMin?: number;
+  keywords?: string;
 };

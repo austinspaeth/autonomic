@@ -8,8 +8,8 @@ keywords: "small fiber neuropathy, small fiber neuropathy POTS, small fiber neur
 date: 2026-08-22
 updated: 2026-08-22
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1615669527499-501446dd48e1?q=80&w=2342&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-photoAttribution: "Unsplash"
+photoLocation: "/articles/small-fiber-neuropathy-pots-long-covid/cover.webp"
+photoAttribution: "Autonomic"
 tldr: "Small fiber neuropathy (SFN) is damage to the thin nerve fibers that carry pain, temperature and autonomic signals. It causes burning or tingling in the feet and hands plus autonomic problems like a racing heart on standing, poor sweating and gut trouble, which is why it overlaps heavily with POTS and long COVID. Because the same small fibers feed the heart's vagal control, SFN often travels with low HRV and orthostatic intolerance. It is diagnosed with a skin biopsy and autonomic tests, not a routine nerve conduction study. You cannot diagnose it at home, but tracking HRV, resting and standing heart rate and symptoms builds the picture your clinician needs."
 categories:
   - pots
@@ -134,7 +134,7 @@ Because the standard tests miss it, diagnosis leans on a different set of tools.
 | Nerve conduction study / EMG | Large, fast fibers | No, usually normal in pure SFN |
 | Quantitative sensory testing | Thresholds for warmth, cold and pain | Yes, functional small-fiber signal |
 
-The skin biopsy is the anchor: a pathologist counts intraepidermal nerve fiber density, and a low count supports the diagnosis. Autonomic tests like QSART and tilt/stand testing add the picture of how the autonomic small fibers are actually behaving. A clinician may also look for treatable causes, because small fiber neuropathy has a long list of them, including diabetes and prediabetes, thyroid disease, B12 deficiency, autoimmune conditions like Sjogren's, and post-viral triggers. Finding a cause matters, because some are reversible.
+The skin biopsy is the anchor: a pathologist counts intraepidermal nerve fiber density, and a low count supports the diagnosis. Autonomic tests like QSART and tilt/stand testing add the picture of how the autonomic small fibers are actually behaving. A clinician may also look for treatable causes, because small fiber neuropathy has a long list of them, including diabetes and prediabetes, thyroid disease, B12 deficiency, autoimmune conditions like [Sjögren's](/insights/pots/sjogrens-dysautonomia-pots/), and post-viral triggers. Finding a cause matters, because some are reversible.
 
 <div class="callout callout-warn">
   <strong>A normal EMG does not rule this out.</strong> If you have burning pain or autonomic symptoms and were told your nerve test was normal, that result only speaks to the large fibers. It is a common reason small fiber neuropathy goes unnamed for years. Small-fiber testing is a separate request.

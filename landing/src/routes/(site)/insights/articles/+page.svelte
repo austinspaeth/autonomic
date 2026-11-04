@@ -1,7 +1,9 @@
 <script lang="ts">
+  import BlogHero from '$lib/v2/blog/BlogHero.svelte';
+  import PostRow from '$lib/v2/blog/PostRow.svelte';
+  import BlogCta from '$lib/v2/blog/BlogCta.svelte';
+  import TopicChips from '$lib/v2/blog/TopicChips.svelte';
   import type { Article } from '../../../api/articles/types';
-  import ArticleLine from '$lib/ArticleLine.svelte';
-  import InsightsShell from '$lib/InsightsShell.svelte';
   import { articleHref } from '$lib/site';
 
   export let data: { articles?: Article[] };
@@ -55,14 +57,12 @@
   {@html `<script type="application/ld+json">${JSON.stringify(breadcrumbLd)}<\/script>`}
 </svelte:head>
 
-<InsightsShell>
-  <div class="articles-index">
-    <a class="article-back" href="/insights/">← Blog home</a>
-    <h1 class="h2">All articles</h1>
-    <div class="article-lines">
-      {#each articles as a (a.slug)}
-        <ArticleLine article={a} />
-      {/each}
-    </div>
-  </div>
-</InsightsShell>
+<BlogHero crumbs={[{ href: '/insights/', label: 'Blog' }, { label: 'All articles' }]} title="Every answer." lead={`All ${articles.length} articles, newest first.`}>
+  <TopicChips label="Or by topic" />
+</BlogHero>
+
+<section class="v2-sec bl-sec-top">
+  <div class="v2-wrap"><div class="bl-rows">{#each articles as a (a.slug)}<PostRow article={a} />{/each}</div></div>
+</section>
+
+<BlogCta />

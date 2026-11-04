@@ -17,6 +17,8 @@ const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const { storeUrl, GIVEAWAY_CAMPAIGN } = await import(pathToFileURL(join(root, 'src/lib/site.ts')).href);
 
 const TARGETS = [
+  // The one code the site shows: /download sniffs the phone and sends it to its store.
+  { file: 'static/qr-app.svg', url: 'https://autonomic.care/download/' },
   { file: 'static/qr-ios.svg', url: storeUrl('ios') },
   { file: 'static/qr-android.svg', url: storeUrl('android') },
   // The giveaway page's modal swaps these in (see aj-store-campaign in app.html).

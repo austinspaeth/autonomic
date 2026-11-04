@@ -1,15 +1,16 @@
 # Autonomic: Fact Sheet
 
-*Quick-reference facts for press. Everything here is confirmed against the
-shipping app. Items in [brackets] need Austin to confirm before external use.*
+*Quick-reference facts for press, matching autonomic.care/press. Everything here
+is confirmed against the shipping app.*
 
 | | |
 | --- | --- |
 | **Name** | Autonomic |
-| **Tagline** | See your nervous system recover. |
-| **What it is** | A private, offline-first app that scores your daily HRV, blood pressure, sleep and orthostatic readings against published medical thresholds, built for people recovering from POTS, dysautonomia, long COVID and post-viral illness. |
-| **Platforms** | iOS + Apple Watch · Android (Health Connect). Both live as of July 2026. |
-| **Price** | Free to use (no account). Autonomic Pro: **$7.99/month or $49.99/year**. Every install opens with 14 days of full Pro access, no card and no account. |
+| **Tagline** | Answers for the questions you live with. |
+| **What it is** | A private recovery journal for people living with POTS, long COVID, ME/CFS and dysautonomia. A five-minute morning reading becomes a daily score, a pacing budget and an early warning, and over weeks the app shows what lines up with better days. Health data stays on the phone. |
+| **Platforms** | iPhone with an Apple Watch app, and Android with Health Connect. Garmin watches through the Autonomic Connect IQ app. Both stores live since July 2026. |
+| **Price** | The journal is free forever, with no account and no ads. Autonomic Pro is **$7.99 a month or $49.99 a year**. Every install opens with 14 days of Pro, with no card. |
+| **Rating** | 4.9 on the App Store |
 | **Category** | Health & Fitness |
 | **Website** | https://autonomic.care |
 | **App Store** | https://apps.apple.com/app/id6789786971 |
@@ -20,45 +21,54 @@ shipping app. Items in [brackets] need Austin to confirm before external use.*
 
 ## What it does
 
-- **Lab-grade HRV, on your phone.** Captures beat-to-beat RR intervals live from a
-  Bluetooth chest strap, an Apple Watch, or your phone's camera (finger over the
-  lens). Computes SDNN, RMSSD, pNN50, PNS/SNS index, Baevsky stress index,
-  VLF/LF/HF power, LF/HF and coherence. Everything runs on-device, with artifact
-  correction, and a noisy reading refuses to fake a score.
-- **Every number graded, no black box.** Each metric is scored
-  great / good / ok / warning / crash against published research thresholds,
-  rolled into one daily Autonomic Score and a plain-language outlook for the day.
-- **POTS testing on the wrist (iOS).** A guided lie-and-stand test on Apple Watch,
-  haptic alert when heart rate climbs 30+ bpm over baseline, one-tap POTS episode
-  capture from the watch face, and a live HR monitor for symptomatic moments.
-- **A journal that measures.** Water, meals and food triggers, meds and
-  supplements, symptoms, activities, sleep, blood pressure, orthostatic tests and
-  digestion, plus your own custom types.
-- **Built for the appointment.** Analysis across days, weeks and months, plus
-  optional AI insights and a doctor-ready report.
+Four answers from one morning reading: *Is today a good day? How much can I do?
+Am I about to crash? What is actually helping?*
 
-## Privacy: the architecture, not a policy
+- **Journal + HRV.** A five-minute reading with the phone camera, an Apple Watch,
+  a Garmin or a chest strap (an optical band like the Polar Verity Sense works
+  too), plus sleep, symptoms, triggers, meds, water and digestion in a couple of
+  taps. Unlimited readings on every plan.
+- **Daily Autonomic Outlook.** The morning reading, sleep and resting heart rate
+  become a score out of 100 and plain guidance, graded against published
+  thresholds and the person's own baseline.
+- **Pacing budget.** A daily energy budget in hours and minutes that spends down
+  with steps, time upright and heart rate, and is judged on the two days after,
+  when crashes land.
+- **Crash warnings.** An early flag when the score slides for days, or when
+  several markers drift from the person's own normal at once.
+- **Insights.** Everything logged is tested against HRV, sleep and symptoms,
+  corrected for chance, and reported as linked, never proven.
+- **POTS stand test.** A guided lie-and-stand test on Apple Watch or a chest
+  strap, plus one-tap capture of real-life episodes like stairs or getting up.
+- **Cycle-aware tracking.** Readings and warnings compared with the same phase of
+  past cycles, so a predictable dip is not mistaken for a decline.
+- **AI reports.** Weeks of data turned into a doctor summary or health report by
+  the AI the person chooses. Nothing leaves the phone until they paste it.
+- **Apple Watch and Garmin.** Live heart rate with a buzz when it jumps 30 bpm
+  over its two-minute average, the stand test on the wrist, and today's pacing
+  budget at a glance.
 
-- **100% offline-first: no account, no cloud, no tracking, no ads.**
-- **The app has no backend.** Nothing is transmitted automatically. Everything is
-  stored on the device; the user owns it and can export it anytime.
-- Reads HRV, resting HR, sleep and blood pressure from Apple Health / Health
-  Connect, and writes back only what the user explicitly logs.
-- Because there is no server, **the developer cannot see, lose, or sell user data.
-  There is none to touch.**
+## Privacy
+
+- **No account, no ads, no cloud for health data.** Every reading, score and
+  insight is computed and stored on the phone.
+- Health data leaves the phone only in an export or AI report the person shares.
+- The app does send **anonymous usage counts and error reports** to a server, with
+  no identifier and no health data in them, so we can tell whether it works. The
+  privacy policy at autonomic.care describes exactly what is sent.
 
 ## What's free vs. Pro
 
-- **Free forever:** journaling (sleep, meds, symptoms, triggers, hydration,
-  meals), manual readings (blood pressure, resting heart rate, episodes), the
-  daily Autonomic Score and outlook, the Apple Watch heart-rate monitor, one live
-  HRV capture a day, 14 days of charts, and full export.
-- **Autonomic Pro adds:** unlimited live HRV captures, week/month/year progress,
-  full historical analysis, POTS stand testing and episode tracking, and AI
-  insights and doctor reports.
+- **Free forever:** the daily journal, manual readings (blood pressure, resting
+  heart rate), the daily Autonomic Outlook, crash warnings, **unlimited HRV
+  readings on every device**, POTS stand test and episode capture, the Apple Watch
+  heart-rate monitor, cycle tracking, 14 days of Progress charts, backups and full
+  export.
+- **Autonomic Pro adds:** the pacing budget, Insights, every Progress range and
+  full history, POTS test results, how the cycle moves the numbers, and AI reports.
 
 ## Important
 
 Autonomic is a personal journal and education tool, **not a medical device.** It
-does not diagnose, treat, or prevent any disease. Users are told to discuss any
-protocol or medication changes with their doctor.
+does not diagnose, treat, or prevent any disease, and it never tells anyone to
+start, stop or change a treatment.

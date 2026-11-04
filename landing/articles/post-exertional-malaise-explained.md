@@ -8,8 +8,8 @@ keywords: "post-exertional malaise, PEM, PEM long COVID, ME/CFS crash, why do I 
 date: 2026-05-19
 updated: 2026-05-19
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1517898717281-8e4385a41802?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Kinga Howard / Unsplash"
+photoLocation: "/articles/post-exertional-malaise-explained/cover.webp"
+photoAttribution: "Autonomic"
 tldr: "Post-exertional malaise (PEM) is a disproportionate worsening of symptoms after physical, mental, or emotional effort. Its defining trait is the delay: you often feel fine during and just after activity, then crash 12 to 48 hours later, and the crash can last days. Because of that lag, the usual \"push through it\" advice can be actively harmful. Pacing inside your energy envelope, guided by objective signals like a rising resting heart rate or a falling HRV trend, is the core of protecting a shaky recovery."
 categories:
   - postviral

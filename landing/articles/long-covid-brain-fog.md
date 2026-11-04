@@ -8,8 +8,8 @@ keywords: "long covid brain fog, brain fog, brain fog dysautonomia, brain fog wh
 date: 2026-07-27
 updated: 2026-07-27
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1780945806713-4bb884acec90?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "The Ridge Ohio / Unsplash"
+photoLocation: "/articles/long-covid-brain-fog/cover.webp"
+photoAttribution: "Autonomic"
 tldr: "Long COVID brain fog is a real, physical symptom, not a lack of effort. A big driver is autonomic: when you are upright, blood can pool in your legs and belly, cerebral blood flow can dip, and thinking gets harder. Many people find their fog eases when they lie down and worsens after standing, sitting up too long, big meals, poor sleep, or overexertion. You cannot always fix it overnight, but you can map when it hits and match a strategy to the cause. None of this is a diagnosis; rule out other causes with your clinician."
 categories:
   - postviral

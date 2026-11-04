@@ -1,23 +1,36 @@
 <script lang="ts">
   import { page } from '$app/stores';
   import type { Article } from '../../../api/articles/types';
-  import ArticleCover from '$lib/ArticleCover.svelte';
-  import ArticleCard from '$lib/ArticleCard.svelte';
-  import BlogEndCTA from '$lib/BlogEndCTA.svelte';
-  import InsightsShell from '$lib/InsightsShell.svelte';
-  import { formatDate, articleHref } from '$lib/site';
-  import TopicIcon from '$lib/TopicIcon.svelte';
-  import { getTopic, topicLabel } from '$lib/topics';
-  import { writerSlug } from '$lib/writers';
+  import { articleHref } from '$lib/site';
+  import { getTopic, topicLabel, topicArticles } from '$lib/topics';
+  import BlogHero from '$lib/v2/blog/BlogHero.svelte';
+  import FeaturedPost from '$lib/v2/blog/FeaturedPost.svelte';
+  import PostCard from '$lib/v2/blog/PostCard.svelte';
+  import BlogCta from '$lib/v2/blog/BlogCta.svelte';
+  import { TOPIC_GUIDES, GROUP_VISIBLE } from '$lib/topicGuides';
 
   export let data: { articles?: Article[] };
 
   $: slug = $page.params.topic ?? '';
   $: topic = getTopic(slug);
   $: longName = topic?.longName ?? topicLabel(slug);
-  $: inTopic = (data.articles ?? []).filter((a) => a.categories?.includes(slug));
+  $: inTopic = topicArticles(data.articles ?? [], slug);
   $: featured = inTopic[0];
   $: rest = inTopic.slice(1);
+
+  // A topic with a guide reads as one: orientation, a path, grouped questions,
+  // then every article newest first (the latest included, no separate feature).
+  $: guide = TOPIC_GUIDES[slug];
+  $: bySlug = new Map((data.articles ?? []).map((a) => [a.slug, a]));
+  $: startPath = (guide?.start ?? [])
+    .map((s) => ({ ...s, article: bySlug.get(s.slug) }))
+    .filter((s): s is typeof s & { article: Article } => Boolean(s.article));
+  $: startMin = startPath.reduce((n, s) => n + (s.article.readMin ?? 0), 0);
+  $: groups = (guide?.groups ?? [])
+    .map((g) => ({ ...g, posts: g.slugs.map((x) => bySlug.get(x)).filter((a): a is Article => Boolean(a)) }))
+    .filter((g) => g.posts.length);
+  $: everything = [...inTopic].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+  $: short = topic?.shortName ?? longName;
   // Thin/unknown hubs shouldn't be indexed.
   $: noindex = !topic || inTopic.length === 0;
   $: canonical = `https://autonomic.care/insights/${slug}/`;
@@ -74,61 +87,108 @@
   {@html `<script type="application/ld+json">${JSON.stringify(breadcrumbLd)}<\/script>`}
 </svelte:head>
 
-<InsightsShell>
-    <a class="article-back" href="/insights/">← All topics</a>
-    <div class="topic-head">
-      <h1 class="h2 topic-title"><span class="topic-ic topic-ic--lg" aria-hidden="true"><TopicIcon {topic} /></span>{longName}</h1>
-      {#if topic?.description}<p class="lead">{topic.description}</p>{/if}
-    </div>
+<BlogHero crumbs={[{ href: '/insights/', label: 'Blog' }, { label: longName }]} title={longName} lead={topic?.description ?? ''} />
 
-    {#if featured}
-      {@const featTopic = featured.categories?.[0]}
-      <article class="feat">
-        <a class="feat-art" href={articleHref(featured)}>
-          <ArticleCover
-            photoLocation={featured.photoLocation}
-            photoAttribution={featured.photoAttribution}
-            title={featured.title}
-            slug={featured.slug}
-            category={featTopic}
-            showTag={false}
-            eager
-          />
-        </a>
-        <div class="feat-body">
-          <div class="feat-meta">
-            <a class="feat-author" href={`/insights/writers/${writerSlug(featured.author)}/`}>{featured.author}</a>
-            <span class="feat-date">{formatDate(featured.date)}</span>
-            {#if featTopic}<a class="feat-tag" href={`/insights/${featTopic}/`}>{topicLabel(featTopic)}</a>{/if}
-          </div>
-          <a class="feat-title-link" href={articleHref(featured)}>
-            <h2 class="feat-title">{featured.title}</h2>
-          </a>
-          <p class="feat-tldr">{featured.tldr || featured.summary}</p>
-          <a class="feat-btn" href={articleHref(featured)}>Read the full story</a>
-        </div>
-      </article>
-    {/if}
-
-    {#if rest.length}
-      <div class="blog-list">
-        {#each rest as a (a.slug)}
-          <ArticleCard article={a} />
-        {/each}
+{#if guide}
+  <section class="v2-sec tg-intro-sec">
+    <div class="v2-wrap tg-intro" class:solo={!guide.facts?.length}>
+      <div class="tg-intro-copy">
+        <h2 class="v2-h2 sm">{guide.heading ?? `What ${short} actually is`}</h2>
+        {#each guide.intro as para}<p class="tg-p">{para}</p>{/each}
       </div>
-    {/if}
-
-    {#if !inTopic.length}
-      <p class="blog-empty">No articles in this topic yet, check back soon.</p>
-    {/if}
-
-    {#if inTopic.length > 1}
-      <p style="margin-top: 28px;">
-        <a class="bf-more" href={`/insights/articles/${slug}/`}>Browse all {inTopic.length} articles in {longName} →</a>
-      </p>
-    {/if}
-
-    <div style="margin-top: 48px;">
-      <BlogEndCTA />
+      {#if guide.facts?.length}
+        <aside class="tg-facts" aria-label="{short} at a glance">
+          <p class="tg-facts-h">{guide.factsTitle ?? 'At a glance'}</p>
+          {#each guide.facts as f}<div class="tg-fact"><b>{f.big}</b><span>{f.label}</span></div>{/each}
+        </aside>
+      {/if}
     </div>
-</InsightsShell>
+  </section>
+
+  {#if startPath.length}
+    <section class="v2-sec nopad-top">
+      <div class="v2-wrap bl-start">
+        <div class="bl-start-head">
+          <h2 class="v2-h2 sm">{(guide.startTitle ?? `New to ${short}? Read these {n} first.`).replace('{n}', String(startPath.length))}</h2>
+          <p class="v2-sub">{guide.startSub ?? 'Read them in order. Each one builds on the one before.'}</p>
+          {#if startMin}<p class="bl-start-total"><span></span>About {startMin} minutes total</p>{/if}
+        </div>
+        <ol class="bl-pillars">
+          {#each startPath as s, i (s.slug)}
+            <li>
+              <a href={articleHref(s.article)} class:last={i === startPath.length - 1}>
+                <span class="bl-pillar-n">{String(i + 1).padStart(2, '0')}</span>
+                <span class="bl-pillar-b"><b>{s.article.title}</b><span>{[s.why, s.article.readMin ? `${s.article.readMin} min` : ''].filter(Boolean).join(' · ')}</span></span>
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
+              </a>
+            </li>
+          {/each}
+        </ol>
+      </div>
+    </section>
+  {/if}
+
+  {#if groups.length}
+    <section class="v2-sec nopad-top">
+      <div class="v2-wrap">
+        <div class="v2-headrow end"><div><h2 class="v2-h2 sm">{guide.groupsTitle ?? `${short}, by what you are dealing with`}</h2></div></div>
+        <nav class="tg-jump" aria-label="Jump to a section">
+          {#each groups as g}<a href={`#${g.id}`}>{g.title}</a>{/each}
+        </nav>
+        <div class="tg-groups">
+          {#each groups as g (g.id)}
+            <div class="tg-group" id={g.id}>
+              <div class="tg-group-h"><h3>{g.title}</h3><span>{g.posts.length}</span></div>
+              <p class="tg-group-b">{g.blurb}</p>
+              {#each g.posts.slice(0, GROUP_VISIBLE) as a (a.slug)}<a class="bl-topic-a" href={articleHref(a)}>{a.title}</a>{/each}
+              {#if g.posts.length > GROUP_VISIBLE}
+                <details class="tg-more">
+                  <summary><span class="tg-more-o">Show {g.posts.length - GROUP_VISIBLE} more</span><span class="tg-more-c">Show fewer</span></summary>
+                  {#each g.posts.slice(GROUP_VISIBLE) as a (a.slug)}<a class="bl-topic-a" href={articleHref(a)}>{a.title}</a>{/each}
+                </details>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      </div>
+    </section>
+  {/if}
+
+  <section class="v2-sec white">
+    <div class="v2-wrap">
+      <div class="v2-headrow end">
+        <div><h2 class="v2-h2 sm">Everything on {short}</h2></div>
+        <a class="v2-link bl-headlink" href={`/insights/articles/${slug}/`}>As a list →</a>
+      </div>
+      <div class="bl-grid">
+        {#each everything as a (a.slug)}<PostCard article={a} />{/each}
+      </div>
+    </div>
+  </section>
+{:else}
+  {#if featured}
+    <section class="v2-sec bl-sec-top">
+      <div class="v2-wrap"><FeaturedPost article={featured} kicker="Newest in {topic?.shortName ?? longName}" showTopic={false} /></div>
+    </section>
+  {/if}
+
+  {#if rest.length}
+    <section class="v2-sec white">
+      <div class="v2-wrap">
+        <div class="v2-headrow end">
+          <div><p class="v2-eyebrow">{inTopic.length} answers</p><h2 class="v2-h2 sm">Everything on {topic?.shortName ?? longName}</h2></div>
+          <a class="v2-link bl-headlink" href={`/insights/articles/${slug}/`}>As a list →</a>
+        </div>
+        <div class="bl-grid">
+          {#each rest as a (a.slug)}<PostCard article={a} />{/each}
+        </div>
+      </div>
+    </section>
+  {/if}
+{/if}
+
+{#if !inTopic.length}
+  <p class="bl-empty">No articles in this topic yet, check back soon.</p>
+{/if}
+
+<BlogCta />

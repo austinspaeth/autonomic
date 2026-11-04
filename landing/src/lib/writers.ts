@@ -6,11 +6,14 @@
 export type Writer = {
   name: string;
   about: string;
+  /** A square headshot, shown round beside the byline. */
+  photo?: string;
 };
 
 export const writers: Record<string, Writer> = {
   'austin spaeth': {
     name: 'Austin Spaeth',
+    photo: '/press/founder-austin-spaeth.jpg',
     about:
       'Austin builds Autonomic, a private, offline journal for tracking autonomic recovery. He writes about HRV, POTS, dysautonomia and post-viral illness for the people living it, turning messy day-to-day data into signals you can actually act on.'
   }

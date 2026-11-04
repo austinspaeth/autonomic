@@ -1,8 +1,9 @@
 <script lang="ts">
+  import BlogHero from '$lib/v2/blog/BlogHero.svelte';
+  import PostRow from '$lib/v2/blog/PostRow.svelte';
+  import BlogCta from '$lib/v2/blog/BlogCta.svelte';
   import { page } from '$app/stores';
   import type { Article } from '../../../../api/articles/types';
-  import ArticleLine from '$lib/ArticleLine.svelte';
-  import InsightsShell from '$lib/InsightsShell.svelte';
   import { getWriter, writerName } from '$lib/writers';
 
   export let data: { articles?: Article[] };
@@ -49,23 +50,19 @@
   {@html `<script type="application/ld+json">${JSON.stringify(profileLd)}<\/script>`}
 </svelte:head>
 
-<InsightsShell>
-  <div class="articles-index">
-    <a class="article-back" href="/insights/">← Blog home</a>
-    <section class="author-box author-box--lead">
-      <p class="author-eyebrow">Writer</p>
-      <h1 class="author-name">{name}</h1>
-      {#if writer?.about}<p class="author-bio">{writer.about}</p>{/if}
-    </section>
+<BlogHero crumbs={[{ href: '/insights/', label: 'Blog' }, { label: 'Writers' }]} eyebrow="Writer" title={name} lead={writer?.about ?? ''}>
+  <svelte:fragment slot="top">{#if writer?.photo}<span class="bl-avatar xl"><img src={writer.photo} alt={name} width="96" height="96" /></span>{/if}</svelte:fragment>
+</BlogHero>
 
-    <h2 class="insights-section-title">Articles by {name}</h2>
-    <div class="article-lines">
-      {#each articles as a (a.slug)}
-        <ArticleLine article={a} />
-      {/each}
-    </div>
-    {#if !articles.length}
-      <p class="blog-empty">No articles yet.</p>
+<section class="v2-sec bl-sec-top">
+  <div class="v2-wrap">
+    <div class="v2-headrow end"><div><p class="v2-eyebrow">{articles.length} articles</p><h2 class="v2-h2 sm">Written by {name}</h2></div></div>
+    {#if articles.length}
+      <div class="bl-rows">{#each articles as a (a.slug)}<PostRow article={a} />{/each}</div>
+    {:else}
+      <p class="bl-empty">No articles yet.</p>
     {/if}
   </div>
-</InsightsShell>
+</section>
+
+<BlogCta />

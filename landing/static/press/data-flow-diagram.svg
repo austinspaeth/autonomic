@@ -1,50 +1,54 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 580" width="920" height="580" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" role="img" aria-label="Data-flow diagram: heart-rate sources feed into your phone, where data is captured, processed and stored on-device. Nothing is sent to any server or cloud; data leaves only when you choose to export it.">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 610" width="920" height="610" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif" role="img" aria-label="Data-flow diagram: heart-rate sources feed into your phone, where data is captured, processed and stored on-device. No health data is sent to any server or cloud; it leaves only when you choose to export it. The app sends only anonymous counts and error reports with no identifier.">
   <defs>
     <marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-      <path d="M0,0 L10,5 L0,10 z" fill="#475569"/>
+      <path d="M0,0 L10,5 L0,10 z" fill="#554d5b"/>
     </marker>
     <marker id="arrowGreen" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#059669"/>
     </marker>
   </defs>
 
-  <rect x="0" y="0" width="920" height="580" fill="#ffffff"/>
+  <rect x="0" y="0" width="920" height="610" fill="#ffffff"/>
 
   <!-- Title -->
-  <text x="40" y="46" font-size="24" font-weight="700" fill="#0F172A">Where your data goes, and where it stops</text>
-  <text x="40" y="72" font-size="15" fill="#64748B">Autonomic has no backend. Nothing is transmitted automatically.</text>
+  <text x="40" y="46" font-size="24" font-weight="700" fill="#231f28">Where your data goes, and where it stops</text>
+  <text x="40" y="72" font-size="15" fill="#6b6371">Your readings are captured, scored and stored on your phone, and never sent anywhere.</text>
 
   <!-- ===== Left: capture sources ===== -->
-  <text x="40" y="120" font-size="13" font-weight="700" fill="#94A3B8" letter-spacing="0.06em">CAPTURE SOURCES</text>
+  <text x="40" y="120" font-size="13" font-weight="700" fill="#8d8491" letter-spacing="0.06em">CAPTURE SOURCES</text>
 
   <!-- source boxes -->
-  <g font-size="14" fill="#0F172A">
-    <rect x="40" y="134" width="196" height="50" rx="10" fill="#F8FAFC" stroke="#E2E8F0"/>
+  <g font-size="14" fill="#231f28">
+    <rect x="40" y="134" width="196" height="50" rx="10" fill="#f2eff1" stroke="#e3dde2"/>
     <text x="60" y="164">Bluetooth chest strap</text>
 
-    <rect x="40" y="196" width="196" height="50" rx="10" fill="#F8FAFC" stroke="#E2E8F0"/>
+    <rect x="40" y="196" width="196" height="50" rx="10" fill="#f2eff1" stroke="#e3dde2"/>
     <text x="60" y="226">Apple Watch</text>
 
-    <rect x="40" y="258" width="196" height="50" rx="10" fill="#F8FAFC" stroke="#E2E8F0"/>
-    <text x="60" y="288">Phone camera (finger PPG)</text>
+    <rect x="40" y="258" width="196" height="50" rx="10" fill="#f2eff1" stroke="#e3dde2"/>
+    <text x="60" y="288">Phone camera</text>
 
-    <rect x="40" y="320" width="196" height="50" rx="10" fill="#F8FAFC" stroke="#E2E8F0"/>
-    <text x="60" y="344">Apple Health / Health</text>
-    <text x="60" y="362" font-size="14">Connect</text>
+    <rect x="40" y="320" width="196" height="50" rx="10" fill="#f2eff1" stroke="#e3dde2"/>
+    <text x="60" y="350">Garmin watch</text>
+
+    <rect x="40" y="382" width="196" height="50" rx="10" fill="#f2eff1" stroke="#e3dde2"/>
+    <text x="60" y="406">Apple Health / Health</text>
+    <text x="60" y="424" font-size="14">Connect</text>
   </g>
 
   <!-- arrows converging into phone -->
-  <g stroke="#475569" stroke-width="2" fill="none" marker-end="url(#arrow)">
+  <g stroke="#554d5b" stroke-width="2" fill="none" marker-end="url(#arrow)">
     <path d="M236,159 C300,175 320,250 372,286"/>
     <path d="M236,221 C300,235 330,262 372,290"/>
     <path d="M236,283 L372,294"/>
     <path d="M236,345 C300,330 330,308 372,300"/>
+    <path d="M236,407 C300,390 330,320 372,306"/>
   </g>
 
   <!-- ===== Center: the phone ===== -->
-  <rect x="372" y="96" width="212" height="404" rx="30" fill="#ffffff" stroke="#0F172A" stroke-width="2.5"/>
-  <rect x="446" y="110" width="64" height="12" rx="6" fill="#0F172A"/>
-  <text x="478" y="486" font-size="14" font-weight="700" fill="#0F172A" text-anchor="middle">Your phone</text>
+  <rect x="372" y="96" width="212" height="404" rx="30" fill="#ffffff" stroke="#231f28" stroke-width="2.5"/>
+  <rect x="446" y="110" width="64" height="12" rx="6" fill="#231f28"/>
+  <text x="478" y="486" font-size="14" font-weight="700" fill="#231f28" text-anchor="middle">Your phone</text>
 
   <!-- three on-device stages -->
   <g>
@@ -77,8 +81,8 @@
     <!-- no-symbol over cloud -->
     <circle cx="742" cy="158" r="40" fill="none" stroke="#EF4444" stroke-width="4"/>
     <line x1="714" y1="130" x2="770" y2="186" stroke="#EF4444" stroke-width="4"/>
-    <text x="742" y="238" font-size="13" font-weight="700" fill="#B91C1C" text-anchor="middle">No server · No cloud</text>
-    <text x="742" y="257" font-size="13" font-weight="700" fill="#B91C1C" text-anchor="middle">No account · No tracking</text>
+    <text x="742" y="238" font-size="13" font-weight="700" fill="#B91C1C" text-anchor="middle">No cloud for your health data</text>
+    <text x="742" y="257" font-size="13" font-weight="700" fill="#B91C1C" text-anchor="middle">No account · No ads</text>
   </g>
 
   <!-- blocked arrow from phone toward cloud -->
@@ -90,15 +94,16 @@
 
   <!-- ===== Bottom right: user-initiated export (the only egress) ===== -->
   <g>
-    <rect x="672" y="360" width="150" height="86" rx="12" fill="#F8FAFC" stroke="#E2E8F0"/>
-    <text x="747" y="392" font-size="13.5" font-weight="700" fill="#0F172A" text-anchor="middle">Export /</text>
-    <text x="747" y="412" font-size="13.5" font-weight="700" fill="#0F172A" text-anchor="middle">doctor report</text>
-    <text x="747" y="432" font-size="11.5" fill="#64748B" text-anchor="middle">only when you tap Share</text>
+    <rect x="652" y="360" width="196" height="86" rx="12" fill="#f2eff1" stroke="#e3dde2"/>
+    <text x="750" y="392" font-size="13.5" font-weight="700" fill="#231f28" text-anchor="middle">Export /</text>
+    <text x="750" y="412" font-size="13.5" font-weight="700" fill="#231f28" text-anchor="middle">doctor report</text>
+    <text x="750" y="432" font-size="11.5" fill="#6b6371" text-anchor="middle">only when you tap Share or Copy</text>
   </g>
-  <path d="M584,420 L666,410" stroke="#059669" stroke-width="2" fill="none" marker-end="url(#arrowGreen)"/>
+  <path d="M584,420 L646,410" stroke="#059669" stroke-width="2" fill="none" marker-end="url(#arrowGreen)"/>
   <text x="600" y="450" font-size="11.5" fill="#059669">you choose</text>
 
   <!-- footer -->
-  <line x1="40" y1="524" x2="880" y2="524" stroke="#E2E8F0"/>
-  <text x="40" y="552" font-size="13.5" fill="#475569">The only way data leaves your phone is an export <tspan font-weight="700" fill="#0F172A">you</tspan> initiate. The developer never has access. There is no backend to hold it.</text>
+  <line x1="40" y1="524" x2="880" y2="524" stroke="#e3dde2"/>
+  <text x="40" y="552" font-size="13.5" fill="#554d5b">Your health data leaves your phone only in an export <tspan font-weight="700" fill="#231f28">you</tspan> start. There is no account, and no server of ours holds it.</text>
+  <text x="40" y="576" font-size="13.5" fill="#554d5b">The app sends only anonymous counts and error reports with no identifier, never a reading or a symptom.</text>
 </svg>

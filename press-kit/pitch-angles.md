@@ -29,8 +29,8 @@ served mostly by hobby apps and wrist-guess trackers.
 > this actually getting better? So I built one. It's called Autonomic: it
 > captures lab-grade HRV from a chest strap, an Apple Watch, or just a finger over
 > the camera, grades every reading against published thresholds instead of a
-> black-box score, and keeps 100% of it on the device: no account, no cloud, no
-> backend.
+> black-box score, and keeps health data on the device: no account and no cloud
+> for it.
 >
 > It just launched on iOS and Android, it's free to use, and it's one person, no
 > VC, no data to sell. I thought it might fit your readers. Press kit here:
@@ -46,24 +46,24 @@ served mostly by hobby apps and wrist-guess trackers.
 security/privacy, EFF-adjacent newsletters, Lifehacker/How-To Geek "private
 alternatives" pieces, privacy directories, r/privacy.
 **The hook:** in an era of period-tracker/Dobbs fear, Flo's FTC settlement, and AI
-companies hoovering health chats, here's a health app that *architecturally
-cannot* leak your data.
+companies hoovering health chats, here's a health app with no cloud for your
+health data at all.
 
 ### Template
 
-> **Subject:** A health app with no backend, and its developer can't see your data because there isn't any
+> **Subject:** A health app that keeps your health data on your phone, and has no cloud to leak it
 >
 > Hi [Name],
 >
 > [One specific sentence tying to their beat, e.g. "Given your reporting on
 > health-data brokers, this might be the clean counter-example."]
 >
-> Most health apps ask you to trust a privacy policy. Autonomic doesn't have a
-> server to trust. It's an offline-first app for chronic-illness recovery (POTS,
-> long COVID, dysautonomia) that captures and scores HRV, sleep and blood pressure
-> entirely on the phone: no account, no cloud, no analytics, no AI training set.
-> There's no backend, so as the developer I have no ability to see, lose, or sell
-> user data. It's not a policy; it's the architecture.
+> Most health apps ask you to trust a privacy policy. Autonomic doesn't hold your
+> health data to begin with. It's an app for chronic-illness recovery (POTS, long
+> COVID, ME/CFS, dysautonomia) that captures and scores HRV, sleep and symptoms
+> entirely on the phone: no account, no cloud for health data, no AI training set.
+> The only thing it sends is anonymous counts and error reports with no
+> identifier. It's not a policy; it's the architecture.
 >
 > The audience makes it sharper: these are people with real insurance and
 > employment anxieties about health data, and every serious competitor is
@@ -71,7 +71,7 @@ cannot* leak your data.
 >
 > Press kit (with a data-flow diagram showing exactly what stays on-device):
 > [link]. Happy to walk through the engineering: BLE RR-interval parsing,
-> on-device HRV, no network calls.
+> on-device HRV, and exactly what the anonymous counts contain.
 >
 > [Austin] · autonomic.care
 

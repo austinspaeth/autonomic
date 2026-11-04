@@ -43,12 +43,14 @@ too, then it's done exactly what I hoped.
 ## The product/privacy bridge (for a reporter who needs the "so what")
 
 Because Austin built Autonomic for himself first, it works the way a patient
-actually needs: it captures real beat-to-beat HRV from a chest strap, an Apple
-Watch, or a phone camera, and grades every reading against published medical
-thresholds instead of a black-box score. And it keeps every byte on the device:
-no account, no cloud, no backend, so the developer himself can't see, lose, or
-sell user data. For an audience with real anxieties about who touches their health
-information, that isn't a privacy *policy*; it's the architecture.
+actually needs: a five-minute morning reading from the phone camera, an Apple
+Watch, a Garmin or a chest strap becomes a daily score, a pacing budget and an
+early warning, graded against published thresholds and the person's own baseline
+instead of a black-box score. And it keeps health data on the device: no account,
+no cloud for health data, and the only automatic traffic is anonymous counts and
+error reports with no identifier. For an audience with real anxieties about who
+touches their health information, that isn't a privacy *policy*; it's the
+architecture.
 
 ---
 
@@ -57,5 +59,7 @@ information, that isn't a privacy *policy*; it's the architecture.
 - **Never promise recovery.** His own line is honest: "I'm not healed, and I won't
   pretend otherwise." Say "see what's helping," never "get better."
 - **The app is a journal and education tool, not a medical device.**
-- The privacy claim is literally true and load-bearing: no account, no cloud, no
-  backend, developer can't access user data.
+- The privacy claim must stay exactly true: no account, no cloud for health data,
+  health data never leaves the phone unless the user exports it. The app does send
+  anonymous counts and error reports with no identifier, so never say "no server"
+  or "nothing is transmitted".

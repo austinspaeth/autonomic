@@ -19,7 +19,7 @@ faq:
   - q: "What can I track in the Autonomic app?"
     a: "Readings like HRV, resting heart rate, blood pressure, oxygen saturation and guided orthostatic stand tests, plus sleep, symptoms, meds and supplements, meals, hydration, triggers and activities. Everything lives in one journal, so the numbers and the context that explains them stay side by side."
   - q: "Do I need an Apple Watch or a chest strap to use it?"
-    a: "No. Autonomic can capture live HRV with a Bluetooth chest strap or your phone's camera, import from the health data already on your phone, or take readings you type in from any cuff, ring or oximeter. It scores whatever you record; better hardware sharpens the data but nothing is required to start."
+    a: "No. Autonomic can capture live HRV with a Bluetooth chest strap or your phone's camera, import from the health data already on your phone, or take readings you type in from any cuff or ring. It scores whatever you record; better hardware sharpens the data but nothing is required to start."
   - q: "Is Autonomic private?"
     a: "Yes, by architecture rather than by policy. The app is offline-first: your journal is stored on your device, there is no account and no cloud sync, and your data never leaves your phone unless you choose to export it."
   - q: "Does Autonomic work on Android?"
@@ -101,7 +101,7 @@ Autonomic tracks the vital signs that actually move during autonomic recovery, a
 - **Symptoms, meds, meals, hydration and triggers**: kept in the same journal as the numbers, so "why was that a bad week?" becomes a question your own data can answer.
 
 <div class="callout callout-note">
-  <strong>Start with what you own.</strong> A chest strap, a ring, a cuff, a pulse oximeter, or nothing but your phone. Autonomic scores whatever you record; nothing on this list is required to begin.
+  <strong>Start with what you own.</strong> A chest strap, a watch, a ring, a cuff, or nothing but your phone. Autonomic scores whatever you record; nothing on this list is required to begin.
 </div>
 
 ## It warns you before the crash

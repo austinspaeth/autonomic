@@ -2,6 +2,10 @@ import type { Article } from '../api/articles/types';
 import { isoDate, articleHref } from '$lib/site';
 import { allTopics } from '$lib/topics';
 import { writerSlug } from '$lib/writers';
+import { FEATURES } from '$lib/v2/features';
+import { CONDITIONS } from '$lib/v2/conditions';
+import { SOURCES_REVIEWED } from '$lib/v2/sources';
+import { RIVALS, CHECKED } from '$lib/v2/compare';
 
 export const prerender = true;
 
@@ -23,6 +27,17 @@ export async function GET() {
 
   const urls = [
     { loc: `${BASE}/`, priority: '1.0' },
+    // Feature pages carry the date they were last checked against their sources.
+    { loc: `${BASE}/features/`, lastmod: SOURCES_REVIEWED, priority: '0.9' },
+    ...FEATURES.map((f) => ({ loc: `${BASE}${f.href}`, lastmod: SOURCES_REVIEWED, priority: '0.9' })),
+    // Live, but kept out of the curated FEATURES list (nav, footer, cards).
+    { loc: `${BASE}/features/apple-watch/`, lastmod: SOURCES_REVIEWED, priority: '0.7' },
+    { loc: `${BASE}/conditions/`, lastmod: SOURCES_REVIEWED, priority: '0.8' },
+    ...CONDITIONS.map((c) => ({ loc: `${BASE}${c.href}`, lastmod: SOURCES_REVIEWED, priority: '0.9' })),
+    { loc: `${BASE}/pricing/`, priority: '0.8' },
+    { loc: `${BASE}/compare/`, lastmod: CHECKED, priority: '0.8' },
+    ...RIVALS.map((r) => ({ loc: `${BASE}/compare/${r.slug}/`, lastmod: CHECKED, priority: '0.8' })),
+    { loc: `${BASE}/story/`, priority: '0.5' },
     { loc: `${BASE}/insights/`, priority: '0.8' },
     { loc: `${BASE}/insights/articles/`, priority: '0.6' },
     { loc: `${BASE}/press/`, priority: '0.5' },

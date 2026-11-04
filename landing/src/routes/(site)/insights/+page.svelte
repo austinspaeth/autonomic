@@ -1,47 +1,60 @@
 <script lang="ts">
   import type { Article } from '../../api/articles/types';
-  import ArticleCover from '$lib/ArticleCover.svelte';
-  import RecentCard from '$lib/RecentCard.svelte';
-  import TopicIcon from '$lib/TopicIcon.svelte';
-  import BlogEndCTA from '$lib/BlogEndCTA.svelte';
-  import InsightsShell from '$lib/InsightsShell.svelte';
-  import { formatDate, articleHref, PILLARS } from '$lib/site';
-  import { allTopics, topicLabel } from '$lib/topics';
-  import { writerSlug } from '$lib/writers';
+  import { articleHref, PILLARS } from '$lib/site';
+  import { barTopics, topicArticles } from '$lib/topics';
+  import BlogHero from '$lib/v2/blog/BlogHero.svelte';
+  import TopicChips from '$lib/v2/blog/TopicChips.svelte';
+  import PostCard from '$lib/v2/blog/PostCard.svelte';
+  import PostRow from '$lib/v2/blog/PostRow.svelte';
+  import BlogCta from '$lib/v2/blog/BlogCta.svelte';
+  import ReviewStrip from '$lib/v2/ReviewStrip.svelte';
+  import { SYMPTOMS, bySlugs } from '$lib/v2/blogData';
 
   export let data: { articles?: Article[] };
 
   const articles: Article[] = data.articles ?? [];
-  $: featured = articles[0];
-  // A tight "Latest" strip (3-up), the rest of the page is organized by topic.
-  $: recent = articles.slice(1, 4);
+  // The hero carries the newest answer; the grid picks up after it.
+  const latest = articles[0];
+  const recent = articles.filter((a) => a !== latest).slice(0, 6);
 
   // The cornerstone guides, resolved from PILLARS against the live article list.
-  $: pillars = PILLARS.map((slug) => articles.find((a) => a.slug === slug)).filter(
-    (a): a is Article => Boolean(a)
-  );
+  const pillars = bySlugs(articles, PILLARS);
+  const pillarMin = pillars.reduce((n, a) => n + (a.readMin ?? 0), 0);
 
-  // One section per topic hub: the newest few articles in that category, in nav order.
-  $: topicSections = allTopics()
-    .map((t) => ({ topic: t, posts: articles.filter((a) => a.categories?.includes(t.slug)).slice(0, 3) }))
-    .filter((s) => s.posts.length > 0);
+  const symptoms = SYMPTOMS.map((s) => ({ ...s, posts: bySlugs(articles, s.slugs) })).filter((s) => s.posts.length);
 
-  const faq = [
-    {
-      q: 'What is HRV, in one sentence?',
-      a: 'Heart rate variability is the tiny beat-to-beat variation in the time between your heartbeats, more variation usually means a more flexible, better-regulated nervous system.'
-    },
-    {
-      q: 'Do I need special hardware to use any of this?',
-      a: 'No. You can log readings from a ring, chest strap, BP cuff or pulse oximeter, Autonomic scores whatever you record.'
-    },
-    {
-      q: 'Is anything here medical advice?',
-      a: 'No. These are educational field notes to help you read your own data and have better conversations with your clinician, they do not diagnose or treat.'
-    }
-  ];
+  // One card per topic hub: its count and newest three.
+  // "Browse by topic" covers the conditions and subjects; the app has its own hero chip.
+  const topicCards = barTopics()
+    .filter((t) => t.slug !== 'app')
+    .map((t) => {
+      const inTopic = topicArticles(articles, t.slug);
+      return { topic: t, count: inTopic.length, posts: inTopic.slice(0, 3) };
+    })
+    .filter((c) => c.count > 0);
 
-  $: blogLd = {
+  /* "What is bothering you most?": a card opens its reading list under the grid.
+     Without the script each card is a plain link to its first answer. */
+  const symScript = `<script>
+(function () {
+  var cards = document.querySelectorAll('[data-sym]');
+  cards.forEach(function (c) {
+    c.addEventListener('click', function (e) {
+      e.preventDefault();
+      var id = c.getAttribute('data-sym'), open = c.getAttribute('aria-expanded') === 'true';
+      cards.forEach(function (o) { o.setAttribute('aria-expanded', 'false'); });
+      document.querySelectorAll('[data-sym-panel]').forEach(function (p) { p.hidden = true; });
+      if (!open) {
+        c.setAttribute('aria-expanded', 'true');
+        var p = document.querySelector('[data-sym-panel="' + id + '"]');
+        if (p) p.hidden = false;
+      }
+    });
+  });
+})();
+<\/script>`;
+
+  const blogLd = {
     '@context': 'https://schema.org',
     '@type': 'Blog',
     name: 'The Autonomic Blog',
@@ -94,117 +107,93 @@
   {@html `<script type="application/ld+json">${JSON.stringify(breadcrumbLd)}<\/script>`}
 </svelte:head>
 
-<!-- Everything, including the top hero, lives in the main (right) column. -->
-<InsightsShell>
-  <!-- Top part (kept from the original blog home) - main page only. -->
-  <div class="blog-head blog-head--left">
-    <p class="eyebrow">The Autonomic blog</p>
-    <h1 class="h2">Reading your nervous system, in plain language.</h1>
-    <p class="lead">
-      Field notes on HRV, POTS, dysautonomia and post-viral recovery, what the numbers mean, and
-      how to turn them into better days.
-    </p>
-  </div>
 
-  {#if featured}
-    {@const topic = featured.categories?.[0]}
-    <article class="feat">
-      <a class="feat-art" href={articleHref(featured)}>
-        <ArticleCover
-          photoLocation={featured.photoLocation}
-          photoAttribution={featured.photoAttribution}
-          title={featured.title}
-          slug={featured.slug}
-          category={topic}
-          showTag={false}
-          eager
-        />
-      </a>
-      <div class="feat-body">
-        <div class="feat-meta">
-          <a class="feat-author" href={`/insights/writers/${writerSlug(featured.author)}/`}>{featured.author}</a>
-          <span class="feat-date">{formatDate(featured.date)}</span>
-          {#if topic}<a class="feat-tag" href={`/insights/${topic}/`}>{topicLabel(topic)}</a>{/if}
-        </div>
-        <a class="feat-title-link" href={articleHref(featured)}>
-          <h2 class="feat-title">{featured.title}</h2>
-        </a>
-        <p class="feat-tldr">{featured.tldr || featured.summary}</p>
-        <a class="feat-btn" href={articleHref(featured)}>Read the full story</a>
+<BlogHero size="xl" eyebrow="The Autonomic blog" title="Questions people ask." lead="Honest answers about POTS, long COVID, ME/CFS and dysautonomia, written by someone living it. Every one starts with the short answer." {latest}>
+  <TopicChips items={['pots', 'postviral', 'mecfs', 'just-diagnosed', 'supporting-someone', 'app']} />
+</BlogHero>
+
+{#if symptoms.length}
+  <section class="v2-sec bl-sec-mid">
+    <div class="v2-wrap">
+      <div class="v2-headrow end"><div><h2 class="v2-h2 sm">What is bothering you most?</h2></div></div>
+      <div class="bl-syms">
+        {#each symptoms as s}
+          <a class="bl-sym" href={articleHref(s.posts[0])} data-sym={s.id} aria-expanded="false" aria-controls={`sym-${s.id}`}>
+            <span class="bl-sym-t">{s.label}</span>
+            <span class="bl-sym-n">{s.posts.length} answers<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg></span>
+          </a>
+        {/each}
       </div>
-    </article>
-  {/if}
-
-  {#if recent.length}
-    <div class="blog-grid-3">
-      {#each recent as a (a.slug)}
-        <RecentCard article={a} />
+      {#each symptoms as s}
+        <div class="bl-sym-panel" id={`sym-${s.id}`} data-sym-panel={s.id} hidden>
+          <p class="bl-sym-panel-h">{s.label}</p>
+          {#each s.posts as a (a.slug)}<PostRow article={a} />{/each}
+        </div>
       {/each}
     </div>
-  {/if}
+  </section>
+{/if}
 
-  {#if pillars.length}
-    <section class="pillar-panel">
-      <h2 class="insights-section-title" style="margin-top: 0;">The pillar guides: start here</h2>
-      <p class="topic-block-desc">
-        A handful of deep guides that cover the core of reading and recovering your nervous system.
-        Read them in order and you'll have the whole map.
-      </p>
-      <ol class="pillar-main-list">
+<ReviewStrip app />
+
+{#if recent.length}
+  <section class="v2-sec white">
+    <div class="v2-wrap">
+      <div class="v2-headrow end">
+        <div><h2 class="v2-h2 sm">New questions, new answers.</h2></div>
+        <a class="v2-link bl-headlink" href="/insights/articles/">All {articles.length} answers →</a>
+      </div>
+      <div class="bl-grid">
+        {#each recent as a (a.slug)}<PostCard article={a} />{/each}
+      </div>
+    </div>
+  </section>
+{/if}
+
+{#if pillars.length}
+  <section class="v2-sec">
+    <div class="v2-wrap bl-start">
+      <div class="bl-start-head">
+        <h2 class="v2-h2 sm">New to all this? {pillars.length} guides to help you make sense of everything.</h2>
+        <p class="v2-sub">Read them in order and you will understand your nervous system better than most people ever get to.</p>
+        {#if pillarMin}<p class="bl-start-total"><span></span>About {pillarMin} minutes total</p>{/if}
+      </div>
+      <ol class="bl-pillars">
         {#each pillars as a, i (a.slug)}
           <li>
-            <a class="pillar-main-link" href={articleHref(a)}>
-              <span class="pillar-main-n">{String(i + 1).padStart(2, '0')}</span>
-              <span class="pillar-main-body">
-                <span class="pillar-main-t">{a.title}</span>
-                <span class="pillar-main-s">{a.summary}</span>
-              </span>
+            <a href={articleHref(a)} class:last={i === pillars.length - 1}>
+              <span class="bl-pillar-n">{String(i + 1).padStart(2, '0')}</span>
+              <span class="bl-pillar-b"><b>{a.title}</b>{#if a.readMin}<span>{a.readMin} min</span>{/if}</span>
+              <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6" /></svg>
             </a>
           </li>
         {/each}
       </ol>
-    </section>
-  {/if}
+    </div>
+  </section>
+{/if}
 
-  {#each topicSections as { topic, posts } (topic.slug)}
-    <section class="topic-panel">
-      <a class="topic-panel-head" href={`/insights/${topic.slug}/`}>
-        <h2 class="topic-panel-title">
-          <span class="topic-ic" aria-hidden="true"><TopicIcon {topic} /></span> {topic.longName}
-        </h2>
-      </a>
-      <p class="topic-panel-desc">{topic.description}</p>
-      <div class="blog-grid-3">
-        {#each posts as a (a.slug)}
-          <RecentCard article={a} />
+{#if topicCards.length}
+  <section class="v2-sec nopad-top">
+    <div class="v2-wrap">
+      <div class="v2-headrow end"><div><p class="v2-eyebrow">Go deeper</p><h2 class="v2-h2 sm">Browse by topic</h2></div></div>
+      <div class="bl-topics">
+        {#each topicCards as c (c.topic.slug)}
+          <div class="bl-topic">
+            <div class="bl-topic-h"><a href={`/insights/${c.topic.slug}/`}>{c.topic.shortName}</a><span>{c.count} answers</span></div>
+            {#each c.posts as a (a.slug)}<a class="bl-topic-a" href={articleHref(a)}>{a.title}</a>{/each}
+            <a class="bl-topic-more" href={`/insights/${c.topic.slug}/`}>Explore {c.topic.shortName.replace(/^The /, '')} →</a>
+          </div>
         {/each}
       </div>
-      <a class="topic-more" href={`/insights/${topic.slug}/`}>
-        Open the {topic.shortName.replace(/^The /, '')} hub →
-      </a>
-    </section>
-  {/each}
-
-  {#if !articles.length}
-    <p class="blog-empty">No articles yet, the first posts are on the way.</p>
-  {/if}
-
-  <div class="faq-wrap" style="margin-top: 56px;">
-    <h2 class="insights-section-title" style="margin-top: 0;">Good to know</h2>
-    <div class="faq">
-      {#each faq as f}
-        <details>
-          <summary>{f.q}<span class="fq-i">+</span></summary>
-          <p>{f.a}</p>
-        </details>
-      {/each}
     </div>
-    <p style="margin-top: 24px;">
-      <a class="bf-more" href="/insights/articles/">Show all articles →</a>
-    </p>
-  </div>
+  </section>
+{/if}
 
-  <div style="margin-top: 48px;">
-    <BlogEndCTA />
-  </div>
-</InsightsShell>
+{#if !articles.length}
+  <p class="bl-empty">No articles yet, the first posts are on the way.</p>
+{/if}
+
+<BlogCta />
+
+{@html symScript}

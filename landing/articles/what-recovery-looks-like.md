@@ -8,8 +8,8 @@ keywords: "POTS recovery timeline, long COVID recovery, how long does recovery t
 date: 2026-07-01
 updated: 2026-07-01
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1559854397-0d8634edcba8?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Ronaldo de Oliveira / Unsplash"
+photoLocation: "/articles/what-recovery-looks-like/cover.webp"
+photoAttribution: "Autonomic"
 tldr: "Recovery from post-viral dysautonomia and POTS usually takes months to a couple of years, and it moves in a noisy zig-zag rather than a smooth line. Judging yourself day to day is demoralizing and misleading, because bad weeks are part of the shape, not proof of failure. Your data often improves before your symptoms do, so watching multi-week trends in HRV, resting heart rate, stand-test rise and symptom load is the honest way to see progress that daily life hides."
 categories:
   - recovery

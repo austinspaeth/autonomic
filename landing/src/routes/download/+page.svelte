@@ -114,6 +114,8 @@
 <svelte:head>
   <title>{title}</title>
   <meta name="description" content={description} />
+  <!-- A store hand-off for link-in-bio traffic, not a page to rank. -->
+  <meta name="robots" content="noindex, follow" />
   <!-- Shared links (a video description, a DM) still unfurl with a card: the
        site's own, which already carries both store badges. -->
   <meta property="og:type" content="website" />

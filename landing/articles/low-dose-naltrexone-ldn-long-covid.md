@@ -123,7 +123,7 @@ Notice what LDN is not. It is not an antiviral, so it is not aimed at any leftov
 
 Here is where honesty matters more than enthusiasm. The evidence is real but uneven, and it is strongest in a condition next door to long COVID rather than in long COVID itself.
 
-The clearest data are in **fibromyalgia**, a chronic pain condition with a lot of overlapping biology. Small randomized, placebo-controlled trials from researchers at Stanford (Younger and colleagues) found that LDN reduced pain compared with placebo. These were small studies, but they were properly controlled, which is why fibromyalgia is often cited as the proof of concept.
+The clearest data are in **fibromyalgia**, a chronic pain condition with a lot of overlapping biology (see [fibromyalgia and dysautonomia](/insights/recovery/fibromyalgia-dysautonomia-pots-hrv/)). Small randomized, placebo-controlled trials from researchers at Stanford (Younger and colleagues) found that LDN reduced pain compared with placebo. These were small studies, but they were properly controlled, which is why fibromyalgia is often cited as the proof of concept.
 
 In **ME/CFS** and **long COVID**, the published evidence is younger and weaker: mostly uncontrolled case series, retrospective chart reviews, and patient surveys. Several report meaningful improvements in fatigue, pain, and cognitive symptoms in a subset of people, which is genuinely encouraging, but uncontrolled reports cannot separate a real drug effect from natural recovery, hope, or the ordinary ups and downs of these illnesses. **Randomized controlled trials of LDN for long COVID are underway**, and those are the studies that will actually settle whether, and for whom, it helps.
 

@@ -7,7 +7,7 @@
   <title>Privacy Policy | Autonomic</title>
   <meta
     name="description"
-    content="Autonomic's privacy policy: the app collects nothing and your data stays on your device. No accounts, no cloud, no in-app tracking, just an anonymous daily counter that carries no identifier. Our marketing website uses basic analytics."
+    content="Autonomic's privacy policy: your health data stays on your device. No accounts, no cloud, no in-app tracking, only an anonymous daily count with no identifier."
   />
   <link rel="canonical" href={canonical} />
   <meta property="og:type" content="website" />

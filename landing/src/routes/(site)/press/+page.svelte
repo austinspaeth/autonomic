@@ -3,420 +3,409 @@
    * /press: the whole press kit as one shareable link.
    *
    * Source of truth is the `press-kit/` folder at the repo root; this page is
-   * that copy, rendered. When those files change, change this page with them.
+   * that copy, rendered, and `static/press/autonomic-press-kit.zip` is built
+   * from both. When one changes, change the other two with it.
    *
-   * The site runs `csr = false`, so there is no client-side Svelte here: the
-   * FAQ uses native <details>, and the copy-to-clipboard buttons are a single
-   * inline vanilla script injected with {@html} (same trick app.html uses for
-   * JSON-LD). Everything still works with JS off except the copy buttons,
-   * which degrade to plain selectable text.
+   * The site runs `csr = false`, so the FAQ uses native <details> and the
+   * copy buttons are one inline vanilla script. With JS off the boilerplate is
+   * still plain selectable text.
    */
-  import { site, appStoreLink, playStoreLink, pricing, priceLabel } from '$lib/site';
+  import { site, appStoreLink, playStoreLink, pricing, priceLabel, rating, competitor, visibleApp } from '$lib/site';
+  import FeatureSeo from '$lib/v2/FeatureSeo.svelte';
+  import ReviewStrip from '$lib/v2/ReviewStrip.svelte';
+  import Faq from '$lib/v2/Faq.svelte';
 
-  const canonical = `${site.url}/press/`;
   const email = 'austin@autonomic.care';
-  const title = 'Press Kit | Autonomic';
-  const description =
-    'Press kit for Autonomic: fact sheet, boilerplate, founder story, quotes, screenshots and brand assets. A private, offline app that scores HRV, blood pressure, sleep and orthostatic data for POTS, dysautonomia and long COVID.';
-
-  const shots = [
-    { file: '01-live-hrv', label: 'Live HRV capture', caption: 'A paced 4/6 breathing session reading beat-to-beat intervals live from a chest strap.' },
-    { file: '02-autonomic-score', label: 'Daily Autonomic Score', caption: 'Every reading of the day rolled into one 0-100 score with a plain-language outlook.' },
-    { file: '03-graded-reading', label: 'A graded reading', caption: 'Every metric scored against published thresholds, with the raw RR trace shown.' },
-    { file: '04-analysis', label: 'Trends over time', caption: 'SDNN and RMSSD tracked across days, weeks, months and years, in grade zones.' },
-    { file: '05-privacy', label: 'No account, no cloud', caption: 'What the app tells you on first run: nothing leaves the device unless you export it.' },
-    { file: '06-watch-stand-test', label: 'POTS stand test (Apple Watch)', caption: 'The standing phase of a guided lie-and-stand test, showing a +31 bpm delta.' }
-  ];
+  const mail = `mailto:${email}?subject=Press%20enquiry%20about%20Autonomic`;
+  const monthly = priceLabel(pricing.monthly);
+  const yearly = priceLabel(pricing.yearly);
+  const ZIP_MB = '2.2';
+  const savePct = Math.round((1 - pricing.yearly / visibleApp.yearly) * 100);
 
   const facts: [string, string][] = [
-    ['What it is', 'A private, offline-first app that scores your daily HRV, blood pressure, sleep and orthostatic readings against published medical thresholds, built for people recovering from POTS, dysautonomia, long COVID and post-viral illness.'],
-    ['Platforms', 'iOS + Apple Watch · Android (Health Connect). Both live as of July 2026.'],
-    ['Price', `Free to use, with no account. Autonomic Pro is ${priceLabel(pricing.monthly)}/month or ${priceLabel(pricing.yearly)}/year. Every install opens with ${pricing.trialDays} days of full Pro access, no card and no account.`],
+    ['Name', 'Autonomic'],
+    ['Tagline', 'Answers for the questions you live with.'],
+    ['What it is', 'A private recovery journal for people living with POTS, long COVID, ME/CFS and dysautonomia. A five-minute morning reading becomes a daily score, a pacing budget and an early warning, and over weeks the app shows what lines up with better days. Health data stays on the phone.'],
+    ['Platforms', 'iPhone with an Apple Watch app, and Android with Health Connect. Garmin watches through the Autonomic Connect IQ app. Both stores live since July 2026.'],
+    ['Price', `The journal is free forever, with no account and no ads. Autonomic Pro is ${monthly} a month or ${yearly} a year. Every install opens with ${pricing.trialDays} days of Pro, with no card.`],
+    ['Rating', `${rating.label} on the ${rating.store}`],
     ['Category', 'Health & Fitness'],
     ['Founder', 'Austin Spaeth, solo patient-founder. Long hauler of 4+ years, dad of six, South Carolina.'],
     ['Launched', 'July 2026'],
     ['Press contact', email]
   ];
 
-  const quotes = [
-    { on: 'On why it exists', text: 'I saw specialist after specialist in cardiology and neurology, and kept leaving with no real answers. So I started tracking everything myself: HRV, blood pressure, sleep, the days I crashed. Slowly the patterns showed up. Autonomic is the tool I built to make sense of my own recovery.' },
-    { on: 'On the privacy architecture', text: "Other health apps promise not to sell your data. Autonomic can't. There's no account, no server, and no tracking, so the numbers never leave your phone. For people already anxious about who sees their health data, that's the whole point." },
-    { on: 'On no false hope', text: "I'm not healed, and I won't pretend otherwise. The app doesn't promise recovery. It shows you honestly what's helping and what's hurting. That's what I needed, so that's what I built." },
-    { on: 'On measurement rigor', text: "A noisy reading should tell you it's noisy, not invent a number. Every metric is graded against published thresholds, out in the open, so a good day and a warning sign don't look the same." },
-    { on: 'On who it is for', text: "I'm not a doctor or an expert. I'm someone on this road: four years of long COVID, six kids, figuring out my recovery one reading at a time. I built the app I wished I'd had when I was getting no answers." },
-    { on: 'On the business model', text: "It's one person and a subscription, no investor, no data to sell. That's exactly why the app has no reason to touch your data. It's free to use, and there's a hardship path for anyone who needs it." }
+  const features = [
+    { n: 'Journal + HRV', d: 'A five-minute reading with the phone camera, an Apple Watch, a Garmin or a chest strap, plus sleep, symptoms, triggers, meds, water and digestion in a couple of taps.', href: '/features/hrv-readings/' },
+    { n: 'Daily Autonomic Outlook', d: 'The morning reading, sleep and resting heart rate become a score out of 100 and plain guidance, graded against the person’s own baseline.', href: '/features/hrv-readings/' },
+    { n: 'Pacing budget', d: 'A daily energy budget in hours and minutes that spends down with steps, time upright and heart rate, and is judged on the two days after, when crashes land.', href: '/features/pacing-budget/' },
+    { n: 'Crash warnings', d: 'An early flag when the score slides for days, or when several markers drift from the person’s own normal at once.', href: '/features/hrv-readings/#crash-warnings' },
+    { n: 'Insights', d: 'Everything logged is tested against HRV, sleep and symptoms, corrected for chance, and reported as linked, never proven.', href: '/features/insights/' },
+    { n: 'POTS stand test', d: 'A guided lie-and-stand test on Apple Watch or a chest strap, plus one-tap capture of real-life episodes like stairs or getting up.', href: '/features/pots-stand-test/' },
+    { n: 'Cycle-aware tracking', d: 'Readings and warnings are compared with the same phase of past cycles, so a predictable dip is not mistaken for a decline.', href: '/features/cycle-tracking/' },
+    { n: 'AI reports', d: 'Weeks of data turned into a doctor summary or health report by the AI the person chooses. Nothing leaves the phone until they paste it.', href: '/features/doctor-reports/' },
+    { n: 'Apple Watch and Garmin', d: 'Live heart rate with a buzz when it jumps 30 bpm, the stand test on the wrist, and today’s pacing budget at a glance.', href: '/features/apple-watch/' }
+  ];
+
+  // `real` marks a capture from the app itself; the others are drawn from the
+  // app's own screens with sample data (see the home page's phone screens).
+  const shots = [
+    { file: '01-daily-outlook', label: 'Daily Autonomic Outlook', caption: 'A morning reading, sleep and resting heart rate rolled into one score out of 100, with plain guidance for the day.' },
+    { file: '02-pacing-budget', label: 'Pacing budget', caption: 'Today’s budget in hours and minutes, what has been spent, and where it went.' },
+    { file: '03-insights', label: 'Insights', caption: 'What changed since starting a supplement, and what lines up with better days, with the evidence one tap away.' },
+    { file: '04-live-hrv-reading', label: 'Live HRV reading', caption: 'A paced breathing session reading beat-to-beat intervals live, with heart rate, SDNN and the raw trace.' },
+    { file: '05-crash-warning', label: 'Crash warning', caption: 'The Journal on a sliding day: a lower score, plainer guidance, and a warning that the trend is heading down.' },
+    { file: '06-pots-stand-test-result', label: 'POTS stand test result', caption: 'A guided lie-and-stand test: the sustained rise, the heart rate curve and the minute the person stood.' },
+    { file: '07-stand-tests-over-time', label: 'Stand tests over time', caption: 'Every stand test kept and compared, so a sustained rise can be followed for months.' },
+    { file: '08-hrv-over-time', label: 'HRV over time', caption: 'Morning HRV across weeks, graded, with baseline and training readings split.' },
+    { file: '09-apple-watch-stand-test', label: 'Apple Watch stand test', caption: 'The standing phase of a stand test on the wrist, with the live rise from lying down.' }
   ];
 
   const boilerplates = [
-    { id: 'bp-one', label: 'One-line descriptor', text: "Autonomic is a private, offline app that turns a heart-rate chest strap, or just your phone's camera, into doctor-ready autonomic reports, with no account and no cloud." },
-    { id: 'bp-25', label: '25 words', text: 'Autonomic is a private, offline-first app for people recovering from POTS, dysautonomia and long COVID. It scores real physiology against medical thresholds, with no account and no cloud.' },
-    { id: 'bp-50', label: '50 words', text: "Autonomic is a private, offline-first recovery journal for POTS, dysautonomia, long COVID and post-viral illness. It captures lab-grade HRV from a chest strap, Apple Watch, or your phone's camera and scores every reading against published medical thresholds, all on-device. No account, no cloud, no tracking. Free to use; Autonomic Pro is $49.99/year." },
-    { id: 'bp-100', label: '100 words (About Autonomic)', text: "Autonomic is a private, offline-first app that helps people recovering from POTS, dysautonomia, long COVID and post-viral illness see what's actually helping. It captures beat-to-beat HRV from a Bluetooth chest strap, an Apple Watch, or a finger over the phone's camera, then grades every reading (HRV, blood pressure, sleep, orthostatic stand tests) against published medical thresholds, rolling them into one daily score and a doctor-ready report. Everything runs on the device: there is no account, no cloud, and no backend, so the data can't be lost or sold. Built solo by a patient-founder. Free to use; Autonomic Pro is $49.99/year. autonomic.care" }
+    { id: 'bp-one', label: 'One line', text: 'Autonomic is a private recovery app for POTS, long COVID, ME/CFS and dysautonomia that turns a five-minute morning reading into answers: how today looks, how much you can do, and what is actually helping.' },
+    { id: 'bp-privacy', label: 'One line, privacy-led', text: 'Autonomic is a health app with no account and no cloud for your health data: it scores your HRV, sleep and symptoms on your phone, and nothing you log leaves it unless you export it.' },
+    { id: 'bp-25', label: '25 words', text: 'Autonomic is a private recovery app for POTS, long COVID and ME/CFS. It scores daily HRV against your own baseline and keeps health data on-device.' },
+    { id: 'bp-50', label: '50 words', text: `Autonomic is a private recovery app for POTS, long COVID, ME/CFS and dysautonomia. A five-minute morning reading, from the phone camera, an Apple Watch, a Garmin or a chest strap, becomes a daily score, a pacing budget and an early warning. Health data stays on the phone. Free journal; Pro is ${yearly} a year.` },
+    { id: 'bp-100', label: '100 words (About Autonomic)', text: `Autonomic is a private recovery app for people living with POTS, long COVID, ME/CFS and dysautonomia, built around the questions they live with: is today a good day, how much can I do, am I about to crash, and what is actually helping? A five-minute morning reading from the phone camera, an Apple Watch, a Garmin or a chest strap becomes a daily score, a pacing budget in hours and minutes, and an early warning when the numbers slide. Over weeks, Insights shows what lines up with better days. Health data stays on the phone, with no account. Built by a patient-founder. Free journal; Pro is ${yearly} a year. autonomic.care` }
   ];
 
-  const faqs = [
-    { q: 'What is Autonomic, in one line?', a: 'A private, offline app that scores your daily HRV, blood pressure, sleep and orthostatic readings against published medical thresholds, for people recovering from POTS, dysautonomia and long COVID.' },
-    { q: 'Who is it for?', a: 'People living with or recovering from POTS, dysautonomia, long COVID, ME/CFS and other post-viral or autonomic conditions, and anyone trying to see whether their recovery is actually trending the right way.' },
-    { q: 'How is it private, exactly?', a: 'There is no account and no backend server. Everything is captured, processed and stored on the device. The app reads from and writes to Apple Health / Health Connect only when you ask it to. Because nothing is transmitted automatically, the developer has no ability to see, lose, or sell user data.' },
-    { q: 'Is it a medical device? Does it diagnose anything?', a: 'No. Autonomic is a personal journal and education tool. It does not diagnose, treat, or prevent any disease, and it tells users to discuss any protocol or medication changes with their doctor.' },
-    { q: 'How does it measure HRV without a lab?', a: "It captures beat-to-beat RR intervals from a Bluetooth chest strap, an Apple Watch, or the phone's camera (finger over the lens), then computes the standard time- and frequency-domain HRV metrics on-device, with artifact correction. Noisy readings are flagged and won't produce a fake score." },
-    { q: 'What makes it different from Welltory, Visible, or a smartwatch?', a: 'Three things: it measures real beat-to-beat data instead of guessing from the wrist; it grades every number against published thresholds instead of a proprietary black-box score; and it has no cloud or hardware subscription, so it works with a strap you buy once and own.' },
-    { q: 'What does it cost?', a: `Free to use, with no account. Autonomic Pro is ${priceLabel(pricing.monthly)}/month or ${priceLabel(pricing.yearly)}/year, and every install starts with ${pricing.trialDays} days of full access. There is a hardship path for anyone who can't afford it: email ${email} and Austin will send a free code, no questions asked.` },
-    { q: 'Who built it?', a: 'One person. Austin Spaeth, a patient-founder who has lived with long COVID for four-plus years and built the app during his own recovery, after specialists left him without answers. He is a solo developer and a dad of six in South Carolina.' },
-    { q: 'What platforms, and when did it launch?', a: 'iOS (with an Apple Watch app) and Android (via Health Connect). Both launched in July 2026.' },
-    { q: 'Do you have user data or outcomes to share?', a: 'By design, no. The app collects nothing, so there is no user dataset. The absence of a dataset is itself the story.' },
-    { q: 'Can I get a review copy or a walkthrough?', a: `Yes. The app is free to download on both stores, and Austin is happy to give a live walkthrough or answer questions. Contact: ${email}.` }
+  const quotes = [
+    { on: 'On why it exists', text: 'I saw specialist after specialist in cardiology and neurology, and kept leaving with no real answers. So I started tracking everything myself: HRV, blood pressure, sleep, the days I crashed. Slowly the patterns showed up. Autonomic is the tool I built to make sense of my own recovery.' },
+    { on: 'On the privacy architecture', text: 'Other health apps promise not to sell your data. Autonomic doesn’t have it to sell. There’s no account and no server holding your health data, so the numbers never leave your phone. For people already anxious about who sees their health data, that’s the whole point.' },
+    { on: 'On no false hope', text: 'I’m not healed, and I won’t pretend otherwise. The app doesn’t promise recovery. It shows you honestly what’s helping and what’s hurting. That’s what I needed, so that’s what I built.' },
+    { on: 'On measurement rigor', text: 'A noisy reading should tell you it’s noisy, not invent a number. Every metric is graded against published thresholds, out in the open, so a good day and a warning sign don’t look the same.' },
+    { on: 'On who it is for', text: 'I’m not a doctor or an expert. I’m someone on this road: four years of long COVID, six kids, figuring out my recovery one reading at a time. I built the app I wished I’d had when I was getting no answers.' },
+    { on: 'On the business model', text: 'It’s one person and a subscription, no investor, no data to sell. That’s exactly why the app has no reason to touch your data. It’s free to use, and there’s a hardship path for anyone who needs it.' }
   ];
 
-  const faqLd = {
-    '@context': 'https://schema.org',
-    '@type': 'FAQPage',
-    mainEntity: faqs.map((f) => ({
-      '@type': 'Question',
-      name: f.q,
-      acceptedAnswer: { '@type': 'Answer', text: f.a }
-    }))
-  };
+  const angles = [
+    {
+      for: 'Patient and health press',
+      hook: 'A long hauler built the tool he could not find.',
+      points: [
+        'A patient-founder with four years of long COVID, after specialist visits left him without answers.',
+        'Built for chronic illness rather than athletes: a POTS stand test, a pacing budget judged on the two days after, cycle-aware baselines.',
+        'Honest by design: insights are corrected for chance and say “linked, never proven”, and an empty report is a real answer.'
+      ]
+    },
+    {
+      for: 'Privacy and technology press',
+      hook: 'A health app with no account and no cloud for health data.',
+      points: [
+        'Every reading, score and insight is computed and stored on the phone.',
+        'The only automatic traffic is anonymous counts and error reports with no identifier: never a reading, a symptom or a name.',
+        'In a market of cloud-first wellness apps, the architecture does the work a privacy policy usually promises.'
+      ]
+    }
+  ];
+
+  const faq = [
+    { q: 'What is Autonomic, in one line?', a: 'A private recovery app for POTS, long COVID, ME/CFS and dysautonomia that turns a five-minute morning reading into answers: how today looks, how much you can do, and what is actually helping.' },
+    { q: 'Who is it for?', a: 'People living with POTS, long COVID, ME/CFS, dysautonomia and the chronic illnesses that travel with them, and anyone trying to see whether their recovery is actually trending the right way.' },
+    { q: 'How is it private, exactly?', a: 'There is no account and no cloud for health data. Readings are captured, scored and stored on the phone, and every insight is computed there. Data leaves only when the person exports it or pastes a report into an AI themselves. The app does send anonymous usage counts and error reports to a server, with no identifier and no health data in them, so we can tell whether it works. The privacy policy at autonomic.care describes exactly what is sent.' },
+    { q: 'Is it a medical device? Does it diagnose anything?', a: 'No. Autonomic is a personal journal and education tool. It does not diagnose, treat, or prevent any disease, and it never tells anyone to start, stop or change a treatment.' },
+    { q: 'How does it measure HRV without a lab?', a: 'It captures beat-to-beat intervals from a Bluetooth chest strap, an optical band like the Polar Verity Sense, an Apple Watch, a Garmin watch, or the phone’s camera with a fingertip over the lens. It computes the standard time- and frequency-domain HRV metrics on the phone, with artifact correction, and grades every reading against published thresholds and the person’s own baseline. A noisy reading is flagged, not turned into a confident number.' },
+    { q: 'How is it different from Welltory, Visible or a smartwatch?', a: `It is built for chronic illness rather than fitness: a POTS stand test, a pacing budget judged on the two days after, cycle-aware baselines, and insights corrected for chance. It works with the phone camera, an Apple Watch, a Garmin or a strap rather than one brand of band, keeps health data on the phone, and costs ${yearly} a year, up to ${savePct}% less than ${competitor.name} or ${visibleApp.name}. The full comparison is at autonomic.care/pricing.` },
+    { q: 'What does it cost?', a: `The journal is free forever, including unlimited HRV readings and every stand test. Autonomic Pro is ${monthly} a month or ${yearly} a year and adds the pacing budget, Insights, full history, stand test results and AI reports. Every install starts with ${pricing.trialDays} days of Pro. For anyone who can’t afford it, email ${email} and Austin will send a free code, no questions asked.` },
+    { q: 'Who built it?', a: 'One person: Austin Spaeth, a patient-founder who has lived with long COVID for four-plus years and built the app during his own recovery, after specialists left him without answers. He is a solo developer and a dad of six in South Carolina.' },
+    { q: 'What platforms, and when did it launch?', a: 'iPhone with an Apple Watch app, and Android with Health Connect, both launched in July 2026. Garmin watches work through the Autonomic Connect IQ app.' },
+    { q: 'Do you have user data or outcomes to share?', a: 'No health data, by design: none of it ever leaves users’ phones, so there is no dataset of readings or outcomes to share. Anonymous counts tell us roughly how many people use the app, but they carry no identity and no health information.' },
+    { q: 'Can I use the screenshots?', a: 'Yes. Every image on this page is free to use in coverage of Autonomic. Some screens use sample data.' },
+    { q: 'Can I get a review copy or a walkthrough?', a: `Yes. The app is free to download on both stores, and Austin is happy to give a live walkthrough or answer questions at ${email}.` }
+  ];
 
   // Copy-to-clipboard for the boilerplate blocks. Inline because csr = false.
-  const copyScript = `
-    document.querySelectorAll('[data-copy]').forEach(function (btn) {
-      btn.addEventListener('click', function () {
-        var el = document.getElementById(btn.getAttribute('data-copy'));
-        if (!el) return;
-        navigator.clipboard.writeText(el.innerText.trim()).then(function () {
-          var old = btn.textContent;
-          btn.textContent = 'Copied';
-          btn.classList.add('is-copied');
-          setTimeout(function () { btn.textContent = old; btn.classList.remove('is-copied'); }, 1600);
-        });
+  const copyScript = `<script>
+(function () {
+  document.querySelectorAll('[data-copy]').forEach(function (btn) {
+    btn.addEventListener('click', function () {
+      var el = document.getElementById(btn.getAttribute('data-copy'));
+      if (!el || !navigator.clipboard) return;
+      navigator.clipboard.writeText(el.innerText.trim()).then(function () {
+        var old = btn.textContent;
+        btn.textContent = 'Copied';
+        btn.classList.add('is-copied');
+        setTimeout(function () { btn.textContent = old; btn.classList.remove('is-copied'); }, 1600);
       });
     });
-  `;
+  });
+})();
+<\/script>`;
 </script>
 
-<svelte:head>
-  <title>{title}</title>
-  <meta name="description" content={description} />
-  <link rel="canonical" href={canonical} />
-  <meta property="og:type" content="website" />
-  <meta property="og:url" content={canonical} />
-  <meta property="og:title" content={title} />
-  <meta property="og:description" content={description} />
-  <meta property="og:image" content={site.ogImage} />
-  <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:image" content={site.ogImage} />
-  {@html `<script type="application/ld+json">${JSON.stringify(faqLd)}<\/script>`}
-</svelte:head>
+<FeatureSeo
+  name="Press kit"
+  path="/press/"
+  section={null}
+  {faq}
+  title="Press Kit: Facts, Screenshots and Founder Story | Autonomic"
+  description="The Autonomic press kit: fact sheet, screenshots, boilerplate, founder story, quotes and brand assets for the private app for POTS, long COVID and ME/CFS."
+/>
 
-<!-- ============ HERO ============ -->
-<section class="pk-hero">
-  <div class="wrap pk-wrap">
-    <p class="eyebrow">Press kit</p>
-    <h1 class="pk-h1">Everything you need to write about Autonomic.</h1>
-    <p class="pk-lead">
-      Autonomic is a private, offline-first app that scores your daily <strong>HRV, blood pressure,
-      sleep and orthostatic readings</strong> against published medical thresholds, built for people
-      recovering from <strong>POTS, dysautonomia and long COVID</strong>. Facts, copy, quotes and
-      assets below are confirmed against the shipping app and free to use.
-    </p>
-    <div class="pk-actions">
-      <a class="btn btn-primary" href="/press/autonomic-press-kit.zip" download>Download all assets (1.2 MB)</a>
-      <a class="btn btn-ghost" href="mailto:{email}?subject=Press%20enquiry%20about%20Autonomic">Email {email}</a>
+<section class="v2-phead">
+  <div class="v2-wrap">
+    <h1>Everything you need to write about Autonomic.</h1>
+    <p class="v2-lead">Autonomic is a private recovery app for people living with POTS, long COVID, ME/CFS and dysautonomia, built around one idea: <b>answers for the questions you live with.</b> Facts, images, copy and quotes below are confirmed against the shipping app and free to use.</p>
+    <div class="v2-phead-cta">
+      <a class="v2-btn" href="/press/autonomic-press-kit.zip" download>Download all assets ({ZIP_MB} MB)</a>
+      <a class="v2-btn ghost" href={mail}>Email {email}</a>
     </div>
-    <ul class="pk-chips">
-      <li>No account</li>
-      <li>No cloud</li>
-      <li>No tracking</li>
-      <li>iOS + Android, live now</li>
-    </ul>
+    <div class="v2-trust-chips"><span>No account</span><span>Health data stays on the phone</span><span>iPhone, Apple Watch and Android</span><span>Rated {rating.label} on the {rating.store}</span></div>
+    <nav class="pk-jump" aria-label="On this page">
+      <a href="#facts">Facts</a><a href="#screenshots">Screenshots</a><a href="#boilerplate">Boilerplate</a><a href="#founder">Founder</a><a href="#quotes">Quotes</a><a href="#angles">Story angles</a><a href="#privacy">Privacy</a><a href="#faq">FAQ</a><a href="#brand">Brand assets</a>
+    </nav>
   </div>
 </section>
 
-<!-- ============ FACT SHEET ============ -->
-<section class="section" id="facts">
-  <div class="wrap pk-wrap">
-    <h2 class="h2">Fact sheet</h2>
+<section class="v2-sec white" id="facts">
+  <div class="v2-wrap">
+    <div class="v2-headrow end">
+      <div><h2 class="v2-h2">The short version.</h2></div>
+      <p class="v2-sub narrow">Everything here matches the app on both stores today.</p>
+    </div>
     <dl class="pk-facts">
-      {#each facts as [k, v]}
-        <div class="pk-fact">
-          <dt>{k}</dt>
-          <dd>{v}</dd>
-        </div>
-      {/each}
-      <div class="pk-fact">
-        <dt>Links</dt>
-        <dd>
-          <a href={site.url}>autonomic.care</a> ·
-          <a href={appStoreLink}>App Store</a> ·
-          <a href={playStoreLink}>Google Play</a>
-        </dd>
-      </div>
+      {#each facts as [k, v]}<div><dt>{k}</dt><dd>{v}</dd></div>{/each}
+      <div><dt>Links</dt><dd><a href={site.url}>autonomic.care</a> · <a href={appStoreLink}>App Store</a> · <a href={playStoreLink}>Google Play</a> · <a href="/pricing/">Pricing</a></dd></div>
     </dl>
+  </div>
+</section>
 
-    <h3 class="pk-h3">What it does</h3>
-    <div class="article-prose">
-      <ul>
-        <li><strong>Lab-grade HRV, on your phone.</strong> Captures beat-to-beat RR intervals live from a Bluetooth chest strap, an Apple Watch, or your phone's camera. Computes SDNN, RMSSD, pNN50, PNS/SNS index, Baevsky stress index, VLF/LF/HF power, LF/HF and coherence, all on-device, with artifact correction. A noisy reading refuses to fake a score.</li>
-        <li><strong>Every number graded, no black box.</strong> Each metric is scored great / good / ok / warning / crash against published research thresholds, rolled into one daily Autonomic Score and a plain-language outlook.</li>
-        <li><strong>POTS testing on the wrist (iOS).</strong> A guided lie-and-stand test on Apple Watch, a haptic alert when heart rate climbs 30+ bpm over baseline, one-tap episode capture, and a live HR monitor for symptomatic moments.</li>
-        <li><strong>A journal that measures.</strong> Water, meals and food triggers, meds and supplements, symptoms, activities, sleep, blood pressure, orthostatic tests and digestion, plus your own custom types.</li>
-        <li><strong>Built for the appointment.</strong> Analysis across days, weeks and months, plus optional AI insights and a doctor-ready report.</li>
-      </ul>
+<section class="v2-sec">
+  <div class="v2-wrap">
+    <div class="v2-center"><h2 class="v2-h2">Four answers from one morning reading.</h2><p class="v2-sub">Is today a good day? How much can I do? Am I about to crash? What is actually helping? Here is the part of the app behind each one.</p></div>
+    <div class="v2-g3 pk-feats">
+      {#each features as f}<a class="pk-feat" href={f.href}><b>{f.n}</b><span>{f.d}</span><em>Read more →</em></a>{/each}
     </div>
   </div>
 </section>
 
-<!-- ============ SCREENSHOTS ============ -->
-<section class="section alt" id="screenshots">
-  <div class="wrap pk-wrap">
-    <h2 class="h2">Screenshots</h2>
-    <p class="lead">
-      Clean, un-captioned captures at native device resolution, ready to drop straight into an
-      article. Click any shot for the full-resolution PNG.
-    </p>
+<section class="v2-sec lilac" id="screenshots">
+  <div class="v2-wrap">
+    <div class="v2-headrow end">
+      <div><h2 class="v2-h2">Clean images of the app, ready to drop in.</h2></div>
+      <p class="v2-sub narrow">Un-captioned, at full phone resolution. Click any image for the full-size PNG.</p>
+    </div>
     <div class="pk-shots">
       {#each shots as s}
         <figure class="pk-shot">
-          <a href="/press/{s.file}.png" download>
-            <img src="/press/{s.file}-preview.png" alt={s.label} loading="lazy" />
-          </a>
-          <figcaption>
-            <b>{s.label}</b>
-            <span>{s.caption}</span>
-            <a class="pk-dl" href="/press/{s.file}.png" download>Download PNG</a>
-          </figcaption>
+          <a class="pk-shot-img" href="/press/{s.file}.png" download><img src="/press/{s.file}-preview.jpg" alt="Autonomic app: {s.label}" loading="lazy" /></a>
+          <figcaption><b>{s.label}</b><span>{s.caption}</span><a class="pk-dl" href="/press/{s.file}.png" download>Download PNG</a></figcaption>
         </figure>
       {/each}
     </div>
   </div>
 </section>
 
-<!-- ============ BOILERPLATE ============ -->
-<section class="section" id="boilerplate">
-  <div class="wrap pk-wrap">
-    <h2 class="h2">Boilerplate</h2>
-    <p class="lead">Four lengths. Take whichever fits your space; all are factually confirmed.</p>
+<section class="v2-sec white" id="boilerplate">
+  <div class="v2-wrap v2-narrow">
+    <h2 class="v2-h2 sm">Pick the length that fits.</h2>
     {#each boilerplates as b}
-      <div class="pk-copyblock">
-        <div class="pk-copyhead">
-          <span class="pk-copylabel">{b.label}</span>
-          <button class="pk-copybtn" type="button" data-copy={b.id}>Copy</button>
-        </div>
-        <p class="pk-copytext" id={b.id}>{b.text}</p>
+      <div class="pk-copy">
+        <div class="pk-copy-head"><span>{b.label}</span><button class="pk-copy-btn" type="button" data-copy={b.id}>Copy</button></div>
+        <p id={b.id}>{b.text}</p>
       </div>
     {/each}
   </div>
 </section>
 
-<!-- ============ FOUNDER ============ -->
-<section class="section alt" id="founder">
-  <div class="wrap pk-wrap">
-    <h2 class="h2">The founder</h2>
-    <div class="pk-founder">
-      <img class="pk-founder-photo" src="/press/founder-austin-spaeth.jpg" alt="Austin Spaeth, founder of Autonomic" width="340" height="340" loading="lazy" />
-      <div class="pk-founder-meta">
-        <p class="pk-founder-name">Austin Spaeth</p>
-        <p class="pk-founder-role">Founder, Autonomic · patient-founder, long hauler of 4+ years, dad of six, South Carolina</p>
-        <a class="pk-dl" href="/press/founder-austin-spaeth.jpg" download>Download photo</a>
+<section class="v2-sec plum" id="founder">
+  <div class="v2-wrap v2-founder">
+    <img src="/journey-family.webp" width="480" height="360" alt="Austin Spaeth, founder of Autonomic, with his wife and six children in South Carolina" loading="lazy" />
+    <div>
+      <blockquote>“I saw specialist after specialist, and kept leaving with no real answers. So I started tracking it myself. Autonomic is the tool I built to make sense of it.”</blockquote>
+      <p class="v2-founder-by">Austin Spaeth · more than four years with long COVID · dad of six, South Carolina</p>
+      <div class="pk-founder-links"><a class="v2-link on-dark" href="/press/founder-austin-spaeth.jpg" download>Download headshot →</a><a class="v2-link on-dark" href="/story/">Read the full story →</a></div>
+    </div>
+  </div>
+</section>
+
+<section class="v2-sec">
+  <div class="v2-wrap v2-explain">
+    <div class="v2-explain-head">
+      <h2 class="v2-h2 sm">In his words.</h2>
+      <div class="v2-facts">
+        <small>For a pitch or an about box</small>
+        <p class="pk-short">Autonomic was built by Austin, a long-COVID patient of more than four years. After specialist visits in cardiology and neurology left him with no real answers, he started tracking his own physiology (HRV, blood pressure, sleep, the days he crashed) until the patterns surfaced and he found what genuinely helped. Autonomic is the app he built from that. He is a solo founder, a long hauler, and a dad of six in South Carolina.</p>
       </div>
     </div>
-
-    <h3 class="pk-h3">Short version</h3>
-    <div class="article-prose">
-      <p>
-        Autonomic was built by Austin, a long-COVID patient of more than four years. After specialist
-        visits in cardiology and neurology left him with no real answers, he started tracking his own
-        physiology, HRV, blood pressure, sleep, the days he crashed, until the patterns surfaced and
-        he found what genuinely helped. Autonomic is the app he built from that: a private, on-device
-        recovery journal that measures instead of guesses. He is a solo founder, a long hauler, and a
-        dad of six in South Carolina.
-      </p>
-    </div>
-
-    <h3 class="pk-h3">In his words</h3>
-    <div class="article-prose">
-      <p>
-        For more than four years, I've been living with long COVID. It started with blood pressure
-        that spiked out of nowhere, a heart that raced the moment I stood up, brain fog that swallowed
-        whole days, and a long list of symptoms that never quite fit together. I saw specialist after
-        specialist in cardiology, neurology and beyond, and kept leaving with the same thing: no real
-        answers.
-      </p>
-      <p>
-        So I started tracking it myself, HRV, blood pressure, heart rate, sleep, what I ate, the days
-        I crashed. Slowly, patterns surfaced. I found small things that made life more livable, and I
-        got a little better. I'm not healed, and I won't pretend otherwise. But over the two years
-        I've used my own early version of Autonomic, I've been able to see what genuinely helps and
-        reach a far better place than I'd been in for a long time.
-      </p>
-      <p>
-        I'm not a doctor. I'm not an expert. I'm just someone on this road, in South Carolina, raising
-        six kids, figuring out my own recovery one reading at a time. Autonomic is the tool I built to
-        make sense of it. If it helps you spot your own patterns, find your own answers, and feel a
-        little more in control of your journey too, then it's done exactly what I hoped.
-      </p>
+    <div class="v2-prose">
+      <p>For more than four years, I’ve been living with long COVID. It started with blood pressure that spiked out of nowhere, a heart that raced the moment I stood up, brain fog that swallowed whole days, and a long list of symptoms that never quite fit together. I saw specialist after specialist in cardiology, neurology and beyond, and kept leaving with the same thing: no real answers.</p>
+      <p>So I started tracking it myself: HRV, blood pressure, heart rate, sleep, what I ate, the days I crashed. Slowly, patterns surfaced. I found small things that made life more livable, and I got a little better. I’m not healed, and I won’t pretend otherwise. But over the two years I’ve used my own early version of Autonomic, I’ve been able to see what genuinely helps and reach a far better place than I’d been in for a long time.</p>
+      <p>I’m not a doctor. I’m not an expert. I’m just someone on this road, in South Carolina, raising six kids, figuring out my own recovery one reading at a time. Autonomic is the tool I built to make sense of it. If it helps you spot your own patterns, find your own answers, and feel a little more in control of your journey too, then it’s done exactly what I hoped.</p>
     </div>
   </div>
 </section>
 
-<!-- ============ QUOTES ============ -->
-<section class="section" id="quotes">
-  <div class="wrap pk-wrap">
-    <h2 class="h2">Quotes, ready to attribute</h2>
-    <p class="lead">
-      Attribute as <strong>Austin Spaeth, founder of Autonomic</strong>. Quote verbatim or ask for
-      something specific.
-    </p>
+<section class="v2-sec white" id="quotes">
+  <div class="v2-wrap">
+    <div class="v2-headrow end">
+      <div><h2 class="v2-h2">Ready to attribute.</h2></div>
+      <p class="v2-sub narrow">Attribute as <b>Austin Spaeth, founder of Autonomic</b>. Quote verbatim, or ask for something specific.</p>
+    </div>
     <div class="pk-quotes">
-      {#each quotes as q}
-        <figure class="pk-quote">
-          <p class="pk-quote-on">{q.on}</p>
-          <blockquote>{q.text}</blockquote>
-        </figure>
+      {#each quotes as q}<figure class="pk-quote"><small>{q.on}</small><blockquote>“{q.text}”</blockquote></figure>{/each}
+    </div>
+  </div>
+</section>
+
+<section class="v2-sec" id="angles">
+  <div class="v2-wrap">
+    <div class="v2-center"><h2 class="v2-h2">Two stories, one app.</h2><p class="v2-sub">Same product, different reporter. Austin is glad to talk through either.</p></div>
+    <div class="v2-verdicts">
+      {#each angles as a, i}
+        <div class="v2-verdict" class:us={i === 0}>
+          <small>{a.for}</small>
+          <b>{a.hook}</b>
+          <ul>{#each a.points as pt}<li>{pt}</li>{/each}</ul>
+        </div>
       {/each}
     </div>
   </div>
 </section>
 
-<!-- ============ PRIVACY ============ -->
-<section class="section alt" id="privacy">
-  <div class="wrap pk-wrap">
-    <h2 class="h2">Privacy: the architecture, not a policy</h2>
-    <p class="lead">
-      The claim is literally true and worth checking. There is no server to send anything to.
-    </p>
-    <div class="pk-diagram">
-      <img src="/press/data-flow-diagram.svg" alt="Data-flow diagram showing that all Autonomic data stays on the device, with no server involved" />
+<section class="v2-sec white" id="privacy">
+  <div class="v2-wrap">
+    <div class="v2-headrow end">
+      <div><h2 class="v2-h2">The architecture, not a policy.</h2></div>
+      <p class="v2-sub narrow">Worth checking, and true: there is no cloud of ours to hold anyone’s health data.</p>
     </div>
-    <div class="article-prose">
-      <ul>
-        <li><strong>100% offline-first:</strong> no account, no cloud, no tracking, no ads.</li>
-        <li><strong>The app has no backend.</strong> Nothing is transmitted automatically. Everything is stored on the device; the user owns it and can export it anytime.</li>
-        <li>Reads HRV, resting heart rate, sleep and blood pressure from Apple Health / Health Connect, and writes back only what the user explicitly logs.</li>
-        <li>Because there is no server, <strong>the developer cannot see, lose, or sell user data. There is none to touch.</strong></li>
-      </ul>
+    <div class="pk-diagram"><img src="/press/data-flow-diagram.svg" width="920" height="610" alt="Data-flow diagram: heart-rate sources feed the phone, where readings are captured, scored and stored. No health data goes to any server; it leaves only in an export the user starts." loading="lazy" /></div>
+    <div class="v2-ledger">
+      <div class="v2-ledger-col stays">
+        <b>Stays on the phone</b>
+        <ul>
+          <li>Every reading, symptom, note, cycle day and sleep record</li>
+          <li>Every score, budget, warning and insight, computed there</li>
+          <li>Apple Health and Health Connect data the person chooses to share</li>
+        </ul>
+      </div>
+      <div class="v2-ledger-col sends">
+        <b>Leaves the phone</b>
+        <ul>
+          <li><strong>An export or AI report,</strong> only when the person shares it</li>
+          <li><strong>Anonymous counts and error reports,</strong> with no identifier and no health data in them</li>
+        </ul>
+      </div>
     </div>
+    <a class="v2-link" href="/privacy-policy/">Read the privacy policy →</a>
   </div>
 </section>
 
-<!-- ============ FAQ ============ -->
-<section class="section" id="faq">
-  <div class="wrap pk-wrap">
-    <h2 class="h2">Press FAQ</h2>
-    <div class="faq pk-faq">
-      {#each faqs as f}
-        <details>
-          <summary>{f.q}<span class="fq-i">+</span></summary>
-          <p>{f.a}</p>
-        </details>
-      {/each}
-    </div>
-  </div>
-</section>
+<ReviewStrip />
 
-<!-- ============ BRAND + CONTACT ============ -->
-<section class="section alt" id="brand">
-  <div class="wrap pk-wrap">
-    <h2 class="h2">Brand assets</h2>
+<Faq id="faq" title="Press FAQ" items={faq} />
+
+<section class="v2-sec white" id="brand">
+  <div class="v2-wrap">
+    <div class="v2-headrow end">
+      <div><h2 class="v2-h2">Logo, icon and diagram.</h2></div>
+      <p class="v2-sub narrow">Please keep the icon on a dark background and the mark in its own red.</p>
+    </div>
     <div class="pk-brand">
-      <a class="pk-brandcard" href="/press/autonomic-logo.svg" download>
-        <img src="/press/autonomic-logo.svg" alt="Autonomic logo" />
-        <span>Logo (SVG)</span>
-      </a>
-      <a class="pk-brandcard" href="/press/autonomic-icon.png" download>
-        <img class="pk-icon" src="/press/autonomic-icon.png" alt="Autonomic app icon" />
-        <span>App icon (PNG)</span>
-      </a>
-      <a class="pk-brandcard" href="/press/data-flow-diagram.svg" download>
-        <img src="/press/data-flow-diagram.svg" alt="Data-flow diagram" />
-        <span>Data-flow diagram (SVG)</span>
-      </a>
-    </div>
-
-    <div class="pk-contact">
-      <h3 class="pk-h3">Contact</h3>
-      <p class="lead">
-        Austin answers press email himself, and is happy to give a live walkthrough.
-        <a href="mailto:{email}?subject=Press%20enquiry%20about%20Autonomic">{email}</a>
-      </p>
-      <p class="pk-note">
-        Autonomic is a personal journal and education tool, <strong>not a medical device</strong>. It
-        does not diagnose, treat, or prevent any disease, and it never promises recovery.
-      </p>
+      <a class="pk-brandcard" href="/press/autonomic-logo.svg" download><span class="pk-brand-art"><img src="/press/autonomic-logo.svg" alt="Autonomic logo" /></span><b>Logo</b><small>SVG</small></a>
+      <a class="pk-brandcard" href="/press/autonomic-icon.png" download><span class="pk-brand-art"><img class="pk-icon" src="/press/autonomic-icon.png" alt="Autonomic app icon" /></span><b>App icon</b><small>PNG</small></a>
+      <a class="pk-brandcard" href="/press/data-flow-diagram.svg" download><span class="pk-brand-art"><img src="/press/data-flow-diagram.svg" alt="Data-flow diagram" /></span><b>Data-flow diagram</b><small>SVG</small></a>
+      <a class="pk-brandcard" href="/press/founder-austin-spaeth.jpg" download><span class="pk-brand-art"><img class="pk-face" src="/press/founder-austin-spaeth.jpg" alt="Austin Spaeth" /></span><b>Founder headshot</b><small>JPG</small></a>
     </div>
   </div>
 </section>
 
-{@html `<script>${copyScript}<\/script>`}
+<section class="v2-sec soft">
+  <div class="v2-wrap">
+    <div class="v2-cta">
+      <div class="v2-cta-copy">
+        <h2>Austin answers press email himself.</h2>
+        <p>Happy to give a live walkthrough, a review copy, or answer anything on this page.</p>
+      </div>
+      <a class="v2-btn" href={mail}>Email {email}</a>
+    </div>
+    <p class="v2-fine pk-note">Autonomic is a personal journal and education tool, not a medical device. It does not diagnose, treat, or prevent any disease, and it never promises recovery.</p>
+  </div>
+</section>
+
+{@html copyScript}
 
 <style>
-  .pk-hero { position: relative; padding: 64px 0 56px; border-bottom: 1px solid var(--line); background: linear-gradient(180deg, rgba(224, 49, 39, 0.07), transparent 70%); }
-  .pk-h1 { font-family: var(--display); font-weight: 600; font-size: clamp(34px, 5vw, 58px); line-height: 1.04; letter-spacing: -0.035em; margin: 0 0 20px; max-width: 18ch; }
-  .pk-lead { font-size: clamp(16px, 1.7vw, 19px); color: var(--dim); max-width: 66ch; margin: 0 0 28px; line-height: 1.65; }
-  .pk-lead strong { color: var(--text); font-weight: 600; }
-  .pk-actions { display: flex; flex-wrap: wrap; gap: 12px; }
-  .pk-chips { list-style: none; display: flex; flex-wrap: wrap; gap: 8px 10px; margin: 26px 0 0; padding: 0; }
-  .pk-chips li { font-family: var(--mono); font-size: 11.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); border: 1px solid var(--line-2); border-radius: 999px; padding: 6px 13px; }
+  .v2-phead .v2-trust-chips { margin-top: 26px; }
+  .pk-jump { display: flex; flex-wrap: wrap; justify-content: center; gap: 6px 18px; margin-top: 26px; font-size: 14.5px; font-weight: 700; }
+  .pk-jump a { color: var(--mute); border-bottom: 1px solid transparent; transition: color .15s, border-color .15s; }
+  .pk-jump a:hover { color: var(--ink); border-bottom-color: color-mix(in srgb, currentColor 45%, transparent); }
 
-  .pk-wrap { max-width: 900px; }
-  .pk-h3 { font-family: var(--display); font-weight: 600; font-size: 22px; letter-spacing: -0.01em; margin: 44px 0 14px; }
+  .pk-facts { margin: 0; background: var(--paper); border-radius: 28px; padding: 6px 28px; }
+  .pk-facts > div { display: grid; grid-template-columns: 190px 1fr; gap: 20px; padding: 17px 0; border-bottom: 1px solid #e3dde2; }
+  .pk-facts > div:last-child { border-bottom: 0; }
+  .pk-facts dt { font-size: 16px; font-weight: 800; color: var(--ink); }
+  .pk-facts dd { margin: 0; font-size: 16px; line-height: 1.6; color: var(--mute); }
+  .pk-facts dd a { color: var(--red); font-weight: 700; }
 
-  /* fact sheet */
-  .pk-facts { margin: 26px 0 0; padding: 0; border-top: 1px solid var(--line); }
-  .pk-fact { display: grid; grid-template-columns: 190px 1fr; gap: 20px; padding: 16px 0; border-bottom: 1px solid var(--line); }
-  .pk-fact dt { font-family: var(--display); font-weight: 600; font-size: 15px; color: var(--text); }
-  .pk-fact dd { margin: 0; font-size: 15.5px; line-height: 1.6; color: var(--dim); }
-  .pk-fact dd a { color: var(--accent-2); text-decoration: underline; text-underline-offset: 2px; }
-  @media (max-width: 640px) { .pk-fact { grid-template-columns: 1fr; gap: 4px; } }
+  .pk-feat { --ring: #d3c8d6; display: flex; flex-direction: column; gap: 8px; background: #fff; border-radius: 24px; padding: 24px; color: var(--ink); box-shadow: 0 0 0 0 var(--ring); transition: box-shadow .32s cubic-bezier(.34,1.56,.64,1); }
+  .pk-feat b { font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
+  .pk-feat span { flex: 1; color: var(--mute); font-size: 15px; line-height: 1.55; }
+  .pk-feat em { font-style: normal; font-size: 14.5px; font-weight: 700; color: var(--red); }
+  @media (hover: hover) { .pk-feat:hover { box-shadow: 0 0 0 3px var(--ring); } }
+  .pk-feat:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ring); }
 
-  /* screenshots */
-  .pk-shots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 26px; margin-top: 30px; }
-  @media (max-width: 860px) { .pk-shots { grid-template-columns: repeat(2, 1fr); } }
-  @media (max-width: 520px) { .pk-shots { grid-template-columns: 1fr; } }
-  .pk-shot { margin: 0; }
-  .pk-shot img { width: 100%; height: auto; border-radius: 14px; border: 1px solid var(--line-2); background: #000; }
-  .pk-shot figcaption { margin-top: 12px; font-size: 13.5px; line-height: 1.5; color: var(--dim); }
-  .pk-shot figcaption b { display: block; color: var(--text); font-weight: 600; font-size: 14.5px; margin-bottom: 3px; }
-  .pk-dl { display: inline-block; margin-top: 8px; font-family: var(--mono); font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--accent-2); text-decoration: underline; text-underline-offset: 3px; }
+  .pk-shots { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 18px; }
+  .pk-shot { margin: 0; background: #fff; border-radius: 26px; padding: 14px 14px 20px; display: flex; flex-direction: column; }
+  .pk-shot-img { display: flex; align-items: center; justify-content: center; height: 440px; border-radius: 18px; background: #f4f0f4; overflow: hidden; }
+  .pk-shot-img img { display: block; height: 400px; width: auto; max-width: 92%; object-fit: contain; border-radius: 16px; box-shadow: 0 20px 36px -22px rgba(20,14,26,.6); }
+  .pk-shot figcaption { padding: 16px 8px 0; display: flex; flex-direction: column; gap: 4px; flex: 1; }
+  .pk-shot figcaption b { font-size: 18px; font-weight: 800; letter-spacing: -.015em; }
+  .pk-shot figcaption span { flex: 1; font-size: 14.5px; line-height: 1.5; color: var(--mute); }
+  .pk-dl { margin-top: 10px; font-size: 14.5px; font-weight: 700; color: var(--red); align-self: flex-start; }
 
-  /* boilerplate */
-  .pk-copyblock { border: 1px solid var(--line-2); border-radius: var(--r); background: var(--panel); padding: 18px 20px; margin-top: 16px; }
-  .pk-copyhead { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 10px; }
-  .pk-copylabel { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dim-2); }
-  .pk-copybtn { font-family: inherit; font-size: 12.5px; font-weight: 600; color: var(--dim); background: var(--panel-2); border: 1px solid var(--line-2); border-radius: 999px; padding: 6px 15px; cursor: pointer; transition: color 0.2s, border-color 0.2s; }
-  .pk-copybtn:hover { color: var(--text); border-color: var(--dim-2); }
-  .pk-copybtn.is-copied { color: var(--green); border-color: var(--green); }
-  .pk-copytext { margin: 0; font-size: 16px; line-height: 1.65; color: var(--text); }
+  .pk-copy { background: var(--paper); border-radius: 22px; padding: 20px 22px; margin-top: 14px; }
+  .pk-copy-head { display: flex; align-items: center; justify-content: space-between; gap: 12px; margin-bottom: 8px; }
+  .pk-copy-head span { font-size: 13px; font-weight: 800; letter-spacing: .06em; text-transform: uppercase; color: #8d8491; }
+  .pk-copy p { margin: 0; font-size: 17px; line-height: 1.65; color: var(--ink); }
+  .pk-copy-btn { --ring: #d3c8d6; border: 0; border-radius: 999px; background: #fff; padding: 8px 16px; font: 700 13.5px/1 var(--body); color: var(--ink); cursor: pointer; box-shadow: 0 0 0 0 var(--ring); transition: box-shadow .32s cubic-bezier(.34,1.56,.64,1), background .15s, color .15s; }
+  @media (hover: hover) { .pk-copy-btn:hover { box-shadow: 0 0 0 3px var(--ring); } }
+  .pk-copy-btn:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ring); }
+  :global(.pk-copy-btn.is-copied) { background: #eef8f1; color: #1f7a45; }
 
-  /* founder */
-  .pk-founder { display: flex; align-items: center; gap: 22px; margin-top: 26px; flex-wrap: wrap; }
-  .pk-founder-photo { width: 108px; height: 108px; border-radius: 50%; object-fit: cover; border: 2px solid var(--accent-soft); flex: none; }
-  .pk-founder-name { font-family: var(--display); font-weight: 600; font-size: 21px; margin: 0 0 4px; }
-  .pk-founder-role { margin: 0 0 8px; font-size: 14.5px; color: var(--dim); max-width: 52ch; }
+  .pk-founder-links { display: flex; flex-wrap: wrap; gap: 4px 24px; }
+  .pk-short { margin: 4px 0 16px; font-size: 15.5px; line-height: 1.6; color: #3d3642; }
 
-  /* quotes */
-  .pk-quotes { display: grid; grid-template-columns: repeat(2, 1fr); gap: 20px; margin-top: 30px; }
-  @media (max-width: 780px) { .pk-quotes { grid-template-columns: 1fr; } }
-  .pk-quote { margin: 0; border: 1px solid var(--line); border-radius: var(--r-lg); background: var(--panel); padding: 22px; }
-  .pk-quote-on { font-family: var(--mono); font-size: 11px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--accent-2); margin: 0 0 12px; }
-  .pk-quote blockquote { margin: 0; padding: 0; border: none; font-style: normal; font-size: 16.5px; line-height: 1.6; color: var(--text); }
+  .pk-quotes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }
+  .pk-quote { margin: 0; background: var(--paper); border-radius: 24px; padding: 26px; }
+  .pk-quote small { display: block; font-size: 13.5px; font-weight: 700; color: var(--red); margin-bottom: 10px; }
+  .pk-quote blockquote { margin: 0; font-size: 18px; font-weight: 700; line-height: 1.45; letter-spacing: -.01em; color: var(--ink); }
 
-  /* privacy diagram */
-  .pk-diagram { margin: 28px 0 8px; border: 1px solid var(--line-2); border-radius: var(--r-lg); background: #fff; padding: 22px; overflow-x: auto; }
-  .pk-diagram img { width: 100%; max-width: 720px; height: auto; margin: 0 auto; }
+  #angles :global(.v2-verdict li) { display: block; position: relative; padding-left: 18px; }
+  #angles :global(.v2-verdict li)::before { content: ''; position: absolute; left: 2px; top: .62em; width: 7px; height: 7px; border-radius: 50%; background: var(--red); margin: 0; }
+  #angles :global(.v2-verdict.us li)::before { background: #ff8c7d; }
 
-  /* brand */
-  .pk-brand { display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px; margin-top: 28px; }
-  @media (max-width: 640px) { .pk-brand { grid-template-columns: 1fr; } }
-  .pk-brandcard { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; min-height: 168px; padding: 22px; border: 1px solid var(--line-2); border-radius: var(--r-lg); background: var(--panel); transition: border-color 0.2s; }
-  .pk-brandcard:hover { border-color: var(--accent); }
-  .pk-brandcard img { max-width: 100%; max-height: 76px; width: auto; }
-  .pk-brandcard .pk-icon { border-radius: 18px; }
-  .pk-brandcard span { font-family: var(--mono); font-size: 11px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dim); }
+  .pk-diagram { background: var(--paper); border-radius: 28px; padding: 24px; margin-bottom: 18px; }
+  .pk-diagram img { display: block; width: 100%; max-width: 920px; height: auto; margin: 0 auto; border-radius: 16px; }
+  #privacy .v2-ledger { margin-top: 0; }
 
-  .pk-contact { margin-top: 48px; padding-top: 30px; border-top: 1px solid var(--line); }
-  .pk-contact a { color: var(--accent-2); text-decoration: underline; text-underline-offset: 2px; }
-  .pk-note { margin: 18px 0 0; font-size: 14px; line-height: 1.6; color: var(--dim-2); max-width: 70ch; }
-  .pk-note strong { color: var(--dim); }
+  .pk-brand { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; }
+  .pk-brandcard { --ring: #d3c8d6; display: flex; flex-direction: column; gap: 2px; background: var(--paper); border-radius: 24px; padding: 14px 14px 18px; color: var(--ink); box-shadow: 0 0 0 0 var(--ring); transition: box-shadow .32s cubic-bezier(.34,1.56,.64,1); }
+  @media (hover: hover) { .pk-brandcard:hover { box-shadow: 0 0 0 3px var(--ring); } }
+  .pk-brandcard:focus-visible { outline: none; box-shadow: 0 0 0 3px var(--ring); }
+  .pk-brand-art { display: flex; align-items: center; justify-content: center; height: 150px; background: #fff; border-radius: 16px; margin-bottom: 12px; padding: 18px; }
+  .pk-brand-art img { max-width: 100%; max-height: 100%; width: auto; }
+  .pk-brand-art .pk-icon { height: 92px; border-radius: 22px; }
+  .pk-brand-art .pk-face { height: 112px; width: 112px; border-radius: 50%; object-fit: cover; }
+  .pk-brandcard b { font-size: 17px; font-weight: 800; padding: 0 6px; }
+  .pk-brandcard small { font-size: 13.5px; font-weight: 600; color: var(--mute); padding: 0 6px; }
+
+  .pk-note { text-align: center; margin-top: 22px; }
+
+  @media (max-width: 1060px) {
+    .pk-shots { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+    .pk-brand { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  }
+  @media (max-width: 760px) {
+    .pk-facts { padding: 4px 20px; }
+    .pk-facts > div { grid-template-columns: 1fr; gap: 4px; }
+    .pk-quotes { grid-template-columns: 1fr; }
+  }
+  @media (max-width: 620px) {
+    .pk-diagram { padding: 8px; border-radius: 22px; }
+    .pk-diagram img { border-radius: 14px; }
+    .pk-shots { grid-template-columns: 1fr; }
+    .pk-shot-img { height: 400px; }
+    .pk-shot-img img { height: 360px; }
+  }
 </style>

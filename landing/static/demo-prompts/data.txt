@@ -1,0 +1,667 @@
+NOTE: This is sample data from the Autonomic website demo, not real medical records. Treat it as a one-off example and do not save it to memory.
+
+DATA EXPORT
+SOURCE: Autonomic (autonomic.care), a personal health-tracking app for autonomic recovery
+PERIOD: Past 30 days (October 6, 2026 to November 4, 2026)
+
+PROFILE (self-entered): Age: 36 | Sex: Female
+
+DAILY AUTONOMIC SCORES:
+[2026-10-06] Autonomic Score: 44/100 (confidence 100%)
+[2026-10-07] Autonomic Score: 40/100 (confidence 100%)
+[2026-10-08] Autonomic Score: 50/100 (confidence 100%)
+[2026-10-09] Autonomic Score: 65/100 (confidence 100%)
+[2026-10-10] Autonomic Score: 55/100 (confidence 100%)
+[2026-10-11] Autonomic Score: 64/100 (confidence 100%)
+[2026-10-12] Autonomic Score: 57/100 (confidence 100%)
+[2026-10-13] Autonomic Score: 68/100 (confidence 100%)
+[2026-10-14] Autonomic Score: 43/100 (confidence 100%)
+[2026-10-15] Autonomic Score: 68/100 (confidence 100%)
+[2026-10-16] Autonomic Score: 70/100 (confidence 100%)
+[2026-10-17] Autonomic Score: 71/100 (confidence 100%)
+[2026-10-18] Autonomic Score: 70/100 (confidence 100%)
+[2026-10-19] Autonomic Score: 73/100 (confidence 100%)
+[2026-10-20] Autonomic Score: 68/100 (confidence 100%)
+[2026-10-21] Autonomic Score: 71/100 (confidence 100%)
+[2026-10-22] Autonomic Score: 79/100 (confidence 100%)
+[2026-10-23] Autonomic Score: 79/100 (confidence 100%)
+[2026-10-24] Autonomic Score: 84/100 (confidence 100%)
+[2026-10-25] Autonomic Score: 77/100 (confidence 100%)
+[2026-10-26] Autonomic Score: 59/100 (confidence 100%)
+[2026-10-27] Autonomic Score: 86/100 (confidence 100%)
+[2026-10-28] Autonomic Score: 90/100 (confidence 100%)
+[2026-10-29] Autonomic Score: 88/100 (confidence 100%)
+[2026-10-30] Autonomic Score: 87/100 (confidence 100%)
+[2026-10-31] Autonomic Score: 91/100 (confidence 100%)
+[2026-11-01] Autonomic Score: 84/100 (confidence 100%)
+[2026-11-02] Autonomic Score: 87/100 (confidence 100%)
+[2026-11-03] Autonomic Score: 88/100 (confidence 100%)
+[2026-11-04] Autonomic Score: 91/100 (confidence 100%)
+
+HRV READINGS (training + baseline):
+[2026-10-06 7:23am] Type: Training, paced 4/6 | HR: 72 | RMSSD: 20.92 | pNN50: 4% | SDNN: 37 | PNS: -0.9 | SNS: 1 | Stress: 151 | Power: 1637 | VLF: 724 | LF: 576 | HF: 337 | LF/HF: 1.71 | LF Peak: 0.06 Hz | HF Peak: 0.19 Hz | Mean RR: 823 ms | MxDMn: 0.204 s | Mode: 800 ms | AMo50: 49% | CV: 4.5% | Reading type: Morning
+[2026-10-06 7:29am] Type: Baseline | HR: 75 | RMSSD: 17.69 | pNN50: 4% | SDNN: 31 | PNS: -1.1 | SNS: 1.2 | Stress: 167 | Power: 1184 | VLF: 652 | LF: 161 | HF: 371 | LF/HF: 0.43 | LF Peak: 0.08 Hz | HF Peak: 0.22 Hz | Mean RR: 824 ms | MxDMn: 0.192 s | Mode: 800 ms | AMo50: 51% | CV: 3.8% | Reading type: Morning
+[2026-10-06 8:41pm] Type: Training, paced 4/6 | HR: 76 | RMSSD: 20.24 | pNN50: 5% | SDNN: 40 | PNS: -1 | SNS: 1 | Stress: 135 | Power: 1707 | VLF: 755 | LF: 601 | HF: 351 | LF/HF: 1.71 | LF Peak: 0.06 Hz | HF Peak: 0.21 Hz | Mean RR: 827 ms | MxDMn: 0.219 s | Mode: 850 ms | AMo50: 50% | CV: 4.8% | Reading type: Evening
+[2026-10-06 8:47pm] Type: Baseline | HR: 77 | RMSSD: 16.71 | pNN50: 6% | SDNN: 33 | PNS: -1.1 | SNS: 1.3 | Stress: 159 | Power: 1234 | VLF: 680 | LF: 168 | HF: 386 | LF/HF: 0.44 | LF Peak: 0.07 Hz | HF Peak: 0.21 Hz | Mean RR: 828 ms | MxDMn: 0.186 s | Mode: 850 ms | AMo50: 50% | CV: 4% | Reading type: Evening
+[2026-10-07 7:38am] Type: Training, paced 4/6 | HR: 72 | RMSSD: 21.37 | pNN50: 4% | SDNN: 39 | PNS: -0.9 | SNS: 0.9 | Stress: 147 | Power: 1649 | VLF: 716 | LF: 589 | HF: 344 | LF/HF: 1.71 | LF Peak: 0.06 Hz | HF Peak: 0.2 Hz | Mean RR: 830 ms | MxDMn: 0.207 s | Mode: 850 ms | AMo50: 52% | CV: 4.7% | Reading type: Morning
+[2026-10-07 7:44am] Type: Baseline | HR: 74 | RMSSD: 18.2 | pNN50: 4% | SDNN: 33 | PNS: -1.1 | SNS: 1.1 | Stress: 153 | Power: 1187 | VLF: 644 | LF: 165 | HF: 378 | LF/HF: 0.44 | LF Peak: 0.06 Hz | HF Peak: 0.2 Hz | Mean RR: 811 ms | MxDMn: 0.212 s | Mode: 800 ms | AMo50: 52% | CV: 4.1% | Reading type: Morning
+[2026-10-07 9:18pm] Type: Training, paced 4/6 | HR: 75 | RMSSD: 19.49 | pNN50: 5% | SDNN: 38 | PNS: -0.9 | SNS: 1 | Stress: 134 | Power: 1670 | VLF: 725 | LF: 597 | HF: 348 | LF/HF: 1.72 | LF Peak: 0.06 Hz | HF Peak: 0.19 Hz | Mean RR: 844 ms | MxDMn: 0.209 s | Mode: 850 ms | AMo50: 47% | CV: 4.5% | Reading type: Evening
+[2026-10-07 9:24pm] Type: Baseline | HR: 76 | RMSSD: 16.95 | pNN50: 4% | SDNN: 33 | PNS: -1.1 | SNS: 1.2 | Stress: 153 | Power: 1203 | VLF: 653 | LF: 167 | HF: 383 | LF/HF: 0.44 | LF Peak: 0.08 Hz | HF Peak: 0.22 Hz | Mean RR: 816 ms | MxDMn: 0.203 s | Mode: 800 ms | AMo50: 50% | CV: 4% | Reading type: Evening
+[2026-10-08 6:55am] Type: Training, paced 4/6 | HR: 71 | RMSSD: 22.4 | pNN50: 6% | SDNN: 43 | PNS: -0.8 | SNS: 0.7 | Stress: 119 | Power: 1814 | VLF: 727 | LF: 687 | HF: 400 | LF/HF: 1.72 | LF Peak: 0.06 Hz | HF Peak: 0.19 Hz | Mean RR: 845 ms | MxDMn: 0.234 s | Mode: 850 ms | AMo50: 47% | CV: 5.1% | Reading type: Morning
+[2026-10-08 7:01am] Type: Baseline | HR: 75 | RMSSD: 21.29 | pNN50: 5% | SDNN: 35 | PNS: -0.9 | SNS: 0.9 | Stress: 135 | Power: 1286 | VLF: 654 | LF: 192 | HF: 440 | LF/HF: 0.44 | LF Peak: 0.08 Hz | HF Peak: 0.21 Hz | Mean RR: 835 ms | MxDMn: 0.22 s | Mode: 850 ms | AMo50: 51% | CV: 4.2% | Reading type: Morning
+[2026-10-08 8:38pm] Type: Training, paced 4/6 | HR: 71 | RMSSD: 20.97 | pNN50: 6% | SDNN: 43 | PNS: -0.8 | SNS: 0.7 | Stress: 116 | Power: 1959 | VLF: 786 | LF: 743 | HF: 430 | LF/HF: 1.73 | LF Peak: 0.06 Hz | HF Peak: 0.2 Hz | Mean RR: 855 ms | MxDMn: 0.24 s | Mode: 850 ms | AMo50: 47% | CV: 5% | Reading type: Evening
+[2026-10-08 8:44pm] Type: Baseline | HR: 75 | RMSSD: 18.37 | pNN50: 6% | SDNN: 34 | PNS: -1 | SNS: 1.1 | Stress: 144 | Power: 1388 | VLF: 707 | LF: 208 | HF: 473 | LF/HF: 0.44 | LF Peak: 0.09 Hz | HF Peak: 0.2 Hz | Mean RR: 847 ms | MxDMn: 0.205 s | Mode: 850 ms | AMo50: 50% | CV: 4% | Reading type: Evening
+[2026-10-09 7:14am] Type: Training, paced 4/6 | HR: 67 | RMSSD: 27.84 | pNN50: 10% | SDNN: 53 | PNS: -0.5 | SNS: 0.1 | Stress: 68 | Power: 2852 | VLF: 803 | LF: 1301 | HF: 748 | LF/HF: 1.74 | LF Peak: 0.07 Hz | HF Peak: 0.19 Hz | Mean RR: 907 ms | MxDMn: 0.313 s | Mode: 900 ms | AMo50: 38% | CV: 5.8% | Reading type: Morning
+[2026-10-09 7:20am] Type: Baseline | HR: 70 | RMSSD: 25.66 | pNN50: 9% | SDNN: 44 | PNS: -0.6 | SNS: 0.4 | Stress: 87 | Power: 1910 | VLF: 723 | LF: 364 | HF: 823 | LF/HF: 0.44 | LF Peak: 0.1 Hz | HF Peak: 0.19 Hz | Mean RR: 896 ms | MxDMn: 0.281 s | Mode: 900 ms | AMo50: 44% | CV: 4.9% | Reading type: Morning
+[2026-10-10 8:01am] Type: Training, paced 4/6 | HR: 71 | RMSSD: 22.73 | pNN50: 6% | SDNN: 43 | PNS: -0.8 | SNS: 0.6 | Stress: 112 | Power: 1992 | VLF: 756 | LF: 783 | HF: 453 | LF/HF: 1.73 | LF Peak: 0.06 Hz | HF Peak: 0.2 Hz | Mean RR: 853 ms | MxDMn: 0.244 s | Mode: 850 ms | AMo50: 46% | CV: 5% | Reading type: Morning
+[2026-10-10 8:07am] Type: Baseline | HR: 74 | RMSSD: 21.41 | pNN50: 6% | SDNN: 36 | PNS: -0.9 | SNS: 0.8 | Stress: 117 | Power: 1397 | VLF: 680 | LF: 219 | HF: 498 | LF/HF: 0.44 | LF Peak: 0.08 Hz | HF Peak: 0.2 Hz | Mean RR: 846 ms | MxDMn: 0.243 s | Mode: 850 ms | AMo50: 48% | CV: 4.3% | Reading type: Morning
+[2026-10-10 9:17pm] Type: Training, paced 4/6 | HR: 71 | RMSSD: 22.03 | pNN50: 8% | SDNN: 44 | PNS: -0.8 | SNS: 0.5 | Stress: 100 | Power: 2014 | VLF: 764 | LF: 792 | HF: 458 | LF/HF: 1.73 | LF Peak: 0.06 Hz | HF Peak: 0.2 Hz | Mean RR: 859 ms | MxDMn: 0.259 s | Mode: 850 ms | AMo50: 44% | CV: 5.1% | Reading type: Evening
+[2026-10-10 9:23pm] Type: Baseline | HR: 75 | RMSSD: 19.2 | pNN50: 5% | SDNN: 38 | PNS: -0.9 | SNS: 0.8 | Stress: 117 | Power: 1414 | VLF: 688 | LF: 222 | HF: 504 | LF/HF: 0.44 | LF Peak: 0.07 Hz | HF Peak: 0.22 Hz | Mean RR: 843 ms | MxDMn: 0.241 s | Mode: 850 ms | AMo50: 48% | CV: 4.5% | Reading type: Evening
+[2026-10-11 7:22am] Type: Training, paced 4/6 | HR: 66 | RMSSD: 28.39 | pNN50: 9% | SDNN: 48 | PNS: -0.5 | SNS: 0.1 | Stress: 79 | Power: 2506 | VLF: 754 | LF: 1112 | HF: 640 | LF/HF: 1.74 | LF Peak: 0.07 Hz | HF Peak: 0.18 Hz | Mean RR: 892 ms | MxDMn: 0.301 s | Mode: 900 ms | AMo50: 43% | CV: 5.4% | Reading type: Morning
+[2026-10-11 7:28am] Type: Baseline | HR: 71 | RMSSD: 24.52 | pNN50: 7% | SDNN: 39 | PNS: -0.7 | SNS: 0.4 | Stress: 84 | Power: 1694 | VLF: 679 | LF: 311 | HF: 704 | LF/HF: 0.44 | LF Peak: 0.1 Hz | HF Peak: 0.21 Hz | Mean RR: 878 ms | MxDMn: 0.275 s | Mode: 900 ms | AMo50: 42% | CV: 4.4% | Reading type: Morning
+[2026-10-11 8:47pm] Type: Training, paced 4/6 | HR: 69 | RMSSD: 27.83 | pNN50: 9% | SDNN: 48 | PNS: -0.5 | SNS: 0.2 | Stress: 74 | Power: 2559 | VLF: 770 | LF: 1136 | HF: 653 | LF/HF: 1.74 | LF Peak: 0.07 Hz | HF Peak: 0.18 Hz | Mean RR: 902 ms | MxDMn: 0.303 s | Mode: 900 ms | AMo50: 40% | CV: 5.3% | Reading type: Evening
+[2026-10-11 8:53pm] Type: Baseline | HR: 70 | RMSSD: 22.97 | pNN50: 9% | SDNN: 42 | PNS: -0.7 | SNS: 0.4 | Stress: 84 | Power: 1729 | VLF: 693 | LF: 318 | HF: 718 | LF/HF: 0.44 | LF Peak: 0.09 Hz | HF Peak: 0.21 Hz | Mean RR: 891 ms | MxDMn: 0.284 s | Mode: 900 ms | AMo50: 43% | CV: 4.7% | Reading type: Evening
+[2026-10-12 7:14am] Type: Training, paced 4/6 | HR: 69 | RMSSD: 26.19 | pNN50: 7% | SDNN: 48 | PNS: -0.6 | SNS: 0.3 | Stress: 80 | Power: 2333 | VLF: 805 | LF: 969 | HF: 559 | LF/HF: 1.73 | LF Peak: 0.06 Hz | HF Peak: 0.19 Hz | Mean RR: 880 ms | MxDMn: 0.288 s | Mode: 900 ms | AMo50: 41% | CV: 5.5% | Reading type: Morning
+[2026-10-12 7:20am] Type: Baseline | HR: 72 | RMSSD: 23.69 | pNN50: 7% | SDNN: 39 | PNS: -0.8 | SNS: 0.6 | Stress: 110 | Power: 1611 | VLF: 725 | LF: 271 | HF: 615 | LF/HF: 0.44 | LF Peak: 0.09 Hz | HF Peak: 0.21 Hz | Mean RR: 853 ms | MxDMn: 0.25 s | Mode: 850 ms | AMo50: 47% | CV: 4.6% | Reading type: Morning
+[2026-10-12 8:49pm] Type: Training, paced 4/6 | HR: 71 | RMSSD: 25.17 | pNN50: 7% | SDNN: 44 | PNS: -0.7 | SNS: 0.4 | Stress: 87 | Power: 2287 | VLF: 789 | LF: 949 | HF: 549 | LF/HF: 1.73 | LF Peak: 0.06 Hz | HF Peak: 0.19 Hz | Mean RR: 869 ms | MxDMn: 0.286 s | Mode: 850 ms | AMo50: 42% | CV: 5.1% | Reading type: Evening
+[2026-10-12 8:55pm] Type: Baseline | HR: 73 | RMSSD: 20.75 | pNN50: 7% | SDNN: 38 | PNS: -0.8 | SNS: 0.7 | Stress: 109 | Power: 1580 | VLF: 710 | LF: 266 | HF: 604 | LF/HF: 0.44 | LF Peak: 0.08 Hz | HF Peak: 0.21 Hz | Mean RR: 864 ms | MxDMn: 0.245 s | Mode: 850 ms | AMo50: 46% | CV: 4.4% | Reading type: Evening
+[2026-10-13 7:45am] Type: Training, paced 4/6 | HR: 68 | RMSSD: 27.11 | pNN50: 8% | SDNN: 50 | PNS: -0.6 | SNS: 0.2 | Stress: 75 | Power: 2637 | VLF: 822 | LF: 1152 | HF: 663 | LF/HF: 1.74 | LF Peak: 0.07 Hz | HF Peak: 0.19 Hz | Mean RR: 882 ms | MxDMn: 0.305 s | Mode: 900 ms | AMo50: 41% | CV: 5.7% | Reading type: Morning
+[2026-10-13 7:51am] Type: Baseline | HR: 69 | RMSSD: 24.62 | pNN50: 7% | SDNN: 39 | PNS: -0.6 | SNS: 0.4 | Stress: 95 | Power: 1792 | VLF: 740 | LF: 323 | HF: 729 | LF/HF: 0.44 | LF Peak: 0.09 Hz | HF Peak: 0.2 Hz | Mean RR: 887 ms | MxDMn: 0.265 s | Mode: 900 ms | AMo50: 46% | CV: 4.4% | Reading type: Morning
+[2026-10-13 8:54pm] Type: Training, paced 4/6 | HR: 70 | RMSSD: 25.03 | pNN50: 9% | SDNN: 47 | PNS: -0.6 | SNS: 0.3 | Stress: 79 | Power: 2553 | VLF: 796 | LF: 1115 | HF: 642 | LF/HF: 1.74 | LF Peak: 0.07 Hz | HF Peak: 0.19 Hz | Mean RR: 894 ms | MxDMn: 0.283 s | Mode: 900 ms | AMo50: 40% | CV: 5.3% | Reading type: Evening
+[2026-10-13 9:00pm] Type: Baseline | HR: 71 | RMSSD: 22.45 | pNN50: 7% | SDNN: 41 | PNS: -0.8 | SNS: 0.5 | Stress: 95 | Power: 1734 | VLF: 716 | LF: 312 | HF: 706 | LF/HF: 0.44 | LF Peak: 0.08 Hz | HF Peak: 0.2 Hz | Mean RR: 868 ms | MxDMn: 0.275 s | Mode: 850 ms | AMo50: 44% | CV: 4.7% | Reading type: Evening
+[2026-10-14 7:48am] Type: Training, paced 4/6 | HR: 74 | RMSSD: 21.35 | pNN50: 4% | SDNN: 37 | PNS: -1 | SNS: 1 | Stress: 145 | Power: 1582 | VLF: 715 | LF: 548 | HF: 319 | LF/HF: 1.72 | LF Peak: 0.05 Hz | HF Peak: 0.19 Hz | Mean RR: 816 ms | MxDMn: 0.211 s | Mode: 800 ms | AMo50: 49% | CV: 4.5% | Reading type: Morning
+[2026-10-14 7:54am] Type: Baseline | HR: 75 | RMSSD: 19.18 | pNN50: 6% | SDNN: 33 | PNS: -1 | SNS: 1.2 | Stress: 165 | Power: 1148 | VLF: 644 | LF: 153 | HF: 351 | LF/HF: 0.44 | LF Peak: 0.06 Hz | HF Peak: 0.2 Hz | Mean RR: 815 ms | MxDMn: 0.191 s | Mode: 800 ms | AMo50: 51% | CV: 4% | Reading type: Morning
+[2026-10-15 7:12am] Type: Training, paced 4/6 | HR: 68 | RMSSD: 27.92 | pNN50: 11% | SDNN: 51 | PNS: -0.5 | SNS: 0.1 | Stress: 74 | Power: 2660 | VLF: 757 | LF: 1209 | HF: 694 | LF/HF: 1.74 | LF Peak: 0.07 Hz | HF Peak: 0.18 Hz | Mean RR: 906 ms | MxDMn: 0.31 s | Mode: 900 ms | AMo50: 41% | CV: 5.6% | Reading type: Morning
+[2026-10-15 7:18am] Type: Baseline | HR: 69 | RMSSD: 25.1 | pNN50: 8% | SDNN: 41 | PNS: -0.6 | SNS: 0.3 | Stress: 86 | Power: 1783 | VLF: 681 | LF: 339 | HF: 763 | LF/HF: 0.44 | LF Peak: 0.08 Hz | HF Peak: 0.21 Hz | Mean RR: 879 ms | MxDMn: 0.278 s | Mode: 900 ms | AMo50: 43% | CV: 4.7% | Reading type: Morning
+[2026-10-16 8:01am] Type: Training, paced 4/6 | HR: 67 | RMSSD: 30.41 | pNN50: 12% | SDNN: 54 | PNS: -0.3 | SNS: 0 | Stress: 63 | Power: 3068 | VLF: 786 | LF: 1451 | HF: 831 | LF/HF: 1.75 | LF Peak: 0.08 Hz | HF Peak: 0.18 Hz | Mean RR: 928 ms | MxDMn: 0.325 s | Mode: 950 ms | AMo50: 39% | CV: 5.8% | Reading type: Morning
+[2026-10-16 8:07am] Type: Baseline | HR: 68 | RMSSD: 25.86 | pNN50: 10% | SDNN: 42 | PNS: -0.6 | SNS: 0.1 | Stress: 68 | Power: 2027 | VLF: 707 | LF: 406 | HF: 914 | LF/HF: 0.44 | LF Peak: 0.1 Hz | HF Peak: 0.2 Hz | Mean RR: 890 ms | MxDMn: 0.318 s | Mode: 900 ms | AMo50: 39% | CV: 4.7% | Reading type: Morning
+[2026-10-16 8:35pm] Type: Training, paced 4/6 | HR: 68 | RMSSD: 29.55 | pNN50: 12% | SDNN: 54 | PNS: -0.4 | SNS: 0 | Stress: 60 | Power: 2814 | VLF: 721 | LF: 1331 | HF: 762 | LF/HF: 1.75 | LF Peak: 0.08 Hz | HF Peak: 0.18 Hz | Mean RR: 915 ms | MxDMn: 0.347 s | Mode: 900 ms | AMo50: 37% | CV: 5.9% | Reading type: Evening
+[2026-10-16 8:41pm] Type: Baseline | HR: 70 | RMSSD: 26.96 | pNN50: 9% | SDNN: 42 | PNS: -0.5 | SNS: 0.3 | Stress: 78 | Power: 1860 | VLF: 649 | LF: 373 | HF: 838 | LF/HF: 0.45 | LF Peak: 0.09 Hz | HF Peak: 0.21 Hz | Mean RR: 890 ms | MxDMn: 0.305 s | Mode: 900 ms | AMo50: 43% | CV: 4.7% | Reading type: Evening
+[2026-10-17 7:26am] Type: Training, paced 4/6 | HR: 65 | RMSSD: 29.41 | pNN50: 10% | SDNN: 55 | PNS: -0.4 | SNS: -0.1 | Stress: 62 | Power: 2930 | VLF: 712 | LF: 1410 | HF: 808 | LF/HF: 1.75 | LF Peak: 0.07 Hz | HF Peak: 0.18 Hz | Mean RR: 917 ms | MxDMn: 0.338 s | Mode: 900 ms | AMo50: 38% | CV: 6% | Reading type: Morning
+[2026-10-17 7:32am] Type: Baseline | HR: 67 | RMSSD: 26.68 | pNN50: 11% | SDNN: 45 | PNS: -0.5 | SNS: 0.1 | Stress: 68 | Power: 1925 | VLF: 641 | LF: 395 | HF: 889 | LF/HF: 0.44 | LF Peak: 0.1 Hz | HF Peak: 0.21 Hz | Mean RR: 918 ms | MxDMn: 0.323 s | Mode: 900 ms | AMo50: 39% | CV: 4.9% | Reading type: Morning
+[2026-10-17 8:39pm] Type: Training, paced 4/6 | HR: 67 | RMSSD: 29.96 | pNN50: 10% | SDNN: 52 | PNS: -0.3 | SNS: 0 | Stress: 63 | Power: 2981 | VLF: 724 | LF: 1435 | HF: 822 | LF/HF: 1.75 | LF Peak: 0.08 Hz | HF Peak: 0.18 Hz | Mean RR: 921 ms | MxDMn: 0.339 s | Mode: 900 ms | AMo50: 38% | CV: 5.6% | Reading type: Evening
+[2026-10-17 8:45pm] Type: Baseline | HR: 70 | RMSSD: 27.11 | pNN50: 9% | SDNN: 45 | PNS: -0.5 | SNS: 0.2 | Stress: 70 | Power: 1958 | VLF: 652 | LF: 402 | HF: 904 | LF/HF: 0.44 | LF Peak: 0.1 Hz | HF Peak: 0.21 Hz | Mean RR: 896 ms | MxDMn: 0.298 s | Mode: 900 ms | AMo50: 37% | CV: 5% | Reading type: Evening
+[2026-10-18 7:30am] Type: Training, paced 4/6 | HR: 67 | RMSSD: 29.83 | pNN50: 12% | SDNN: 52 | PNS: -0.4 | SNS: 0 | Stress: 65 | Power: 2932 | VLF: 772 | LF: 1372 | HF: 788 | LF/HF: 1.74 | LF Peak: 0.08 Hz | HF Peak: 0.18 Hz | Mean RR: 917 ms | MxDMn: 0.333 s | Mode: 900 ms | AMo50: 39% | CV: 5.7% | Reading type: Morning
+[2026-10-18 7:36am] Type: Baseline | HR: 68 | RMSSD: 25.89 | pNN50: 8% | SDNN: 42 | PNS: -0.5 | SNS: 0.2 | Stress: 71 | Power: 1946 | VLF: 695 | LF: 384 | HF: 867 | LF/HF: 0.44 | LF Peak: 0.08 Hz | HF Peak: 0.19 Hz | Mean RR: 902 ms | MxDMn: 0.308 s | Mode: 900 ms | AMo50: 39% | CV: 4.7% | Reading type: Morning
+[2026-10-18 8:54pm] Type: Training, paced 4/6 | HR: 68 | RMSSD: 29.6 | pNN50: 12% | SDNN: 51 | PNS: -0.3 | SNS: 0.1 | Stress: 65 | Power: 2944 | VLF: 776 | LF: 1378 | HF: 790 | LF/HF: 1.74 | LF Peak: 0.07 Hz | HF Peak: 0.19 Hz | Mean RR: 925 ms | MxDMn: 0.327 s | Mode: 950 ms | AMo50: 40% | CV: 5.5% | Reading type: Evening
+[2026-10-18 9:00pm] Type: Baseline | HR: 69 | RMSSD: 26.56 | pNN50: 9% | SDNN: 42 | PNS: -0.5 | SNS: 0.2 | Stress: 76 | Power: 1953 | VLF: 698 | LF: 386 | HF: 869 | LF/HF: 0.44 | LF Peak: 0.09 Hz | HF Peak: 0.21 Hz | Mean RR: 895 ms | MxDMn: 0.305 s | Mode: 900 ms | AMo50: 42% | CV: 4.7% | Reading type: Evening
+[2026-10-19 7:56am] Type: Training, paced 4/6 | HR: 67 | RMSSD: 29.28 | pNN50: 12% | SDNN: 53 | PNS: -0.4 | SNS: 0 | Stress: 66 | Power: 2909 | VLF: 767 | LF: 1361 | HF: 781 | LF/HF: 1.74 | LF Peak: 0.07 Hz | HF Peak: 0.18 Hz | Mean RR: 926 ms | MxDMn: 0.314 s | Mode: 950 ms | AMo50: 39% | CV: 5.7% | Reading type: Morning
+[2026-10-19 8:02am] Type: Baseline | HR: 68 | RMSSD: 27.58 | pNN50: 8% | SDNN: 41 | PNS: -0.5 | SNS: 0.1 | Stress: 71 | Power: 1930 | VLF: 690 | LF: 381 | HF: 859 | LF/HF: 0.44 | LF Peak: 0.1 Hz | HF Peak: 0.21 Hz | Mean RR: 892 ms | MxDMn: 0.311 s | Mode: 900 ms | AMo50: 40% | CV: 4.6% | Reading type: Morning
+[2026-10-20 7:30am] Type: Training, paced 4/6 | HR: 66 | RMSSD: 30.06 | pNN50: 10% | SDNN: 51 | PNS: -0.3 | SNS: 0 | Stress: 67 | Power: 2850 | VLF: 769 | LF: 1322 | HF: 759 | LF/HF: 1.74 | LF Peak: 0.07 Hz | HF Peak: 0.19 Hz | Mean RR: 923 ms | MxDMn: 0.326 s | Mode: 900 ms | AMo50: 39% | CV: 5.5% | Reading type: Morning
+[2026-10-20 7:36am] Type: Baseline | HR: 69 | RMSSD: 26.33 | pNN50: 10% | SDNN: 44 | PNS: -0.5 | SNS: 0.2 | Stress: 71 | Power: 1897 | VLF: 692 | LF: 370 | HF: 835 | LF/HF: 0.44 | LF Peak: 0.09 Hz | HF Peak: 0.2 Hz | Mean RR: 905 ms | MxDMn: 0.302 s | Mode: 900 ms | AMo50: 39% | CV: 4.9% | Reading type: Morning
+[2026-10-20 8:46pm] Type: Training, paced 4/6 | HR: 68 | RMSSD: 27.99 | pNN50: 11% | SDNN: 53 | PNS: -0.4 | SNS: 0.1 | Stress: 64 | Power: 2969 | VLF: 801 | LF: 1378 | HF: 790 | LF/HF: 1.74 | LF Peak: 0.07 Hz | HF Peak: 0.17 Hz | Mean RR: 923 ms | MxDMn: 0.321 s | Mode: 900 ms | AMo50: 37% | CV: 5.7% | Reading type: Evening
+[2026-10-20 8:52pm] Type: Baseline | HR: 69 | RMSSD: 26.34 | pNN50: 10% | SDNN: 45 | PNS: -0.5 | SNS: 0.3 | Stress: 81 | Power: 1976 | VLF: 721 | LF: 386 | HF: 869 | LF/HF: 0.44 | LF Peak: 0.09 Hz | HF Peak: 0.21 Hz | Mean RR: 906 ms | MxDMn: 0.294 s | Mode: 900 ms | AMo50: 43% | CV: 5% | Reading type: Evening
+[2026-10-21 7:36am] Type: Training, paced 4/6 | HR: 65 | RMSSD: 30.87 | pNN50: 11% | SDNN: 53 | PNS: -0.4 | SNS: 0 | Stress: 68 | Power: 2970 | VLF: 753 | LF: 1409 | HF: 808 | LF/HF: 1.74 | LF Peak: 0.07 Hz | HF Peak: 0.17 Hz | Mean RR: 909 ms | MxDMn: 0.325 s | Mode: 900 ms | AMo50: 40% | CV: 5.8% | Reading type: Morning
+[2026-10-21 7:42am] Type: Baseline | HR: 68 | RMSSD: 26.35 | pNN50: 11% | SDNN: 45 | PNS: -0.5 | SNS: 0.2 | Stress: 79 | Power: 1962 | VLF: 678 | LF: 395 | HF: 889 | LF/HF: 0.44 | LF Peak: 0.09 Hz | HF Peak: 0.19 Hz | Mean RR: 911 ms | MxDMn: 0.294 s | Mode: 900 ms | AMo50: 42% | CV: 4.9% | Reading type: Morning
+[2026-10-21 9:12pm] Type: Training, paced 4/6 | HR: 66 | RMSSD: 29.23 | pNN50: 12% | SDNN: 52 | PNS: -0.4 | SNS: 0 | Stress: 63 | Power: 2875 | VLF: 729 | LF: 1364 | HF: 782 | LF/HF: 1.74 | LF Peak: 0.07 Hz | HF Peak: 0.19 Hz | Mean RR: 911 ms | MxDMn: 0.339 s | Mode: 900 ms | AMo50: 38% | CV: 5.7% | Reading type: Evening
+[2026-10-21 9:18pm] Type: Baseline | HR: 69 | RMSSD: 27.19 | pNN50: 10% | SDNN: 43 | PNS: -0.5 | SNS: 0.2 | Stress: 70 | Power: 1898 | VLF: 656 | LF: 382 | HF: 860 | LF/HF: 0.44 | LF Peak: 0.1 Hz | HF Peak: 0.2 Hz | Mean RR: 900 ms | MxDMn: 0.317 s | Mode: 900 ms | AMo50: 40% | CV: 4.8% | Reading type: Evening
+[2026-10-22 7:25am] Type: Training, paced 4/6 | HR: 65 | RMSSD: 32.28 | pNN50: 11% | SDNN: 54 | PNS: -0.2 | SNS: -0.2 | Stress: 54 | Power: 3134 | VLF: 689 | LF: 1556 | HF: 889 | LF/HF: 1.75 | LF Peak: 0.08 Hz | HF Peak: 0.18 Hz | Mean RR: 941 ms | MxDMn: 0.364 s | Mode: 950 ms | AMo50: 37% | CV: 5.7% | Reading type: Morning
+[2026-10-22 7:31am] Type: Baseline | HR: 66 | RMSSD: 27.69 | pNN50: 11% | SDNN: 44 | PNS: -0.5 | SNS: 0 | Stress: 62 | Power: 2034 | VLF: 620 | LF: 436 | HF: 978 | LF/HF: 0.45 | LF Peak: 0.1 Hz | HF Peak: 0.19 Hz | Mean RR: 907 ms | MxDMn: 0.327 s | Mode: 900 ms | AMo50: 36% | CV: 4.9% | Reading type: Morning
+[2026-10-22 9:15pm] Type: Training, paced 4/6 | HR: 65 | RMSSD: 30.6 | pNN50: 13% | SDNN: 55 | PNS: -0.3 | SNS: -0.2 | Stress: 51 | Power: 3154 | VLF: 693 | LF: 1566 | HF: 895 | LF/HF: 1.75 | LF Peak: 0.08 Hz | HF Peak: 0.18 Hz | Mean RR: 929 ms | MxDMn: 0.368 s | Mode: 950 ms | AMo50: 35% | CV: 5.9% | Reading type: Evening
+[2026-10-22 9:21pm] Type: Baseline | HR: 66 | RMSSD: 28.72 | pNN50: 9% | SDNN: 48 | PNS: -0.4 | SNS: 0 | Stress: 63 | Power: 2047 | VLF: 624 | LF: 438 | HF: 985 | LF/HF: 0.44 | LF Peak: 0.11 Hz | HF Peak: 0.2 Hz | Mean RR: 930 ms | MxDMn: 0.315 s | Mode: 950 ms | AMo50: 37% | CV: 5.2% | Reading type: Evening
+[2026-10-23 7:26am] Type: Training, paced 4/6 | HR: 63 | RMSSD: 31.91 | pNN50: 13% | SDNN: 55 | PNS: -0.3 | SNS: -0.2 | Stress: 54 | Power: 3313 | VLF: 729 | LF: 1644 | HF: 940 | LF/HF: 1.75 | LF Peak: 0.08 Hz | HF Peak: 0.17 Hz | Mean RR: 929 ms | MxDMn: 0.37 s | Mode: 950 ms | AMo50: 38% | CV: 5.9% | Reading type: Morning
+[2026-10-23 7:32am] Type: Baseline | HR: 66 | RMSSD: 28.41 | pNN50: 9% | SDNN: 45 | PNS: -0.4 | SNS: 0 | Stress: 67 | Power: 2150 | VLF: 656 | LF: 460 | HF: 1034 | LF/HF: 0.44 | LF Peak: 0.1 Hz | HF Peak: 0.2 Hz | Mean RR: 917 ms | MxDMn: 0.325 s | Mode: 900 ms | AMo50: 39% | CV: 4.9% | Reading type: Morning
+[2026-10-24 7:41am] Type: Training, paced 4/6 | HR: 63 | RMSSD: 32.54 | pNN50: 15% | SDNN: 58 | PNS: -0.2 | SNS: -0.3 | Stress: 46 | Power: 3448 | VLF: 596 | LF: 1816 | HF: 1036 | LF/HF: 1.75 | LF Peak: 0.08 Hz | HF Peak: 0.18 Hz | Mean RR: 955 ms | MxDMn: 0.394 s | Mode: 950 ms | AMo50: 34% | CV: 6.1% | Reading type: Morning
+[2026-10-24 7:47am] Type: Baseline | HR: 66 | RMSSD: 29.9 | pNN50: 11% | SDNN: 49 | PNS: -0.3 | SNS: -0.1 | Stress: 52 | Power: 2184 | VLF: 536 | LF: 508 | HF: 1140 | LF/HF: 0.45 | LF Peak: 0.1 Hz | HF Peak: 0.21 Hz | Mean RR: 941 ms | MxDMn: 0.347 s | Mode: 950 ms | AMo50: 34% | CV: 5.2% | Reading type: Morning
+[2026-10-25 7:53am] Type: Training, paced 4/6 | HR: 64 | RMSSD: 30.09 | pNN50: 11% | SDNN: 53 | PNS: -0.3 | SNS: -0.1 | Stress: 59 | Power: 2974 | VLF: 704 | LF: 1444 | HF: 826 | LF/HF: 1.75 | LF Peak: 0.07 Hz | HF Peak: 0.18 Hz | Mean RR: 931 ms | MxDMn: 0.346 s | Mode: 950 ms | AMo50: 39% | CV: 5.7% | Reading type: Morning
+[2026-10-25 7:59am] Type: Baseline | HR: 66 | RMSSD: 28.8 | pNN50: 8% | SDNN: 46 | PNS: -0.4 | SNS: 0 | Stress: 69 | Power: 1947 | VLF: 634 | LF: 404 | HF: 909 | LF/HF: 0.44 | LF Peak: 0.09 Hz | HF Peak: 0.19 Hz | Mean RR: 913 ms | MxDMn: 0.311 s | Mode: 900 ms | AMo50: 39% | CV: 5% | Reading type: Morning
+[2026-10-26 8:01am] Type: Training, paced 4/6 | HR: 70 | RMSSD: 24.26 | pNN50: 8% | SDNN: 46 | PNS: -0.7 | SNS: 0.5 | Stress: 108 | Power: 2348 | VLF: 844 | LF: 953 | HF: 551 | LF/HF: 1.73 | LF Peak: 0.07 Hz | HF Peak: 0.18 Hz | Mean RR: 868 ms | MxDMn: 0.256 s | Mode: 850 ms | AMo50: 47% | CV: 5.3% | Reading type: Morning
+[2026-10-26 8:07am] Type: Baseline | HR: 71 | RMSSD: 22.03 | pNN50: 8% | SDNN: 37 | PNS: -0.8 | SNS: 0.7 | Stress: 120 | Power: 1633 | VLF: 760 | LF: 267 | HF: 606 | LF/HF: 0.44 | LF Peak: 0.08 Hz | HF Peak: 0.19 Hz | Mean RR: 848 ms | MxDMn: 0.235 s | Mode: 850 ms | AMo50: 48% | CV: 4.4% | Reading type: Morning
+[2026-10-26 9:20pm] Type: Training, paced 4/6 | HR: 70 | RMSSD: 24.06 | pNN50: 9% | SDNN: 46 | PNS: -0.7 | SNS: 0.5 | Stress: 99 | Power: 2295 | VLF: 825 | LF: 932 | HF: 538 | LF/HF: 1.73 | LF Peak: 0.06 Hz | HF Peak: 0.2 Hz | Mean RR: 880 ms | MxDMn: 0.265 s | Mode: 900 ms | AMo50: 47% | CV: 5.2% | Reading type: Evening
+[2026-10-26 9:26pm] Type: Baseline | HR: 73 | RMSSD: 20.68 | pNN50: 5% | SDNN: 37 | PNS: -0.8 | SNS: 0.8 | Stress: 122 | Power: 1596 | VLF: 743 | LF: 261 | HF: 592 | LF/HF: 0.44 | LF Peak: 0.08 Hz | HF Peak: 0.21 Hz | Mean RR: 860 ms | MxDMn: 0.232 s | Mode: 850 ms | AMo50: 48% | CV: 4.3% | Reading type: Evening
+[2026-10-27 7:47am] Type: Training, paced 4/6 | HR: 61 | RMSSD: 32.72 | pNN50: 12% | SDNN: 61 | PNS: -0.1 | SNS: -0.4 | Stress: 42 | Power: 3455 | VLF: 607 | LF: 1814 | HF: 1034 | LF/HF: 1.75 | LF Peak: 0.09 Hz | HF Peak: 0.17 Hz | Mean RR: 957 ms | MxDMn: 0.396 s | Mode: 950 ms | AMo50: 31% | CV: 6.4% | Reading type: Morning
+[2026-10-27 7:53am] Type: Baseline | HR: 64 | RMSSD: 29.73 | pNN50: 10% | SDNN: 51 | PNS: -0.3 | SNS: -0.2 | Stress: 49 | Power: 2191 | VLF: 546 | LF: 508 | HF: 1137 | LF/HF: 0.45 | LF Peak: 0.1 Hz | HF Peak: 0.19 Hz | Mean RR: 931 ms | MxDMn: 0.361 s | Mode: 950 ms | AMo50: 33% | CV: 5.5% | Reading type: Morning
+[2026-10-28 7:37am] Type: Training, paced 4/6 | HR: 62 | RMSSD: 32.67 | pNN50: 13% | SDNN: 59 | PNS: -0.2 | SNS: -0.4 | Stress: 42 | Power: 3600 | VLF: 629 | LF: 1892 | HF: 1079 | LF/HF: 1.75 | LF Peak: 0.09 Hz | HF Peak: 0.18 Hz | Mean RR: 945 ms | MxDMn: 0.393 s | Mode: 950 ms | AMo50: 31% | CV: 6.2% | Reading type: Morning
+[2026-10-28 7:43am] Type: Baseline | HR: 64 | RMSSD: 30.31 | pNN50: 10% | SDNN: 49 | PNS: -0.3 | SNS: -0.2 | Stress: 48 | Power: 2283 | VLF: 566 | LF: 530 | HF: 1187 | LF/HF: 0.45 | LF Peak: 0.11 Hz | HF Peak: 0.2 Hz | Mean RR: 935 ms | MxDMn: 0.366 s | Mode: 950 ms | AMo50: 33% | CV: 5.2% | Reading type: Morning
+[2026-10-29 7:56am] Type: Training, paced 4/6 | HR: 63 | RMSSD: 34.87 | pNN50: 13% | SDNN: 62 | PNS: 0 | SNS: -0.4 | Stress: 44 | Power: 3720 | VLF: 592 | LF: 1993 | HF: 1135 | LF/HF: 1.76 | LF Peak: 0.08 Hz | HF Peak: 0.17 Hz | Mean RR: 970 ms | MxDMn: 0.383 s | Mode: 950 ms | AMo50: 32% | CV: 6.4% | Reading type: Morning
+[2026-10-29 8:02am] Type: Baseline | HR: 63 | RMSSD: 31.42 | pNN50: 13% | SDNN: 51 | PNS: -0.3 | SNS: -0.2 | Stress: 51 | Power: 2340 | VLF: 533 | LF: 558 | HF: 1249 | LF/HF: 0.45 | LF Peak: 0.1 Hz | HF Peak: 0.2 Hz | Mean RR: 936 ms | MxDMn: 0.357 s | Mode: 950 ms | AMo50: 35% | CV: 5.4% | Reading type: Morning
+[2026-10-29 8:50pm] Type: Training, paced 4/6 | HR: 63 | RMSSD: 33.69 | pNN50: 14% | SDNN: 62 | PNS: -0.1 | SNS: -0.4 | Stress: 39 | Power: 3594 | VLF: 572 | LF: 1925 | HF: 1097 | LF/HF: 1.75 | LF Peak: 0.09 Hz | HF Peak: 0.18 Hz | Mean RR: 965 ms | MxDMn: 0.404 s | Mode: 950 ms | AMo50: 30% | CV: 6.4% | Reading type: Evening
+[2026-10-29 8:56pm] Type: Baseline | HR: 66 | RMSSD: 31.28 | pNN50: 12% | SDNN: 48 | PNS: -0.2 | SNS: -0.2 | Stress: 50 | Power: 2261 | VLF: 515 | LF: 539 | HF: 1207 | LF/HF: 0.45 | LF Peak: 0.11 Hz | HF Peak: 0.21 Hz | Mean RR: 945 ms | MxDMn: 0.348 s | Mode: 950 ms | AMo50: 33% | CV: 5.1% | Reading type: Evening
+[2026-10-30 7:49am] Type: Training, paced 4/6 | HR: 62 | RMSSD: 33.52 | pNN50: 12% | SDNN: 57 | PNS: -0.1 | SNS: -0.3 | Stress: 52 | Power: 3459 | VLF: 662 | LF: 1781 | HF: 1016 | LF/HF: 1.75 | LF Peak: 0.09 Hz | HF Peak: 0.17 Hz | Mean RR: 949 ms | MxDMn: 0.366 s | Mode: 950 ms | AMo50: 36% | CV: 6% | Reading type: Morning
+[2026-10-30 7:55am] Type: Baseline | HR: 64 | RMSSD: 30.55 | pNN50: 11% | SDNN: 49 | PNS: -0.3 | SNS: -0.2 | Stress: 55 | Power: 2213 | VLF: 596 | LF: 499 | HF: 1118 | LF/HF: 0.45 | LF Peak: 0.11 Hz | HF Peak: 0.2 Hz | Mean RR: 928 ms | MxDMn: 0.343 s | Mode: 950 ms | AMo50: 36% | CV: 5.3% | Reading type: Morning
+[2026-10-31 7:28am] Type: Training, paced 4/6 | HR: 61 | RMSSD: 36.3 | pNN50: 15% | SDNN: 64 | PNS: 0 | SNS: -0.5 | Stress: 34 | Power: 3831 | VLF: 471 | LF: 2142 | HF: 1218 | LF/HF: 1.76 | LF Peak: 0.09 Hz | HF Peak: 0.17 Hz | Mean RR: 977 ms | MxDMn: 0.432 s | Mode: 1000 ms | AMo50: 29% | CV: 6.6% | Reading type: Morning
+[2026-10-31 7:34am] Type: Baseline | HR: 62 | RMSSD: 32.9 | pNN50: 14% | SDNN: 53 | PNS: -0.1 | SNS: -0.4 | Stress: 39 | Power: 2364 | VLF: 424 | LF: 600 | HF: 1340 | LF/HF: 0.45 | LF Peak: 0.12 Hz | HF Peak: 0.19 Hz | Mean RR: 972 ms | MxDMn: 0.397 s | Mode: 950 ms | AMo50: 30% | CV: 5.5% | Reading type: Morning
+[2026-10-31 8:55pm] Type: Training, paced 4/6 | HR: 61 | RMSSD: 33.98 | pNN50: 15% | SDNN: 62 | PNS: -0.1 | SNS: -0.5 | Stress: 35 | Power: 3827 | VLF: 470 | LF: 2141 | HF: 1216 | LF/HF: 1.76 | LF Peak: 0.09 Hz | HF Peak: 0.17 Hz | Mean RR: 971 ms | MxDMn: 0.421 s | Mode: 950 ms | AMo50: 28% | CV: 6.4% | Reading type: Evening
+[2026-10-31 9:01pm] Type: Baseline | HR: 64 | RMSSD: 32.09 | pNN50: 12% | SDNN: 52 | PNS: -0.2 | SNS: -0.3 | Stress: 41 | Power: 2360 | VLF: 423 | LF: 599 | HF: 1338 | LF/HF: 0.45 | LF Peak: 0.11 Hz | HF Peak: 0.2 Hz | Mean RR: 958 ms | MxDMn: 0.381 s | Mode: 950 ms | AMo50: 30% | CV: 5.4% | Reading type: Evening
+[2026-11-01 7:33am] Type: Training, paced 4/6 | HR: 63 | RMSSD: 32.92 | pNN50: 13% | SDNN: 57 | PNS: -0.2 | SNS: -0.3 | Stress: 47 | Power: 3457 | VLF: 635 | LF: 1797 | HF: 1025 | LF/HF: 1.75 | LF Peak: 0.08 Hz | HF Peak: 0.17 Hz | Mean RR: 951 ms | MxDMn: 0.38 s | Mode: 950 ms | AMo50: 34% | CV: 6% | Reading type: Morning
+[2026-11-01 7:39am] Type: Baseline | HR: 65 | RMSSD: 29.05 | pNN50: 12% | SDNN: 47 | PNS: -0.3 | SNS: -0.1 | Stress: 54 | Power: 2203 | VLF: 572 | LF: 503 | HF: 1128 | LF/HF: 0.45 | LF Peak: 0.1 Hz | HF Peak: 0.18 Hz | Mean RR: 934 ms | MxDMn: 0.351 s | Mode: 950 ms | AMo50: 36% | CV: 5% | Reading type: Morning
+[2026-11-01 8:44pm] Type: Training, paced 4/6 | HR: 64 | RMSSD: 31.11 | pNN50: 13% | SDNN: 59 | PNS: -0.2 | SNS: -0.2 | Stress: 49 | Power: 3413 | VLF: 626 | LF: 1774 | HF: 1013 | LF/HF: 1.75 | LF Peak: 0.08 Hz | HF Peak: 0.17 Hz | Mean RR: 949 ms | MxDMn: 0.388 s | Mode: 950 ms | AMo50: 36% | CV: 6.2% | Reading type: Evening
+[2026-11-01 8:50pm] Type: Baseline | HR: 65 | RMSSD: 28.07 | pNN50: 12% | SDNN: 48 | PNS: -0.4 | SNS: -0.1 | Stress: 58 | Power: 2174 | VLF: 563 | LF: 497 | HF: 1114 | LF/HF: 0.45 | LF Peak: 0.11 Hz | HF Peak: 0.2 Hz | Mean RR: 925 ms | MxDMn: 0.342 s | Mode: 950 ms | AMo50: 38% | CV: 5.2% | Reading type: Evening
+[2026-11-02 7:21am] Type: Training, paced 4/6 | HR: 61 | RMSSD: 32.88 | pNN50: 14% | SDNN: 58 | PNS: -0.1 | SNS: -0.4 | Stress: 48 | Power: 3520 | VLF: 584 | LF: 1871 | HF: 1065 | LF/HF: 1.76 | LF Peak: 0.09 Hz | HF Peak: 0.17 Hz | Mean RR: 968 ms | MxDMn: 0.378 s | Mode: 950 ms | AMo50: 35% | CV: 6% | Reading type: Morning
+[2026-11-02 7:27am] Type: Baseline | HR: 64 | RMSSD: 31.11 | pNN50: 12% | SDNN: 50 | PNS: -0.3 | SNS: -0.2 | Stress: 53 | Power: 2222 | VLF: 526 | LF: 524 | HF: 1172 | LF/HF: 0.45 | LF Peak: 0.11 Hz | HF Peak: 0.19 Hz | Mean RR: 930 ms | MxDMn: 0.364 s | Mode: 950 ms | AMo50: 37% | CV: 5.4% | Reading type: Morning
+[2026-11-03 7:47am] Type: Training, paced 4/6 | HR: 62 | RMSSD: 33.96 | pNN50: 14% | SDNN: 60 | PNS: -0.1 | SNS: -0.4 | Stress: 45 | Power: 3454 | VLF: 584 | LF: 1829 | HF: 1041 | LF/HF: 1.76 | LF Peak: 0.09 Hz | HF Peak: 0.18 Hz | Mean RR: 969 ms | MxDMn: 0.402 s | Mode: 950 ms | AMo50: 34% | CV: 6.2% | Reading type: Morning
+[2026-11-03 7:53am] Type: Baseline | HR: 66 | RMSSD: 31.32 | pNN50: 11% | SDNN: 50 | PNS: -0.3 | SNS: -0.1 | Stress: 54 | Power: 2183 | VLF: 526 | LF: 512 | HF: 1145 | LF/HF: 0.45 | LF Peak: 0.11 Hz | HF Peak: 0.21 Hz | Mean RR: 935 ms | MxDMn: 0.341 s | Mode: 950 ms | AMo50: 35% | CV: 5.3% | Reading type: Morning
+[2026-11-03 9:02pm] Type: Training, paced 4/6 | HR: 63 | RMSSD: 34.16 | pNN50: 15% | SDNN: 61 | PNS: -0.1 | SNS: -0.3 | Stress: 45 | Power: 3566 | VLF: 603 | LF: 1887 | HF: 1076 | LF/HF: 1.75 | LF Peak: 0.09 Hz | HF Peak: 0.17 Hz | Mean RR: 955 ms | MxDMn: 0.376 s | Mode: 950 ms | AMo50: 32% | CV: 6.4% | Reading type: Evening
+[2026-11-03 9:08pm] Type: Baseline | HR: 64 | RMSSD: 29.21 | pNN50: 12% | SDNN: 51 | PNS: -0.3 | SNS: -0.2 | Stress: 50 | Power: 2255 | VLF: 543 | LF: 528 | HF: 1184 | LF/HF: 0.45 | LF Peak: 0.11 Hz | HF Peak: 0.21 Hz | Mean RR: 950 ms | MxDMn: 0.356 s | Mode: 950 ms | AMo50: 34% | CV: 5.4% | Reading type: Evening
+[2026-11-04 7:37am] Type: Training, paced 4/6 | HR: 61 | RMSSD: 34.3 | pNN50: 15% | SDNN: 62 | PNS: -0.1 | SNS: -0.4 | Stress: 41 | Power: 3632 | VLF: 558 | LF: 1959 | HF: 1115 | LF/HF: 1.76 | LF Peak: 0.09 Hz | HF Peak: 0.17 Hz | Mean RR: 969 ms | MxDMn: 0.404 s | Mode: 950 ms | AMo50: 31% | CV: 6.4% | Reading type: Morning
+[2026-11-04 7:43am] Type: Baseline | HR: 64 | RMSSD: 30.81 | pNN50: 13% | SDNN: 48 | PNS: -0.2 | SNS: -0.2 | Stress: 47 | Power: 2278 | VLF: 502 | LF: 549 | HF: 1227 | LF/HF: 0.45 | LF Peak: 0.11 Hz | HF Peak: 0.2 Hz | Mean RR: 957 ms | MxDMn: 0.354 s | Mode: 950 ms | AMo50: 32% | CV: 5% | Reading type: Morning
+
+BLOOD PRESSURE READINGS:
+[2026-10-06 6:56am] BP: 107/66 | Pulse: 77 | Type: Morning | MAP: 79.7 | Pulse pressure: 41 | Kerdo: 14.3 | Robinson: 82.4 | BCE: 3157 | Kvas: 18.8
+[2026-10-07 7:23am] BP: 99/60 | Pulse: 86 | Type: Morning | MAP: 73 | Pulse pressure: 39 | Kerdo: 30.2 | Robinson: 85.1 | BCE: 3354 | Kvas: 22.1
+[2026-10-07 9:28pm] BP: 97/60 | Pulse: 86 | Type: Evening | MAP: 72.3 | Pulse pressure: 37 | Kerdo: 30.2 | Robinson: 83.4 | BCE: 3182 | Kvas: 23.2
+[2026-10-08 6:45am] BP: 102/64 | Pulse: 78 | Type: Morning | MAP: 76.7 | Pulse pressure: 38 | Kerdo: 17.9 | Robinson: 79.6 | BCE: 2964 | Kvas: 20.5
+[2026-10-08 9:15pm] BP: 101/63 | Pulse: 79 | Type: Evening | MAP: 75.7 | Pulse pressure: 38 | Kerdo: 20.3 | Robinson: 79.8 | BCE: 3002 | Kvas: 20.8
+[2026-10-09 6:55am] BP: 104/65 | Pulse: 81 | Type: Morning | MAP: 78 | Pulse pressure: 39 | Kerdo: 19.8 | Robinson: 84.2 | BCE: 3159 | Kvas: 20.8
+[2026-10-09 9:07pm] BP: 102/62 | Pulse: 79 | Type: Evening | MAP: 75.3 | Pulse pressure: 40 | Kerdo: 21.5 | Robinson: 80.6 | BCE: 3160 | Kvas: 19.8
+[2026-10-10 7:45am] BP: 108/67 | Pulse: 74 | Type: Morning | MAP: 80.7 | Pulse pressure: 41 | Kerdo: 9.5 | Robinson: 79.9 | BCE: 3034 | Kvas: 18.0
+[2026-10-10 9:21pm] BP: 105/69 | Pulse: 72 | Type: Evening | MAP: 81 | Pulse pressure: 36 | Kerdo: 4.2 | Robinson: 75.6 | BCE: 2592 | Kvas: 20
+[2026-10-11 6:56am] BP: 106/65 | Pulse: 79 | Type: Morning | MAP: 78.7 | Pulse pressure: 41 | Kerdo: 17.7 | Robinson: 83.7 | BCE: 3239 | Kvas: 19.3
+[2026-10-11 9:39pm] BP: 105/66 | Pulse: 76 | Type: Evening | MAP: 79 | Pulse pressure: 39 | Kerdo: 13.2 | Robinson: 79.8 | BCE: 2964 | Kvas: 19.5
+[2026-10-12 6:59am] BP: 105/66 | Pulse: 75 | Type: Morning | MAP: 79 | Pulse pressure: 39 | Kerdo: 12 | Robinson: 78.8 | BCE: 2925 | Kvas: 19.2
+[2026-10-12 9:03pm] BP: 107/66 | Pulse: 72 | Type: Evening | MAP: 79.7 | Pulse pressure: 41 | Kerdo: 8.3 | Robinson: 77.0 | BCE: 2952 | Kvas: 17.6
+[2026-10-13 7:27am] BP: 110/69 | Pulse: 70 | Type: Morning | MAP: 82.7 | Pulse pressure: 41 | Kerdo: 1.4 | Robinson: 77 | BCE: 2870 | Kvas: 17.1
+[2026-10-13 9:22pm] BP: 110/70 | Pulse: 68 | Type: Evening | MAP: 83.3 | Pulse pressure: 40 | Kerdo: -2.9 | Robinson: 74.8 | BCE: 2720 | Kvas: 17
+[2026-10-14 7:19am] BP: 103/66 | Pulse: 74 | Type: Morning | MAP: 78.3 | Pulse pressure: 37 | Kerdo: 10.8 | Robinson: 76.2 | BCE: 2738 | Kvas: 20
+[2026-10-14 9:24pm] BP: 107/65 | Pulse: 74 | Type: Evening | MAP: 79 | Pulse pressure: 42 | Kerdo: 12.2 | Robinson: 79.2 | BCE: 3108 | Kvas: 17.6
+[2026-10-15 6:48am] BP: 108/68 | Pulse: 69 | Type: Morning | MAP: 81.3 | Pulse pressure: 40 | Kerdo: 1.4 | Robinson: 74.5 | BCE: 2760 | Kvas: 17.3
+[2026-10-15 9:14pm] BP: 111/69 | Pulse: 72 | Type: Evening | MAP: 83 | Pulse pressure: 42 | Kerdo: 4.2 | Robinson: 79.9 | BCE: 3024 | Kvas: 17.1
+[2026-10-16 7:31am] BP: 112/70 | Pulse: 71 | Type: Morning | MAP: 84 | Pulse pressure: 42 | Kerdo: 1.4 | Robinson: 79.5 | BCE: 2982 | Kvas: 16.9
+[2026-10-16 9:37pm] BP: 112/70 | Pulse: 71 | Type: Evening | MAP: 84 | Pulse pressure: 42 | Kerdo: 1.4 | Robinson: 79.5 | BCE: 2982 | Kvas: 16.9
+[2026-10-17 7:00am] BP: 107/68 | Pulse: 74 | Type: Morning | MAP: 81 | Pulse pressure: 39 | Kerdo: 8.1 | Robinson: 79.2 | BCE: 2886 | Kvas: 19.0
+[2026-10-18 7:13am] BP: 112/72 | Pulse: 68 | Type: Morning | MAP: 85.3 | Pulse pressure: 40 | Kerdo: -5.9 | Robinson: 76.2 | BCE: 2720 | Kvas: 17
+[2026-10-19 7:35am] BP: 112/74 | Pulse: 64 | Type: Morning | MAP: 86.7 | Pulse pressure: 38 | Kerdo: -15.6 | Robinson: 71.7 | BCE: 2432 | Kvas: 16.8
+[2026-10-20 7:01am] BP: 108/66 | Pulse: 74 | Type: Morning | MAP: 80 | Pulse pressure: 42 | Kerdo: 10.8 | Robinson: 79.9 | BCE: 3108 | Kvas: 17.6
+[2026-10-21 7:14am] BP: 105/65 | Pulse: 75 | Type: Morning | MAP: 78.3 | Pulse pressure: 40 | Kerdo: 13.3 | Robinson: 78.8 | BCE: 3000 | Kvas: 18.8
+[2026-10-21 9:25pm] BP: 107/66 | Pulse: 73 | Type: Evening | MAP: 79.7 | Pulse pressure: 41 | Kerdo: 9.6 | Robinson: 78.1 | BCE: 2993 | Kvas: 17.8
+[2026-10-22 6:57am] BP: 108/71 | Pulse: 70 | Type: Morning | MAP: 83.3 | Pulse pressure: 37 | Kerdo: -1.4 | Robinson: 75.6 | BCE: 2590 | Kvas: 18.9
+[2026-10-23 7:04am] BP: 116/72 | Pulse: 63 | Type: Morning | MAP: 86.7 | Pulse pressure: 44 | Kerdo: -14.3 | Robinson: 73.1 | BCE: 2772 | Kvas: 14.3
+[2026-10-24 7:13am] BP: 109/70 | Pulse: 68 | Type: Morning | MAP: 83 | Pulse pressure: 39 | Kerdo: -2.9 | Robinson: 74.1 | BCE: 2652 | Kvas: 17.4
+[2026-10-24 9:07pm] BP: 110/69 | Pulse: 68 | Type: Evening | MAP: 82.7 | Pulse pressure: 41 | Kerdo: -1.5 | Robinson: 74.8 | BCE: 2788 | Kvas: 16.6
+[2026-10-25 7:28am] BP: 111/68 | Pulse: 70 | Type: Morning | MAP: 82.3 | Pulse pressure: 43 | Kerdo: 2.9 | Robinson: 77.7 | BCE: 3010 | Kvas: 16.3
+[2026-10-25 9:17pm] BP: 108/70 | Pulse: 72 | Type: Evening | MAP: 82.7 | Pulse pressure: 38 | Kerdo: 2.8 | Robinson: 77.8 | BCE: 2736 | Kvas: 18.9
+[2026-10-26 7:40am] BP: 107/68 | Pulse: 75 | Type: Morning | MAP: 81 | Pulse pressure: 39 | Kerdo: 9.3 | Robinson: 80.3 | BCE: 2925 | Kvas: 19.2
+[2026-10-26 9:31pm] BP: 105/67 | Pulse: 74 | Type: Evening | MAP: 79.7 | Pulse pressure: 38 | Kerdo: 9.5 | Robinson: 77.7 | BCE: 2812 | Kvas: 19.5
+[2026-10-27 7:30am] BP: 110/70 | Pulse: 69 | Type: Morning | MAP: 83.3 | Pulse pressure: 40 | Kerdo: -1.4 | Robinson: 75.9 | BCE: 2760 | Kvas: 17.3
+[2026-10-28 7:19am] BP: 113/72 | Pulse: 68 | Type: Morning | MAP: 85.7 | Pulse pressure: 41 | Kerdo: -5.9 | Robinson: 76.8 | BCE: 2788 | Kvas: 16.6
+[2026-10-29 7:35am] BP: 108/71 | Pulse: 67 | Type: Morning | MAP: 83.3 | Pulse pressure: 37 | Kerdo: -6.0 | Robinson: 72.4 | BCE: 2479 | Kvas: 18.1
+[2026-10-30 7:36am] BP: 111/69 | Pulse: 69 | Type: Morning | MAP: 83 | Pulse pressure: 42 | Kerdo: 0 | Robinson: 76.6 | BCE: 2898 | Kvas: 16.4
+[2026-10-30 9:05pm] BP: 112/72 | Pulse: 70 | Type: Evening | MAP: 85.3 | Pulse pressure: 40 | Kerdo: -2.9 | Robinson: 78.4 | BCE: 2800 | Kvas: 17.5
+[2026-10-31 7:02am] BP: 107/70 | Pulse: 71 | Type: Morning | MAP: 82.3 | Pulse pressure: 37 | Kerdo: 1.4 | Robinson: 76.0 | BCE: 2627 | Kvas: 19.2
+[2026-10-31 9:38pm] BP: 111/69 | Pulse: 71 | Type: Evening | MAP: 83 | Pulse pressure: 42 | Kerdo: 2.8 | Robinson: 78.8 | BCE: 2982 | Kvas: 16.9
+[2026-11-01 7:20am] BP: 115/75 | Pulse: 64 | Type: Morning | MAP: 88.3 | Pulse pressure: 40 | Kerdo: -17.2 | Robinson: 73.6 | BCE: 2560 | Kvas: 16
+[2026-11-01 9:16pm] BP: 114/76 | Pulse: 61 | Type: Evening | MAP: 88.7 | Pulse pressure: 38 | Kerdo: -24.6 | Robinson: 69.5 | BCE: 2318 | Kvas: 16.1
+[2026-11-02 6:57am] BP: 112/68 | Pulse: 69 | Type: Morning | MAP: 82.7 | Pulse pressure: 44 | Kerdo: 1.4 | Robinson: 77.3 | BCE: 3036 | Kvas: 15.7
+[2026-11-02 9:29pm] BP: 107/71 | Pulse: 68 | Type: Evening | MAP: 83 | Pulse pressure: 36 | Kerdo: -4.4 | Robinson: 72.8 | BCE: 2448 | Kvas: 18.9
+[2026-11-03 7:35am] BP: 112/69 | Pulse: 71 | Type: Morning | MAP: 83.3 | Pulse pressure: 43 | Kerdo: 2.8 | Robinson: 79.5 | BCE: 3053 | Kvas: 16.5
+[2026-11-04 7:19am] BP: 111/70 | Pulse: 69 | Type: Morning | MAP: 83.7 | Pulse pressure: 41 | Kerdo: -1.4 | Robinson: 76.6 | BCE: 2829 | Kvas: 16.8
+[2026-11-04 9:01pm] BP: 111/70 | Pulse: 68 | Type: Evening | MAP: 83.7 | Pulse pressure: 41 | Kerdo: -2.9 | Robinson: 75.5 | BCE: 2788 | Kvas: 16.6
+
+RESTING HEART RATE:
+[2026-10-06 6:49am] Position: Laying | HR: 77
+[2026-10-07 7:16am] Position: Laying | HR: 83
+[2026-10-08 6:38am] Position: Laying | HR: 75
+[2026-10-12 6:52am] Position: Laying | HR: 74
+[2026-10-15 6:41am] Position: Laying | HR: 71
+[2026-10-16 7:24am] Position: Laying | HR: 71
+[2026-10-17 6:53am] Position: Laying | HR: 71
+[2026-10-18 7:06am] Position: Laying | HR: 67
+[2026-10-19 7:28am] Position: Laying | HR: 69
+[2026-10-20 6:54am] Position: Laying | HR: 72
+[2026-10-21 7:07am] Position: Laying | HR: 68
+[2026-10-22 6:50am] Position: Laying | HR: 66
+[2026-10-24 7:06am] Position: Laying | HR: 65
+[2026-10-25 7:21am] Position: Laying | HR: 66
+[2026-10-26 7:33am] Position: Laying | HR: 72
+[2026-10-27 7:23am] Position: Laying | HR: 65
+[2026-10-28 7:12am] Position: Laying | HR: 66
+[2026-10-30 7:29am] Position: Laying | HR: 64
+[2026-11-01 7:13am] Position: Laying | HR: 65
+[2026-11-02 6:50am] Position: Laying | HR: 62
+[2026-11-03 7:28am] Position: Laying | HR: 63
+[2026-11-04 7:12am] Position: Laying | HR: 62
+
+SLEEP DATA:
+[2026-10-06] Bed last night: 11:47pm | Woke this morning: 6:41am | Duration: 6.9 hrs | Quality: Good | Low HR: 65 | High HR: 95
+[2026-10-07] Bed last night: 1:02am | Woke this morning: 7:08am | Duration: 6.1 hrs | Quality: Interrupted | Low HR: 72 | High HR: 101
+[2026-10-08] Bed last night: 11:46pm | Woke this morning: 6:30am | Duration: 6.7 hrs | Quality: Good | Low HR: 63 | High HR: 95
+[2026-10-09] Bed last night: 11:49pm | Woke this morning: 6:40am | Duration: 6.8 hrs | Quality: Good | Low HR: 65 | High HR: 96
+[2026-10-10] Bed last night: 11:55pm | Woke this morning: 7:30am | Duration: 7.6 hrs | Quality: Good | Low HR: 61 | High HR: 92
+[2026-10-11] Bed last night: 12:15am | Woke this morning: 6:41am | Duration: 6.4 hrs | Quality: Good | Low HR: 70 | High HR: 99
+[2026-10-12] Bed last night: 12:31am | Woke this morning: 6:44am | Duration: 6.2 hrs | Quality: Interrupted | Low HR: 71 | High HR: 104
+[2026-10-13] Bed last night: 11:29pm | Woke this morning: 7:12am | Duration: 7.7 hrs | Quality: Good | Low HR: 60 | High HR: 92
+[2026-10-14] Bed last night: 1:38am | Woke this morning: 7:04am | Duration: 5.4 hrs | Quality: Interrupted | Low HR: 74 | High HR: 106
+[2026-10-15] Bed last night: 11:55pm | Woke this morning: 6:33am | Duration: 6.6 hrs | Quality: Good | Low HR: 65 | High HR: 95
+[2026-10-16] Bed last night: 12:32am | Woke this morning: 7:16am | Duration: 6.7 hrs | Quality: Good | Low HR: 67 | High HR: 99
+[2026-10-17] Bed last night: 11:30pm | Woke this morning: 6:45am | Duration: 7.3 hrs | Quality: Good | Low HR: 60 | High HR: 91
+[2026-10-18] Bed last night: 12:26am | Woke this morning: 6:58am | Duration: 6.5 hrs | Quality: Good | Low HR: 68 | High HR: 100
+[2026-10-19] Bed last night: 12:46am | Woke this morning: 7:20am | Duration: 6.6 hrs | Quality: Good | Low HR: 67 | High HR: 99
+[2026-10-20] Bed last night: 11:54pm | Woke this morning: 6:46am | Duration: 6.9 hrs | Quality: Good | Low HR: 66 | High HR: 98
+[2026-10-21] Bed last night: 11:35pm | Woke this morning: 6:59am | Duration: 7.4 hrs | Quality: Good | Low HR: 59 | High HR: 90
+[2026-10-22] Bed last night: 12:10am | Woke this morning: 6:42am | Duration: 6.5 hrs | Quality: Good | Low HR: 66 | High HR: 98
+[2026-10-23] Bed last night: 11:29pm | Woke this morning: 6:49am | Duration: 7.3 hrs | Quality: Good | Low HR: 60 | High HR: 93
+[2026-10-24] Bed last night: 11:50pm | Woke this morning: 6:58am | Duration: 7.1 hrs | Quality: Good | Low HR: 63 | High HR: 95
+[2026-10-25] Bed last night: 11:56pm | Woke this morning: 7:13am | Duration: 7.3 hrs | Quality: Good | Low HR: 64 | High HR: 93
+[2026-10-26] Bed last night: 12:31am | Woke this morning: 7:25am | Duration: 6.9 hrs | Quality: Good | Low HR: 66 | High HR: 96
+[2026-10-27] Bed last night: 11:29pm | Woke this morning: 7:15am | Duration: 7.8 hrs | Quality: Good | Low HR: 58 | High HR: 90
+[2026-10-28] Bed last night: 10:56pm | Woke this morning: 7:04am | Duration: 8.1 hrs | Quality: Good | Low HR: 54 | High HR: 86
+[2026-10-29] Bed last night: 12:02am | Woke this morning: 7:20am | Duration: 7.3 hrs | Quality: Good | Low HR: 62 | High HR: 94
+[2026-10-30] Bed last night: 11:20pm | Woke this morning: 7:21am | Duration: 8.0 hrs | Quality: Good | Low HR: 57 | High HR: 87
+[2026-10-31] Bed last night: 10:33pm | Woke this morning: 6:47am | Duration: 8.2 hrs | Quality: Good | Low HR: 55 | High HR: 87
+[2026-11-01] Bed last night: 11:01pm | Woke this morning: 7:05am | Duration: 8.1 hrs | Quality: Good | Low HR: 56 | High HR: 83
+[2026-11-02] Bed last night: 11:39pm | Woke this morning: 6:42am | Duration: 7.0 hrs | Quality: Good | Low HR: 64 | High HR: 92
+[2026-11-03] Bed last night: 11:28pm | Woke this morning: 7:20am | Duration: 7.9 hrs | Quality: Good | Low HR: 58 | High HR: 90
+[2026-11-04] Bed last night: 10:55pm | Woke this morning: 7:04am | Duration: 8.2 hrs | Quality: Good | Low HR: 55 | High HR: 84
+
+ORTHOSTATIC / HR EVENTS:
+[2026-10-06 6:35pm] Sitting to standing | Before HR: 75 | After HR: 103 | HR @1min: 92
+[2026-10-06 9:36pm] Climbing stairs | Before HR: 76 | After HR: 117 | HR @1min: 108
+[2026-10-07 9:27pm] Laying to standing | Before HR: 79 | After HR: 113 | HR @1min: 104
+[2026-10-07 7:03pm] Sitting to standing | Before HR: 78 | After HR: 112 | HR @1min: 105
+[2026-10-07 10:51am] Sitting to standing | Before HR: 80 | After HR: 113 | HR @1min: 107
+[2026-10-08 7:16pm] Sitting to standing | Before HR: 75 | After HR: 101 | HR @1min: 88
+[2026-10-08 10:39am] Sitting to standing | Before HR: 72 | After HR: 101 | HR @1min: 89
+[2026-10-08 7:20am] POTS stand test | Baseline HR: 72 | Peak HR: 113 | Peak Δ: 41 | Sustained Δ: 29 | Sustained rise ≥30 bpm: No | Max HR reached: 113
+[2026-10-09 10:56am] Climbing stairs | Before HR: 74 | After HR: 113 | HR @1min: 102
+[2026-10-09 3:53pm] Climbing stairs | Before HR: 73 | After HR: 110 | HR @1min: 97
+[2026-10-10 4:13pm] Sitting to standing | Before HR: 71 | After HR: 99 | HR @1min: 89
+[2026-10-11 7:20pm] Laying to standing | Before HR: 75 | After HR: 103 | HR @1min: 92
+[2026-10-12 5:36pm] Sitting to standing | Before HR: 74 | After HR: 102 | HR @1min: 90
+[2026-10-13 10:58am] Sitting to standing | Before HR: 70 | After HR: 96 | HR @1min: 85
+[2026-10-13 8:02am] POTS stand test | Baseline HR: 68 | Peak HR: 106 | Peak Δ: 38 | Sustained Δ: 28 | Sustained rise ≥30 bpm: No | Max HR reached: 106
+[2026-10-14 1:48pm] Laying to standing | Before HR: 76 | After HR: 109 | HR @1min: 99
+[2026-10-14 4:17pm] Climbing stairs | Before HR: 77 | After HR: 122 | HR @1min: 113
+[2026-10-15 9:32pm] Sitting to standing | Before HR: 69 | After HR: 91 | HR @1min: 76
+[2026-10-16 8:50pm] Laying to standing | Before HR: 69 | After HR: 93 | HR @1min: 80
+[2026-10-17 1:50pm] Climbing stairs | Before HR: 72 | After HR: 110 | HR @1min: 97
+[2026-10-18 1:56pm] Climbing stairs | Before HR: 67 | After HR: 101 | HR @1min: 85
+[2026-10-18 7:48am] POTS stand test | Baseline HR: 64 | Peak HR: 95 | Peak Δ: 31 | Sustained Δ: 22 | Sustained rise ≥30 bpm: No | Max HR reached: 95
+[2026-10-19 12:47pm] Sitting to standing | Before HR: 72 | After HR: 96 | HR @1min: 81
+[2026-10-20 9:02pm] Sitting to standing | Before HR: 72 | After HR: 95 | HR @1min: 81
+[2026-10-21 8:34pm] Climbing stairs | Before HR: 69 | After HR: 104 | HR @1min: 91
+[2026-10-22 6:26pm] Climbing stairs | Before HR: 69 | After HR: 103 | HR @1min: 88
+[2026-10-23 9:31pm] Laying to standing | Before HR: 68 | After HR: 86 | HR @1min: 70
+[2026-10-23 7:39am] POTS stand test | Baseline HR: 63 | Peak HR: 94 | Peak Δ: 31 | Sustained Δ: 21 | Sustained rise ≥30 bpm: No | Max HR reached: 94
+[2026-10-25 8:15pm] Laying to standing | Before HR: 69 | After HR: 86 | HR @1min: 73
+[2026-10-26 8:00pm] Climbing stairs | Before HR: 71 | After HR: 108 | HR @1min: 96
+[2026-10-27 7:03pm] Sitting to standing | Before HR: 67 | After HR: 89 | HR @1min: 72
+[2026-10-28 7:54am] POTS stand test | Baseline HR: 63 | Peak HR: 91 | Peak Δ: 28 | Sustained Δ: 18 | Sustained rise ≥30 bpm: No | Max HR reached: 91
+[2026-10-29 3:08pm] Laying to standing | Before HR: 66 | After HR: 88 | HR @1min: 72
+[2026-10-30 5:18pm] Sitting to standing | Before HR: 65 | After HR: 83 | HR @1min: 66
+[2026-11-02 7:32am] POTS stand test | Baseline HR: 60 | Peak HR: 83 | Peak Δ: 23 | Sustained Δ: 15 | Sustained rise ≥30 bpm: No | Max HR reached: 83
+
+ACTIVITIES:
+[2026-10-06 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 14min
+[2026-10-07 8:00pm] Breathwork / meditation (rest, not exercise) | Duration: 9min
+[2026-10-08 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 12min
+[2026-10-08 4:30pm] Walk | Duration: 14min
+[2026-10-09 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 13min
+[2026-10-09 4:30pm] Walk | Duration: 15min
+[2026-10-09 1:00pm] Errands / shopping | Duration: 44min
+[2026-10-10 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 11min
+[2026-10-10 4:30pm] Walk | Duration: 16min
+[2026-10-11 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 10min
+[2026-10-11 4:30pm] Walk | Duration: 15min
+[2026-10-11 1:00pm] Errands / shopping | Duration: 54min
+[2026-10-12 4:30pm] Walk | Duration: 17min
+[2026-10-12 1:00pm] Errands / shopping | Duration: 48min
+[2026-10-13 4:30pm] Walk | Duration: 21min
+[2026-10-14 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 13min
+[2026-10-14 4:30pm] Walk | Duration: 16min
+[2026-10-14 1:00pm] Errands / shopping | Duration: 50min
+[2026-10-15 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 10min
+[2026-10-15 4:00pm] Walk | Duration: 37min
+[2026-10-15 5:00pm] Yoga / stretching | Duration: 25min
+[2026-10-15 1:00pm] Errands / shopping | Duration: 49min
+[2026-10-16 4:00pm] Walk | Duration: 26min
+[2026-10-16 5:00pm] Indoor bike | Duration: 28 min
+[2026-10-17 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 11min
+[2026-10-17 4:00pm] Walk | Duration: 34min
+[2026-10-18 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 10min
+[2026-10-18 4:00pm] Walk | Duration: 34min
+[2026-10-18 1:00pm] Errands / shopping | Duration: 43min
+[2026-10-19 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 10min
+[2026-10-19 4:00pm] Walk | Duration: 29min
+[2026-10-20 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 11min
+[2026-10-21 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 11min
+[2026-10-21 4:00pm] Walk | Duration: 36min
+[2026-10-21 5:00pm] Indoor bike | Duration: 21 min
+[2026-10-21 1:00pm] Errands / shopping | Duration: 55min
+[2026-10-22 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 14min
+[2026-10-22 1:00pm] Errands / shopping | Duration: 50min
+[2026-10-23 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 11min
+[2026-10-23 4:00pm] Walk | Duration: 35min
+[2026-10-23 1:00pm] Errands / shopping | Duration: 48min
+[2026-10-24 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 11min
+[2026-10-24 1:00pm] Errands / shopping | Duration: 43min
+[2026-10-25 4:00pm] Walk | Duration: 31min
+[2026-10-25 1:00pm] Errands / shopping | Duration: 60min
+[2026-10-26 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 12min
+[2026-10-27 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 12min
+[2026-10-27 4:00pm] Walk | Duration: 35min
+[2026-10-27 1:00pm] Errands / shopping | Duration: 48min
+[2026-10-28 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 12min
+[2026-10-28 4:00pm] Walk | Duration: 28min
+[2026-10-29 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 12min
+[2026-10-29 4:00pm] Walk | Duration: 27min
+[2026-10-29 1:00pm] Errands / shopping | Duration: 57min
+[2026-10-30 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 14min
+[2026-10-30 4:00pm] Walk | Duration: 34min
+[2026-10-31 4:00pm] Walk | Duration: 34min
+[2026-11-01 4:00pm] Walk | Duration: 32min
+[2026-11-01 5:00pm] Indoor bike | Duration: 23 min
+[2026-11-01 1:00pm] Errands / shopping | Duration: 53min
+[2026-11-02 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 13min
+[2026-11-02 4:00pm] Walk | Duration: 35min
+[2026-11-02 5:00pm] Yoga / stretching | Duration: 22min
+[2026-11-03 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 14min
+[2026-11-03 4:00pm] Walk | Duration: 32min
+[2026-11-03 5:00pm] Indoor bike | Duration: 23 min
+[2026-11-04 9:00am] Breathwork / meditation (rest, not exercise) | Duration: 11min
+[2026-11-04 4:00pm] Walk | Duration: 37min
+[2026-11-04 5:00pm] Indoor bike | Duration: 26 min
+[2026-11-04 1:00pm] Errands / shopping | Duration: 42min
+[2026-11-04 6:00pm] Strength training | Duration: 30min
+
+TRIGGERS & HYDRATION:
+[2026-10-06] Triggers: Heat / hot weather
+[2026-10-06] Water: 64 oz
+[2026-10-07] Triggers: Heat / hot weather x2
+[2026-10-07] Water: 51 oz
+[2026-10-08] Triggers: Caffeine
+[2026-10-08] Water: 74 oz
+[2026-10-09] Triggers: Large meal
+[2026-10-09] Water: 78 oz
+[2026-10-10] Triggers: Overexertion
+[2026-10-10] Water: 81 oz
+[2026-10-11] Triggers: Heat / hot weather
+[2026-10-11] Water: 78 oz
+[2026-10-12] Triggers: Heat / hot weather
+[2026-10-12] Water: 78 oz
+[2026-10-13] Triggers: Stress
+[2026-10-13] Water: 81 oz
+[2026-10-14] Triggers: Heat / hot weather, Prolonged standing
+[2026-10-14] Water: 71 oz
+[2026-10-15] Water: 88 oz
+[2026-10-16] Water: 88 oz
+[2026-10-17] Water: 78 oz
+[2026-10-18] Water: 91 oz
+[2026-10-19] Water: 81 oz
+[2026-10-20] Triggers: Large meal
+[2026-10-20] Water: 85 oz
+[2026-10-21] Water: 91 oz
+[2026-10-22] Water: 91 oz
+[2026-10-23] Water: 98 oz
+[2026-10-24] Water: 91 oz
+[2026-10-25] Water: 98 oz
+[2026-10-26] Triggers: Caffeine
+[2026-10-26] Water: 85 oz
+[2026-10-27] Water: 95 oz
+[2026-10-28] Water: 101 oz
+[2026-10-29] Water: 95 oz
+[2026-10-30] Water: 95 oz
+[2026-10-31] Water: 98 oz
+[2026-11-01] Triggers: Alcohol
+[2026-11-01] Water: 98 oz
+[2026-11-02] Water: 105 oz
+[2026-11-03] Water: 98 oz
+[2026-11-04] Water: 101 oz
+
+MEDICATIONS TAKEN:
+[2026-10-06 10:00pm] Melatonin | 1mg
+[2026-10-14 10:00pm] Melatonin | 1mg
+
+SUPPLEMENTS TAKEN:
+[2026-10-06 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-06 7:11am] Quercetin | 500mg
+[2026-10-06 7:13am] Vitamin D3 | 5000 IU
+[2026-10-06 11:00am] LMNT | 1 stick
+[2026-10-07 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-07 7:38am] Quercetin | 500mg
+[2026-10-07 11:00am] LMNT | 1 stick
+[2026-10-08 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-08 7:00am] Quercetin | 500mg
+[2026-10-08 7:02am] Vitamin D3 | 5000 IU
+[2026-10-08 11:00am] LMNT | 1 stick
+[2026-10-09 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-09 7:10am] Quercetin | 500mg
+[2026-10-09 7:12am] Vitamin D3 | 5000 IU
+[2026-10-09 11:00am] LMNT | 1 stick
+[2026-10-10 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-10 8:02am] Vitamin D3 | 5000 IU
+[2026-10-11 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-11 7:11am] Quercetin | 500mg
+[2026-10-12 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-12 7:14am] Quercetin | 500mg
+[2026-10-12 7:16am] Vitamin D3 | 5000 IU
+[2026-10-13 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-13 7:42am] Quercetin | 500mg
+[2026-10-13 7:44am] Vitamin D3 | 5000 IU
+[2026-10-13 11:00am] LMNT | 1 stick
+[2026-10-14 7:36am] Vitamin D3 | 5000 IU
+[2026-10-15 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-15 7:03am] Quercetin | 500mg
+[2026-10-15 7:05am] Vitamin D3 | 5000 IU
+[2026-10-16 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-16 7:46am] Quercetin | 500mg
+[2026-10-16 7:48am] Vitamin D3 | 5000 IU
+[2026-10-16 11:00am] LMNT | 1 stick
+[2026-10-17 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-17 7:15am] Quercetin | 500mg
+[2026-10-17 11:00am] LMNT | 1 stick
+[2026-10-18 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-18 7:30am] Vitamin D3 | 5000 IU
+[2026-10-19 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-19 7:52am] Vitamin D3 | 5000 IU
+[2026-10-19 11:00am] LMNT | 1 stick
+[2026-10-20 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-20 7:18am] Vitamin D3 | 5000 IU
+[2026-10-20 11:00am] LMNT | 1 stick
+[2026-10-21 7:29am] Quercetin | 500mg
+[2026-10-21 7:31am] Vitamin D3 | 5000 IU
+[2026-10-21 11:00am] LMNT | 1 stick
+[2026-10-22 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-22 7:12am] Quercetin | 500mg
+[2026-10-22 7:14am] Vitamin D3 | 5000 IU
+[2026-10-23 7:19am] Quercetin | 500mg
+[2026-10-23 7:21am] Vitamin D3 | 5000 IU
+[2026-10-24 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-24 7:30am] Vitamin D3 | 5000 IU
+[2026-10-25 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-25 7:43am] Quercetin | 500mg
+[2026-10-25 7:45am] Vitamin D3 | 5000 IU
+[2026-10-26 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-26 7:55am] Quercetin | 500mg
+[2026-10-26 7:57am] Vitamin D3 | 5000 IU
+[2026-10-27 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-27 7:45am] Quercetin | 500mg
+[2026-10-28 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-28 7:34am] Quercetin | 500mg
+[2026-10-28 7:36am] Vitamin D3 | 5000 IU
+[2026-10-29 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-29 7:50am] Quercetin | 500mg
+[2026-10-29 7:52am] Vitamin D3 | 5000 IU
+[2026-10-29 11:00am] LMNT | 1 stick
+[2026-10-30 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-30 7:51am] Quercetin | 500mg
+[2026-10-30 7:53am] Vitamin D3 | 5000 IU
+[2026-10-31 9:30pm] Magnesium Glycinate | 400mg
+[2026-10-31 7:17am] Quercetin | 500mg
+[2026-10-31 7:19am] Vitamin D3 | 5000 IU
+[2026-10-31 11:00am] LMNT | 1 stick
+[2026-11-01 9:30pm] Magnesium Glycinate | 400mg
+[2026-11-01 7:35am] Quercetin | 500mg
+[2026-11-01 7:37am] Vitamin D3 | 5000 IU
+[2026-11-02 9:30pm] Magnesium Glycinate | 400mg
+[2026-11-02 7:12am] Quercetin | 500mg
+[2026-11-02 7:14am] Vitamin D3 | 5000 IU
+[2026-11-02 11:00am] LMNT | 1 stick
+[2026-11-03 9:30pm] Magnesium Glycinate | 400mg
+[2026-11-03 7:50am] Quercetin | 500mg
+[2026-11-03 7:52am] Vitamin D3 | 5000 IU
+[2026-11-04 9:30pm] Magnesium Glycinate | 400mg
+[2026-11-04 7:34am] Quercetin | 500mg
+[2026-11-04 7:36am] Vitamin D3 | 5000 IU
+[2026-11-04 11:00am] LMNT | 1 stick
+
+SYMPTOMS NOTED:
+[2026-10-06 3:51pm] Fatigue
+[2026-10-06 4:18pm] Brain fog
+[2026-10-06 3:39pm] Post-exertional malaise
+[2026-10-06 2:00pm] Headache
+[2026-10-07 1:38pm] Fatigue
+[2026-10-07 7:25pm] Brain fog
+[2026-10-07 6:49pm] Light Headed/Dizzy
+[2026-10-07 4:05pm] Palpitations
+[2026-10-07 3:39pm] Post-exertional malaise
+[2026-10-07 3:02pm] Coat hanger pain
+[2026-10-07 2:09pm] Headache
+[2026-10-08 8:25pm] Fatigue
+[2026-10-08 6:54pm] Brain fog
+[2026-10-08 5:08pm] Light Headed/Dizzy
+[2026-10-08 2:38pm] Palpitations
+[2026-10-08 2:01pm] Post-exertional malaise
+[2026-10-08 11:50am] Coat hanger pain
+[2026-10-08 11:13am] Headache
+[2026-10-09 12:10pm] Fatigue
+[2026-10-09 8:34pm] Brain fog
+[2026-10-09 5:21pm] Post-exertional malaise
+[2026-10-10 6:38pm] Fatigue
+[2026-10-10 5:43pm] Brain fog
+[2026-10-10 1:33pm] Light Headed/Dizzy
+[2026-10-10 3:27pm] Post-exertional malaise
+[2026-10-10 12:12pm] Insomnia / poor sleep
+[2026-10-11 1:07pm] Post-exertional malaise
+[2026-10-12 12:25pm] Brain fog
+[2026-10-12 12:49pm] Palpitations
+[2026-10-12 8:50pm] Post-exertional malaise
+[2026-10-12 11:40am] Coat hanger pain
+[2026-10-12 7:03pm] Insomnia / poor sleep
+[2026-10-13 5:52pm] Palpitations
+[2026-10-14 2:06pm] Fatigue
+[2026-10-14 3:24pm] Light Headed/Dizzy
+[2026-10-15 2:55pm] Fatigue
+[2026-10-18 1:47pm] Palpitations
+[2026-10-20 8:10pm] Fatigue
+[2026-10-20 12:39pm] Brain fog
+[2026-10-20 4:40pm] Light Headed/Dizzy
+[2026-10-20 5:24pm] Palpitations
+[2026-10-21 7:07pm] Fatigue
+[2026-10-24 4:49pm] Fatigue
+[2026-10-24 8:46pm] Brain fog
+[2026-10-25 12:06pm] Light Headed/Dizzy
+[2026-10-25 11:38am] Palpitations
+[2026-10-26 8:28pm] Fatigue
+[2026-10-26 2:02pm] Light Headed/Dizzy
+[2026-11-02 6:20pm] Coat hanger pain
+
+BOWEL MOVEMENTS:
+SUMMARY: 25 movements | a movement on 25 of 30 tracked days | form: Formed 22, Loose 2, Hard 1 | longest run without one: 1 day. A tracked day is one with a movement logged, or a day other entries were logged while bowel movements were being recorded.
+[2026-10-06 9:01am] Hard
+[2026-10-07 9:02am] Loose
+[2026-10-08 7:48am] Formed
+[2026-10-09 7:46am] Formed
+[2026-10-11 7:49am] Formed
+[2026-10-12 7:57am] Formed
+[2026-10-14 8:13am] Loose
+[2026-10-15 7:44am] Formed
+[2026-10-16 8:59am] Formed
+[2026-10-17 7:29am] Formed
+[2026-10-18 8:54am] Formed
+[2026-10-19 9:38am] Formed
+[2026-10-20 8:00am] Formed
+[2026-10-22 7:58am] Formed
+[2026-10-24 8:22am] Formed
+[2026-10-25 9:52am] Formed
+[2026-10-26 9:50am] Formed
+[2026-10-27 9:22am] Formed
+[2026-10-28 9:42am] Formed
+[2026-10-29 9:16am] Formed
+[2026-10-31 8:55am] Formed
+[2026-11-01 8:13am] Formed
+[2026-11-02 7:47am] Formed
+[2026-11-03 9:46am] Formed
+[2026-11-04 8:17am] Formed
+
+PACING BUDGET (effort minutes):
+HOW TO READ THIS SECTION. These figures come from this app's pacing model. Do not map them onto calories, METs, exercise minutes or any fitness metric; they are none of those, and treating them as such will produce wrong conclusions.
+
+THE UNIT. One "effort minute" is one minute of moderate effort. A minute of a light activity costs 0.6, moderate 1.0, heavy 1.6, strenuous 2.2, and a minute of restorative activity (lying with legs up, napping, lying down to rest, breathwork, or any activity the person marked as Rest) gives 0.35 back. The spread is deliberately compressed: for this population the cost of being upright and stressed is comparable to the cost of exercise, so standing in a queue and cycling are much closer together here than a metabolic-equivalent table would put them.
+
+WHAT CHARGES A DAY, all in effort minutes, summed:
+  1. Logged activities: duration x the weight above, raised by up to 1.5x when the session's average heart rate ran above this person's own exertion line.
+  2. Minutes the heart sat above that exertion line, priced by how far above it sat. The line is this person's own 42-day median resting heart rate plus 25 bpm, NOT a fitness zone or a percentage of max: in this population a resting rate of 95 is ordinary, and a textbook threshold would call their whole day a workout. Minutes already inside a logged workout are removed from the top intensity bands first, so nothing is billed twice.
+  3. Upright time at 0.2 per minute, which is the real limiter in POTS and what no fitness metric bills for. Measured walking (from step timestamps, overlapping device records merged, never summed) plus, where a heart-rate series exists, standing still INFERRED from the heart sitting in this person's own standing band with no steps. Inferred standing is an estimate and is labelled as one.
+  4. A floor from step count, never a sum: if 0.011 per step exceeds everything above, the difference is added so a phone-only day still shows a number.
+  5. Restorative entries and minutes the heart spent settled below this person's own recovery line REFUND, capped at a quarter of what the day cost. Sleep is excluded.
+Gaps in the heart-rate series longer than 5 minutes are treated as UNOBSERVED, never as rest, and a day with under 2 hours of series is not charged a heart-rate row at all.
+
+THE BUDGET is a CEILING fitted from this person's own history, not a target, a goal, a prescription or a recommendation from a clinician. It starts from a prior set by that day's own autonomic grade and is then pulled toward the 75th percentile of what they have actually absorbed on days that were FOLLOWED by a non-declining window. Held-day spend can only RAISE it; lowering it requires evidence of a dip. It is then corrected slowly against their own record (days under budget that dipped anyway pull it down 5% each, days over budget that held push it up 3%, bounded to 0.7-1.15x), narrowed by that morning's readings against their own 42-day usual, and narrowed further when the previous day ran over. The figure in the Budget column below is the number the app actually showed them that day, after all of that.
+
+"NEXT 2 DAYS" is the verdict: whether the daily autonomic score held over the following two days, which is the delayed window post-exertional symptoms appear in. A verdict read off the next day alone would clear a Tuesday that put this person on the floor on Thursday. "held" means it did not fall more than 10 points and did not reach crash grade; "dipped" means it did.
+
+Crash-grade days publish no budget at all, by design. Days the app had no way to observe are omitted rather than reported as costing nothing, so an absent day is missing data, never a rest day.
+
+SUMMARY: 30 days with a budget | over budget on 0 | average margin +157m | stayed steady over the following two days on 24 of 28 under-budget days
+[2026-10-06] Budget: 131m | Cost: 0m | Margin: +131m | Next 2 days: held | Coverage: logged activities and steps only
+[2026-10-07] Budget: 131m | Cost: 0m | Margin: +131m | Next 2 days: held | Coverage: logged activities and steps only
+[2026-10-08] Budget: 131m | Cost: 6m | Margin: +125m | Next 2 days: held | Charged: Logged activities +8m (Walk); Recovery time -2m (Breathwork / meditation 12m) | Coverage: logged activities and steps only
+[2026-10-09] Budget: 169m | Cost: 48m | Margin: +121m | Next 2 days: held | Charged: Logged activities +53m (Walk, Errands / shopping); Recovery time -5m (Breathwork / meditation 13m) | Coverage: logged activities and steps only
+[2026-10-10] Budget: 169m | Cost: 7m | Margin: +162m | Next 2 days: held | Charged: Logged activities +10m (Walk); Recovery time -2m (Breathwork / meditation 11m) | Coverage: logged activities and steps only
+[2026-10-11] Budget: 169m | Cost: 60m | Margin: +110m | Next 2 days: held | Charged: Logged activities +63m (Walk, Errands / shopping); Recovery time -3m (Breathwork / meditation 10m) | Coverage: logged activities and steps only
+[2026-10-12] Budget: 182m | Cost: 58m | Margin: +124m | Next 2 days: dipped | Charged: Logged activities +58m (Walk, Errands / shopping) | Coverage: logged activities and steps only
+[2026-10-13] Budget: 169m | Cost: 13m | Margin: +156m | Next 2 days: dipped | Charged: Logged activities +13m (Walk) | Coverage: logged activities and steps only
+[2026-10-14] Budget: 131m | Cost: 55m | Margin: +76m | Next 2 days: held | Charged: Logged activities +60m (Walk, Errands / shopping); Recovery time -5m (Breathwork / meditation 13m) | Coverage: logged activities and steps only
+[2026-10-15] Budget: 169m | Cost: 83m | Margin: +86m | Next 2 days: held | Charged: Logged activities +86m (Walk, Yoga / stretching, Errands / shopping); Recovery time -3m (Breathwork / meditation 10m) | Coverage: logged activities and steps only
+[2026-10-16] Budget: 223m | Cost: 44m | Margin: +179m | Next 2 days: held | Charged: Logged activities +44m (Walk, Indoor bike) | Coverage: logged activities and steps only
+[2026-10-17] Budget: 223m | Cost: 17m | Margin: +206m | Next 2 days: held | Charged: Logged activities +20m (Walk); Recovery time -4m (Breathwork / meditation 11m) | Coverage: logged activities and steps only
+[2026-10-18] Budget: 223m | Cost: 60m | Margin: +163m | Next 2 days: held | Charged: Logged activities +63m (Walk, Errands / shopping); Recovery time -3m (Breathwork / meditation 10m) | Coverage: logged activities and steps only
+[2026-10-19] Budget: 190m | Cost: 14m | Margin: +176m | Next 2 days: held | Charged: Logged activities +17m (Walk); Recovery time -3m (Breathwork / meditation 10m) | Coverage: logged activities and steps only
+[2026-10-20] Budget: 131m | Cost: 0m | Margin: +131m | Next 2 days: held | Coverage: logged activities and steps only
+[2026-10-21] Budget: 161m | Cost: 94m | Margin: +67m | Next 2 days: held | Charged: Logged activities +98m (Walk, Indoor bike, Errands / shopping); Recovery time -4m (Breathwork / meditation 11m) | Coverage: logged activities and steps only
+[2026-10-22] Budget: 172m | Cost: 45m | Margin: +127m | Next 2 days: held | Charged: Logged activities +50m (Errands / shopping); Recovery time -5m (Breathwork / meditation 14m) | Coverage: logged activities and steps only
+[2026-10-23] Budget: 183m | Cost: 65m | Margin: +118m | Next 2 days: held | Charged: Logged activities +69m (Walk, Errands / shopping); Recovery time -4m (Breathwork / meditation 11m) | Coverage: logged activities and steps only
+[2026-10-24] Budget: 183m | Cost: 39m | Margin: +144m | Next 2 days: dipped | Charged: Logged activities +43m (Errands / shopping); Recovery time -4m (Breathwork / meditation 11m) | Coverage: logged activities and steps only
+[2026-10-25] Budget: 202m | Cost: 79m | Margin: +123m | Next 2 days: dipped | Charged: Logged activities +79m (Walk, Errands / shopping) | Coverage: logged activities and steps only
+[2026-10-26] Budget: 194m | Cost: 0m | Margin: +194m | Next 2 days: held | Coverage: logged activities and steps only
+[2026-10-27] Budget: 239m | Cost: 65m | Margin: +174m | Next 2 days: held | Charged: Logged activities +69m (Walk, Errands / shopping); Recovery time -4m (Breathwork / meditation 12m) | Coverage: logged activities and steps only
+[2026-10-28] Budget: 215m | Cost: 13m | Margin: +202m | Next 2 days: held | Charged: Logged activities +17m (Walk); Recovery time -4m (Breathwork / meditation 12m) | Coverage: logged activities and steps only
+[2026-10-29] Budget: 253m | Cost: 69m | Margin: +184m | Next 2 days: held | Charged: Logged activities +73m (Walk, Errands / shopping); Recovery time -4m (Breathwork / meditation 12m) | Coverage: logged activities and steps only
+[2026-10-30] Budget: 297m | Cost: 16m | Margin: +282m | Next 2 days: held | Charged: Logged activities +20m (Walk); Recovery time -5m (Breathwork / meditation 14m) | Coverage: logged activities and steps only
+[2026-10-31] Budget: 297m | Cost: 20m | Margin: +277m | Next 2 days: held | Charged: Logged activities +20m (Walk) | Coverage: logged activities and steps only
+[2026-11-01] Budget: 267m | Cost: 95m | Margin: +172m | Next 2 days: held | Charged: Logged activities +95m (Walk, Indoor bike, Errands / shopping) | Coverage: logged activities and steps only
+[2026-11-02] Budget: 297m | Cost: 30m | Margin: +267m | Next 2 days: held | Charged: Logged activities +34m (Walk, Yoga / stretching); Recovery time -5m (Breathwork / meditation 13m) | Coverage: logged activities and steps only
+[2026-11-03] Budget: 253m | Cost: 37m | Margin: +216m | Next 2 days: not yet known | Charged: Logged activities +42m (Walk, Indoor bike); Recovery time -5m (Breathwork / meditation 14m) | Coverage: logged activities and steps only
+[2026-11-04] Budget: 215m | Cost: 134m | Margin: +81m | Next 2 days: not yet known | Charged: Logged activities +138m (Walk, Indoor bike, Errands / shopping and 1 more); Recovery time -4m (Breathwork / meditation 11m) | Coverage: logged activities and steps only
+
+CLEAN DAY STATUS:
+[2026-10-06] Clean day: NO (missed: No triggers, Water (85 oz), Sleep 7h or more)
+[2026-10-07] Clean day: NO (missed: No triggers, Water (85 oz), Sleep 7h or more)
+[2026-10-08] Clean day: NO (missed: No triggers, Water (85 oz), Sleep 7h or more)
+[2026-10-09] Clean day: NO (missed: No triggers, Water (85 oz), Sleep 7h or more)
+[2026-10-10] Clean day: NO (missed: No triggers, Water (85 oz))
+[2026-10-11] Clean day: NO (missed: No triggers, Water (85 oz), Sleep 7h or more)
+[2026-10-12] Clean day: NO (missed: No triggers, Water (85 oz), Sleep 7h or more)
+[2026-10-13] Clean day: NO (missed: No triggers, Water (85 oz))
+[2026-10-14] Clean day: NO (missed: No triggers, Water (85 oz), Sleep 7h or more)
+[2026-10-15] Clean day: NO (missed: Sleep 7h or more)
+[2026-10-16] Clean day: NO (missed: Sleep 7h or more)
+[2026-10-17] Clean day: NO (missed: Water (85 oz))
+[2026-10-18] Clean day: NO (missed: Sleep 7h or more)
+[2026-10-19] Clean day: NO (missed: Water (85 oz), Sleep 7h or more)
+[2026-10-20] Clean day: NO (missed: No triggers, Sleep 7h or more)
+[2026-10-21] Clean day: YES
+[2026-10-22] Clean day: NO (missed: Sleep 7h or more)
+[2026-10-23] Clean day: YES
+[2026-10-24] Clean day: YES
+[2026-10-25] Clean day: YES
+[2026-10-26] Clean day: NO (missed: No triggers, Sleep 7h or more)
+[2026-10-27] Clean day: YES
+[2026-10-28] Clean day: YES
+[2026-10-29] Clean day: YES
+[2026-10-30] Clean day: YES
+[2026-10-31] Clean day: YES
+[2026-11-01] Clean day: NO (missed: No triggers)
+[2026-11-02] Clean day: YES
+[2026-11-03] Clean day: YES
+[2026-11-04] Clean day: YES
+
+DAILY NOTES:
+[2026-10-07] Big setback. Hot day, stood in a queue too long, was flat by 2pm.
+[2026-10-11] Slept through the night for the first time in weeks. Woke up and actually wanted breakfast.
+[2026-10-14] Bad one. Stressful week at work and it caught up with me all at once.
+[2026-10-18] Walked 30 minutes without needing to sit down. First time since this started.
+[2026-10-23] Mornings are clearly better than afternoons now. Moving my readings earlier so they are comparable.
+[2026-10-26] Setback again after a stressful week. Less severe than the last one and I came out of it faster.
+[2026-10-30] Two weeks of decent sleep in a row. Everything else seems to follow it.
+[2026-11-03] Best week yet. Still pacing, but the ceiling is clearly higher than it was two months ago.

@@ -8,8 +8,8 @@ keywords: "hot showers POTS, showering with POTS, POTS dizzy in shower, why do I
 date: 2026-10-01
 updated: 2026-10-01
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1698724624855-e9dbc5a0bddb?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Unsplash"
+photoLocation: "/articles/hot-showers-pots/cover.webp"
+photoAttribution: "Autonomic"
 tldr: "Hot showers make POTS worse because they combine three triggers at once: heat opens up the blood vessels in your skin and belly so blood pools away from your heart and brain, you are standing still with no muscle pump to push it back, and sweating slowly drops your blood volume. The riskiest moment is stepping out, when those dilated vessels have not yet tightened back up. You do not have to give up showering. Use cooler water, sit on a shower chair, keep the room ventilated, pre-hydrate with salt and fluids, keep it short, and move slowly when you get out."
 categories:
   - pots

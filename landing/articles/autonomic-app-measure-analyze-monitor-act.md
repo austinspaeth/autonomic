@@ -18,7 +18,7 @@ faq:
   - q: "Is my health data private?"
     a: "Yes. Autonomic is offline-first and stores everything on your device; there's no account, no cloud sync, and your data never leaves your phone unless you choose to export it. Privacy isn't a setting; it's the architecture."
   - q: "Do I need special hardware to use Autonomic?"
-    a: "No. You can log readings from whatever you already have: a chest strap or ring for HRV, a blood-pressure cuff, a pulse oximeter, or even two fingers and a clock for a stand test. Autonomic scores whatever you record; it works with your existing devices rather than requiring new ones."
+    a: "No. You can log readings from whatever you already have: your phone camera, a chest strap, an Apple Watch or a Garmin for HRV, a blood-pressure cuff, or even two fingers and a clock for a stand test. Autonomic scores whatever you record; it works with your existing devices rather than requiring new ones."
   - q: "How is Autonomic different from a fitness tracker?"
     a: "Fitness trackers are built for healthy people chasing performance, and they compare you to population averages. Autonomic is built for people recovering from POTS, dysautonomia and long COVID: it scores readings against medical thresholds relevant to recovery, focuses on your personal baseline and trend rather than generic 'normal,' and keeps symptoms and triggers in the same place as the numbers."
   - q: "Does Autonomic use AI?"
@@ -89,12 +89,12 @@ Every good intention about recovery breaks somewhere in this loop. You measure i
 
 A trend is only as good as the readings under it, and the enemy is inconsistency. Autonomic makes consistent capture easy:
 
-- Log **HRV, resting heart rate, blood pressure, oxygen saturation, sleep** and more, from whatever devices you already own.
+- Log **HRV, resting heart rate, blood pressure, sleep, symptoms** and more, from whatever devices you already own.
 - Run a guided **[orthostatic stand test](/insights/pots/the-orthostatic-stand-test-at-home/)** with the timing structure built in, so every test is comparable to the last.
 - Capture **live HRV** readings directly, and keep **symptoms, triggers, meals and activities** in the same journal as the numbers.
 
 <div class="callout callout-note">
-  <strong>No new hardware required.</strong> A ring, a chest strap, a BP cuff, a pulse oximeter, or two fingers and a clock. Autonomic scores whatever you record. It meets you where you already are.
+  <strong>No new hardware required.</strong> Your phone camera, a chest strap, a watch, a BP cuff, or two fingers and a clock. Autonomic scores whatever you record. It meets you where you already are.
 </div>
 
 ## Analyze: every reading scored against medical thresholds

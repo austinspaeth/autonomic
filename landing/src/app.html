@@ -3,9 +3,9 @@
   <head>
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#050506" media="(prefers-color-scheme: dark)" />
-    <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)" />
-    <meta name="color-scheme" content="dark light" />
+    <meta name="theme-color" content="#f2eff1" media="(prefers-color-scheme: dark)" />
+    <meta name="theme-color" content="#f2eff1" media="(prefers-color-scheme: light)" />
+    <meta name="color-scheme" content="light" />
     <meta name="format-detection" content="telephone=no" />
     <meta name="application-name" content="Autonomic" />
     <meta name="apple-mobile-web-app-title" content="Autonomic" />
@@ -90,7 +90,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
-      href="https://fonts.googleapis.com/css2?family=Manrope:wght@800&family=Space+Grotesk:wght@400;500;600;700&family=Space+Mono:wght@400;700&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Manrope:wght@800&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&family=Space+Grotesk:wght@700&display=swap"
       rel="stylesheet"
     />
     <script>
@@ -285,9 +285,16 @@
 
           var nav = document.getElementById('nav');
           if (nav) {
-            var onScroll = function () { nav.classList.toggle('scrolled', window.scrollY > 12); };
+            var onScroll = function () {
+              var on = window.scrollY > 12;
+              nav.classList.toggle('scrolled', on);
+              // The blog's topic bar sits under the header and changes with it.
+              document.documentElement.classList.toggle('nav-scrolled', on);
+            };
             onScroll();
             window.addEventListener('scroll', onScroll, { passive: true });
+            // A restored scroll position (reload, Back) can land without a scroll event.
+            window.addEventListener('pageshow', onScroll);
 
             var burger = document.getElementById('burger');
             if (burger) {
@@ -804,30 +811,43 @@
             });
           })();
 
-          // AI report picker: clicking a chip swaps the mocked prompt (title +
-          // body) to that report's full, pasteable prompt. Each chip carries its
-          // prompt + title in data-prompt / data-title attributes.
+          // AI report picker: clicking a chip swaps the preview, title and
+          // footer to that report. The full prompts run to 150 KB, so they live
+          // in static/demo-prompts and are fetched up front once the section is
+          // near, so Copy can write synchronously inside the click.
+          var aiPrompts = {};
           (function () {
-            var chips = document.querySelectorAll('.ai-chip[data-prompt]');
+            var chips = document.querySelectorAll('.ai-chip[data-src]');
             var bodyEl = document.querySelector('.aip-body');
             var titleEl = document.querySelector('.aip-title');
+            var noteEl = document.querySelector('.aip-note');
             if (!chips.length || !bodyEl) return;
             function esc(s) { return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
-            function previewOf(t) { var i = t.indexOf('FOCUS:'); return i >= 0 ? t.slice(i) : t; }
             function render(chip) {
-              var text = chip.getAttribute('data-prompt') || '';
-              bodyEl.innerHTML = esc(previewOf(text)).replace(/^([A-Z][A-Z0-9 ()/&.'-]*?:)/gm, '<span class="c-key">$1<\/span>');
-              bodyEl.setAttribute('data-copy', text);
+              bodyEl.innerHTML = esc(chip.getAttribute('data-preview') || '').replace(/^([A-Z][A-Z0-9 ()/&.'-]*?:)/gm, '<span class="c-key">$1<\/span>');
+              bodyEl.setAttribute('data-src', chip.getAttribute('data-src') || '');
               if (titleEl) titleEl.textContent = chip.getAttribute('data-title') || '';
+              if (noteEl) noteEl.textContent = chip.getAttribute('data-foot') || '';
               chips.forEach(function (c) { c.classList.toggle('selected', c === chip); });
             }
             chips.forEach(function (c) {
               c.addEventListener('click', function () { render(c); });
             });
-            // Seed data-copy from the initial (statically-rendered) report so the
-            // copy button grabs the full prompt even before any click.
-            var start = document.querySelector('.ai-chip.selected[data-prompt]') || chips[0];
-            if (start) bodyEl.setAttribute('data-copy', start.getAttribute('data-prompt') || '');
+            function prefetch() {
+              chips.forEach(function (c) {
+                var src = c.getAttribute('data-src');
+                if (src && !aiPrompts[src]) {
+                  aiPrompts[src] = fetch(src).then(function (r) { return r.text(); }).then(function (t) { aiPrompts[src] = t; return t; });
+                }
+              });
+            }
+            var section = document.getElementById('ai');
+            if (section && 'IntersectionObserver' in window) {
+              var io = new IntersectionObserver(function (es) {
+                if (es.some(function (e) { return e.isIntersecting; })) { io.disconnect(); prefetch(); }
+              }, { rootMargin: '600px' });
+              io.observe(section);
+            } else prefetch();
           })();
 
           // Track store CTA clicks site-wide. Every store badge/link carries
@@ -886,7 +906,7 @@
               var action = el.getAttribute('data-wa-log') ? 'log:' + el.getAttribute('data-wa-log')
                 : el.getAttribute('data-wa-act') || 'go:' + el.getAttribute('data-wa-go');
               ajEvent('watch_interact', { action: action });
-            } else if ((el = t.closest('.ai-chip[data-prompt]'))) {
+            } else if ((el = t.closest('.ai-chip[data-src]'))) {
               // AI interactive: report chip selected.
               ajEvent('ai_report_select', { report: el.getAttribute('data-report') || el.getAttribute('data-title') || '' });
             } else if ((el = t.closest('.aip-copy'))) {
@@ -1122,14 +1142,24 @@
           if (copyBtn) {
             var promptEl = document.querySelector('.aip-body');
             copyBtn.addEventListener('click', function () {
-              var txt = promptEl ? (promptEl.getAttribute('data-copy') || promptEl.innerText) : '';
-              var done = function () {
-                var prev = copyBtn.textContent;
-                copyBtn.textContent = 'Copied ✓';
-                setTimeout(function () { copyBtn.textContent = prev; }, 1600);
+              var src = promptEl ? promptEl.getAttribute('data-src') || '' : '';
+              var got = aiPrompts[src];
+              var label = copyBtn.textContent;
+              var done = function (ok) {
+                copyBtn.textContent = ok ? 'Copied ✓' : 'Copy failed';
+                setTimeout(function () { copyBtn.textContent = label; }, 1600);
               };
-              if (navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(txt).then(done, done);
-              else done();
+              var cb = navigator.clipboard;
+              if (!cb) { done(false); return; }
+              if (typeof got === 'string') { cb.writeText(got).then(function () { done(true); }, function () { done(false); }); return; }
+              // Not fetched yet: hand the clipboard a promise, which keeps the
+              // write inside the click for Safari.
+              var text = got || fetch(src).then(function (r) { return r.text(); });
+              if (window.ClipboardItem && cb.write) {
+                cb.write([new ClipboardItem({ 'text/plain': Promise.resolve(text).then(function (t) { return new Blob([t], { type: 'text/plain' }); }) })]).then(function () { done(true); }, function () { done(false); });
+              } else {
+                Promise.resolve(text).then(function (t) { return cb.writeText(t); }).then(function () { done(true); }, function () { done(false); });
+              }
             });
           }
         }

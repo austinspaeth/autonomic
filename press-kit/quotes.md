@@ -18,9 +18,10 @@ of Autonomic" to match how you sign everywhere else).
 
 ### On the privacy architecture (the reporter's favorite)
 
-> "Other health apps promise not to sell your data. Autonomic can't. There's no
-> account, no server, and no tracking, so the numbers never leave your phone. For
-> people already anxious about who sees their health data, that's the whole point."
+> "Other health apps promise not to sell your data. Autonomic doesn't have it to
+> sell. There's no account and no server holding your health data, so the numbers
+> never leave your phone. For people already anxious about who sees their health
+> data, that's the whole point."
 
 ### On honesty / no false hope
 

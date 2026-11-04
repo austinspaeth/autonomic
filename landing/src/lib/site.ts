@@ -13,20 +13,6 @@ export const site = {
  * anywhere a machine reads the URL. Human-facing CTAs should use `storeUrl()`
  * below so the download is credited to the site.
  */
-/** The October giveaway page. Every giveaway banner's "Learn more" and the
- *  nav's awareness ribbon point here. */
-export const giveawayUrl = '/dysautonomia-awareness-giveaway/';
-
-/** The official giveaway post on each platform, where tagging a friend earns a
- *  bonus entry. A platform left null renders as a disabled tile rather than a
- *  dead link. */
-export const giveawayPosts: Record<'facebook' | 'instagram' | 'tiktok' | 'x', string | null> = {
-  facebook: null,
-  instagram: null,
-  tiktok: null,
-  x: null
-};
-
 export const appStoreUrl = 'https://apps.apple.com/app/id6789786971';
 export const playStoreUrl =
   'https://play.google.com/store/apps/details?id=com.autonomic.journal';
@@ -185,12 +171,14 @@ export const yearlySavePct = Math.round((1 - pricing.yearly / (pricing.monthly *
  * moment they differ, name the one the number belongs to.
  */
 export const rating: { stars: number; label: string; store: string; reviews: number | null } = {
-  stars: 5,
-  label: '5.0',
+  // App Store Connect, Nov 2026: 4.9 from 26 ratings. Apple's public lookup
+  // API lags behind Connect, so read the number there, never from the API.
+  stars: 4.9,
+  label: '4.9',
   // "&", not "and": the row is white-space: nowrap, and at 375px the longer
   // form ran past the gutter in the pricing and closing CTA placements.
-  store: 'App Store & Google Play',
-  reviews: null
+  store: 'App Store',
+  reviews: 26
 };
 
 /**
@@ -308,3 +296,14 @@ function toDate(input?: string | Date): Date | null {
   const d = m ? new Date(+m[1], +m[2] - 1, +m[3]) : new Date(iso);
   return Number.isNaN(d.getTime()) ? null : d;
 }
+
+/** The conditions the home hero names, each linking to its own page. The pages
+ *  themselves are listed in `lib/v2/conditions.ts` (hub, footer, sitemap); a
+ *  renamed URL moves in both places. */
+export const CONDITION_LINKS = {
+  pots: { label: 'POTS', href: '/conditions/pots/' },
+  longCovid: { label: 'long COVID', href: '/conditions/long-covid/' },
+  meCfs: { label: 'ME/CFS', href: '/conditions/me-cfs/' },
+  dysautonomia: { label: 'dysautonomia', href: '/conditions/dysautonomia/' },
+  chronic: { label: 'chronic illness', href: '/conditions/chronic-illness/' },
+} as const;

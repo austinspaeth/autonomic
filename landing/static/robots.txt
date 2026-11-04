@@ -39,3 +39,6 @@ User-agent: Bingbot
 Allow: /
 
 Sitemap: https://autonomic.care/sitemap.xml
+
+# A plain-text briefing for AI assistants (https://llmstxt.org):
+# https://autonomic.care/llms.txt

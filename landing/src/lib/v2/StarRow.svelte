@@ -1,0 +1,1 @@
+<span class="v2-stars" aria-hidden="true">{#each [1, 2, 3, 4, 5] as _}<svg viewBox="2.6 2.4 18.8 18" width="13" height="12.5"><path fill="#e3a12f" d="M12 2.6l2.83 5.73 6.32.92-4.57 4.46 1.08 6.3L12 17.03l-5.66 2.98 1.08-6.3L2.85 9.25l6.32-.92z" /></svg>{/each}</span>

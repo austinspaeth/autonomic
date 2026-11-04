@@ -1,11 +1,11 @@
 <script lang="ts">
   import type { Article } from '../../../../api/articles/types';
   import ArticleCover from '$lib/ArticleCover.svelte';
-  import ArticleCard from '$lib/ArticleCard.svelte';
-  import BlogEndCTA from '$lib/BlogEndCTA.svelte';
   import SocialShareWidget from '$lib/SocialShareWidget.svelte';
-  import InsightsShell from '$lib/InsightsShell.svelte';
-  import { formatDate, isoDate, articleHref } from '$lib/site';
+  import { formatDate, isoDate, APP_MARK_PATH } from '$lib/site';
+  import PostCard from '$lib/v2/blog/PostCard.svelte';
+  import BlogCta from '$lib/v2/blog/BlogCta.svelte';
+  import Stores from '$lib/v2/Stores.svelte';
   import { topicLabel } from '$lib/topics';
   import { writerSlug, getWriter } from '$lib/writers';
   import ogCards from '$lib/og-cards.json';
@@ -48,7 +48,52 @@
       : 'https://autonomic.care/og.png');
   $: authorSlug = writerSlug(meta.author);
   $: bio = getWriter(authorSlug)?.about;
-  $: extraCats = (meta.categories ?? []).slice(1);
+  $: photo = getWriter(authorSlug)?.photo;
+  $: readMin = (data.articles ?? []).find((a) => a.slug === meta.slug)?.readMin;
+  $: initials = meta.author.split(/\s+/).map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+
+  /* The rail's "On this page" list, the numbered section anchors and the
+     reading-progress bar under the topic bar. Built from the article's own h2s
+     at load (the markdown carries no ids), so without script the rail simply
+     shows no list. */
+  const articleScript = `<script>
+(function () {
+  var prose = document.querySelector('[data-prose]');
+  if (!prose) return;
+  var hs = Array.prototype.slice.call(prose.querySelectorAll('h2'));
+  var toc = document.querySelector('[data-toc]');
+  var used = {};
+  var links = hs.map(function (h, i) {
+    var id = h.id || (h.textContent || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 60) || ('section-' + (i + 1));
+    while (used[id]) id += '-' + i;
+    used[id] = 1; h.id = id;
+    if (!toc) return null;
+    var a = document.createElement('a');
+    a.href = '#' + id;
+    a.innerHTML = '<span>' + String(i + 1).padStart(2, '0') + '</span>';
+    a.appendChild(document.createTextNode(h.textContent || ''));
+    toc.appendChild(a);
+    return a;
+  });
+  if (toc && hs.length) toc.closest('[data-toc-card]').hidden = false;
+  var bar = document.querySelector('[data-read-bar]');
+  var art = document.querySelector('[data-article]');
+  var ticking = false;
+  function update() {
+    ticking = false;
+    if (bar && art) {
+      var r = art.getBoundingClientRect(), vh = window.innerHeight;
+      var p = Math.min(1, Math.max(0, (vh * 0.35 - r.top) / Math.max(1, r.height - vh * 0.5)));
+      bar.style.width = (p * 100).toFixed(1) + '%';
+    }
+    var cur = -1;
+    for (var i = 0; i < hs.length; i++) if (hs[i].getBoundingClientRect().top < 240) cur = i;
+    links.forEach(function (a, i) { if (a) a.classList.toggle('on', i === cur); });
+  }
+  window.addEventListener('scroll', function () { if (!ticking) { ticking = true; requestAnimationFrame(update); } }, { passive: true });
+  update();
+})();
+<\/script>`;
 
   // Related: prefer articles sharing a category, then fill with most recent.
   $: related = (() => {
@@ -166,53 +211,61 @@
   {#if faqLd}{@html `<script type="application/ld+json">${JSON.stringify(faqLd)}<\/script>`}{/if}
 </svelte:head>
 
-<InsightsShell>
-  <SocialShareWidget social={meta.social} />
-  <article class="article-card">
-    <figure class="ac-figure">
-      <ArticleCover
-        photoLocation={meta.photoLocation}
-        photoAttribution={meta.photoAttribution}
-        title={meta.title}
-        slug={meta.slug}
-        category={primaryCat}
-        eager
-      />
-      {#if meta.photoLocation && meta.photoAttribution}
-        <figcaption class="ac-figcap">© {meta.photoAttribution}</figcaption>
-      {/if}
-    </figure>
-
-    <div class="ac-body">
-      <h1 class="ac-title">{meta.title}</h1>
-
-      <div class="ac-meta">
-        <a class="ac-author" href={`/insights/writers/${authorSlug}/`}>{meta.author}</a>
-        <span class="ac-date"><time datetime={isoDate(meta.date)}>{formatDate(meta.date)}</time></span>
-        {#if primaryCat}<a class="ac-tag" href={`/insights/${primaryCat}/`}>{topicLabel(primaryCat)}</a>{/if}
-      </div>
-
-      {#if extraCats.length}
-        <div class="article-chips ac-chips">
-          {#each extraCats as c}
-            <a class="chip" href={`/insights/${c}/`}>{topicLabel(c)}</a>
-          {/each}
+<section class="bl-ahero">
+  <figure class="bl-ahero-bg">
+    <ArticleCover photoLocation={meta.photoLocation} photoAttribution={meta.photoAttribution} title={meta.title} slug={meta.slug} category={primaryCat} showTag={false} eager />
+    {#if meta.photoLocation && meta.photoAttribution}<figcaption>© {meta.photoAttribution}</figcaption>{/if}
+  </figure>
+  <div class="v2-wrap bl-ahero-in">
+    <div class="bl-ahero-copy">
+      <nav class="bl-crumb" aria-label="Breadcrumb">
+        <a href="/insights/">Blog</a>
+        {#if primaryCat}<span aria-hidden="true">/</span><a href={`/insights/${primaryCat}/`}>{topicLabel(primaryCat)}</a>{/if}
+      </nav>
+      {#if meta.categories?.length}
+        <div class="bl-atags">
+          {#each meta.categories as c}<a href={`/insights/${c}/`}>{topicLabel(c)}</a>{/each}
         </div>
       {/if}
+      <h1 class="bl-ah1">{meta.title}</h1>
+      {#if meta.summary}<p class="bl-lead">{meta.summary}</p>{/if}
+      <div class="bl-byline">
+        <span class="bl-avatar" aria-hidden="true">{#if photo}<img src={photo} alt="" width="48" height="48" />{:else}{initials}{/if}</span>
+        <span>
+          <a class="bl-byline-n" href={`/insights/writers/${authorSlug}/`}>{meta.author}</a>
+          <span class="bl-byline-m"><time datetime={isoDate(meta.date)}>{formatDate(meta.date)}</time>{#if readMin} · {readMin} min read{/if}</span>
+        </span>
+      </div>
+    </div>
+  </div>
+</section>
 
-      {#if meta.summary}<p class="ac-summary">{meta.summary}</p>{/if}
+<section class="bl-abody">
+  <div class="v2-wrap bl-agrid">
+    <article class="bl-article" data-article>
+      <SocialShareWidget social={meta.social} />
 
-      {#if meta.tldr}
-        <div class="article-tldr"><strong>TLDR</strong>{meta.tldr}</div>
-      {/if}
+      <div class="bl-answers">
+        {#if meta.tldr}
+          <div class="bl-ans">
+            <p class="bl-ans-k">The short answer</p>
+            <p class="bl-ans-t">{meta.tldr}</p>
+          </div>
+        {/if}
+        <div class="bl-ans dark">
+          <p class="bl-ans-k"><svg viewBox="0 0 651.59 348.34" aria-hidden="true"><path d={APP_MARK_PATH} fill="#e03127" stroke="#e03127" stroke-width="9" /></svg>Your answer</p>
+          <p class="bl-ans-t">Only your own readings can say what this looks like for you. Two minutes tomorrow morning is where that starts.</p>
+          <a class="bl-ans-btn" data-dl-cta href="/#download">Get the free app</a>
+        </div>
+      </div>
 
-      <div class="article-prose">
+      <div class="article-prose bl-prose" data-prose>
         <svelte:component this={data.content} />
       </div>
 
       {#if meta.faq?.length}
-        <section class="article-faq">
-          <h2 class="af-title">Frequently asked questions</h2>
+        <section class="bl-afaq">
+          <h2 class="bl-sub-h">Frequently asked questions</h2>
           <div class="faq">
             {#each meta.faq as f}
               <details>
@@ -224,33 +277,51 @@
         </section>
       {/if}
 
-      <div class="article-share">
-        <span class="ash-label">Share</span>
-        {#each shares as s}
-          <a class="ash-btn" href={s.href} target="_blank" rel="noopener noreferrer">{s.label}</a>
-        {/each}
-      </div>
-
-      <BlogEndCTA />
-
       {#if bio}
-        <section class="author-box">
-          <p class="author-eyebrow">Written by</p>
-          <h2 class="author-name"><a href={`/insights/writers/${authorSlug}/`}>{meta.author}</a></h2>
-          <p class="author-bio">{bio}</p>
-        </section>
-      {/if}
-
-      {#if related.length}
-        <section class="article-related">
-          <h2 class="ar-title">Keep reading</h2>
-          <div class="blog-list">
-            {#each related as a (a.slug)}
-              <ArticleCard article={a} />
-            {/each}
+        <section class="bl-author">
+          <span class="bl-avatar lg" aria-hidden="true">{#if photo}<img src={photo} alt="" width="64" height="64" loading="lazy" />{:else}{initials}{/if}</span>
+          <div>
+            <p class="bl-ans-k">Written by</p>
+            <h2><a href={`/insights/writers/${authorSlug}/`}>{meta.author}</a></h2>
+            <p>{bio}</p>
           </div>
         </section>
       {/if}
+    </article>
+
+    <aside class="bl-rail">
+      <div class="bl-rail-card" data-toc-card hidden>
+        <p class="bl-ans-k">On this page</p>
+        <nav class="bl-toc" data-toc aria-label="On this page"></nav>
+      </div>
+      <div class="bl-rail-card dark">
+        <span class="v2-appicon sm"><svg viewBox="0 0 651.59 348.34" aria-hidden="true"><path d={APP_MARK_PATH} fill="#e03127" stroke="#e03127" stroke-width="9" /></svg></span>
+        <p class="bl-rail-h">See it in your own numbers.</p>
+        <p class="bl-rail-s">A two-minute HRV reading each morning, scored against your own baseline. Free on iPhone and Android.</p>
+        <Stores tone="glass" stack />
+      </div>
+      <div class="bl-rail-share">
+        <span>Share</span>
+        {#each shares as s}<a href={s.href} target="_blank" rel="noopener noreferrer">{s.label}</a>{/each}
+      </div>
+    </aside>
+  </div>
+</section>
+
+{#if related.length}
+  <section class="v2-sec white">
+    <div class="v2-wrap">
+      <div class="v2-headrow end">
+        <div><p class="v2-eyebrow">Keep reading</p><h2 class="v2-h2 sm">Related answers</h2></div>
+        {#if primaryCat}<a class="v2-link bl-headlink" href={`/insights/${primaryCat}/`}>More on {topicLabel(primaryCat)} →</a>{/if}
+      </div>
+      <div class="bl-grid">
+        {#each related as a (a.slug)}<PostCard article={a} />{/each}
+      </div>
     </div>
-  </article>
-</InsightsShell>
+  </section>
+{/if}
+
+<BlogCta />
+
+{@html articleScript}

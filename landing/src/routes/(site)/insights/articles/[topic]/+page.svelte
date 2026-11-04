@@ -1,16 +1,17 @@
 <script lang="ts">
+  import BlogHero from '$lib/v2/blog/BlogHero.svelte';
+  import PostRow from '$lib/v2/blog/PostRow.svelte';
+  import BlogCta from '$lib/v2/blog/BlogCta.svelte';
   import { page } from '$app/stores';
   import type { Article } from '../../../../api/articles/types';
-  import ArticleLine from '$lib/ArticleLine.svelte';
-  import InsightsShell from '$lib/InsightsShell.svelte';
-  import { getTopic, topicLabel } from '$lib/topics';
+  import { getTopic, topicLabel, topicArticles } from '$lib/topics';
 
   export let data: { articles?: Article[] };
 
   $: slug = $page.params.topic ?? '';
   $: topic = getTopic(slug);
   $: longName = topic?.longName ?? topicLabel(slug);
-  $: articles = (data.articles ?? []).filter((a) => a.categories?.includes(slug));
+  $: articles = topicArticles(data.articles ?? [], slug);
   $: canonical = `https://autonomic.care/insights/articles/${slug}/`;
 </script>
 
@@ -28,17 +29,16 @@
   <meta name="twitter:image" content="https://autonomic.care/og.png" />
 </svelte:head>
 
-<InsightsShell>
-  <div class="articles-index">
-    <a class="article-back" href={`/insights/${slug}/`}>← {longName}</a>
-    <h1 class="h2">{longName} <span class="al-muted">· all articles</span></h1>
-    <div class="article-lines">
-      {#each articles as a (a.slug)}
-        <ArticleLine article={a} />
-      {/each}
-    </div>
-    {#if !articles.length}
-      <p class="blog-empty">No articles in this topic yet.</p>
+<BlogHero crumbs={[{ href: '/insights/', label: 'Blog' }, { href: `/insights/${slug}/`, label: longName }, { label: 'All articles' }]} title={longName} lead={`All ${articles.length} articles, newest first.`} />
+
+<section class="v2-sec bl-sec-top">
+  <div class="v2-wrap">
+    {#if articles.length}
+      <div class="bl-rows">{#each articles as a (a.slug)}<PostRow article={a} />{/each}</div>
+    {:else}
+      <p class="bl-empty">No articles in this topic yet.</p>
     {/if}
   </div>
-</InsightsShell>
+</section>
+
+<BlogCta />
