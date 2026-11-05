@@ -9,8 +9,8 @@ date: 2026-11-05
 updated: 2026-11-05
 reviewed: 2026-11-05
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1498837167922-ddd27525d352?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Dan Gold / Unsplash"
+photoLocation: "https://plus.unsplash.com/premium_photo-1723672929404-36ba6ed8ab50?q=80&w=1363&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
+photoAttribution: "Unsplash"
 tldr: "Thiamine (vitamin B1) is an essential cofactor for the enzymes that turn food into cellular energy, and autonomic nerves are among the most energy-hungry tissue in the body. Classic deficiency (beriberi) has caused tachycardia, orthostatic intolerance and gut dysmotility for over a century, which is why thiamine gets discussed in POTS, dysautonomia and long COVID circles. The modern idea, that high-dose thiamine helps people who are not frankly deficient, rests on small, mostly open-label studies and case series, not randomized controlled trials, so it is a reasonable thing to explore rather than a proven treatment. Thiamine is water-soluble and generally very safe, needs magnesium to become active, and comes in several forms. The useful move is to check whether you have real risk factors for being low, discuss testing with your clinician, and if you trial it, track your own morning HRV, resting heart rate and stand test so the effect shows up as a real shift in your trend rather than a hunch."
 question: "Does vitamin B1 (thiamine) help POTS, dysautonomia or long COVID?"
 app:
