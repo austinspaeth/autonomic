@@ -20,9 +20,9 @@ export const homeScript = `<script>
     var glass = bub && $('.hb-glass', bub), edge = bub && $('.hb-edge', bub);
     if (!bub || !box || !meas || !glass || !edge || !heroLoop) return;
     var CUES = ${JSON.stringify(HERO_CUES)}, screens = $$('[data-hero-screen]'), cur = 0;
-    var rim = $('.hb-rim', edge), shade = $('.hb-shadow', edge), maskP = $('.hb-mask-p', edge), maskR = $('.hb-mask-r', edge);
+    var rim = $('.hb-rim', edge), shade = $('.hb-shadow', edge), maskP = $('.hb-mask-p', edge);
     var glow = $('.hb-glow', edge), inP = $('.hb-in-p', edge);
-    var size = null, raf = 0;
+    var size = null, raf = 0, drawn = null;
     // Lay a question out the way the bubble will show it (balanced lines), and
     // read back its lines and the body size that fits them.
     function lay(q) {
@@ -63,34 +63,63 @@ export const homeScript = `<script>
         'V' + n(h - r) + 'A' + n(r) + ' ' + n(r) + ' 0 0 1 ' + n(w - r) + ' ' + n(h) + 'H' + n(r) +
         'A' + n(r) + ' ' + n(r) + ' 0 0 1 0 ' + n(h - r) + 'V' + n(r) + 'A' + n(r) + ' ' + n(r) + ' 0 0 1 ' + n(r) + ' 0Z';
     }
+    // DRAW the outline at one size. This is the expensive half: a fresh mask
+    // raster, five path rewrites and two SVG filter regions, so it runs ONCE
+    // per question and NEVER inside the spring below. It used to run on every
+    // frame, and on an iPhone that is a new SVG image decode, a re-derived
+    // gaussian-blur region and a fresh backdrop snapshot sixty times a second
+    // for a bubble sitting on top of a playing video.
     function paint(w, h) {
       var k = parseFloat(getComputedStyle(bub).fontSize) / 32, W = w + 20 * k, d = outline(w, h, k), pad = 80 * k;
-      box.style.width = W + 'px'; box.style.height = h + 'px';
       // A MASK, not clip-path: Chrome clips a clip-path element's paint but lets
       // its backdrop blur leak out to the bounding box, a square halo round the
       // bubble. A mask trims the blurred backdrop too.
       var m = 'url("data:image/svg+xml,' + encodeURIComponent("<svg xmlns='http://www.w3.org/2000/svg' width='" + W + "' height='" + h + "' viewBox='0 0 " + W + ' ' + h + "'><path d='" + d + "'/></svg>") + '")';
       glass.style.webkitMaskImage = glass.style.maskImage = m;
-      edge.setAttribute('width', W); edge.setAttribute('height', h);
-      rim.setAttribute('d', d); maskP.setAttribute('d', d); inP.setAttribute('d', d);
+      // The viewport is set per frame by stretch(); the viewBox is what the
+      // shape was drawn at, so the whole edge scales with the box instead of
+      // being laid out again.
+      edge.setAttribute('viewBox', '0 0 ' + W + ' ' + h);
+      edge.setAttribute('preserveAspectRatio', 'none');
+      rim.setAttribute('d', d); inP.setAttribute('d', d);
       glow.setAttribute('d', d); glow.setAttribute('stroke-width', 9 * k);
       shade.setAttribute('d', d); shade.setAttribute('transform', 'translate(0 ' + (12 * k) + ')');
-      maskR.setAttribute('x', -pad); maskR.setAttribute('y', -pad);
-      maskR.setAttribute('width', W + 2 * pad); maskR.setAttribute('height', h + 2 * pad);
-      // The mask's own region defaults to the drawing's bounds, which would cut
-      // the blurred shadow off square; give it the same margin as its rect.
-      var mk = maskR.parentNode;
-      mk.setAttribute('x', -pad); mk.setAttribute('y', -pad); mk.setAttribute('width', W + 2 * pad); mk.setAttribute('height', h + 2 * pad);
+      // The shadow is cut to the region OUTSIDE the bubble, or it would darken
+      // the glass it is supposed to sit behind. That cut is a CLIP (one
+      // even-odd path: a padded rectangle with the bubble punched out of it),
+      // never an SVG <mask>: WebKit painted the mask's own white backing rect,
+      // which is what laid a pale rectangle over the video beside the bubble.
+      // The padding is the blur's reach, so the soft edge is not cut off square.
+      maskP.setAttribute('d', 'M' + (-pad) + ' ' + (-pad) + 'H' + (W + pad) + 'V' + (h + pad) + 'H' + (-pad) + 'Z' + d);
+      drawn = { k: k, w: w, h: h };
+      stretch(w, h);
+    }
+    // FOLLOW the spring. The shape is already drawn, so a frame writes four
+    // numbers: the mask stretches with the box (mask-size: 100% 100%) and the
+    // edge stretches with its viewBox. The corner radii are a little off true
+    // while it travels and exact the moment it lands, which is the trade a
+    // morphing speech bubble can afford and a dropped frame is not.
+    // TOP, not a translate: the backdrop blur is sampled wrong under a
+    // transformed ancestor on iOS, which is what put the frosting beside the
+    // bubble rather than inside it. The script knows the height, so it can
+    // place the tip without one; the CSS keeps the -75% for the no-script box.
+    function stretch(w, h) {
+      var W = w + 20 * drawn.k;
+      box.style.width = W + 'px'; box.style.height = h + 'px'; box.style.top = (-.75 * h) + 'px';
+      edge.setAttribute('width', W); edge.setAttribute('height', h);
     }
     // Spring the outline to a new size (ease-out quint), from wherever it is.
     function sizeTo(w, h, animate) {
       cancelAnimationFrame(raf);
       if (!animate || !size) { size = { w: w, h: h }; paint(w, h); return; }
       var from = size, t0 = performance.now(), D = 640;
+      // Draw the DESTINATION once, then travel to it: the shape is only ever
+      // stretched on its way somewhere, and is exact once it arrives.
+      paint(w, h); stretch(from.w, from.h);
       var step = function (now) {
         var p = Math.min(1, (now - t0) / D), e = 1 - Math.pow(1 - p, 5);
         size = { w: from.w + (w - from.w) * e, h: from.h + (h - from.h) * e };
-        paint(size.w, size.h);
+        stretch(size.w, size.h);
         if (p < 1) raf = requestAnimationFrame(step);
       };
       raf = requestAnimationFrame(step);

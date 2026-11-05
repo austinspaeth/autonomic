@@ -240,15 +240,25 @@ body { background: var(--paper); color: var(--ink); }
 .hb-glow { fill: none; stroke: #fff; stroke-opacity: .55; }
 .v2-hero-bubble.live .hb-glass { position: absolute; inset: 0; border-radius: 0; box-shadow: none; -webkit-mask-size: 100% 100%; mask-size: 100% 100%; -webkit-mask-repeat: no-repeat; mask-repeat: no-repeat; }
 .v2-hero-bubble.live .hb-edge { display: block; }
+/* A TRANSFORM OVER A BACKDROP FILTER IS SAMPLED WRONG ON iOS: the blur came
+   out beside the bubble instead of inside it. With the script running, the
+   box is placed with `top` (set in stretch()) and carries no translate; the
+   -75% above is the no-script fallback. */
+.v2-hero-bubble.live .hb-box { translate: none; }
 .hb-text, .hb-measure { margin: 0; padding: calc(20px * var(--s)) calc(28px * var(--s)) calc(22px * var(--s)); width: max-content; max-width: 9.6em; text-wrap: balance; }
 .hb-measure { position: absolute; right: 0; top: 0; visibility: hidden; pointer-events: none; }
 .hb-measure span, .hb-text .w { display: inline-block; }
 .hb-line { display: block; }
-.v2-hero-bubble.live .hb-text { position: absolute; left: 0; top: 0; max-width: none; white-space: nowrap; transition: opacity .24s ease, transform .32s ease, filter .24s ease; }
-.v2-hero-bubble.live .hb-text.out { opacity: 0; transform: translateY(-.2em); filter: blur(4px); }
+.v2-hero-bubble.live .hb-text { position: absolute; left: 0; top: 0; max-width: none; white-space: nowrap; transition: opacity .24s ease, transform .32s ease; }
+/* NO blur() on the words. Every frame of an animated text blur re-rasterises
+   the type AND, because it sits on a backdrop-filtered surface, forces the
+   frosting under it to be snapshotted again. On iOS that is what made the
+   question judder as it arrived. Opacity and travel say the same thing and
+   are composited. */
+.v2-hero-bubble.live .hb-text.out { opacity: 0; transform: translateY(-.2em); }
 .hb-text.in .w { animation: hb-word .64s cubic-bezier(.22,1,.36,1) both; }
 @keyframes hb-pop { from { opacity: 0; transform: scale(.9); } to { opacity: 1; transform: none; } }
-@keyframes hb-word { from { opacity: 0; transform: translateY(.38em); filter: blur(6px); } to { opacity: 1; transform: none; filter: none; } }
+@keyframes hb-word { from { opacity: 0; transform: translateY(.38em); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .hb-box, .hb-text.in .w { animation: none; } .v2-hero-bubble.live .hb-text { transition: none; } }
 
 /* The hero phone's screens, stacked and cross-faded on the same cues. A drawn
@@ -699,6 +709,13 @@ body { background: var(--paper); color: var(--ink); }
   /* Text keeps a readable floor as the row shrinks, so the tip slides right by
      what the floor adds, or the widest question would leave the gutter. */
   .v2-hero-bubble { --s: max(.56, calc(.8 * var(--k))); --tx: calc(266px * var(--k) + (var(--s) - .8 * var(--k)) * 330px); --ty: calc(30px * var(--k)); }
+  /* NO GLASS ON A PHONE. A backdrop filter is the one thing in this bubble
+     that costs on every frame it moves: the whole backdrop under it, a playing
+     video included, is snapshotted, blurred 26px and saturated again. At this
+     size the bubble is small and sits mostly over flat page background, so the
+     frosting buys almost nothing and was paying for the judder. Opaque, the
+     rim, the glow and the shadow still do all the work. */
+  .hb-glass { background: linear-gradient(180deg, #fff, #faf8fb 58%, #fdfcfe); -webkit-backdrop-filter: none; backdrop-filter: none; }
 }
 @media (max-width: 517px) { .v2-hero-art, .v2-fhero-art:has(> .v2-photo) { --k: .9; } }
 @media (max-width: 469px) { .v2-hero-art, .v2-fhero-art:has(> .v2-photo) { --k: .8; } }
