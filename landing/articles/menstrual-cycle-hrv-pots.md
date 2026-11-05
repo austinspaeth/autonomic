@@ -6,11 +6,17 @@ summary: "HRV tends to run higher in the follicular half of your cycle and lower
 description: "How the menstrual cycle affects HRV and POTS: why HRV drops and resting heart rate rises in the luteal phase, why symptoms flare premenstrually, and how to read your baseline without misreading the cycle."
 keywords: "menstrual cycle and HRV, HRV luteal phase, HRV follicular phase, POTS menstrual cycle, POTS period flare, progesterone HRV, estrogen HRV, HRV before period, resting heart rate menstrual cycle, dysautonomia periods"
 date: 2026-07-19
-updated: 2026-07-19
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1783916812204-1e975731de9d?q=80&w=1287&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Jared Rice / Unsplash"
-tldr: "Across a typical cycle, estrogen dominates the first (follicular) half and tends to lift HRV and lower resting heart rate, while progesterone dominates the second (luteal) half and does the reverse: HRV drifts down and resting heart rate rises a few beats. That means a lower HRV in the week before your period is usually expected physiology, not a red flag. It also helps explain why POTS and dysautonomia symptoms so often worsen premenstrually and during bleeding, when hormones withdraw and blood volume can dip. The practical move is to know your cycle phase when you read your numbers, compare like phase to like phase, and follow the multi-cycle trend rather than reacting to a single luteal-phase dip."
+tldr: "Across a typical cycle, estrogen dominates the first (follicular) half and tends to lift HRV and lower resting heart rate, while progesterone dominates the second (luteal) half and does the reverse: HRV drifts down and resting heart rate rises a few beats. That means a lower HRV in the week before your period is usually expected physiology, not a red flag. It also helps explain why POTS and dysautonomia symptoms so often worsen premenstrually and during bleeding, when hormones withdraw and menstrual blood loss trims volume. The practical move is to know your cycle phase when you read your numbers, compare like phase to like phase, and follow the multi-cycle trend rather than reacting to a single luteal-phase dip."
+question: "Why does my HRV dip and POTS flare before my period?"
+app:
+  feature: cycle-tracking
+  hook: "See your HRV against your cycle."
+  line: "Autonomic reads your HRV, heart rate and symptoms against your cycle, so a dip before your period reads as your pattern, not a crash."
 categories:
   - hrv
   - pots
@@ -18,7 +24,7 @@ faq:
   - q: "Does your menstrual cycle affect HRV?"
     a: "Yes, and the pattern is fairly consistent. In the follicular phase (from the first day of bleeding to ovulation), rising estrogen tends to support vagal tone, so HRV runs a little higher and resting heart rate a little lower. In the luteal phase (after ovulation until your next period), progesterone rises, resting heart rate climbs by roughly two to four beats per minute, and HRV usually drifts down, reaching its lowest point in the days just before bleeding. The size of the swing varies a lot from person to person."
   - q: "Why do my POTS symptoms get worse before and during my period?"
-    a: "Several things line up at once. In the late luteal phase both estrogen and progesterone fall sharply, which unsettles the autonomic and vascular tone they help regulate. Progesterone is mildly natriuretic, meaning it nudges the body to shed sodium and water, so plasma volume can run lower right when POTS depends on volume the most. Prostaglandins released around menstruation add vasodilation and cramping. Blood loss trims volume further. None of this is dangerous on its own, but together it is why many people report perimenstrual flares of lightheadedness, palpitations and fatigue."
+    a: "Several things line up at once. In the late luteal phase both estrogen and progesterone fall sharply, which unsettles the autonomic and vascular tone they help regulate. Progesterone also blocks aldosterone, the hormone that helps your kidneys hold on to sodium, though the effect is small and studies of plasma volume across the cycle are mixed. Prostaglandins released around menstruation add vasodilation and cramping. Blood loss trims volume further. None of this is dangerous on its own, but together it is why many people report perimenstrual flares of lightheadedness, palpitations and fatigue."
   - q: "Should I compare HRV across different cycle phases?"
     a: "Ideally compare like phase to like phase: this week's reading against the same week last cycle. If that is too fiddly, at least know which phase you are in so a luteal-phase dip reads as expected rather than alarming. A rolling baseline helps here, because it averages across recent readings and absorbs some of the cyclical swing, but it cannot see your calendar, so you still supply the context."
   - q: "Does a lower HRV in the luteal phase mean something is wrong?"
@@ -31,7 +37,7 @@ social:
 
     In the follicular half of the cycle, estrogen supports vagal tone, so HRV tends to run higher and resting heart rate lower. After ovulation, progesterone takes over: resting heart rate climbs a few beats and HRV drifts down, bottoming out in the days before bleeding. So a lower reading the week before a period is usually expected physiology, not a warning sign.
 
-    This matters clinically for POTS and dysautonomia, where symptoms so often flare perimenstrually. Late in the luteal phase both hormones fall, progesterone's mild sodium-shedding effect can trim plasma volume right when volume matters most, and menstrual blood loss trims it further. Reading a normal luteal dip as a crash sends people into an anxiety spiral that itself lowers HRV.
+    This matters clinically for POTS and dysautonomia, where symptoms so often flare perimenstrually. Late in the luteal phase both hormones fall, and menstrual blood loss trims blood volume right when volume matters most. Reading a normal luteal dip as a crash sends people into an anxiety spiral that itself lowers HRV.
 
     The fix is simple: know your cycle phase when you read your numbers, compare like phase to like phase, and follow the multi-cycle trend.
 
@@ -46,7 +52,7 @@ social:
 
     Quick version: the first half of your cycle (follicular) is estrogen-led, which supports vagal tone, so HRV tends to be higher and resting HR lower. The second half (luteal) is progesterone-led, and progesterone bumps resting HR up a few beats and pulls HRV down, lowest in the days right before you bleed. So a lower reading premenstrually is usually expected, not a red flag.
 
-    The POTS-specific part that helped me: late luteal both hormones drop, progesterone is mildly natriuretic so you can be running on less plasma volume exactly when volume matters most for us, and then bleeding trims volume a bit more. That stack is why the lightheadedness and palpitations get louder around my period. On those days I lean harder on salt, fluids and pacing instead of panicking about the numbers.
+    The POTS-specific part that helped me: late luteal both hormones drop, and then bleeding trims volume a bit, exactly when volume matters most for us. That stack is why the lightheadedness and palpitations get louder around my period. On those days I lean harder on salt, fluids and pacing instead of panicking about the numbers.
 
     Not medical advice, just what finally made my data make sense. If it helps, I compare this week against the same week last cycle rather than day to day. Wrote up the physiology and a reference table here: https://autonomic.care/insights/hrv/menstrual-cycle-hrv-pots/?utm_source=reddit&utm_medium=social&utm_campaign=menstrual-cycle-hrv-pots
   x: |
@@ -204,7 +210,7 @@ Timing is approximate and assumes a 28-day cycle. Ovulation lands roughly 14 day
 If you live with POTS, long COVID or another form of dysautonomia, you may have noticed that the perimenstrual window (the days just before and during bleeding) is often your hardest. Several things stack up at once, and none of them are dangerous on their own:
 
 - **Hormone withdrawal.** In the late luteal phase both estrogen and progesterone fall steeply. Because both help regulate vascular and autonomic tone, that rapid drop unsettles a system that is already running with less margin.
-- **Volume can dip when you need it most.** Progesterone is mildly **natriuretic**, meaning it competes with aldosterone and nudges your kidneys to shed sodium and water. POTS depends heavily on blood volume, so running a bit low on plasma volume right before your period works directly against you. This is also why the salt and fluid strategies in [the science of salt and fluids for POTS](/insights/pots/science-of-salt-and-fluids-for-pots/) tend to matter even more in this window.
+- **Fluid balance shifts.** Progesterone blocks aldosterone, the hormone that tells your kidneys to hold on to sodium, though in practice the effect is small and studies of plasma volume across the cycle are mixed. POTS depends heavily on blood volume, which is why the salt and fluid strategies in [the science of salt and fluids for POTS](/insights/pots/science-of-salt-and-fluids-for-pots/) tend to matter even more in this window.
 - **Prostaglandins and blood loss.** Prostaglandins released around menstruation drive cramping and some vasodilation, and the blood loss itself trims volume a little further. Both can add to lightheadedness and a higher standing heart rate.
 
 Put together, that is a physiological explanation for the perimenstrual flare of dizziness, palpitations, brain fog and fatigue that so many patients describe. It does not mean your condition is worsening; it means the calendar briefly stacked the odds against you.
@@ -286,3 +292,11 @@ Your menstrual cycle is one of the largest and most predictable natural influenc
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Cycle-related HRV changes are individual, and new or worsening symptoms, very irregular cycles or heavy bleeding are worth discussing with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Schmalenberger KM, Eisenlohr-Moul TA, Würth L, et al. [A systematic review and meta-analysis of within-person changes in cardiac vagal activity across the menstrual cycle: implications for female health and future studies](https://doi.org/10.3390/jcm8111946). *Journal of Clinical Medicine*, 2019.
+- Heneghan C, Lafon B, Schneider L, et al. [Assessing the impact of menstrual cycle phase on respiration rate, resting heart rate, heart rate variability, nocturnal oxygenation and sleep time using wearable devices](https://doi.org/10.1177/17455057261503611). *Women's Health*, 2026.
+- Peggs KJ, Nguyen H, Enayat D, et al. [Gynecologic disorders and menstrual cycle lightheadedness in postural tachycardia syndrome](https://doi.org/10.1016/j.ijgo.2012.04.014). *International Journal of Gynaecology and Obstetrics*, 2012.
+- Quinkler M, Meyer B, Oelkers W, et al. [Renal inactivation, mineralocorticoid generation, and 11beta-hydroxysteroid dehydrogenase inhibition ameliorate the antimineralocorticoid effect of progesterone in vivo](https://doi.org/10.1210/jc.2003-030092). *Journal of Clinical Endocrinology and Metabolism*, 2003.
+- Stachenfeld NS. [Sex hormone effects on body fluid regulation](https://doi.org/10.1097/JES.0b013e31817be928). *Exercise and Sport Sciences Reviews*, 2008.

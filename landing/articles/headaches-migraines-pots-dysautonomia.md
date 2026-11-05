@@ -6,11 +6,17 @@ summary: "Headaches are one of the most common and least-discussed symptoms of P
 description: "Why POTS and dysautonomia cause headaches and migraines: cerebral blood flow, orthostatic headache, migraine overlap, the hEDS and CSF-leak angle, triggers, red flags, and what actually helps."
 keywords: "POTS headaches, POTS migraines, dysautonomia headaches, orthostatic headache, headache when standing, long COVID headaches, migraine and POTS, cerebral blood flow POTS, headache worse upright, POTS headache treatment, why does POTS cause headaches"
 date: 2026-10-20
-updated: 2026-10-20
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1714646183974-099d000b6a84?q=80&w=1632&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
 photoAttribution: "Unsplash"
 tldr: "Headaches in POTS and dysautonomia usually come from the same place as the dizziness: when you are upright, blood pools low and cerebral blood flow drops, and your brain and the muscles holding your head up feel it. That produces orthostatic headaches that ease when you lie down. On top of that, migraine is genuinely more common in people with POTS, and the two share autonomic machinery. The practical move is to notice whether your headache tracks being upright, because a posture-locked headache responds to fluids, salt, compression and pacing, while a migraine needs migraine-specific care. A brand-new, severe, or thunderclap headache, a headache that is worse lying down, or one with fever, vision loss or weakness needs prompt medical attention."
+question: "Why does my head hurt when I stand up with POTS?"
+app:
+  feature: insights
+  hook: "See what your headaches line up with."
+  line: "Log headaches, sleep, water, food and triggers. Autonomic looks for what lines up with headache days, including low barometric pressure."
 categories:
   - pots
   - postviral
@@ -271,3 +277,10 @@ Most headaches in POTS and dysautonomia are uncomfortable but not dangerous. A f
 ## The bottom line
 
 Headaches in POTS, dysautonomia and long COVID are not a sign that you are drinking too little water or imagining things. They are mostly the visible edge of a circulation that cannot keep your head steadily supplied when you stand, layered on a genuine overlap with migraine. That reframing is useful because it points at real levers. Ask what posture does to your headache: if it eases when you lie down, the orthostatic toolkit of fluids, salt, compression and pacing is where to start, and if it throbs regardless of position, that is migraine and needs its own treatment. Track the pattern against your HRV and a stand test so you can tell what is working. And keep the short red-flag list handy, because a sudden, severe, or position-flipped headache is the one time this symptom is worth moving quickly on.
+
+## Sources
+
+- Ray JC, Pham X, Foster E, et al. [The prevalence of headache disorders in postural tachycardia syndrome: a systematic review and meta-analysis of the literature](https://doi.org/10.1177/03331024221095153). *Cephalalgia*, 2022.
+- van Campen CLMC, Verheugt FWA, Rowe PC, et al. [Cerebral blood flow is reduced in ME/CFS during head-up tilt testing even in the absence of hypotension or tachycardia: a quantitative, controlled study using Doppler echography](https://doi.org/10.1016/j.cnp.2020.01.003). *Clinical Neurophysiology Practice*, 2020.
+- Schievink WI. [Spontaneous spinal cerebrospinal fluid leaks and intracranial hypotension](https://doi.org/10.1001/jama.295.19.2286). *JAMA*, 2006.
+- Holland S, Silberstein SD, Freitag F, et al. [Evidence-based guideline update: NSAIDs and other complementary treatments for episodic migraine prevention in adults](https://doi.org/10.1212/WNL.0b013e3182535d0c). *Neurology*, 2012.

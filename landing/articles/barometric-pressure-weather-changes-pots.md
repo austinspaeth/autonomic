@@ -6,11 +6,17 @@ summary: "Many people with POTS and dysautonomia swear their symptoms track the 
 description: "Does weather affect POTS? How barometric pressure, humidity, cold, and passing fronts move heart rate, HRV, and orthostatic symptoms in POTS and dysautonomia, and how to track whether weather is your trigger."
 keywords: "weather and POTS, barometric pressure POTS, does weather affect POTS, humidity POTS, cold weather POTS, weather changes dysautonomia, low pressure headache POTS, weather sensitivity chronic illness, POTS symptoms weather, barometric pressure dysautonomia"
 date: 2026-08-12
-updated: 2026-08-12
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1513866717996-6c19fd870937?q=80&w=1632&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Unsplash"
 tldr: "Weather changes really can move POTS and dysautonomia symptoms, mostly through the autonomic nervous system's job of thermoregulation and blood pressure control. Heat and humidity widen skin vessels and drain fluid, so blood pools and standing heart rate climbs. High humidity blocks sweat from evaporating, making a moderate day feel worse than the thermometer says. Falling barometric pressure ahead of a storm is a weaker and more individual trigger, but many people feel it, likely because a passing front bundles pressure, temperature, and humidity swings together. Cold helps some people (vessels tighten, blood volume centralizes) and hurts others (Raynaud's, stiffness, extra cardiovascular load). None of this means you are backsliding. Log the weather alongside your readings for a few weeks and you can see whether the sky is genuinely your trigger or a coincidence, then plan the hard days instead of dreading them."
+question: "Can weather changes make my POTS symptoms worse?"
+app:
+  feature: insights
+  hook: "Find out whether the weather really affects you."
+  line: "Autonomic records barometric pressure in the background and checks whether low pressure days line up with your worse days."
 categories:
   - pots
   - recovery
@@ -18,7 +24,7 @@ faq:
   - q: "Does barometric pressure affect POTS?"
     a: "For many people, yes, though the evidence is more mixed than for heat. The leading explanation is that a drop in barometric pressure rarely arrives alone: it comes with a passing weather front that also swings temperature and humidity, and those two have clear autonomic effects. Small pressure changes may also nudge how fluid distributes in the body and how sensitive pressure-sensing baroreceptors feel. Whether pressure itself or the whole weather package is doing the work, plenty of people with POTS reliably feel worse in the day or two before a storm. It is highly individual, so tracking your own pattern beats any general rule."
   - q: "Why does humidity make POTS worse?"
-    a: "Sweating cools you only when the sweat evaporates, and humid air is already near saturation, so it evaporates poorly. Your body compensates by widening skin vessels and sweating even more, which pools blood in the skin and drains fluid and salt from an already low blood volume. The result is that a humid 78F day can feel harder on your heart rate and standing tolerance than a dry 88F one. Humidity effectively lowers the temperature at which heat starts to bother you."
+    a: "Sweating cools you only when the sweat evaporates, and humid air is already near saturation, so it evaporates poorly. Your body compensates by widening skin vessels and sweating even more, which pools blood in the skin and drains fluid and salt from an already low blood volume. The result is that a humid 85F day can feel harder on your heart rate and standing tolerance than a dry 85F one. Humidity effectively lowers the temperature at which heat starts to bother you."
   - q: "Is cold weather good or bad for POTS?"
     a: "It splits people. Cold makes blood vessels constrict and shifts blood back toward your core, which can actually improve orthostatic tolerance and is one reason some people feel their best in winter. But cold also raises cardiovascular workload, worsens Raynaud's and cold-limb pain that are common in dysautonomia, stiffens muscles, and pairs with dry indoor heating that quietly dehydrates you. Sudden cold exposure can trigger sharp heart rate swings too. Which way it tips is personal, which is exactly why tracking helps."
   - q: "Can weather changes trigger a POTS flare?"
@@ -31,7 +37,7 @@ social:
   linkedin: |
     A pattern worth taking seriously if you work with POTS or dysautonomia patients: the ones who say their symptoms track the weather are usually not imagining it.
 
-    The physiology is cleanest for heat and humidity. Thermoregulation is an autonomic job, so to shed heat the body widens skin vessels and sweats, which pools blood and drains an already low blood volume. Humidity makes it worse by blocking sweat from evaporating, so a muggy 78F day can hit harder than a dry 88F one. Barometric pressure is a weaker and more individual signal, but a falling barometer rarely travels alone: a passing front bundles pressure, temperature, and humidity swings together, and the whole package lands on a nervous system that is already working hard to hold blood pressure steady.
+    The physiology is cleanest for heat and humidity. Thermoregulation is an autonomic job, so to shed heat the body widens skin vessels and sweats, which pools blood and drains an already low blood volume. Humidity makes it worse by blocking sweat from evaporating, so a muggy 85F day can hit harder than a dry 85F one. Barometric pressure is a weaker and more individual signal, but a falling barometer rarely travels alone: a passing front bundles pressure, temperature, and humidity swings together, and the whole package lands on a nervous system that is already working hard to hold blood pressure steady.
 
     None of this means a patient is backsliding when a storm rolls in. It means the day is genuinely harder, and it will settle. The useful move is to log the weather next to resting heart rate, HRV, and standing tolerance for a few weeks, so a real trigger can be told apart from coincidence and the hard days can be planned for instead of dreaded.
 
@@ -98,7 +104,7 @@ For the deeper picture of the reflex doing that upright work, see [baroreflex se
 
 Heat is the most reliable weather trigger in POTS, and humidity quietly makes it worse. To shed heat, your body widens the blood vessels in your skin and starts to sweat. Both of those work against an autonomic system trying to keep blood pressure up: widened skin vessels let blood pool toward the surface and the legs, and sweating drains fluid and salt from a blood volume that is often low to begin with. Less blood returns to your heart, so your heart rate climbs to compensate, HRV tends to fall, and standing gets harder.
 
-Humidity is the part people underestimate. Sweat only cools you when it **evaporates**, and humid air is already close to saturated, so it evaporates poorly. Your body responds by sweating even more and widening vessels further, chasing a cooling effect it cannot get. The practical result is that a muggy 78F day can be harder on your numbers than a dry 88F one. Humidity effectively lowers the temperature at which heat starts to cost you.
+Humidity is the part people underestimate. Sweat only cools you when it **evaporates**, and humid air is already close to saturated, so it evaporates poorly. Your body responds by sweating even more and widening vessels further, chasing a cooling effect it cannot get. The practical result is that a muggy 85F day can be harder on your numbers than a dry 85F one. Humidity effectively lowers the temperature at which heat starts to cost you.
 
 <figure class="prose-figure">
   <svg viewBox="0 0 720 240" role="img" aria-label="Timeline of standing heart rate across a day, comparing a mild dry day where it stays low and a hot humid day where it climbs steadily higher">
@@ -185,3 +191,11 @@ Weather sensitivity in POTS and dysautonomia is real, and it comes from the same
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Weather can worsen symptoms but does not explain everything, so if your readings concern you, your flares are severe, or your pattern is changing, discuss it with a clinician who can evaluate you properly. Changes to fluid and salt intake in particular should be made with your clinician, especially if you have any heart or kidney condition.
 </div>
+
+## Sources
+
+- Schlader ZJ, Wilson TE, Crandall CG. [Mechanisms of orthostatic intolerance during heat stress](https://doi.org/10.1016/j.autneu.2015.12.005). *Autonomic Neuroscience*, 2016.
+- Centers for Disease Control and Prevention, National Center for Environmental Health. [Frequently Asked Questions (FAQ) About Extreme Heat](https://stacks.cdc.gov/view/cdc/154503). 2012.
+- Raj SR, Biaggioni I, Yamhure PC, et al. [Renin-aldosterone paradox and perturbed blood volume regulation underlying postural tachycardia syndrome](https://doi.org/10.1161/01.CIR.0000160356.97313.5D). *Circulation*, 2005.
+- Dixon WG, Beukenhorst AL, Yimer BB, et al. [How the weather affects the pain of citizen scientists using a smartphone app](https://doi.org/10.1038/s41746-019-0180-3). *npj Digital Medicine*, 2019.
+- Cui J, Durand S, Levine BD, et al. [Effect of skin surface cooling on central venous pressure during orthostatic challenge](https://doi.org/10.1152/ajpheart.00383.2005). *American Journal of Physiology: Heart and Circulatory Physiology*, 2005.

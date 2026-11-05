@@ -6,11 +6,17 @@ summary: "Most POTS medications work on the heart. Midodrine works on the blood 
 description: "How midodrine treats POTS: it constricts blood vessels through alpha-1 receptors to reduce venous pooling and raise standing blood pressure. Mechanism, supine hypertension, dose timing, side effects, and what to track on your stand test."
 keywords: "midodrine for POTS, midodrine POTS, midodrine dosing, midodrine orthostatic hypotension, midodrine vasoconstrictor, alpha-1 agonist POTS, midodrine supine hypertension, midodrine side effects, midodrine vs beta blocker, does midodrine lower heart rate, midodrine blood pooling POTS, midodrine timing bedtime"
 date: 2026-09-02
-updated: 2026-09-02
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1559538733-914540eace75?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Unsplash"
 tldr: "Midodrine treats POTS from a different direction than beta blockers or ivabradine: instead of slowing the heart, it tightens blood vessels through alpha-1 receptors, so less blood pools in your legs when you stand. That lifts standing blood pressure, improves the volume of blood returning to your heart, and often shrinks the reflex tachycardia that pooling drives. It is short-acting, dosed a few times across your waking hours, and its main safety rule is not lying flat for a few hours after a dose because it can raise blood pressure while you are supine. Track your standing blood pressure and your stand-test heart-rate jump, and keep every dose decision with your clinician."
+question: "How does midodrine work for POTS?"
+app:
+  feature: pots-stand-test
+  hook: "See how your stand test looks on midodrine."
+  line: "Run a home stand test in Autonomic and keep the results over time, so you and your doctor can see how your heart rate rise looks on it."
 categories:
   - pots
   - hrv
@@ -20,7 +26,7 @@ faq:
   - q: "Does midodrine lower heart rate?"
     a: "Not directly, and that is the key difference from beta blockers and ivabradine. Midodrine does not act on the heart at all; it acts on blood vessels. But by raising blood pressure it can trigger the baroreflex, a built-in loop that nudges heart rate down a little when pressure rises, and by reducing the pooling that provokes standing tachycardia it can lower the reflex heart-rate surge you feel on standing. So the standing heart rate often improves, but as a downstream effect of better blood pressure and venous return, not because the drug slowed the pacemaker."
   - q: "Why can't I lie down after taking midodrine?"
-    a: "Midodrine raises blood pressure, and it does not know whether you are standing or lying down. Standing is when you need that pressure; lying flat is when your blood pressure is already at its highest, so a dose taken too close to lying down can push it too high, which is called supine hypertension. The common clinical rule is to take doses during your waking, upright hours and to avoid lying flat for a few hours after a dose, which usually means no dose within roughly three to four hours of bedtime. Your clinician sets the exact spacing for you, and often checks your lying blood pressure to make sure it stays safe."
+    a: "Midodrine raises blood pressure, and it does not know whether you are standing or lying down. Standing is when you need that pressure; lying flat is when your blood pressure is already at its highest, so a dose taken too close to lying down can push it too high, which is called supine hypertension. The common clinical rule is to take doses during your waking, upright hours and to avoid lying flat for a few hours after a dose, which per the drug label means no dose after your evening meal or within 4 hours of bedtime. Your clinician sets the exact spacing for you, and often checks your lying blood pressure to make sure it stays safe."
   - q: "What are the side effects of midodrine?"
     a: "The most distinctive come straight from the mechanism. Because it activates alpha-1 receptors in the skin, many people feel goosebumps, a tingling or crawling scalp, and chills. Because those receptors are also at the bladder neck, it can cause urinary urgency or difficulty. The safety concern to know is supine hypertension, blood pressure that runs too high when lying down, which is why dose timing matters. A useful upside is that its active form does not cross into the brain, so it does not cause sedation or fog the way some medications do. None of this is a reason to fear the drug, and your prescriber screens for the cautions and sets the dose."
   - q: "How is midodrine different from a beta blocker for POTS?"
@@ -83,7 +89,7 @@ social:
     if (!t) {
       out.textContent = 'Enter a bedtime';
       out.style.color = '';
-      note.textContent = 'The rule of thumb is to take your last dose a few hours before you lie down for the night.';
+      note.textContent = 'The label says to take your last dose at least 4 hours before you lie down for the night, and not after your evening meal.';
       if (card) card.style.setProperty('--mc-accent', 'var(--line-2)');
       return;
     }
@@ -173,7 +179,7 @@ Two honest caveats keep this in proportion. First, midodrine treats the mechanic
 
 Here is the single most important practical fact about midodrine. It raises blood pressure, and it cannot tell whether you are standing or lying down. Standing is when you want that extra pressure. Lying flat is when your blood pressure is naturally at its highest already, because gravity is no longer pulling blood away from your head. A dose that is still active when you lie down can push blood pressure too high while you are supine, which is called **supine hypertension**.
 
-The practical answer is timing. Midodrine is short-acting, with an effect that builds over about an hour and largely fades within three to four hours, which is why it is dosed several times across your **waking, upright hours** rather than once a day. The common rule is to avoid taking a dose within roughly three to four hours of lying down for the night, and to stay upright after each dose rather than going back to bed. Your clinician sets your exact spacing and often checks your lying blood pressure to be sure it stays in a safe range.
+The practical answer is timing. Midodrine is short-acting, with an effect that builds over about an hour and largely fades within three to four hours, which is why it is dosed several times across your **waking, upright hours** rather than once a day. The drug label's rule is to take no dose after your evening meal or less than 4 hours before bedtime, and to stay upright after each dose rather than going back to bed. Your clinician sets your exact spacing and often checks your lying blood pressure to be sure it stays in a safe range.
 
 <figure class="prose-figure">
   <svg viewBox="0 0 720 240" role="img" aria-label="A blood pressure line across a day with three midodrine doses in the morning, midday, and afternoon, each producing a rise. A shaded evening bedtime zone shows the last dose is spaced well before it, so blood pressure has returned to baseline before lying down.">
@@ -198,7 +204,7 @@ The practical answer is timing. Midodrine is short-acting, with an effect that b
   <figcaption>Illustrative pattern, not one person's data. Doses are spread across the upright hours, and the last one is spaced well before bedtime so the pressure-raising effect has faded before lying flat. That spacing is what keeps supine blood pressure from climbing too high overnight.</figcaption>
 </figure>
 
-Use the helper below to see roughly when a last dose would land relative to your own bedtime. It uses the common three-to-four-hour rule of thumb; it is an educational guide, not a dosing instruction, and your clinician's schedule wins.
+Use the helper below to see roughly when a last dose would land relative to your own bedtime. It uses the label's rule of at least 4 hours before bed; it is an educational guide, not a dosing instruction, and your clinician's schedule wins.
 
 <div class="metric-calc" id="md-calc">
   <p class="mc-head">Last-dose timing helper</p>
@@ -210,14 +216,14 @@ Use the helper below to see roughly when a last dose would land relative to your
     <div class="mc-field">
       <label class="mc-label" for="md-gap">Hours upright before bed</label>
       <select class="mc-input" id="md-gap">
-        <option value="3">3 hours</option>
         <option value="4" selected>4 hours</option>
+        <option value="5">5 hours</option>
       </select>
     </div>
   </div>
   <div class="mc-out">
     <span class="mc-grade" id="md-out">Enter a bedtime</span>
-    <span class="mc-note" id="md-note">The rule of thumb is to take your last dose a few hours before you lie down for the night.</span>
+    <span class="mc-note" id="md-note">The label says to take your last dose at least 4 hours before you lie down for the night, and not after your evening meal.</span>
   </div>
 </div>
 
@@ -273,7 +279,7 @@ There is a genuine upside built into the molecule as well: **desglymidodrine doe
 
 **Does midodrine lower heart rate?** Not directly; it does not act on the heart. But by raising blood pressure it can engage the baroreflex, and by reducing pooling it can ease the standing tachycardia, so the standing heart rate often improves as a knock-on effect.
 
-**Why can't I lie down after taking midodrine?** Because it raises blood pressure regardless of your position, and lying flat is when blood pressure is already highest. A dose still active while you are supine can cause supine hypertension, so doses are kept to your upright hours, usually none within three to four hours of bedtime.
+**Why can't I lie down after taking midodrine?** Because it raises blood pressure regardless of your position, and lying flat is when blood pressure is already highest. A dose still active while you are supine can cause supine hypertension, so doses are kept to your upright hours, with none after your evening meal or within 4 hours of bedtime.
 
 **What are midodrine's side effects?** Goosebumps, scalp tingling, and chills from alpha-1 receptors in the skin; urinary urgency or difficulty from the bladder neck; and supine hypertension as the safety concern. A notable upside is that it does not enter the brain, so it does not sedate or worsen fog.
 
@@ -286,3 +292,10 @@ There is a genuine upside built into the molecule as well: **desglymidodrine doe
 ## The bottom line
 
 Midodrine is the POTS drug that works from a different direction. Instead of slowing the heart, it tightens the blood vessels through alpha-1 receptors, so less blood pools in your legs when you stand, standing blood pressure holds up, and the reflex heart-rate jump often eases on its own. That makes it a strong fit when pooling and low standing pressure are the core problem, and a poor fit when a racing, hyperadrenergic heart with normal pressure is. It is short-acting, dosed across your upright hours, and defined by one safety rule: keep it away from the time you lie down, to avoid supine hypertension. Track your standing blood pressure and your stand-test heart-rate jump, read any HRV change as a small, indirect effect rather than a cure, and keep every dose and timing decision a conversation with the clinician who prescribes it.
+
+## Sources
+
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- U.S. National Library of Medicine, DailyMed. [Midodrine hydrochloride tablet: prescribing information](https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=a88cd5b5-bdcb-4ef7-8b04-ee4603bcd621). Updated 2026.
+- Ross AJ, Ocon AJ, Medow MS, et al. [A double-blind placebo-controlled cross-over study of the vascular effects of midodrine in neuropathic compared with hyperadrenergic postural tachycardia syndrome](https://doi.org/10.1042/CS20130222). *Clinical Science*, 2014.
+- Smith W, Wan H, Much D, et al. [Clinical benefit of midodrine hydrochloride in symptomatic orthostatic hypotension: a phase 4, double-blind, placebo-controlled, randomized, tilt-table study](https://doi.org/10.1007/s10286-016-0363-9). *Clinical Autonomic Research*, 2016.

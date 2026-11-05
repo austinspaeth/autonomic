@@ -6,10 +6,16 @@ summary: "POTS, long COVID, ME/CFS and MCAS overlap so much that many people are
 description: "A clear guide to the overlap between POTS, long COVID, ME/CFS and MCAS, why these post-viral conditions cluster together, how dysautonomia links them, how they differ, and what you can measure to track each one."
 keywords: "POTS, long COVID, MCAS, ME/CFS, mast cell activation syndrome, dysautonomia, post-viral illness, post-exertional malaise, POTS and long COVID, MCAS and POTS"
 date: 2026-07-05
-updated: 2026-07-05
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1710751057757-69c7d57ea41e?q=80&w=2667&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 tldr: "POTS, long COVID, ME/CFS and MCAS overlap heavily because they often share one root: an immune trigger (frequently a virus) that leaves the autonomic nervous system dysregulated. Many people meet criteria for more than one. They differ in their defining feature: POTS is a heart-rate rise on standing, ME/CFS centers on post-exertional malaise, MCAS on mast-cell/allergic symptoms, but the shared autonomic dysfunction is why they cluster. The tractable move is to stop treating them as separate mysteries and track the measurable signals they share: HRV, heart rate, and the orthostatic response."
+question: "Why do POTS, long COVID and MCAS happen together?"
+app:
+  feature: doctor-reports
+  hook: "Bring all of it to one appointment."
+  line: "Autonomic turns your stand tests, HRV and symptom logs into one doctor summary, so overlapping conditions are easier to talk through."
 categories:
   - postviral
   - pots
@@ -117,3 +123,12 @@ POTS, long COVID, ME/CFS and MCAS travel together because they so often share on
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> POTS, MCAS, ME/CFS and long COVID are real diagnoses that require proper clinical evaluation. This guide is for understanding and tracking your own data, not for diagnosing or treating any condition.
 </div>
+
+## Sources
+
+- Vernino S, Bourne KM, Stiles LE, et al. [Postural orthostatic tachycardia syndrome (POTS): State of the science and clinical care from a 2019 National Institutes of Health Expert Consensus Meeting - Part 1](https://doi.org/10.1016/j.autneu.2021.102828). *Autonomic Neuroscience*, 2021.
+- Novak P, Systrom DM, Witte A, et al. [Shared autonomic phenotype of long COVID and myalgic encephalomyelitis/chronic fatigue syndrome](https://doi.org/10.1371/journal.pone.0341278). *PLoS One*, 2026.
+- Blitshteyn S, Whitelaw S. [Postural orthostatic tachycardia syndrome (POTS) and other autonomic disorders after COVID-19 infection: a case series of 20 patients](https://doi.org/10.1007/s12026-021-09185-5). *Immunologic Research*, 2021.
+- Shibao C, Arzubiaga C, Roberts LJ, et al. [Hyperadrenergic postural tachycardia syndrome in mast cell activation disorders](https://doi.org/10.1161/01.HYP.0000158259.68614.40). *Hypertension*, 2005.
+- National Institute for Health and Care Excellence. [Myalgic encephalomyelitis (or encephalopathy)/chronic fatigue syndrome: diagnosis and management (NG206)](https://www.nice.org.uk/guidance/ng206). Published 2021.
+- Vøllestad NK, Mengshoel AM. [Post-exertional malaise in daily life and experimental exercise models in patients with myalgic encephalomyelitis/chronic fatigue syndrome](https://doi.org/10.3389/fphys.2023.1257557). *Frontiers in Physiology*, 2023.

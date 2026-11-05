@@ -6,9 +6,16 @@ summary: "Heart rate variability is one of the clearest windows into your autono
 description: "A plain-language guide to heart rate variability (HRV) for people recovering from POTS, dysautonomia and long COVID: what RMSSD and SDNN mean, why HRV falls, and how to use it."
 keywords: "HRV, heart rate variability, POTS, dysautonomia, RMSSD, parasympathetic, autonomic recovery, long COVID"
 date: 2026-05-28
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1682706841289-9d7ddf5eb999?q=80&w=1760&auto=format&fit=crop"
-tldr: "HRV is the tiny, beat-to-beat variation in the time between your heartbeats. More variation usually means a more flexible, better-regulated nervous system. In POTS and post-viral illness, HRV often drops because the system is stuck in \"fight or flight.\" Tracked over weeks, not minutes, it is one of the best signals of whether your recovery is trending the right way."
+tldr: "HRV is the tiny, beat-to-beat variation in the time between your heartbeats. More variation usually means a more flexible, better-regulated nervous system. In POTS, HRV often drops because the system is stuck in \"fight or flight\"; in long COVID the evidence is more mixed. Tracked over weeks, not minutes, it is one of the best signals of whether your recovery is trending the right way."
+question: "What is HRV, and why does it matter for POTS?"
+app:
+  feature: hrv-readings
+  hook: "Take your first HRV reading this morning."
+  line: "Use your phone camera, a chest strap or a watch for a short morning reading, and Autonomic turns it into a score and a trend."
 categories:
   - hrv
   - pots
@@ -19,7 +26,7 @@ social:
 
     HRV is the tiny, beat-to-beat variation in the gap between your heartbeats. Counterintuitively, more variation is usually better: it means the parasympathetic "rest and digest" side is engaged and your system can respond flexibly. When variability collapses, the sympathetic "fight or flight" side has taken over.
 
-    That is exactly why HRV tends to sit low in POTS, dysautonomia and long COVID. The system is biased toward always-on sympathetic activation, so a number that a generic fitness app calls "poor" can still be meaningful for you. Two metrics carry most of the weight: RMSSD, the direct readout of vagal tone and the one worth watching day to day, and SDNN, the broader summary of overall capacity.
+    That is exactly why HRV tends to sit low in POTS and dysautonomia (in long COVID the evidence is more mixed). The system is biased toward always-on sympathetic activation, so a number that a generic fitness app calls "poor" can still be meaningful for you. Two metrics carry most of the weight: RMSSD, the direct readout of vagal tone and the one worth watching day to day, and SDNN, the broader summary of overall capacity.
 
     The practical part: measure the same way each morning, watch the 7 to 14 day direction instead of today's number, and read every reading next to its context (sleep, alcohol, a known trigger). Recovery is not about hitting a universal target. It is your own baseline slowly climbing back.
 
@@ -33,7 +40,7 @@ social:
 
     I spent a long time staring at an HRV number without really knowing what it was, so here is the version I wish someone had given me early on.
 
-    HRV is the small variation in the time between your heartbeats. More variation is generally better, because it means your parasympathetic (rest and digest) branch is engaged and your system can shift gears. Less variation usually means the sympathetic (fight or flight) branch is running the show. In POTS and post-viral illness the system tends to sit biased sympathetic, which is why so many of us see a resting HRV well under what the app's "normal" band says. That is the condition showing up in the data, not a personal failing.
+    HRV is the small variation in the time between your heartbeats. More variation is generally better, because it means your parasympathetic (rest and digest) branch is engaged and your system can shift gears. Less variation usually means the sympathetic (fight or flight) branch is running the show. In POTS the system tends to sit biased sympathetic, which is why so many of us see a resting HRV well under what the app's "normal" band says. That is the condition showing up in the data, not a personal failing.
 
     The two numbers worth knowing: RMSSD is the beat-to-beat one and the most direct read on vagal tone, so it is the day-to-day number. SDNN is the wider spread across the reading and blends both branches, more of an overall capacity read.
 
@@ -41,7 +48,7 @@ social:
   x: |
     Low HRV in POTS is not a personal failing, it is a nervous system stuck in fight or flight. What to watch instead of today's number: https://autonomic.care/insights/hrv/what-is-hrv-and-why-it-matters-for-pots-recovery/?utm_source=x&utm_medium=social&utm_campaign=what-is-hrv-and-why-it-matters-for-pots-recovery #HRV #POTS
   facebook: |
-    If your watch keeps telling you your HRV is low, here is what that number actually means. HRV is the tiny variation in the gap between your heartbeats, and more of it is usually better because it means the calming side of your nervous system is engaged. In POTS, dysautonomia and long COVID the system often sits stuck in fight or flight, so a lower HRV is expected rather than a personal failing.
+    If your watch keeps telling you your HRV is low, here is what that number actually means. HRV is the tiny variation in the gap between your heartbeats, and more of it is usually better because it means the calming side of your nervous system is engaged. In POTS and dysautonomia the system often sits stuck in fight or flight, so a lower HRV is expected rather than a personal failing (in long COVID the research is more mixed).
 
     The trick is to stop reading single mornings. Measure the same way each day, then watch the 7 to 14 day trend and your own baseline instead of a chart built for someone else. What is the one thing you have noticed moves your HRV the most?
 
@@ -63,7 +70,7 @@ When you have lots of variability, it means the calming, parasympathetic side is
 
 ## Why HRV drops in POTS and post-viral illness
 
-In POTS, dysautonomia and long COVID, the autonomic nervous system is dysregulated, often biased toward that sympathetic, "always on" state. The result is frequently a **lower resting HRV** than you would have had before getting sick.
+In POTS and dysautonomia, the autonomic nervous system is dysregulated, often biased toward that sympathetic, "always on" state. The result is frequently a **lower resting HRV** than you would have had before getting sick. In long COVID the evidence is more mixed: some studies find lower HRV, and pooled results so far show only a weak trend.
 
 This is why a number that looks "fine" on a generic fitness tracker can still be meaningful for you. Recovery is rarely about hitting some universal target. It is about watching *your own baseline* slowly climb back toward where it used to be.
 
@@ -91,3 +98,12 @@ This is exactly the gap Autonomic is built to close; it scores each reading agai
 ## The bottom line
 
 HRV is not a grade on your worth or even your effort. It is a window into how regulated your nervous system is on a given day, and, tracked patiently over weeks, one of the clearest signs that your recovery is moving in the right direction. Learn your baseline, respect the trend, and let the single bad mornings go.
+
+## Sources
+
+- Task Force of the European Society of Cardiology and the North American Society of Pacing and Electrophysiology. [Heart rate variability: standards of measurement, physiological interpretation and clinical use](https://pubmed.ncbi.nlm.nih.gov/8598068/). *Circulation*, 1996.
+- Shaffer F, Ginsberg JP. [An overview of heart rate variability metrics and norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.
+- Laborde S, Mosley E, Thayer JF. [Heart rate variability and cardiac vagal tone in psychophysiological research: recommendations for experiment planning, data analysis, and data reporting](https://doi.org/10.3389/fpsyg.2017.00213). *Frontiers in Psychology*, 2017.
+- Swai J, Hu Z, Zhao X, et al. [Heart rate and heart rate variability comparison between postural orthostatic tachycardia syndrome versus healthy participants; a systematic review and meta-analysis](https://doi.org/10.1186/s12872-019-01298-y). *BMC Cardiovascular Disorders*, 2019.
+- Schoene D, Deckert S, Barlinn K, et al. [Neurocardiac autonomic dysfunction in patients with post-COVID-19 condition: a systematic review and meta-analysis](https://doi.org/10.1111/ene.70561). *European Journal of Neurology*, 2026.
+- Plews DJ, Laursen PB, Stanley J, et al. [Training adaptation and heart rate variability in elite endurance athletes: opening the door to effective monitoring](https://doi.org/10.1007/s40279-013-0071-8). *Sports Medicine*, 2013.

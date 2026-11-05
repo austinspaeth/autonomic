@@ -6,11 +6,17 @@ summary: "Most of your parasympathetic restoration happens overnight, which make
 description: "Sleep is the biggest daily lever on autonomic recovery. Why HRV peaks overnight, how POTS and long COVID disrupt sleep, and gentle, dysautonomia-friendly fixes that actually help."
 keywords: "sleep and HRV, sleep autonomic recovery, POTS sleep problems, long COVID insomnia, unrefreshing sleep, overnight HRV, sleep and dysautonomia, sleep hygiene chronic illness"
 date: 2026-06-20
-updated: 2026-06-20
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1552858725-2758b5fb1286?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Jp Valery / Unsplash"
 tldr: "Overnight is when your parasympathetic nervous system does most of its repair, and it is when your HRV is highest. Poor sleep shows up the next morning as lower HRV and a higher resting heart rate. Dysautonomia can make sleep genuinely hard: racing heart lying down, adrenaline surges, unrefreshing sleep. Small, gentle changes to schedule, position, hydration timing and wind-down often move the needle more than any single supplement."
+question: "How does sleep affect my HRV and recovery?"
+app:
+  feature: hrv-readings
+  hook: "See how last night shows up this morning."
+  line: "Autonomic pairs each night of sleep with your morning HRV reading, so you can see how a rough night changes your score."
 categories:
   - recovery
   - hrv
@@ -118,3 +124,11 @@ Sleep is the biggest daily lever you have, and dysautonomia makes it both more i
   for personalized care. <em>Persistent insomnia, loud snoring, or signs of sleep-disordered breathing deserve a proper clinical evaluation, not just better sleep habits.</em> Talk with a qualified
   clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Trinder J, Kleiman J, Carrington M, et al. [Autonomic activity during human sleep as a function of time and sleep stage](https://doi.org/10.1046/j.1365-2869.2001.00263.x). *Journal of Sleep Research*, 2001.
+- Bagai K, Song Y, Ling JF, et al. [Sleep disturbances and diminished quality of life in postural tachycardia syndrome](https://doi.org/10.5664/jcsm.28110). *Journal of Clinical Sleep Medicine*, 2011.
+- Pietilä J, Helander E, Korhonen I, et al. [Acute effect of alcohol intake on cardiovascular autonomic regulation during the first hours of sleep in a large real-world sample of Finnish employees](https://doi.org/10.2196/mental.9519). *JMIR Mental Health*, 2018.
+- da Silva ALG, Vieira LDP, Dias LS, et al. [Impact of long COVID on the heart rate variability at rest and during deep breathing maneuver](https://doi.org/10.1038/s41598-023-50276-0). *Scientific Reports*, 2023.
+- Astin R, Banerjee A, Baker MR, et al. [Long COVID: mechanisms, risk factors and recovery](https://doi.org/10.1113/EP090802). *Experimental Physiology*, 2023.

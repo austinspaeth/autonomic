@@ -6,11 +6,17 @@ summary: "A tilt table test tips you upright on a motorized table while your hea
 description: "What to expect during a tilt table test for POTS, dysautonomia and syncope: how the test works, how long it takes, how results are read, and how it compares to the at-home stand test. Educational, non-diagnostic."
 keywords: "tilt table test, head up tilt table test, tilt table test POTS, tilt table test what to expect, tilt table test results, HUTT, tilt table test syncope, tilt table vs stand test, orthostatic testing, dysautonomia testing"
 date: 2026-08-24
-updated: 2026-08-24
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1758691462651-611d730c5272?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Unsplash"
 tldr: "A tilt table test straps you to a motorized table and tilts you head-up to about 60 to 70 degrees while a monitor tracks your heart rate and blood pressure beat by beat. Because the table holds you still, it removes the leg-muscle pumping that masks symptoms during ordinary standing, so it can bring out patterns a casual stand does not. It is used to sort out POTS (a big sustained heart rate rise with stable blood pressure), orthostatic hypotension (a blood pressure drop) and vasovagal syncope (a sudden crash in blood pressure, sometimes with a slowing heart, that causes fainting). The test is meant to provoke your symptoms on purpose, which is uncomfortable but the point. A normal result does not rule everything out, and results should always be read alongside your history by a clinician."
+question: "What happens during a tilt table test?"
+app:
+  feature: pots-stand-test
+  hook: "Practice standing tests at home before the tilt."
+  line: "Autonomic guides a home stand test and keeps every result, so you arrive with weeks of standing heart rate data to share."
 categories:
   - pots
   - basics
@@ -140,7 +146,7 @@ Here is how those patterns line up at a glance.
 | POTS | Sustained rise, 30+ bpm adults / 40+ teens | Roughly steady | Postural orthostatic tachycardia syndrome |
 | Orthostatic hypotension | Variable | Drops 20 systolic / 10 diastolic within 3 min | Orthostatic hypotension |
 | Vasovagal syncope | Often slows near the faint | Sudden late crash | Neurally mediated (reflex) syncope |
-| Normal | Small rise (10 to 20 bpm), then settles | Well maintained | No orthostatic disorder captured that day |
+| Normal | A rise, often 20 to 30 bpm, that stays under the POTS threshold | Well maintained | No orthostatic disorder captured that day |
 
 One caution about that last row. A **normal tilt table test does not rule out POTS or fainting.** The test is provocative but imperfect: its results vary with hydration, medications, sleep, the time of day, how anxious you feel and the specific protocol the lab uses. Reproducibility from one test to the next is only moderate. That is exactly why clinicians read it alongside your symptom history and repeated measurements rather than treating one afternoon on the table as the final verdict.
 
@@ -192,3 +198,11 @@ The test itself is safe and closely supervised. Fainting during it is not an eme
 A tilt table test is a supervised way of asking your nervous system a hard question: what do you do when I hold you upright and take away the help your legs would normally give? The three answers it can reveal, a racing heart with stable pressure, a falling pressure, or a sudden faint, map onto very different conditions and very different treatments. It is uncomfortable by design, safe in practice, and most useful when it is read as one piece of a larger picture that includes your own day-to-day numbers.
 
 These are educational field notes, not medical advice. A tilt table test is ordered and interpreted by a clinician, and any changes to your care, medications or activity should be discussed with your own doctor. If you have a test coming up, the best thing you can bring is context: a clear record of how your heart rate, blood pressure and symptoms behave on an ordinary day, so the snapshot on the table has something to stand next to.
+
+## Sources
+
+- Cheshire WP, Goldstein DS. [Autonomic uprising: the tilt table test in autonomic medicine](https://doi.org/10.1007/s10286-019-00598-9). *Clinical Autonomic Research*, 2019.
+- Brignole M, Moya A, de Lange FJ, et al. [2018 ESC Guidelines for the diagnosis and management of syncope](https://doi.org/10.1093/eurheartj/ehy037). *European Heart Journal*, 2018.
+- Freeman R, Wieling W, Axelrod FB, et al. [Consensus statement on the definition of orthostatic hypotension, neurally mediated syncope and the postural tachycardia syndrome](https://doi.org/10.1007/s10286-011-0119-5). *Clinical Autonomic Research*, 2011.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Plash WB, Diedrich A, Biaggioni I, et al. [Diagnosing postural tachycardia syndrome: comparison of tilt testing compared with standing haemodynamics](https://doi.org/10.1042/CS20120276). *Clinical Science*, 2013.

@@ -6,10 +6,16 @@ summary: "Melatonin is one of the most common sleep supplements in POTS, dysauto
 description: "Does melatonin help POTS and long COVID sleep and HRV? A calm, non-diagnostic guide to timing over dose, the blood-pressure caution, the OTC label problem, and tracking your own response."
 keywords: "melatonin and HRV, melatonin for POTS, melatonin dysautonomia, melatonin long covid sleep, does melatonin help HRV, melatonin dosage sleep, melatonin blood pressure, melatonin nocturnal dip, low dose melatonin, melatonin circadian rhythm, melatonin insomnia POTS, melatonin side effects"
 date: 2026-11-03
-updated: 2026-11-03
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1686827986095-1982d3cf3dac?q=80&w=2286&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
-tldr: "Melatonin is a hormone that tells your body it is night, not a sedative that knocks you out. For POTS and long COVID sleep, a low dose taken at a consistent time usually beats a big dose taken late, and the clearest benefit to your HRV comes indirectly, through a better night. It can also nudge blood pressure down overnight, which is usually fine and sometimes a reason to go gently. Over-the-counter products vary wildly in actual content, so treat any effect as something to test against your own baseline rather than a given."
+tldr: "Melatonin is a hormone that tells your body it is night, not a sedative that knocks you out. For POTS and long COVID sleep, a low dose taken at a consistent time usually beats a big dose taken late, and the clearest benefit to your HRV comes indirectly, through a better night. Controlled-release forms can also nudge blood pressure down overnight, which is usually fine and sometimes a reason to go gently. Over-the-counter products vary wildly in actual content, so treat any effect as something to test against your own baseline rather than a given."
+question: "Does melatonin help sleep and HRV with POTS?"
+app:
+  feature: insights
+  hook: "See how your nights look on melatonin."
+  line: "Log melatonin and your sleep in Autonomic and it shows whether your sleep and morning HRV line up with the nights you take it."
 categories:
   - food
   - recovery
@@ -19,7 +25,7 @@ faq:
   - q: "How much melatonin should I take for sleep?"
     a: "Less than most bottles suggest. Natural nighttime melatonin levels are tiny, and physiological doses of about 0.3 to 0.5 mg are often as effective for sleep onset as the 5 or 10 mg products on the shelf, with less next-day grogginess. A common sensible starting range is 0.5 to 3 mg taken 30 to 60 minutes before your target sleep time. More is not better, and if you are using it to shift a late body clock earlier, the timing matters more than the amount. Clear the plan with your clinician, especially if you take other medications."
   - q: "Is melatonin safe for POTS, and can it lower blood pressure?"
-    a: "For most people melatonin is well tolerated short term, and many with POTS use it comfortably for sleep. It can modestly lower nighttime blood pressure and supports the normal overnight blood-pressure dip, which is usually harmless and sometimes helpful. The POTS-relevant caution is that if you already run low blood pressure or take blood-pressure-lowering medication, the effect can add up, so start low, take it at night, and notice how you feel standing up the next morning. Discuss ongoing use with your clinician."
+    a: "For most people melatonin is well tolerated short term, and many with POTS use it comfortably for sleep. Controlled-release melatonin can modestly lower nighttime blood pressure, which is usually harmless and sometimes helpful, though ordinary fast-release tablets showed no effect in trials. The POTS-relevant caution is that if you already run low blood pressure or take blood-pressure-lowering medication, the effect can add up, so start low, take it at night, and notice how you feel standing up the next morning. Discuss ongoing use with your clinician."
   - q: "Why does the same melatonin dose feel different from different bottles?"
     a: "Because over-the-counter melatonin is poorly regulated and the actual content often does not match the label. An independent analysis of commercial products found melatonin content ranging from far below to several times the stated amount, and some products contained other compounds entirely. That variability is one reason an effect can seem inconsistent, and a good argument for choosing a reputable brand and judging the result against your own tracked baseline rather than the number on the front of the bottle."
   - q: "Should I take melatonin every night long term?"
@@ -30,7 +36,7 @@ social:
 
     It is not a sedative. It is a hormone that signals darkness, the body's "it is night now" message, and its most reliable effect is on the timing of sleep rather than on knocking you out. That reframes almost everything. Physiological doses of roughly 0.3 to 0.5 mg are often as effective for sleep onset as the 5 and 10 mg products on the shelf, with less morning grogginess, and for shifting a late body clock earlier the timing of the dose matters more than the amount.
 
-    Two points worth flagging for anyone managing dysautonomia. First, the clearest benefit to HRV is indirect: a better-timed, sounder night lifts overnight and next-morning readings, rather than melatonin acting on the heart directly. Second, melatonin can modestly lower nighttime blood pressure and supports the normal overnight dip, which is usually fine and occasionally a reason to go gently if you already run low or take blood-pressure medication.
+    Two points worth flagging for anyone managing dysautonomia. First, the clearest benefit to HRV is indirect: a better-timed, sounder night lifts overnight and next-morning readings, rather than melatonin acting on the heart directly. Second, controlled-release melatonin can modestly lower nighttime blood pressure, which is usually fine and occasionally a reason to go gently if you already run low or take blood-pressure medication.
 
     Full, non-diagnostic write-up, including the over-the-counter label problem and how to test your own response: https://autonomic.care/insights/food/melatonin-sleep-hrv-pots/?utm_source=linkedin&utm_medium=social&utm_campaign=melatonin-sleep-hrv-pots
 
@@ -45,13 +51,13 @@ social:
 
     If your problem is a delayed clock (wired but tired, falling asleep at 3am, which is so common with us), the timing of the dose matters more than the size, and a low dose taken earlier in the evening can nudge things earlier over time. That is different from just taking it to fall asleep.
 
-    Two POTS-specific things I didn't know: it can gently lower blood pressure overnight (usually fine, worth easing into if you run low or take BP meds), and the main benefit to HRV seems to be indirect, just from sleeping better. Also OTC melatonin content is genuinely all over the place versus the label, so brand matters and you kind of have to test it on yourself.
+    Two POTS-specific things I didn't know: controlled-release versions can gently lower blood pressure overnight (usually fine, worth easing into if you run low or take BP meds), and the main benefit to HRV seems to be indirect, just from sleeping better. Also OTC melatonin content is genuinely all over the place versus the label, so brand matters and you kind of have to test it on yourself.
 
     Not medical advice, just what helped me stop taking it the dumb way. Longer writeup with a dosing table and a little timing tool if it is useful: https://autonomic.care/insights/food/melatonin-sleep-hrv-pots/?utm_source=reddit&utm_medium=social&utm_campaign=melatonin-sleep-hrv-pots
   x: |
     Melatonin is a timing signal, not a sedative. For POTS/long COVID sleep: low and early often beats high and late. Honest guide: https://autonomic.care/insights/food/melatonin-sleep-hrv-pots/?utm_source=x&utm_medium=social&utm_campaign=melatonin-sleep-hrv-pots #POTS #HRV
   facebook: |
-    If you take melatonin for sleep, you might be taking it in the way least likely to help. It is not a sedative, it is the hormone that tells your body it is nighttime, so a low dose at a consistent time usually works better than a big dose taken late. For those of us with POTS or long COVID, the clearest benefit to HRV tends to come just from sleeping better, and it can gently lower blood pressure overnight, which is worth easing into if you run low.
+    If you take melatonin for sleep, you might be taking it in the way least likely to help. It is not a sedative, it is the hormone that tells your body it is nighttime, so a low dose at a consistent time usually works better than a big dose taken late. For those of us with POTS or long COVID, the clearest benefit to HRV tends to come just from sleeping better, and controlled-release versions can gently lower blood pressure overnight, which is worth easing into if you run low.
 
     Do you take melatonin, and did changing the dose or timing make a difference for you? Here is a calm, non-scary write-up with a simple dosing table and the questions worth asking your clinician: https://autonomic.care/insights/food/melatonin-sleep-hrv-pots/?utm_source=facebook&utm_medium=social&utm_campaign=melatonin-sleep-hrv-pots
 
@@ -88,7 +94,7 @@ social:
     var bed = parseInt(parts[0], 10) * 60 + parseInt(parts[1], 10);
     if (isNaN(bed)) return;
     onsetOut.textContent = fmt(bed - 45);
-    circOut.textContent = fmt(bed - 180);
+    circOut.textContent = fmt(bed - 360) + ' to ' + fmt(bed - 240);
     note.textContent = 'Keep the dose low and the time consistent. The earlier window is for gently shifting a late clock, not for a stronger effect.';
   }
   input.addEventListener('input', update);
@@ -105,7 +111,7 @@ Melatonin is one of the most common supplements in POTS, dysautonomia and long C
 The single most useful thing to understand is this: melatonin is not a sedative. It is a hormone your brain releases in darkness to tell the rest of your body that it is night. Its most reliable job is **timing**, not knockout power. That reframes the dose, the schedule and your expectations all at once, and it explains why a small amount taken at a consistent time usually outperforms a big dose swallowed late.
 
 <div class="callout callout-note">
-  <strong>The short version.</strong> Melatonin signals "it is night," so it is best at nudging the timing of sleep rather than forcing it. Low doses (about 0.3 to 0.5 mg) often work as well as big ones for falling asleep, with less morning grogginess. The clearest benefit to HRV is indirect, through a better night. It can gently lower overnight blood pressure, a mild POTS caution worth easing into. Over-the-counter products vary a lot in real content, so test any effect against your own baseline.
+  <strong>The short version.</strong> Melatonin signals "it is night," so it is best at nudging the timing of sleep rather than forcing it. Low doses (about 0.3 to 0.5 mg) often work as well as big ones for falling asleep, with less morning grogginess. The clearest benefit to HRV is indirect, through a better night. Controlled-release forms can gently lower overnight blood pressure, a mild POTS caution worth easing into. Over-the-counter products vary a lot in real content, so test any effect against your own baseline.
 </div>
 
 ## What melatonin actually is
@@ -154,7 +160,7 @@ So the honest framing is: melatonin may help your HRV, mostly by helping your sl
 
 ## Melatonin, blood pressure and the POTS caution
 
-This is the part supplement pages tend to skip, and it is the one most relevant if you have POTS or orthostatic intolerance. Melatonin has a mild **blood-pressure-lowering** effect at night. It is studied as a gentle support for the normal overnight blood-pressure **dip**, the healthy drop of roughly 10 to 20 percent during sleep. People whose pressure fails to dip at night (a pattern covered in [non-dipping blood pressure](/insights/basics/non-dipping-blood-pressure-nocturnal-dip/)) are sometimes exactly the people melatonin's nighttime effect is studied in.
+This is the part supplement pages tend to skip, and it is the one most relevant if you have POTS or orthostatic intolerance. Some melatonin has a mild **blood-pressure-lowering** effect at night: in a pooled analysis of trials, controlled-release melatonin lowered nighttime pressure, ordinary fast-release melatonin did not, and the effect across all the trials together was not significant. It is studied as a gentle support for the normal overnight blood-pressure **dip**, the healthy drop of roughly 10 to 20 percent during sleep. People whose pressure fails to dip at night (a pattern covered in [non-dipping blood pressure](/insights/basics/non-dipping-blood-pressure-nocturnal-dip/)) are sometimes exactly the people melatonin's nighttime effect is studied in.
 
 For most people this is harmless, and plenty with POTS take melatonin comfortably and sleep better for it. But if you already run **low or borderline blood pressure**, or you take a medication that lowers it, melatonin's overnight effect can add to that. The practical consequences are small and manageable, but worth naming: take it at night when you are lying down rather than during upright hours, start low, and pay attention to how you feel standing up the next morning, since mornings are already the hardest part of the day for many with POTS (see [why POTS symptoms are worse in the morning](/insights/pots/pots-symptoms-worse-in-the-morning/)). A simple way to keep an eye on it is the at-home stand test; if your standing heart-rate rise climbs or you feel more lightheaded after starting melatonin, note it and raise it with your clinician.
 
@@ -162,7 +168,7 @@ For most people this is harmless, and plenty with POTS take melatonin comfortabl
 
 Because melatonin is a clock signal, **when** you take it can matter as much as how much. Two different problems call for two different approaches.
 
-If the problem is simply falling asleep at a reasonable time, a low dose 30 to 60 minutes before your target sleep reinforces the natural evening rise. If the problem is a **delayed body clock**, the "wired but tired" pattern where you cannot fall asleep until the small hours (common in POTS and long COVID, and discussed in [POTS insomnia](/insights/pots/pots-insomnia-wired-but-tired/)), then a small dose taken earlier in the evening can gradually shift your clock earlier over several days. That is a timing intervention, not a sedative one, and the amount is almost beside the point.
+If the problem is simply falling asleep at a reasonable time, a low dose 30 to 60 minutes before your target sleep reinforces the natural evening rise. If the problem is a **delayed body clock**, the "wired but tired" pattern where you cannot fall asleep until the small hours (common in POTS and long COVID, and discussed in [POTS insomnia](/insights/pots/pots-insomnia-wired-but-tired/)), then a small dose taken in the late afternoon or early evening, about 4 to 6 hours before your usual sleep time (2 to 4 hours before your own melatonin starts to rise), can gradually shift your clock earlier over several days. That is a timing intervention, not a sedative one, and the amount is almost beside the point.
 
 The helper below turns a target sleep time into two suggested windows. Treat it as an educational starting point to discuss with your clinician, not a prescription.
 
@@ -180,7 +186,7 @@ The helper below turns a target sleep time into two suggested windows. Treat it 
   </div>
   <div class="mc-out">
     <span class="mc-grade" id="mel-circ">&#8212;</span>
-    <span class="mc-note" id="mel-note">Circadian window: a low dose earlier can gently shift a late clock earlier.</span>
+    <span class="mc-note" id="mel-note">Circadian window: a low dose 4 to 6 hours before sleep can gently shift a late clock earlier.</span>
   </div>
 </div>
 
@@ -199,7 +205,7 @@ Less than most bottles suggest. Because natural levels are tiny, physiological d
 | Physiological (low) | 0.3 to 0.5 mg | Matching natural levels, gentle sleep-onset help | Often as effective as higher doses, with the least next-day grogginess |
 | Common over-the-counter | 1 to 3 mg | Occasional trouble falling asleep | A reasonable starting range. More is not reliably better |
 | High over-the-counter | 5 to 10 mg | Widely sold, rarely necessary | Pushes blood levels far above natural; more grogginess and vivid dreams |
-| Timing-focused (not dose) | A low dose, 2 to 5 hours before target sleep | Shifting a delayed body clock earlier | The timing carries the effect; get clinician guidance for this use |
+| Timing-focused (not dose) | A low dose (0.5 mg), about 4 to 6 hours before your usual sleep time | Shifting a delayed body clock earlier | The timing carries the effect; get clinician guidance for this use |
 
 There is a second catch that has nothing to do with dose: over-the-counter melatonin is poorly regulated, and the amount in the pill often does not match the label. An independent analysis of commercial melatonin products found actual content ranging from far below to several times the stated amount, with some products containing other compounds entirely. That is a real reason an effect can feel inconsistent from bottle to bottle, and a good argument for a reputable brand and for judging the result by how you sleep, not by the number on the front.
 
@@ -249,8 +255,16 @@ The approach is simple. Change one thing at a time, hold the dose and timing ste
 
 ## The bottom line
 
-Melatonin is a timing signal, not a sedative, and using it that way is most of the battle. For POTS, dysautonomia and long COVID sleep, a low dose at a consistent time usually beats a big dose taken late, bright morning light does at least as much work for a delayed clock, and the clearest benefit to your HRV comes indirectly, through a better night rather than through anything melatonin does to your heart. Mind the mild overnight blood-pressure effect if you run low, pick a reputable brand because the label cannot be trusted at face value, and let your own tracked trend, not a marketing claim, decide whether it earns a place in your routine.
+Melatonin is a timing signal, not a sedative, and using it that way is most of the battle. For POTS, dysautonomia and long COVID sleep, a low dose at a consistent time usually beats a big dose taken late, bright morning light does at least as much work for a delayed clock, and the clearest benefit to your HRV comes indirectly, through a better night rather than through anything melatonin does to your heart. Mind the mild overnight blood-pressure effect of controlled-release forms if you run low, pick a reputable brand because the label cannot be trusted at face value, and let your own tracked trend, not a marketing claim, decide whether it earns a place in your routine.
 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Melatonin is a hormone that can interact with medications and is not right for everyone. Talk with your doctor or pharmacist before starting it, especially if you take other medications or have a chronic condition, and if your sleep or symptoms are worsening, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Zhdanova IV, Wurtman RJ, Regan MM, et al. [Melatonin treatment for age-related insomnia](https://doi.org/10.1210/jcem.86.10.7901). *Journal of Clinical Endocrinology and Metabolism*, 2001.
+- Burgess HJ, Revell VL, Molina TA, et al. [Human phase response curves to three days of daily melatonin: 0.5 mg versus 3.0 mg](https://doi.org/10.1210/jc.2009-2590). *Journal of Clinical Endocrinology and Metabolism*, 2010.
+- Erland LAE, Saxena PK. [Melatonin natural health products and supplements: presence of serotonin and significant variability of melatonin content](https://doi.org/10.5664/jcsm.6462). *Journal of Clinical Sleep Medicine*, 2017.
+- Grossman E, Laudon M, Zisapel N. [Effect of melatonin on nocturnal blood pressure: meta-analysis of randomized controlled trials](https://doi.org/10.2147/VHRM.S24603). *Vascular Health and Risk Management*, 2011.
+- Nishiyama K, Yasue H, Moriyama Y, et al. [Acute effects of melatonin administration on cardiovascular autonomic regulation in healthy men](https://doi.org/10.1067/mhj.2001.114368). *American Heart Journal*, 2001.

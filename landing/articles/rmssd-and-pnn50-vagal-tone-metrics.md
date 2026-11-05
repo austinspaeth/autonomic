@@ -6,11 +6,17 @@ summary: "RMSSD and pNN50 are the two time-domain numbers that track vagal tone,
 description: "What RMSSD and pNN50 mean in HRV: how each vagal-tone metric is calculated, healthy ranges for short readings, why RMSSD swings day to day, and how to track them in POTS and long COVID recovery."
 keywords: "RMSSD, pNN50, vagal tone, parasympathetic HRV, RMSSD normal range, what is RMSSD, RMSSD vs SDNN, pNN50 meaning, heart rate variability, POTS, long COVID"
 date: 2026-07-09
-updated: 2026-07-09
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1593030019566-d681b01e877f?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Sarah Brown / Unsplash"
 tldr: "RMSSD is the root mean square of the differences between successive heartbeat intervals: it isolates the fast, beat-to-beat changes driven mainly by the vagus nerve, which makes it the single cleanest day-to-day recovery signal in HRV. pNN50 is the percentage of successive intervals that differ by more than 50 ms; it tracks the same vagal activity but saturates at the extremes, so it's best read as a sustained trend that moves with RMSSD. Both run low in POTS and long COVID and typically climb over a recovery arc. Compare same-time-of-day readings only."
+question: "What do RMSSD and pNN50 mean in HRV?"
+app:
+  feature: hrv-readings
+  hook: "Get your own RMSSD and pNN50 each morning."
+  line: "Take a reading with your phone camera, a chest strap or a watch, and Autonomic grades RMSSD and pNN50 against bands built for recovery."
 categories:
   - basics
   - hrv
@@ -185,7 +191,7 @@ A few habits keep it honest:
 - **Follow 7–14 days, not one morning.** A single low reading is usually last night, not a trend. A two-week slide is signal.
 - **Read it beside its siblings.** RMSSD next to a falling [resting heart rate](/insights/basics/resting-heart-rate-and-mean-rr/) and a shrinking [stand-test rise](/insights/pots/the-orthostatic-stand-test-at-home/) tells a far stronger recovery story than any one number alone, and the [complete HRV guide](/insights/hrv/hrv-complete-guide/) shows how they fit together.
 
-In POTS, long COVID and post-viral dysautonomia, a suppressed RMSSD and pNN50 are typical: the system leans toward "fight or flight," which is precisely the state that flattens vagal variability. For the fuller picture of that overlap, see [POTS, long COVID and MCAS](/insights/postviral/pots-long-covid-and-mcas-overlap/). The encouraging part is that vagal tone is trainable and recoverable: many people watch their RMSSD baseline climb over months of pacing, and often see it move *before* they feel better. We follow that arc in [recovery from post-viral dysautonomia](/insights/recovery/recovery-from-post-viral-dysautonomia/).
+In POTS, long COVID and post-viral dysautonomia, a suppressed RMSSD and pNN50 are typical: the system leans toward "fight or flight," which is precisely the state that flattens vagal variability. For the fuller picture of that overlap, see [POTS, long COVID and MCAS](/insights/postviral/pots-long-covid-and-mcas-overlap/). The encouraging part is that vagal tone is trainable and recoverable: many people watch their RMSSD baseline climb over months of pacing, and for some people it can move *before* they feel better. We follow that arc in [recovery from post-viral dysautonomia](/insights/recovery/recovery-from-post-viral-dysautonomia/).
 
 <details class="prose-details">
   <summary><strong>Worked example: same average heart rate, opposite RMSSD</strong></summary>
@@ -203,3 +209,11 @@ RMSSD and pNN50 are your two vagal-tone metrics: both built from the fast, beat-
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. If your readings concern you or your symptoms are worsening, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Shaffer F, Ginsberg JP. [An overview of heart rate variability metrics and norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.
+- Laborde S, Mosley E, Thayer JF. [Heart rate variability and cardiac vagal tone in psychophysiological research: recommendations for experiment planning, data analysis, and data reporting](https://doi.org/10.3389/fpsyg.2017.00213). *Frontiers in Psychology*, 2017.
+- Task Force of the European Society of Cardiology and the North American Society of Pacing and Electrophysiology. [Heart rate variability: standards of measurement, physiological interpretation and clinical use](https://doi.org/10.1161/01.CIR.93.5.1043). *Circulation*, 1996.
+- Munoz ML, van Roon A, Riese H, et al. [Validity of (ultra-)short recordings for heart rate variability measurements](https://doi.org/10.1371/journal.pone.0138921). *PLoS One*, 2015.
+- Swai J, Hu Z, Zhao X, et al. [Heart rate and heart rate variability comparison between postural orthostatic tachycardia syndrome versus healthy participants; a systematic review and meta-analysis](https://doi.org/10.1186/s12872-019-01298-y). *BMC Cardiovascular Disorders*, 2019.

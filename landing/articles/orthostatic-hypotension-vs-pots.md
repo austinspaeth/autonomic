@@ -6,11 +6,17 @@ summary: "Both make you dizzy when you stand up, but they are opposite problems 
 description: "Orthostatic hypotension vs POTS: OH is a sustained BP fall of 20/10 mmHg on standing; POTS is a 30+ bpm heart-rate rise with BP maintained. How to tell them apart at home by measuring both."
 keywords: "orthostatic hypotension vs POTS, orthostatic hypotension, POTS vs orthostatic hypotension, is it POTS or orthostatic hypotension, orthostatic hypotension symptoms, neurogenic orthostatic hypotension, blood pressure drop standing, orthostatic intolerance"
 date: 2026-08-18
-updated: 2026-08-18
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1615486511484-92e172cc4fe0?q=80&w=1471&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Kinga Howard / Unsplash"
 tldr: "Orthostatic hypotension (OH) and POTS both cause dizziness on standing, but they are opposite readings. OH is a sustained fall in blood pressure when you stand: at least 20 mmHg systolic or 10 mmHg diastolic within three minutes. POTS is a sustained rise in heart rate of at least 30 bpm (40 for teens) with the blood pressure holding steady, and its definition specifically excludes a big BP drop. The only way to tell them apart at home is to measure BOTH your blood pressure and your heart rate across the same lie-to-stand test, and a clinician confirms which one it is."
+question: "How do I tell orthostatic hypotension from POTS?"
+app:
+  feature: pots-stand-test
+  hook: "Measure what happens when you stand."
+  line: "Autonomic guides a home stand test and records your heart rate rise, and you can enter blood pressure alongside it."
 categories:
   - pots
   - basics
@@ -276,3 +282,13 @@ Orthostatic hypotension and POTS wear the same coat: dizziness, greyed vision, a
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational field notes to help you understand and track your own data, not a tool to diagnose or treat anything. <em>Distinguishing orthostatic hypotension from POTS, and confirming either, requires clinical evaluation; self-tracking supports that conversation but does not replace it.</em> Talk with a qualified clinician before changing medication, salt or fluid intake, or exercise, and seek care promptly if you are fainting, falling, or your symptoms are severe or worsening.
 </div>
+
+## Sources
+
+- Freeman R, Wieling W, Axelrod FB, et al. [Consensus statement on the definition of orthostatic hypotension, neurally mediated syncope and the postural tachycardia syndrome](https://doi.org/10.1007/s10286-011-0119-5). *Clinical Autonomic Research*, 2011.
+- Shibao C, Lipsitz LA, Biaggioni I. [Evaluation and treatment of orthostatic hypotension](https://doi.org/10.1016/j.jash.2013.04.006). *Journal of the American Society of Hypertension*, 2013.
+- Wieling W, Krediet CT, van Dijk N, et al. [Initial orthostatic hypotension: review of a forgotten condition](https://doi.org/10.1042/CS20060091). *Clinical Science*, 2007.
+- Gibbons CH, Schmidt P, Biaggioni I, et al. [The recommendations of a consensus panel for the screening, diagnosis, and treatment of neurogenic orthostatic hypotension and associated supine hypertension](https://doi.org/10.1007/s00415-016-8375-x). *Journal of Neurology*, 2017.
+- Norcliffe-Kaufmann L, Kaufmann H, Palma JA, et al. [Orthostatic heart rate changes in patients with autonomic failure caused by neurodegenerative synucleinopathies](https://doi.org/10.1002/ana.25170). *Annals of Neurology*, 2018.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Raj SR. [Postural tachycardia syndrome (POTS)](https://doi.org/10.1161/CIRCULATIONAHA.112.144501). *Circulation*, 2013.

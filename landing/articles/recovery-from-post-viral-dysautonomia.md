@@ -6,10 +6,16 @@ summary: "Recovery from POTS and post-viral dysautonomia is slow, noisy and non-
 description: "A practical guide to recovering from post-viral dysautonomia, POTS and long COVID: how pacing works, why you must track trends not days, how to find your triggers, and how to turn your HRV, heart rate and stand-test data into real decisions."
 keywords: "post-viral recovery, POTS recovery, long COVID recovery, dysautonomia recovery, pacing, energy envelope, HRV trend, post-exertional malaise, autonomic recovery"
 date: 2026-07-07
-updated: 2026-07-07
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1769107301312-66cf5fb144b8?q=80&w=2670&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-tldr: "Post-viral recovery is real but slow, and it moves in a noisy zig-zag, not a straight line, so judging it day to day is demoralizing and misleading. The winning strategy is to zoom out: track your HRV, resting heart rate and stand test as trends over weeks, pace within your energy envelope to avoid crashes, and log context so you can find the specific triggers that move your numbers. Many people see their data improve weeks before they feel better; catching that early is what keeps you going. Trends, not days. That's the whole game."
+tldr: "Post-viral recovery is real but slow, and it moves in a noisy zig-zag, not a straight line, so judging it day to day is demoralizing and misleading. The winning strategy is to zoom out: track your HRV, resting heart rate and stand test as trends over weeks, pace within your energy envelope to avoid crashes, and log context so you can find the specific triggers that move your numbers. For some people the data can improve before they feel better; catching that early is what keeps you going. Trends, not days. That's the whole game."
+question: "How do I know if I'm recovering from post-viral dysautonomia?"
+app:
+  feature: hrv-readings
+  hook: "Watch your recovery as a trend, not a day."
+  line: "A short morning HRV reading gives you a daily score, and Autonomic charts it over weeks so the slow upward line shows through the noise."
 categories:
   - recovery
   - pots
@@ -114,7 +120,7 @@ And when it's time for an appointment, the same data pays off again: [turning mo
 
 ## What recovery actually looks like on the data
 
-For many people, the encouraging surprise is that **the data improves before the feeling does.** The stand-test rise shrinks. The morning HRV baseline creeps up. The resting heart rate settles. These often move *weeks* ahead of "I feel better", which means that if you're only going by feel, you're missing the earliest, most motivating evidence that you're healing.
+For some people, the encouraging surprise is that **the data can improve before the feeling does.** The stand-test rise shrinks. The morning HRV baseline creeps up. The resting heart rate settles. These can move ahead of "I feel better", which means that if you're only going by feel, you may miss early, motivating evidence that you're healing.
 
 That's the deepest reason to track: on the hard days, when your body is telling you nothing has changed, the trend can show you that it has.
 
@@ -125,3 +131,10 @@ Post-viral recovery is real, slow, and noisy. The day-to-day will lie to you; th
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> Recovery varies from person to person and this guide can't replace care tailored to you. Use it to track your own patterns and to work more effectively with your clinician.
 </div>
+
+## Sources
+
+- Centers for Disease Control and Prevention. [Strategies to Prevent Worsening of Symptoms (ME/CFS)](https://www.cdc.gov/me-cfs/hcp/clinical-care/treating-the-most-disruptive-symptoms-first-and-preventing-worsening-of-symptoms.html). 2024.
+- National Institute for Health and Care Excellence. [Myalgic encephalomyelitis (or encephalopathy)/chronic fatigue syndrome: diagnosis and management (NG206)](https://www.nice.org.uk/guidance/ng206). 2021.
+- Vernino S, Bourne KM, Stiles LE, et al. [Postural orthostatic tachycardia syndrome (POTS): State of the science and clinical care from a 2019 National Institutes of Health Expert Consensus Meeting, Part 1](https://doi.org/10.1016/j.autneu.2021.102828). *Autonomic Neuroscience*, 2021.
+- Pietilä J, Helander E, Korhonen I, et al. [Acute effect of alcohol intake on cardiovascular autonomic regulation during the first hours of sleep in a large real-world sample of Finnish employees](https://doi.org/10.2196/mental.9519). *JMIR Mental Health*, 2018.

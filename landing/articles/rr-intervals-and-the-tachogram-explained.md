@@ -6,11 +6,17 @@ summary: "Every HRV number you'll ever see is built from one simple series: the 
 description: "What RR and NN intervals are, how the tachogram plots them, why a healthy heart is not a metronome, and how artifacts get corrected before HRV metrics are computed."
 keywords: "RR interval, NN interval, tachogram, heart rate variability, RR intervals explained, ectopic beat, artifact correction, respiratory sinus arrhythmia, HRV raw data, POTS, long COVID"
 date: 2026-07-09
-updated: 2026-07-09
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1627302800387-8dbab13aefba?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Clay Banks / Unsplash"
 tldr: "An RR interval is the time in milliseconds between two heartbeats. String those intervals together over a reading and plot them and you get a tachogram, the raw material every HRV metric is made of. A healthy trace isn't flat; it rolls in gentle waves as your breathing speeds and slows the heart, and that variation is the good part. A missed or extra beat shows up as a sharp spike, which HRV software detects and corrects before it computes anything, which is why your app sometimes 'drops' a beat. SDNN, RMSSD and the power bands are all just different summaries of this one series."
+question: "What are RR intervals and what is a tachogram?"
+app:
+  feature: hrv-readings
+  hook: "See the raw heartbeats behind your HRV."
+  line: "Every Autonomic reading shows your RR interval trace as it records, then builds your HRV numbers from those same beats."
 categories:
   - basics
   - hrv
@@ -185,3 +191,11 @@ Strip away the acronyms and heart rate variability comes down to one series: the
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. If your readings concern you or your symptoms are worsening, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Task Force of the European Society of Cardiology and the North American Society of Pacing and Electrophysiology. [Heart rate variability: standards of measurement, physiological interpretation and clinical use](https://doi.org/10.1161/01.CIR.93.5.1043). *Circulation*, 1996.
+- Shaffer F, McCraty R, Zerr CL. [A healthy heart is not a metronome: an integrative review of the heart's anatomy and heart rate variability](https://doi.org/10.3389/fpsyg.2014.01040). *Frontiers in Psychology*, 2014.
+- Yasuma F, Hayano J. [Respiratory sinus arrhythmia: why does the heartbeat synchronize with respiratory rhythm?](https://doi.org/10.1378/chest.125.2.683) *Chest*, 2004.
+- Peltola MA. [Role of editing of R-R intervals in the analysis of heart rate variability](https://doi.org/10.3389/fphys.2012.00148). *Frontiers in Physiology*, 2012.
+- Lipponen JA, Tarvainen MP. [A robust algorithm for heart rate variability time series artefact correction using novel beat classification](https://doi.org/10.1080/03091902.2019.1640306). *Journal of Medical Engineering and Technology*, 2019.

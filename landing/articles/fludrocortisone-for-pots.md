@@ -6,17 +6,23 @@ summary: "Most POTS medications work on the heart or the blood vessels. Fludroco
 description: "How fludrocortisone treats POTS: a mineralocorticoid that makes the kidneys retain sodium and water to expand low blood volume. Mechanism, salt requirement, potassium monitoring, side effects, and what to track on your stand test."
 keywords: "fludrocortisone for POTS, fludrocortisone POTS, florinef POTS, fludrocortisone dosing, fludrocortisone blood volume, mineralocorticoid POTS, fludrocortisone side effects, fludrocortisone potassium, fludrocortisone hypovolemic POTS, does fludrocortisone lower heart rate, fludrocortisone vs midodrine, fludrocortisone salt intake"
 date: 2026-09-03
-updated: 2026-09-03
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1562243061-204550d8a2c9?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Unsplash"
 tldr: "Fludrocortisone treats POTS from a third direction, different from both beta blockers and midodrine: instead of slowing the heart or tightening blood vessels, it acts on the kidneys as a synthetic mineralocorticoid, telling them to hold on to sodium and, with it, water. That expands plasma volume, which is what a low-volume, pooling body lacks when standing. It only works if you are eating enough salt and drinking enough fluid, because it retains what you take in rather than creating it. It is slow to build over days, and it carries a specific rule of its own: because it makes the kidneys dump potassium in exchange for sodium, your clinician watches your potassium and often your blood pressure and weight. Track your standing heart-rate jump, your resting heart rate, and how much salt and fluid you are actually taking, and keep every dose decision with your clinician."
+question: "How does fludrocortisone work for POTS?"
+app:
+  feature: pots-stand-test
+  hook: "See how your stand test looks on fludrocortisone."
+  line: "Run a guided home stand test now and again, and see how your heart rate rise looks on it. Talk any changes over with your doctor."
 categories:
   - pots
   - hrv
 faq:
   - q: "How does fludrocortisone help POTS?"
-    a: "Fludrocortisone is a synthetic mineralocorticoid, a copy of the body's own aldosterone. It acts on the kidneys and tells them to reabsorb sodium instead of passing it into urine, and water follows the sodium back into the bloodstream. The result is a larger plasma volume. In the low-blood-volume, pooling type of POTS, a bigger volume means more blood returns to the heart when you stand, standing circulation holds up better, and the reflex heart-rate spike that low volume drives tends to shrink. It treats the fluid-volume side of the problem rather than acting on the heart or the vessels directly, and it does not cure the underlying condition."
+    a: "Fludrocortisone is a synthetic mineralocorticoid, a copy of the body's own aldosterone. It acts on the kidneys and tells them to reabsorb sodium instead of passing it into urine, and water follows the sodium back into the bloodstream. The result is a larger plasma volume. In the low-blood-volume, pooling type of POTS, a bigger volume means more blood returns to the heart when you stand, standing circulation holds up better, and the reflex heart-rate spike that low volume drives tends to shrink. Controlled studies of it in POTS itself are still lacking, though. It treats the fluid-volume side of the problem rather than acting on the heart or the vessels directly, and it does not cure the underlying condition."
   - q: "Does fludrocortisone lower heart rate?"
     a: "Not directly, and that is the point. Fludrocortisone does not act on the heart at all. It works on the kidneys to expand blood volume. But because a large share of POTS tachycardia is a reflex response to too little blood returning to the heart on standing, filling the tank back up can shrink the lying-to-standing heart-rate jump. So the standing heart rate often improves, but as a downstream effect of better blood volume and venous return, not because the drug slowed the pacemaker the way a beta blocker or ivabradine does."
   - q: "Why do I have to eat more salt on fludrocortisone?"
@@ -71,7 +77,7 @@ Your body already has a hormone whose whole job is to manage blood volume: **ald
 
 Fludrocortisone (you may see the brand name Florinef) is a **synthetic mineralocorticoid**. It is essentially a potent, long-acting stand-in for aldosterone. Swallowed as a small daily dose, it switches on the same sodium-retaining machinery in the kidney, so more of the sodium you take in stays in your body instead of leaving in urine, and your plasma volume expands over several days.
 
-For the low-volume, pooling POTS body, that expansion is the point. A bigger blood volume means more blood is available to return to the heart when you stand, standing circulation holds up better, and because the reflex tachycardia of POTS is largely a reaction to too little blood coming back, filling the tank often shrinks the lying-to-standing heart-rate jump. All of that happens without the drug ever acting on the heart itself.
+For the low-volume, pooling POTS body, that expansion is the point. A bigger blood volume means more blood is available to return to the heart when you stand, standing circulation holds up better, and because the reflex tachycardia of POTS is largely a reaction to too little blood coming back, filling the tank can shrink the lying-to-standing heart-rate jump, though controlled studies in POTS are still lacking. All of that happens without the drug ever acting on the heart itself.
 
 <figure class="prose-figure">
   <svg viewBox="0 0 720 250" role="img" aria-label="A kidney tubule schematic. On the left, untreated, sodium and water leave into the urine and the bloodstream tank is low. On the right, on fludrocortisone, the kidney reabsorbs sodium and water back into the blood and the tank is fuller, while potassium is excreted in exchange.">
@@ -133,7 +139,7 @@ If you are weighing the other two directions, the companion pieces on [midodrine
 
 ## Does fludrocortisone actually help POTS?
 
-Fludrocortisone has a long track record in **orthostatic intolerance** and is a recognized option for POTS, though its use here is off-label. The <a href="https://www.heartrhythmjournal.com/article/S1547-5271(15)00549-9/fulltext" target="_blank" rel="noopener">2015 Heart Rhythm Society expert consensus statement on POTS</a> lists it among the pharmacologic options, particularly for patients whose problem is low blood volume that has not responded to salt and fluids alone. In practice it is often reached for when the volume-expansion strategy is working directionally but needs more force than diet can provide.
+Fludrocortisone has a long track record in **orthostatic intolerance** and is a recognized option for POTS, though its use here is off-label. The <a href="https://www.heartrhythmjournal.com/article/S1547-5271(15)00549-9/fulltext" target="_blank" rel="noopener">2015 Heart Rhythm Society expert consensus statement on POTS</a> lists it among the pharmacologic options, particularly for patients whose problem is low blood volume that has not responded to salt and fluids alone. In practice it is often reached for when the volume-expansion strategy is working directionally but needs more force than diet can provide. Be aware, though, that <a href="https://doi.org/10.1503/cmaj.211373" target="_blank" rel="noopener">controlled studies of fludrocortisone in POTS are lacking</a>: its trial support is stronger in vasovagal fainting than in POTS itself.
 
 Two honest caveats keep this in proportion. First, fludrocortisone treats the volume side of POTS, not its cause. It does not repair the autonomic disturbance, reverse deconditioning, or fix the pooling directly. It makes upright life more tolerable by keeping the tank fuller while the structural work happens. Second, it does not suit everyone. Someone whose blood pressure already runs high, or who retains fluid easily, may get little benefit and could feel worse, which is why matching the drug to the [POTS subtype](/insights/pots/pots-subtypes-explained/) matters. The person it helps most is often the one whose readings point toward [low blood volume](/insights/pots/low-blood-volume-pots-hypovolemia/) rather than a hyperadrenergic surge.
 
@@ -210,7 +216,7 @@ The practical response is the same one that works for any change in your regimen
 
 ## Frequently asked questions
 
-**How does fludrocortisone help POTS?** It is a synthetic mineralocorticoid that acts on the kidneys, telling them to hold on to sodium so water follows and blood volume expands. In the low-volume, pooling type of POTS, a bigger volume means more blood returns to the heart on standing, standing circulation holds up, and the reflex heart-rate jump often shrinks as a result.
+**How does fludrocortisone help POTS?** It is a synthetic mineralocorticoid that acts on the kidneys, telling them to hold on to sodium so water follows and blood volume expands. In the low-volume, pooling type of POTS, a bigger volume means more blood returns to the heart on standing, standing circulation holds up, and the reflex heart-rate jump often shrinks as a result. Controlled studies in POTS are still lacking, so this rests more on mechanism and clinical experience than on trials.
 
 **Does fludrocortisone lower heart rate?** Not directly; it does not act on the heart. But by expanding blood volume and easing the standing shortfall that provokes tachycardia, it can shrink the lying-to-standing heart-rate jump, so the standing heart rate often improves as a downstream effect.
 
@@ -226,4 +232,13 @@ The practical response is the same one that works for any change in your regimen
 
 ## The bottom line
 
-Fludrocortisone is the POTS drug that works from a third direction. Instead of slowing the heart or tightening the vessels, it acts on the kidneys as a synthetic mineralocorticoid, making them hold on to sodium so water follows and blood volume expands. That makes it a strong fit when low blood volume is the core problem, and a poor fit when a racing, hyperadrenergic heart with normal or high pressure dominates. It only works if enough salt and fluid are coming in, it builds slowly over days rather than acting within the hour, and it carries one rule of its own: because the kidneys trade sodium for potassium, your clinician watches your potassium along with your blood pressure and weight. Track your standing heart-rate jump, your resting heart rate, and your salt and fluid habits, read any HRV change as a small, indirect effect rather than a cure, and keep every dose and monitoring decision a conversation with the clinician who prescribes it.
+Fludrocortisone is the POTS drug that works from a third direction. Instead of slowing the heart or tightening the vessels, it acts on the kidneys as a synthetic mineralocorticoid, making them hold on to sodium so water follows and blood volume expands. That makes it a reasonable fit when low blood volume is the core problem, though controlled studies in POTS are lacking, and a poor fit when a racing, hyperadrenergic heart with normal or high pressure dominates. It only works if enough salt and fluid are coming in, it builds slowly over days rather than acting within the hour, and it carries one rule of its own: because the kidneys trade sodium for potassium, your clinician watches your potassium along with your blood pressure and weight. Track your standing heart-rate jump, your resting heart rate, and your salt and fluid habits, read any HRV change as a small, indirect effect rather than a cure, and keep every dose and monitoring decision a conversation with the clinician who prescribes it.
+
+## Sources
+
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Raj SR, Fedorowski A, Sheldon RS. [Diagnosis and management of postural orthostatic tachycardia syndrome](https://doi.org/10.1503/cmaj.211373). *CMAJ*, 2022.
+- Raj SR, Biaggioni I, Yamhure PC, et al. [Renin-aldosterone paradox and perturbed blood volume regulation underlying postural tachycardia syndrome](https://doi.org/10.1161/01.CIR.0000160356.97313.5D). *Circulation*, 2005.
+- Sheldon R, Raj SR, Rose MS, et al. [Fludrocortisone for the prevention of vasovagal syncope: a randomized, placebo-controlled trial](https://doi.org/10.1016/j.jacc.2016.04.030). *Journal of the American College of Cardiology*, 2016.
+- U.S. National Library of Medicine. [Fludrocortisone acetate tablets: prescribing information](https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=933e28ef-05e8-419e-a786-21eab67f33a2). *DailyMed*, 2026.
+- MedlinePlus. [Fludrocortisone acetate](https://medlineplus.gov/druginfo/meds/a682549.html). Revised 2017.

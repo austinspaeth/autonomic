@@ -6,11 +6,17 @@ summary: "If your heart races, your head swims, or you crash for an hour after a
 description: "Why POTS and dysautonomia feel worse after eating: postprandial hypotension explained, the splanchnic blood-pooling mechanism, which meals trigger it, and practical, non-diagnostic ways to eat that steady your heart rate and blood pressure."
 keywords: "postprandial hypotension, POTS worse after eating, dizzy after eating POTS, heart racing after meals, POTS food crash, splanchnic pooling, postprandial tachycardia, dysautonomia after eating, small frequent meals POTS, why do I feel worse after eating"
 date: 2026-07-25
-updated: 2026-07-25
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Brooke Lark / Unsplash"
 tldr: "Eating diverts a large share of your blood into the gut for digestion. A healthy autonomic system tightens vessels elsewhere and nudges heart rate up a little to hold blood pressure steady. In POTS and dysautonomia that compensation runs short, so blood pressure can dip, heart rate can spike, and symptoms flare for up to two hours. Large, high-carbohydrate meals are the strongest trigger. Smaller, more frequent, lower-glycemic meals, plus water and salt, are the highest-yield fix, and a before-and-after stand test shows you your own pattern."
+question: "Why does my POTS get worse after I eat?"
+app:
+  feature: insights
+  hook: "See which meals hit you hardest."
+  line: "Log meals and symptoms in Autonomic and it shows which foods and meal sizes line up with your worse days."
 categories:
   - pots
   - food
@@ -241,7 +247,7 @@ None of the strategies below are exotic, and most people notice a difference wit
 | Fewer fast carbs | Blunts the steep insulin-driven pooling | Swap white bread and sugary drinks for protein, fat, fiber |
 | Water with meals | A 300 to 500 mL water bolus can transiently raise blood pressure | A full glass or two before and during eating |
 | Keep salt up | Supports blood volume, the core POTS lever | Salt to taste if your clinician agrees |
-| Stay upright, gently | Reduces added lower-body pooling | Sit or stroll; avoid standing suddenly or lying flat right after |
+| Rise slowly, rest if you need to | Avoids adding a standing drop on top of the meal's | Avoid standing up suddenly; lying down after eating can help if your pressure drops after meals |
 | Skip alcohol at the table | Alcohol dilates vessels and worsens pooling | Save it for another time, or a small amount well-hydrated |
 | Light movement, not a workout | A gentle walk aids venous return | A slow five to ten minute walk, not intense exercise |
 
@@ -278,3 +284,10 @@ Feeling worse after eating is not weakness or an overactive imagination. Digesti
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Post-meal symptoms can have several causes, and new, severe, or worsening symptoms deserve evaluation. Discuss any changes, especially to medication or diet, with a clinician who knows your history.
 </div>
+
+## Sources
+
+- Trahair LG, Horowitz M, Jones KL. [Postprandial hypotension: a systematic review](https://doi.org/10.1016/j.jamda.2014.01.011). *Journal of the American Medical Directors Association*, 2014.
+- Wang B, Zhao J, Zhan Q, et al. [Acarbose for postprandial hypotension with glucose metabolism disorders: a systematic review and meta-analysis](https://doi.org/10.3389/fcvm.2021.663635). *Frontiers in Cardiovascular Medicine*, 2021.
+- Jordan J, Shannon JR, Black BK, et al. [The pressor response to water drinking in humans: a sympathetic reflex?](https://doi.org/10.1161/01.cir.101.5.504) *Circulation*, 2000.
+- Cleveland Clinic. [Postprandial hypotension: blood pressure drops after eating](https://my.clevelandclinic.org/health/diseases/postprandial-hypotension). Updated 2024.

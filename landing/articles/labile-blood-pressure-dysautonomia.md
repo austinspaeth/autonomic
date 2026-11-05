@@ -6,11 +6,17 @@ summary: "Labile blood pressure, the kind that climbs and falls through the day 
 description: "Labile blood pressure in dysautonomia explained: why BP swings up and down, the common patterns (orthostatic, postprandial, adrenaline surges, non-dipping), how big a swing is normal, and how to track it at home."
 keywords: "labile blood pressure, blood pressure swings, fluctuating blood pressure, blood pressure variability, dysautonomia blood pressure, POTS blood pressure, orthostatic hypotension, hyperadrenergic blood pressure spikes, home blood pressure monitoring, MAP"
 date: 2026-10-24
-updated: 2026-10-24
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1621525466547-4ac135e85f59?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
 photoAttribution: "Unsplash"
 tldr: "Labile blood pressure means your BP rises and falls more than the usual background variation, often within minutes, because the autonomic reflexes that normally buffer it are not keeping up. In dysautonomia this shows up as drops on standing, dips after meals, adrenaline-driven spikes, and a flatter day-night rhythm. A single odd reading is almost never the story: what matters is the pattern, measured the same way over time, and read alongside your heart rate and symptoms. It is worth understanding and tracking, but on its own it is not a diagnosis."
+question: "Why does my blood pressure swing so much with dysautonomia?"
+app:
+  feature: hrv-readings
+  hook: "Log every swing, see the pattern."
+  line: "Log blood pressure whenever you take it, beside your morning HRV and symptoms, so the ups and downs are in one place."
 categories:
   - pots
   - basics
@@ -199,7 +205,7 @@ The reference points that matter are about specific, repeatable changes rather t
 | Measurement | Reference point |
 | --- | --- |
 | Orthostatic fall | Systolic down 20 mmHg, or diastolic down 10 mmHg, sustained within 3 minutes of standing |
-| Initial orthostatic dip | A brief, larger drop in the first 15 to 30 seconds of standing that recovers quickly |
+| Initial orthostatic dip | A brief drop of at least 40 mmHg systolic and/or 20 mmHg diastolic within 15 seconds of standing that recovers quickly |
 | Ordinary daytime range | Systolic commonly varies about 10 to 20 mmHg through a normal day |
 | Night-time dip | Pressure normally falls about 10 to 20 percent during sleep |
 
@@ -280,3 +286,11 @@ Labile blood pressure is pressure that drifts and jumps instead of holding stead
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Blood pressure changes, especially large swings, fainting or sustained high readings, should be assessed by a clinician who can evaluate you properly. Discuss any changes to salt, fluids, medication or activity with your own healthcare provider.
 </div>
+
+## Sources
+
+- Freeman R, Wieling W, Axelrod FB, et al. [Consensus statement on the definition of orthostatic hypotension, neurally mediated syncope and the postural tachycardia syndrome](https://doi.org/10.1007/s10286-011-0119-5). *Clinical Autonomic Research*, 2011.
+- Ketch T, Biaggioni I, Robertson R, Robertson D. [Four faces of baroreflex failure: hypertensive crisis, volatile hypertension, orthostatic tachycardia, and malignant vagotonia](https://doi.org/10.1161/01.cir.0000017186.52382.f4). *Circulation*, 2002.
+- Raj SR, Biaggioni I, Yamhure PC, et al. [Renin-aldosterone paradox and perturbed blood volume regulation underlying postural tachycardia syndrome](https://doi.org/10.1161/01.CIR.0000160356.97313.5D). *Circulation*, 2005.
+- Xu T, Zhang YQ, Tan XR. [The dilemma of nocturnal blood pressure](https://doi.org/10.1111/jch.12003). *Journal of Clinical Hypertension*, 2012.
+- Centers for Disease Control and Prevention. [Measuring your blood pressure](https://www.cdc.gov/high-blood-pressure/measure/index.html). Updated 2026.

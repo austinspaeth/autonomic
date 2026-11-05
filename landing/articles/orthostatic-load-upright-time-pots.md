@@ -7,9 +7,15 @@ description: "Orthostatic load explained: why total upright time, not just activ
 keywords: "orthostatic load, upright time POTS, orthostatic intolerance, time on feet dysautonomia, standing tolerance POTS, horizontal rest, recumbent rest POTS, pacing upright time, blood pooling, long COVID orthostatic"
 date: 2026-11-04
 updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1769416945759-4660fd121172?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
 tldr: "Orthostatic load is the total gravitational stress of being upright across a day: roughly how upright you are multiplied by how long. In POTS and dysautonomia, every minute on your feet forces your nervous system to defend blood pressure and brain blood flow against pooling, so load accumulates and symptoms track total upright time more closely than how 'busy' you were. Lying flat resets it. You lower load by breaking up standing, reclining for short horizontal rests, keeping legs moving when you must stand, and supporting blood volume, not by white-knuckling through."
+question: "Why does time on my feet make POTS worse?"
+app:
+  feature: pacing-budget
+  hook: "Count your upright time against your budget."
+  line: "Autonomic's daily pacing budget counts time on your feet alongside steps and workouts, and alerts you when it is nearly spent."
 categories:
   - pots
   - recovery
@@ -238,3 +244,11 @@ For people whose dysautonomia overlaps with ME/CFS or long COVID, too much uprig
 <div class="callout callout-note">
 These are educational field notes, not medical advice. Orthostatic load is a practical model, not a diagnosis or a lab value, and everyone's tolerance is different and changes day to day. Use it to notice patterns and ask better questions, and discuss any real changes to your management with your own clinician.
 </div>
+
+## Sources
+
+- Truijen J, Bundgaard-Nielsen M, van Lieshout JJ. [A definition of normovolaemia and consequences for cardiovascular control during orthostatic and environmental stress](https://doi.org/10.1007/s00421-009-1346-5). *European Journal of Applied Physiology*, 2010.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Stewart JM, Medow MS, Montgomery LD, et al. [Decreased skeletal muscle pump activity in patients with postural tachycardia syndrome and low peripheral blood flow](https://doi.org/10.1152/ajpheart.00738.2003). *American Journal of Physiology: Heart and Circulatory Physiology*, 2004.
+- Tani H, Singer W, McPhee BR, et al. [Splanchnic-mesenteric capacitance bed in the postural tachycardia syndrome (POTS)](https://doi.org/10.1016/S1566-0702%2800%2900205-8). *Autonomic Neuroscience*, 2000.
+- Bourne KM, Sheldon RS, Hall J, et al. [Compression garment reduces orthostatic tachycardia and symptoms in patients with postural orthostatic tachycardia syndrome](https://doi.org/10.1016/j.jacc.2020.11.040). *Journal of the American College of Cardiology*, 2021.

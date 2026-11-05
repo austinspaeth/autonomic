@@ -6,19 +6,25 @@ summary: "POTS insomnia is the exhausting mismatch between a body that is deplet
 description: "POTS insomnia and the wired-but-tired feeling: why dysautonomia keeps you awake, what nocturnal tachycardia and blunted overnight heart-rate dip mean, and calm, practical ways to sleep better."
 keywords: "POTS insomnia, can't sleep with POTS, wired but tired, dysautonomia insomnia, racing heart when trying to sleep, nocturnal tachycardia POTS, POTS sleep problems, adrenaline surges at night, overnight heart rate, long COVID insomnia"
 date: 2026-10-15
-updated: 2026-10-15
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: https://images.unsplash.com/photo-1552081844-512cf156e161?q=80&w=1760&auto=format&fit=crop
 photoAttribution: "Jonathan Borba / Unsplash"
-tldr: "The wired-but-tired feeling in POTS is a nervous system stuck in a sympathetic, fight-or-flight gear at the exact moment it should be winding down. Lying flat, delayed stress hormones, adrenaline surges and a heart that does not slow much overnight all keep you alert while your body is drained. The fixes are mostly about lowering sympathetic drive before bed and through the day: steady pacing, morning light, cool and dark at night, slow breathing, and a consistent wake time. Track your overnight heart rate and morning HRV to see the pattern instead of fearing it, and rule out sleep apnea with a clinician."
+tldr: "The wired-but-tired feeling in POTS is a nervous system stuck in a sympathetic, fight-or-flight gear at the exact moment it should be winding down. Why sleep feels so much worse is not fully understood: sleep studies find only small objective differences, yet sleep is clearly worse as people with POTS experience it, and an overactive sympathetic system is the leading suspect, alongside mistimed stress hormones and a heart that may not slow much overnight. The fixes are mostly about lowering sympathetic drive before bed and through the day: steady pacing, morning light, cool and dark at night, slow breathing, and a consistent wake time. Track your overnight heart rate and morning HRV to see the pattern instead of fearing it, and rule out sleep apnea with a clinician."
+question: "Why am I wired but tired and can't sleep with POTS?"
+app:
+  feature: hrv-readings
+  hook: "See how much your heart slows at night."
+  line: "Autonomic brings in your sleep and overnight heart rate beside your morning HRV, so you can see how your nights are really going."
 categories:
   - pots
   - recovery
 faq:
   - q: "Why do I feel wired but tired with POTS?"
-    a: "Because your nervous system is leaning on its sympathetic 'fight or flight' branch when it should be handing over to the parasympathetic 'rest and digest' side. Your body is genuinely depleted, but the alert signal stays switched on, so you feel exhausted and buzzing at the same time. In POTS and dysautonomia this sympathetic bias is already higher than usual, and lying down at night can trigger adrenaline surges and a racing heart rather than calm."
+    a: "Because your nervous system is leaning on its sympathetic 'fight or flight' branch when it should be handing over to the parasympathetic 'rest and digest' side. Your body is genuinely depleted, but the alert signal stays switched on, so you feel exhausted and buzzing at the same time. In POTS and dysautonomia this sympathetic bias is already higher than usual, and why lying down at night can bring a racing heart rather than calm is not fully understood."
   - q: "Why does my heart race when I try to fall asleep?"
-    a: "When you lie flat, blood that was pooling in your legs and abdomen returns to your chest, and in many people with POTS this shift provokes a surge of adrenaline and noradrenaline, so the heart speeds up instead of settling. Elevated evening stress hormones, anxiety about the symptom itself, and an under-recovered autonomic system all add to it. It is usually frightening rather than dangerous, but new or severe palpitations are always worth discussing with your clinician."
+    a: "Nobody fully knows yet. A common idea is that pooled blood returning to your chest when you lie flat sets off an adrenaline surge, but studies have not shown that. What is known is that people with POTS report much worse sleep, and an overactive sympathetic system is thought to contribute. Elevated evening stress hormones, anxiety about the symptom itself, and an under-recovered autonomic system all add to it. It is usually frightening rather than dangerous, but new or severe palpitations are always worth discussing with your clinician."
   - q: "Does POTS cause insomnia?"
     a: "POTS does not have insomnia in its formal definition, but poor, fragmented and unrefreshing sleep is one of the most commonly reported symptoms in POTS, long COVID and related dysautonomia. The same autonomic imbalance that drives the daytime symptoms also makes it hard to fall asleep, stay asleep, and wake feeling rested. Treating the autonomic picture and your sleep habits together tends to help more than tackling either alone."
   - q: "How can I calm my nervous system before bed with POTS?"
@@ -29,7 +35,7 @@ social:
   linkedin: |
     One of the most exhausting parts of POTS and dysautonomia rarely makes the symptom lists: the wired-but-tired night. Your body is depleted, yet your nervous system will not switch off.
 
-    The physiology makes sense once you see it. POTS already runs with a sympathetic, fight-or-flight bias. Lying down at night returns pooled blood to the chest, which in many people provokes a surge of adrenaline and a racing heart rather than calm. Add delayed or elevated evening cortisol, a heart that barely slows overnight, and anxiety about the symptom itself, and you get the familiar mix: drained and buzzing at the same time.
+    The physiology makes sense once you see it. POTS already runs with a sympathetic, fight-or-flight bias. Exactly why lying down can bring a racing heart rather than calm is not fully understood, but that sympathetic bias is the leading suspect. Add delayed or elevated evening cortisol, a heart that barely slows overnight, and anxiety about the symptom itself, and you get the familiar mix: drained and buzzing at the same time.
 
     What helps is mostly about lowering sympathetic drive, through the day as much as at night: steady pacing so the evening does not become an adrenaline rebound, morning daylight to anchor the body clock, a cool dark room, slow paced breathing at around six breaths a minute, and a consistent wake time. Raising the head of the bed and keeping fluids earlier in the day help some people. And a heart that does not dip overnight, loud snoring or witnessed pauses deserve a sleep-apnea screen.
 
@@ -44,15 +50,15 @@ social:
 
     For the longest time the cruelest part of POTS was bedtime. I would be completely drained all day, then lie down and my heart would pick up, my mind would switch on, and I would be wired but tired for hours. I used to think I was just bad at sleeping.
 
-    What helped was learning the mechanism. POTS already leans toward the sympathetic, fight-or-flight side. When you lie flat, the blood that was pooling in your legs comes back to your chest, and for a lot of us that shift kicks off an adrenaline surge instead of the calm you are supposed to feel. On top of that, stress hormones that should be low at night can run high, and the heart does not slow down the way it should overnight. So you end up exhausted and buzzing at the same time. It is miserable but it is not usually dangerous.
+    What helped was learning the mechanism. POTS already leans toward the sympathetic, fight-or-flight side. Why lying down can rev you up instead of calming you is not fully understood, and sleep studies find surprisingly small differences, but sleep clearly feels worse for a lot of us. On top of that, stress hormones that should be low at night can run high, and the heart does not slow down the way it should overnight. So you end up exhausted and buzzing at the same time. It is miserable but it is not usually dangerous.
 
     The stuff that actually moved the needle for me was less about bedtime tricks and more about the whole day: pacing so I did not crash into an evening adrenaline rebound, getting daylight in the morning, keeping the room cool and dark, a few minutes of slow breathing (around six breaths a minute), and most of all a consistent wake time even on bad nights. Raising the head of my bed and front-loading fluids earlier helped the midnight wakeups too.
 
     Not medical advice, just a patient sharing what helped. One thing worth flagging: if you snore loudly, wake gasping, or someone has seen you stop breathing, push for a sleep apnea screen, because that is common and very treatable. I wrote up the physiology and a wind-down plan here: https://autonomic.care/insights/pots/pots-insomnia-wired-but-tired/?utm_source=reddit&utm_medium=social&utm_campaign=pots-insomnia-wired-but-tired
   x: |
-    Wired but tired with POTS? Lying flat sends pooled blood to your chest, and for many that sparks an adrenaline surge, so the heart races at bedtime. Frightening, rarely dangerous. Why it happens + what helps: https://autonomic.care/insights/pots/pots-insomnia-wired-but-tired/?utm_source=x&utm_medium=social&utm_campaign=pots-insomnia-wired-but-tired #POTS #Dysautonomia
+    Wired but tired with POTS? Your nervous system can stay stuck in alert mode at bedtime, so the heart races. Why is not fully understood. Frightening, rarely dangerous. Why it happens + what helps: https://autonomic.care/insights/pots/pots-insomnia-wired-but-tired/?utm_source=x&utm_medium=social&utm_campaign=pots-insomnia-wired-but-tired #POTS #Dysautonomia
   facebook: |
-    If you have POTS or dysautonomia and you are too exhausted to function but still cannot fall asleep, you are not imagining it and you are not bad at sleeping. That wired-but-tired feeling is a nervous system stuck in alert mode at the moment it should be winding down. Lying flat can even set off an adrenaline surge and a racing heart instead of calm.
+    If you have POTS or dysautonomia and you are too exhausted to function but still cannot fall asleep, you are not imagining it and you are not bad at sleeping. That wired-but-tired feeling is a nervous system stuck in alert mode at the moment it should be winding down. For some, lying down even brings a racing heart instead of calm, and why is not fully understood.
 
     Does your heart tend to pick up right when you lie down to sleep? The encouraging part is that this is something you can understand and get ahead of: steady pacing through the day, morning daylight, a cool dark room, slow breathing before bed, and a consistent wake time all lower that alert signal over time. We wrote up why it happens and a gentle plan here: https://autonomic.care/insights/pots/pots-insomnia-wired-but-tired/?utm_source=facebook&utm_medium=social&utm_campaign=pots-insomnia-wired-but-tired
 
@@ -107,7 +113,7 @@ Few things about POTS are as quietly demoralising as this: you are too tired to 
 This article explains why the wired-but-tired feeling happens, what the overnight numbers (heart rate and HRV) actually show, and a calm, practical plan to settle the night. It is educational field notes, not medical advice, so treat it as a way to understand and track your own pattern, and bring any changes to a clinician who knows your case.
 
 <div class="callout callout-note">
-  <strong>TL;DR.</strong> Wired but tired is a sympathetic, fight-or-flight nervous system refusing to hand over to the parasympathetic rest-and-digest side at bedtime. Lying flat, delayed stress hormones, adrenaline surges and a heart that does not slow much overnight all keep you alert while your body is drained. Lower that drive through the day and before bed: steady pacing, morning light, cool and dark, slow breathing, consistent wake time. Track overnight heart rate and morning HRV to read the pattern, and rule out sleep apnea.
+  <strong>TL;DR.</strong> Wired but tired is a sympathetic, fight-or-flight nervous system refusing to hand over to the parasympathetic rest-and-digest side at bedtime. Why sleep feels so much worse is not fully understood: sleep studies find only small objective differences, yet sleep is clearly worse as people with POTS experience it, and an overactive sympathetic system is the leading suspect. Lower that drive through the day and before bed: steady pacing, morning light, cool and dark, slow breathing, consistent wake time. Track overnight heart rate and morning HRV to read the pattern, and rule out sleep apnea.
 </div>
 
 ## Why am I wired but tired?
@@ -135,9 +141,9 @@ In POTS and dysautonomia that handover is sticky. The system already sits with a
 
 Several threads tend to braid together. You will not have all of them, and naming the ones you recognise is the first step to loosening them.
 
-### Adrenaline surges when you lie down
+### A racing heart when you lie down
 
-This is the one that frightens people most. During the day, gravity pulls blood into your legs and abdomen, and your body fights to keep enough reaching your brain. When you lie flat, all of that pooled blood suddenly returns to your chest. In many people with POTS, especially the hyperadrenergic pattern, that shift triggers a release of adrenaline and noradrenaline rather than calm, so the heart speeds up and you feel a jolt of alertness just as you are trying to drift off. It is almost always distressing rather than dangerous, but it is real physiology, not anxiety inventing a problem. If the surges are severe, your clinician may discuss whether a medication that blunts that drive is appropriate, which is the territory of drugs like [clonidine and guanfacine](/insights/pots/clonidine-guanfacine-hyperadrenergic-pots/).
+This is the one that frightens people most: you lie down, your heart speeds up, and you feel a jolt of alertness just as you are trying to drift off. A common explanation is that pooled blood returning to your chest triggers a release of adrenaline, but studies have not shown that, and why sleep feels so much worse in POTS is not fully understood. Overnight sleep studies find only small differences from people without POTS, yet sleep as people with POTS experience it is clearly worse, and an overactive sympathetic system is thought to contribute. It is almost always distressing rather than dangerous, and it is real, not anxiety inventing a problem. If night-time surges are severe, your clinician may discuss whether a medication that blunts that drive is appropriate, which is the territory of drugs like [clonidine and guanfacine](/insights/pots/clonidine-guanfacine-hyperadrenergic-pots/).
 
 ### Stress hormones at the wrong time
 
@@ -159,7 +165,7 @@ Overdo it during the day and the body often answers with a wired, over-alert eve
 
 | Pattern you notice | Likely driver | First thing to try |
 | --- | --- | --- |
-| Heart races the moment you lie flat | Adrenaline surge on fluid shift | Raise the head of the bed; slow breathing; discuss with clinician if severe |
+| Heart races the moment you lie flat | Sympathetic alerting (not fully understood) | Raise the head of the bed; slow breathing; discuss with clinician if severe |
 | Mind buzzing, cannot switch off | Elevated evening sympathetic tone or cortisol | Dim lights early; wind-down routine; consistent wake time |
 | Fall asleep, wake at 2 to 4 am | Nocturnal adrenaline or cortisol shift | Front-load fluids earlier; cool room; avoid late alcohol |
 | Wake flushed, itchy or pounding | Possible histamine or mast cell flare | Note the pattern; review triggers with clinician |
@@ -268,8 +274,16 @@ The cruelty of a wired-but-tired night is partly that it feels random and fright
 
 ## The bottom line
 
-The wired-but-tired night is not you failing at sleep. It is a nervous system leaning on its accelerator when it should be reaching for the brake, made worse by fluid shifts on lying down, mistimed stress hormones and a heart that does not fully stand down overnight. The way out is to lower that drive, patiently and across the whole day: pace so the evening is not a rebound, catch the morning light, keep the room cool and dark, breathe slowly before bed, and hold a steady wake time even after a bad night. Track your overnight heart rate and morning HRV so the pattern becomes readable, rule out sleep apnea, and work changes through with a clinician. Night by night, a frightening symptom becomes a map of your recovery.
+The wired-but-tired night is not you failing at sleep. It is a nervous system leaning on its accelerator when it should be reaching for the brake, possibly made worse by mistimed stress hormones and a heart that does not fully stand down overnight. The way out is to lower that drive, patiently and across the whole day: pace so the evening is not a rebound, catch the morning light, keep the room cool and dark, breathe slowly before bed, and hold a steady wake time even after a bad night. Track your overnight heart rate and morning HRV so the pattern becomes readable, rule out sleep apnea, and work changes through with a clinician. Night by night, a frightening symptom becomes a map of your recovery.
 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Sleep problems can have many causes. If your symptoms are severe or worsening, or you are considering any change to your routine or medication, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Bagai K, Song Y, Ling JF, et al. [Sleep disturbances and diminished quality of life in postural tachycardia syndrome](https://pmc.ncbi.nlm.nih.gov/articles/PMC3077350/). *Journal of Clinical Sleep Medicine*, 2011.
+- Bagai K, Peltier AC, Malow BA, et al. [Objective sleep assessments in patients with postural tachycardia syndrome using overnight polysomnograms](https://doi.org/10.5664/jcsm.5806). *Journal of Clinical Sleep Medicine*, 2016.
+- Thakkar MM. [Histamine in the regulation of wakefulness](https://doi.org/10.1016/j.smrv.2010.06.004). *Sleep Medicine Reviews*, 2011.
+- Zaccaro A, Piarulli A, Laurino M, et al. [How breath-control can change your life: a systematic review on psycho-physiological correlates of slow breathing](https://doi.org/10.3389/fnhum.2018.00353). *Frontiers in Human Neuroscience*, 2018.
+- Qaseem A, Kansagara D, Forciea MA, et al. [Management of chronic insomnia disorder in adults: a clinical practice guideline from the American College of Physicians](https://doi.org/10.7326/M15-2175). *Annals of Internal Medicine*, 2016.

@@ -6,10 +6,16 @@ summary: "A chest strap is the single biggest upgrade you can make to your HRV d
 description: "Why a chest strap beats a watch, ring or phone camera for HRV, and how the Polar H10 compares with the budget COOSPO H808S in real daily use."
 keywords: "best HRV chest strap, Polar H10 review, COOSPO H808S, HRV chest strap vs watch, RR interval Bluetooth strap, cheap HRV monitor, chest strap for POTS, heart rate variability accuracy"
 date: 2026-07-25
-updated: 2026-07-25
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=1760&auto=format&fit=crop"
 tldr: "A chest strap reads your heartbeat electrically instead of optically, which is the difference between beat timing that is accurate to the millisecond and beat timing that is guessed. That matters enormously for HRV. The Polar H10 is the research-grade default and what we recommend if budget is not the deciding factor. The COOSPO H808S costs a fraction of it and, in our testing, produced readings we could not meaningfully separate from the Polar's. The Polar is a little more comfortable over long wear; the COOSPO beeps audibly when it connects and disconnects, which some people like and some find irritating. Either one will transform your data."
+question: "Which HRV chest strap is better, Polar H10 or COOSPO H808S?"
+app:
+  feature: hrv-readings
+  hook: "Put your new chest strap to work each morning."
+  line: "Pair your strap with Autonomic for a beat by beat morning HRV reading and a daily score out of 100."
 categories:
   - hrv
   - app
@@ -118,3 +124,10 @@ A chest strap is the highest-leverage purchase in home HRV tracking, because it 
 <div class="callout callout-warn">
 <strong>Not medical advice.</strong> This article is educational and not a substitute for personalized care. <em>Consumer heart-rate straps are built for tracking your own trends over time, not for diagnosing any heart or autonomic condition.</em> Talk with a qualified clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Gilgen-Ammann R, Schweizer T, Wyss T. [RR interval signal quality of a heart rate monitor and an ECG Holter at rest and during exercise](https://doi.org/10.1007/s00421-019-04142-5). *European Journal of Applied Physiology*, 2019.
+- Schäfer A, Vagedes J. [How accurate is pulse rate variability as an estimate of heart rate variability? A review on studies comparing photoplethysmographic technology with an electrocardiogram](https://doi.org/10.1016/j.ijcard.2012.03.119). *International Journal of Cardiology*, 2013.
+- O'Grady B, Lambe R, Baldwin M, et al. [The validity of Apple Watch Series 9 and Ultra 2 for serial measurements of heart rate variability and resting heart rate](https://doi.org/10.3390/s24196220). *Sensors*, 2024.
+- Shaffer F, Ginsberg JP. [An overview of heart rate variability metrics and norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.

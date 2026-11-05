@@ -6,11 +6,17 @@ summary: "There is no single POTS diet, but a few patterns reliably help: smalle
 description: "A practical POTS diet guide: why small, salty, frequent meals help, how much salt to aim for, which foods steady blood sugar, and what to limit, without going restrictive."
 keywords: "POTS diet, what to eat with POTS, POTS foods to avoid, small frequent meals POTS, salt POTS diet, POTS blood sugar, post-meal symptoms POTS, reactive hypoglycemia"
 date: 2026-06-09
-updated: 2026-06-09
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1512621776951-a57141f2eefd?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Anna Pelzer / Unsplash"
 tldr: "Eating is a physical stressor in POTS: digestion pulls a large volume of blood to your gut, which worsens pooling and spikes heart rate. The fix is rarely one magic food, it is a pattern. Eat smaller meals more often, get plenty of sodium and fluids to expand blood volume, and keep blood sugar steady with protein, fiber and fat. Big refined-carb loads, excess caffeine and alcohol are the usual troublemakers."
+question: "What should I eat if I have POTS?"
+app:
+  feature: insights
+  hook: "See which meals your body handles best."
+  line: "Log meals, salt and water in Autonomic and it shows which foods and habits line up with your better and worse days."
 categories:
   - food
   - pots
@@ -134,3 +140,11 @@ There is no perfect POTS diet, and you do not need to fear food. The wins come f
   for personalized care. <em>High-sodium diets are not safe for everyone: they can be harmful with high blood pressure, kidney or heart conditions.</em> Talk with a qualified
   clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Vernino S, Bourne KM, Stiles LE, et al. [Postural orthostatic tachycardia syndrome (POTS): State of the science and clinical care from a 2019 National Institutes of Health Expert Consensus Meeting - Part 1](https://doi.org/10.1016/j.autneu.2021.102828). *Autonomic Neuroscience*, 2021.
+- Garland EM, Gamboa A, Nwazue VC, et al. [Effect of high dietary sodium intake in patients with postural tachycardia syndrome](https://doi.org/10.1016/j.jacc.2021.03.005). *Journal of the American College of Cardiology*, 2021.
+- Tani H, Singer W, McPhee BR, et al. [Splanchnic-mesenteric capacitance bed in the postural tachycardia syndrome (POTS)](https://doi.org/10.1016/S1566-0702%2800%2900205-8). *Autonomic Neuroscience*, 2000.
+- Breier NC, Paranjape SY, Scudder S, et al. [Worsening postural tachycardia syndrome is associated with increased glucose-dependent insulinotropic polypeptide secretion](https://doi.org/10.1161/HYPERTENSIONAHA.121.17852). *Hypertension*, 2022.
+- Cleveland Clinic. [Postural orthostatic tachycardia syndrome (POTS)](https://my.clevelandclinic.org/health/diseases/16560-postural-orthostatic-tachycardia-syndrome-pots). Reviewed 2026.

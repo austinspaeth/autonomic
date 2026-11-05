@@ -6,17 +6,23 @@ summary: "Nicotine is a stimulant that reliably raises heart rate and lowers HRV
 description: "How nicotine affects HRV and heart rate: the sympathetic physiology, how smoking, vaping, and pouches compare, why it matters for POTS, and how HRV recovers after you quit."
 keywords: "nicotine and HRV, does nicotine lower HRV, vaping HRV, nicotine heart rate variability, nicotine pouches heart rate, smoking and HRV, nicotine POTS, quitting smoking HRV recovery, vaping heart rate variability, nicotine sympathetic nervous system"
 date: 2026-09-21
-updated: 2026-09-21
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1580691179247-aa36daf766c9?q=80&w=928&auto=format&fit=crop"
 photoAttribution: "Unsplash"
 tldr: "Nicotine is a sympathomimetic stimulant, so it reliably raises heart rate and lowers HRV by tilting your autonomic balance toward fight-or-flight. Unlike caffeine, that direction is consistent across the research. The size of each hit depends on delivery (a cigarette's fast bolus is sharper than a patch's steady release), and for POTS it pushes an already-fast, adrenaline-heavy system harder. The reassuring part: HRV starts climbing within days of quitting, with clear gains over the following weeks. Track your resting heart rate, HRV, and a stand test against your own baseline."
+question: "Does nicotine lower my HRV?"
+app:
+  feature: insights
+  hook: "See what nicotine does to your numbers."
+  line: "Log nicotine in Autonomic and it shows how your HRV and heart rate line up with the days you use it, or since you cut down."
 categories:
   - hrv
   - pots
 faq:
   - q: "Does nicotine lower your HRV?"
-    a: "Yes, and unlike caffeine the direction is consistent. Nicotine is a sympathomimetic: it triggers a release of adrenaline and noradrenaline, which raises heart rate and blood pressure and shifts your autonomic balance toward the sympathetic (fight-or-flight) branch. In HRV terms that shows up as lower vagal markers like RMSSD and HF power and a higher LF/HF ratio in the minutes after a dose. Repeated dosing through the day keeps the balance tilted, and long-term smokers tend to show chronically lower HRV than non-smokers."
+    a: "Yes, and unlike caffeine the direction is consistent. Nicotine is a sympathomimetic: it triggers a release of adrenaline and noradrenaline, which raises heart rate and blood pressure and shifts your autonomic balance toward the sympathetic (fight-or-flight) branch. In HRV terms that shows up as a lower vagal marker like RMSSD in the minutes after a dose, though results for HF power and the LF/HF ratio vary between studies. Repeated dosing through the day keeps the balance tilted, and long-term smokers tend to show chronically lower HRV than non-smokers."
   - q: "Is vaping better than smoking for HRV?"
     a: "Vaping avoids combustion products, but the autonomic hit is driven mainly by the nicotine itself, and studies of nicotine-containing e-cigarettes show the same acute shift toward sympathetic dominance and a rise in heart rate. Nicotine-free e-liquids produce a much smaller effect, which points the finger at the nicotine rather than the vapor. So vaping with nicotine is not a free pass for your HRV, even if other health considerations differ."
   - q: "Do nicotine pouches affect heart rate variability?"
@@ -29,7 +35,7 @@ social:
   linkedin: |
     Caffeine's effect on HRV is genuinely mixed in the research. Nicotine's is not.
 
-    Nicotine is a sympathomimetic: it triggers a release of adrenaline and noradrenaline, raising heart rate and blood pressure and tilting the autonomic balance toward the sympathetic branch. In HRV terms that is a reliable acute drop in vagal markers (RMSSD, HF power) and a rise in the LF/HF ratio, and it holds across cigarettes and nicotine-containing e-cigarettes. Nicotine-free e-liquid produces a much smaller effect, which points at the nicotine rather than the vapor.
+    Nicotine is a sympathomimetic: it triggers a release of adrenaline and noradrenaline, raising heart rate and blood pressure and tilting the autonomic balance toward the sympathetic branch. In HRV terms that is an acute drop in RMSSD, a vagal marker, and the sympathetic shift holds across cigarettes and nicotine-containing e-cigarettes. Nicotine-free e-liquid produces a much smaller effect, which points at the nicotine rather than the vapor.
 
     Two things worth knowing for patients and clinicians. First, delivery shapes the hit: a cigarette's fast arterial bolus produces a sharper autonomic spike than a pouch or a patch's steady release. Second, the recovery story is encouraging: HRV starts climbing within days of quitting, with clear gains over the following weeks. For anyone tracking dysautonomia or POTS, that makes cutting down one of the more visible wins on a personal baseline.
 
@@ -68,7 +74,7 @@ Nicotine works by imitating **acetylcholine**, one of your body's own signaling 
 
 The result is a classic sympathomimetic response, meaning nicotine mimics the effects of your own stress hormones:
 
-- **Heart rate rises**, often by 10 to 20 beats per minute within a few minutes of a cigarette or vape.
+- **Heart rate rises**, by as much as 10 to 15 beats per minute within a few minutes of a cigarette or vape.
 - **Blood pressure climbs** a little, and blood vessels constrict.
 - **Vagal (parasympathetic) tone pulls back.** The calming brake on your heart eases off, which is exactly what lowers HRV.
 
@@ -76,7 +82,7 @@ None of this is subtle machinery. Nicotine is doing to your cardiovascular syste
 
 ## Does nicotine lower your HRV?
 
-Yes, and this is the part worth underlining, because it is where nicotine differs from the other everyday stimulants. Controlled studies of acute nicotine and cigarette smoking consistently show the same picture: a drop in the time-domain vagal markers like [RMSSD](/insights/basics/rmssd-and-pnn50-vagal-tone-metrics/), a drop in high-frequency (HF) power, and a rise in the LF/HF ratio, all signs that the autonomic balance has tipped toward the sympathetic side. An <a href="https://doi.org/10.1177/0003319706294555" target="_blank" rel="noopener">acute-effect study of cigarette smoking</a> found exactly this shift within minutes of smoking, and reviews of e-cigarette use report the <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC7704447/" target="_blank" rel="noopener">same move toward sympathetic dominance</a>.
+Yes, and this is the part worth underlining, because it is where nicotine differs from the other everyday stimulants. Controlled studies of acute nicotine and cigarette smoking point the same way: a faster heart rate and a drop in time-domain vagal markers like [RMSSD](/insights/basics/rmssd-and-pnn50-vagal-tone-metrics/), signs that the autonomic balance has tipped toward the sympathetic side. The frequency bands, high-frequency (HF) power and the LF/HF ratio, are less consistent from study to study. An <a href="https://doi.org/10.1177/0003319706294555" target="_blank" rel="noopener">acute-effect study of cigarette smoking</a> found RMSSD falling within minutes of smoking while its HF power rose and its LF/HF ratio fell, and reviews of e-cigarette use report the <a href="https://pmc.ncbi.nlm.nih.gov/articles/PMC7704447/" target="_blank" rel="noopener">same move toward sympathetic dominance</a>.
 
 <figure class="prose-figure">
   <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="A line chart over sixty minutes. After a nicotine dose, the heart rate line jumps up and the HRV line drops sharply, then both curves ease back toward baseline over the following hour.">
@@ -117,8 +123,8 @@ Here is how the common HRV metrics respond to an acute dose:
 | HRV metric | Direction after nicotine | What it means |
 | --- | --- | --- |
 | RMSSD | Down | Less beat-to-beat vagal (parasympathetic) activity |
-| HF power | Down | The parasympathetic, breathing-linked band is suppressed |
-| LF/HF ratio | Up | Balance tips toward sympathetic dominance |
+| HF power | Varies by study | The parasympathetic, breathing-linked band; results are mixed |
+| LF/HF ratio | Varies by study | Often read as sympathetic balance, but results are mixed |
 | Resting heart rate | Up | The vagal brake eases and sympathetic drive rises |
 | pNN50 | Down | Fewer large beat-to-beat gaps, a marker of vagal tone |
 
@@ -217,3 +223,11 @@ Because the effect is real but the timing is quick, the useful move is to compar
 Nicotine is a sympathomimetic stimulant, so it reliably raises heart rate and lowers HRV by tilting your autonomic balance toward fight-or-flight. That direction is consistent across the research, which sets it apart from caffeine. The size of each hit depends on delivery, with a cigarette's fast bolus sharper than a patch's steady release, and the nicotine itself does most of the work regardless of the form. For POTS and dysautonomia, it adds to a load the system is already carrying. And the encouraging counterpart is just as real: HRV starts recovering within days of cutting down, which makes it one of the more visible wins you can track on your own baseline.
 
 For related reading, see [alcohol and HRV](/insights/hrv/alcohol-and-hrv-pots/), [caffeine and POTS](/insights/pots/caffeine-and-pots-heart-rate-hrv/), and [how to improve your HRV: what actually works](/insights/hrv/how-to-improve-hrv-what-works/).
+
+## Sources
+
+- Karakaya O, Barutcu I, Kaya D, et al. [Acute effect of cigarette smoking on heart rate variability](https://doi.org/10.1177/0003319706294555). *Angiology*, 2007.
+- Garcia PD, Gornbein JA, Middlekauff HR. [Cardiovascular autonomic effects of electronic cigarette use: a systematic review](https://doi.org/10.1007/s10286-020-00683-4). *Clinical Autonomic Research*, 2020.
+- Benowitz NL, Burbank AD. [Cardiovascular toxicity of nicotine: implications for electronic cigarette use](https://doi.org/10.1016/j.tcm.2016.03.001). *Trends in Cardiovascular Medicine*, 2016.
+- Minami J, Ishimitsu T, Matsuoka H. [Effects of smoking cessation on blood pressure and heart rate variability in habitual smokers](https://doi.org/10.1161/01.HYP.33.1.586). *Hypertension*, 1999.
+- Harte CB, Meston CM. [Effects of smoking cessation on heart rate variability among long-term male smokers](https://doi.org/10.1007/s12529-013-9295-0). *International Journal of Behavioral Medicine*, 2014.

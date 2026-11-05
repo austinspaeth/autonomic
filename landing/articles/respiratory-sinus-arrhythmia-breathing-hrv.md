@@ -6,11 +6,17 @@ summary: "Respiratory sinus arrhythmia is the normal, healthy way your heart spe
 description: "What respiratory sinus arrhythmia (RSA) is: why heart rate rises on the inhale and falls on the exhale, how it drives RMSSD and HF power, and what a small RSA means in POTS and long COVID."
 keywords: "respiratory sinus arrhythmia, RSA, breathing and heart rate variability, why does heart rate change with breathing, vagal tone, HF power, RMSSD, deep breathing test, slow breathing HRV, POTS, long COVID"
 date: 2026-08-20
-updated: 2026-08-20
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1465409042654-5314e9d1754b?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Unsplash"
 tldr: "Respiratory sinus arrhythmia (RSA) is the rise and fall of your heart rate across a single breath: it speeds up as you inhale and slows as you exhale, driven by the vagus nerve. That breathing-linked swing is the largest part of your short-term HRV, which is why RMSSD and HF power climb when you breathe slowly and shrink when you breathe fast or shallow. A healthy RSA is a sign of good vagal tone. It tends to run small in POTS and long COVID, and it is one of the few HRV features you can deliberately change in real time by slowing your breath."
+question: "Why does my heart rate go up and down when I breathe?"
+app:
+  feature: hrv-readings
+  hook: "Watch your heart rate breathe with you."
+  line: "During a reading, Autonomic draws your beat-to-beat trace live, so you can see your heart speed up on each inhale and slow on each exhale."
 categories:
   - hrv
   - basics
@@ -195,9 +201,9 @@ The single most important line in that table is the first one, because breathing
 
 ## What a small RSA means in POTS and long COVID
 
-In [POTS](/insights/hrv/what-is-hrv-and-why-it-matters-for-pots-recovery/), long COVID and other forms of dysautonomia, the resting balance tends to sit tilted toward sympathetic activity, and vagal tone runs low. A common signature of that is a **reduced RSA**: the heart-rate swing across the breath is smaller than you would expect for the person's age, and it shrinks further on standing. That shows up in the app as low RMSSD and low HF power.
+In [POTS](/insights/hrv/what-is-hrv-and-why-it-matters-for-pots-recovery/), long COVID and other forms of dysautonomia, the resting balance tends to sit tilted toward sympathetic activity, and vagal tone runs low. A common signature of that is a **reduced RSA**: the heart-rate swing across the breath is smaller than you would expect for the person's age, and it shrinks further on standing. That tends to show up in the app as a low RMSSD; studies comparing POTS with healthy people find RMSSD lower, while HF power trends lower without a clear difference.
 
-Two cautions keep this honest. First, a small RSA is a **pattern, not a diagnosis**. Plenty of things flatten it temporarily, and one low reading means very little. Second, RSA and standing heart rate are answering different questions: RSA is about vagal tone and the quality of the rhythm, while the [10-minute stand test](/insights/pots/the-orthostatic-stand-test-at-home/) is about the heart-rate jump on standing. Both are worth tracking, and neither replaces a clinician's assessment. What is genuinely encouraging is that RSA is responsive: as people recover, the breathing-linked swing often widens again, and it is one of the earliest HRV features to move.
+Two cautions keep this honest. First, a small RSA is a **pattern, not a diagnosis**. Plenty of things flatten it temporarily, and one low reading means very little. Second, RSA and standing heart rate are answering different questions: RSA is about vagal tone and the quality of the rhythm, while the [10-minute stand test](/insights/pots/the-orthostatic-stand-test-at-home/) is about the heart-rate jump on standing. Both are worth tracking, and neither replaces a clinician's assessment. What is genuinely encouraging is that RSA is responsive: as people recover, the breathing-linked swing can widen again.
 
 ## How to see your own RSA
 
@@ -223,3 +229,11 @@ Your heart rate is meant to breathe with you. Respiratory sinus arrhythmia, the 
 </div>
 
 *Educational field notes, not medical advice. Autonomic is a private tracking tool, not a medical device, and it does not diagnose or treat any condition. Discuss any changes to your care with your clinician.*
+
+## Sources
+
+- Task Force of the European Society of Cardiology and the North American Society of Pacing and Electrophysiology. [Heart rate variability: standards of measurement, physiological interpretation and clinical use](https://doi.org/10.1161/01.CIR.93.5.1043). *Circulation*, 1996.
+- Yasuma F, Hayano J. [Respiratory sinus arrhythmia: why does the heartbeat synchronize with respiratory rhythm?](https://doi.org/10.1378/chest.125.2.683) *Chest*, 2004.
+- Hirsch JA, Bishop B. [Respiratory sinus arrhythmia in humans: how breathing pattern modulates heart rate](https://doi.org/10.1152/ajpheart.1981.241.4.H620). *American Journal of Physiology*, 1981.
+- Lehrer PM, Gevirtz R. [Heart rate variability biofeedback: how and why does it work?](https://doi.org/10.3389/fpsyg.2014.00756) *Frontiers in Psychology*, 2014.
+- Swai J, Hu Z, Zhao X, et al. [Heart rate and heart rate variability comparison between postural orthostatic tachycardia syndrome versus healthy participants; a systematic review and meta-analysis](https://doi.org/10.1186/s12872-019-01298-y). *BMC Cardiovascular Disorders*, 2019.

@@ -6,11 +6,17 @@ summary: "Small fiber neuropathy damages the tiny nerves that carry pain, temper
 description: "Small fiber neuropathy in POTS and long COVID: burning pain, autonomic symptoms, how skin biopsy and QSART testing work, the link to low HRV, and what you can track at home. Educational, non-diagnostic."
 keywords: "small fiber neuropathy, small fiber neuropathy POTS, small fiber neuropathy long covid, autonomic neuropathy, small fiber neuropathy symptoms, skin biopsy small fiber neuropathy, QSART, burning feet neuropathy, small fiber neuropathy test, dysautonomia neuropathy"
 date: 2026-08-22
-updated: 2026-08-22
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "/articles/small-fiber-neuropathy-pots-long-covid/cover.webp"
 photoAttribution: "Autonomic"
 tldr: "Small fiber neuropathy (SFN) is damage to the thin nerve fibers that carry pain, temperature and autonomic signals. It causes burning or tingling in the feet and hands plus autonomic problems like a racing heart on standing, poor sweating and gut trouble, which is why it overlaps heavily with POTS and long COVID. Because the same small fibers feed the heart's vagal control, SFN often travels with low HRV and orthostatic intolerance. It is diagnosed with a skin biopsy and autonomic tests, not a routine nerve conduction study. You cannot diagnose it at home, but tracking HRV, resting and standing heart rate and symptoms builds the picture your clinician needs."
+question: "What is small fiber neuropathy, and how is it tested?"
+app:
+  feature: doctor-reports
+  hook: "Walk into neurology with your symptoms on paper."
+  line: "Autonomic turns your logged symptoms, HRV and stand tests into a doctor summary, so burning feet and a racing heart get seen together."
 categories:
   - pots
   - postviral
@@ -208,3 +214,11 @@ Small fiber neuropathy is damage to the thin nerves that carry pain, temperature
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Small fiber neuropathy, POTS and long COVID all require proper evaluation, and testing and treatment should be guided by a clinician. If your symptoms are new, worsening or frightening, get medical care.
 </div>
+
+## Sources
+
+- Lauria G, Hsieh ST, Johansson O, et al. [European Federation of Neurological Societies/Peripheral Nerve Society guideline on the use of skin biopsy in the diagnosis of small fiber neuropathy](https://doi.org/10.1111/j.1468-1331.2010.03023.x). *European Journal of Neurology*, 2010.
+- Gibbons CH, Bonyhay I, Benson A, et al. [Structural and functional small fiber abnormalities in the neuropathic postural tachycardia syndrome](https://doi.org/10.1371/journal.pone.0084716). *PLoS One*, 2013.
+- Oaklander AL, Mills AJ, Kelley M, et al. [Peripheral neuropathy evaluations of patients with prolonged long COVID](https://doi.org/10.1212/NXI.0000000000001146). *Neurology: Neuroimmunology and Neuroinflammation*, 2022.
+- Pál E, Fülöp K, Tóth P, et al. [Small fiber neuropathy: clinicopathological correlations](https://doi.org/10.1155/2020/8796519). *Behavioural Neurology*, 2020.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.

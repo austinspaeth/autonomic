@@ -6,11 +6,17 @@ summary: "Heart rate zones split effort into five bands off your estimated maxim
 description: "Heart rate zones Z1 to Z5 explained: how the 208 minus 0.7 times age formula works, what each zone trains, why beta blockers and POTS break the effort-to-heart-rate link, and how to use time in zone alongside post-exertional malaise."
 keywords: "heart rate zones, Z1 Z2 Z3 Z4 Z5, maximum heart rate formula, 208 minus 0.7 age, zone 2 training, time in zone, heart rate zones POTS, beta blockers heart rate zones, exercise long COVID, post-exertional malaise heart rate"
 date: 2026-08-11
-updated: 2026-08-11
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1758520705189-a6b56a7ae832?q=80&w=3132&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Briana Tozour / Unsplash"
 tldr: "Heart rate zones divide effort into five bands as a percentage of your estimated maximum heart rate: Z1 under 60 percent, Z2 60 to 70, Z3 70 to 80, Z4 80 to 90, Z5 above 90. Autonomic estimates your maximum from your age using 208 minus 0.7 times age, which is a population average with a wide spread around it, and which reads badly if you take a beta blocker or if your heart rate is driven by orthostatic stress rather than effort. Zone 2 is where aerobic and autonomic base is rebuilt. In dysautonomia, work recumbent first, treat Z4 and Z5 minutes as a risk you accepted rather than a win, and read your zone chart beside your post-exertional malaise log rather than on its own."
+question: "What do heart rate zones mean if I have POTS or PEM?"
+app:
+  feature: pacing-budget
+  hook: "Know how much effort today can take."
+  line: "Autonomic counts time spent above your own heart rate line toward a daily energy budget, and alerts you when it is nearly spent."
 categories:
   - recovery
   - pots
@@ -18,9 +24,9 @@ faq:
   - q: "How are heart rate zones calculated?"
     a: "Zones are percentages of your maximum heart rate. Autonomic estimates your maximum from the birthday in Settings using 208 minus 0.7 times your age, then splits effort into five bands: Z1 below 60 percent of max, Z2 from 60 to 70 percent, Z3 from 70 to 80, Z4 from 80 to 90, and Z5 at 90 percent and above. A 40-year-old gets an estimated maximum of 180 bpm, so their Z2 runs roughly 108 to 126 bpm."
   - q: "Is 220 minus your age accurate?"
-    a: "It is the best-known formula and the least accurate. The 208 minus 0.7 times age equation that Autonomic uses comes from a large meta-analysis and fits observed data better, particularly for older adults, but both are population averages. Real maximum heart rates scatter roughly 10 to 12 beats either side of any age formula, so two healthy people of the same age can have maximums 20 beats apart. Treat your zones as a consistent scale for comparing your own sessions, not as physiological truth."
+    a: "It is the best-known formula and the least accurate. The 208 minus 0.7 times age equation that Autonomic uses comes from a large meta-analysis and fits observed data better, particularly for older adults, but both are population averages. Real maximum heart rates scatter widely around any age formula, so two healthy people of the same age can have quite different maximums. Treat your zones as a consistent scale for comparing your own sessions, not as physiological truth."
   - q: "What is zone 2 training and why does it matter?"
-    a: "Zone 2 is the comfortable aerobic band, roughly 60 to 70 percent of maximum heart rate, where you can still hold a conversation. It is where mitochondrial density, capillary networks and stroke volume are built, and it is the intensity most associated with improving vagal tone and heart rate variability over months. For anyone rebuilding after dysautonomia or a post-viral illness, Z2 and below is where almost all of the useful work happens."
+    a: "Zone 2 is the comfortable aerobic band, roughly 60 to 70 percent of maximum heart rate, where you can still hold a conversation. It is where mitochondrial density, capillary networks and stroke volume are built. For anyone rebuilding after dysautonomia or a post-viral illness, Z2 and below is where almost all of the useful work happens."
   - q: "Are heart rate zones useful if you have POTS?"
     a: "They are useful as a warning system and much less useful as a training prescription. In POTS your heart rate rises from posture and blood pooling, not only from effort, so standing still can put you in Z3 while your muscles are doing nothing. The workaround is to train recumbent first, where the heart rate you see is closer to genuine effort, and to treat a rising zone during easy work as a signal to stop rather than a sign you are training harder."
   - q: "Do beta blockers change my heart rate zones?"
@@ -93,7 +99,7 @@ Zones are percentages of your **maximum heart rate**: the fastest your heart can
 
 **Zone 1, under 60 percent.** Very easy movement: a slow walk, stretching, the warm-up and cool-down around everything else. Circulation increases, but the system is barely taxed. In severe dysautonomia this is not a warm-up zone at all, it is the whole session, and that is a legitimate place to be.
 
-**Zone 2, 60 to 70 percent.** The conversational aerobic band, the one you can hold for a long time while still finishing sentences. Physiologically this is where the slow, structural adaptations happen: more mitochondria, denser capillary beds, a larger stroke volume so each beat moves more blood. It is also the intensity most consistently linked to improving vagal tone, which is why it matters so much here. **Zone 2 is where autonomic recovery is actually built.**
+**Zone 2, 60 to 70 percent.** The conversational aerobic band, the one you can hold for a long time while still finishing sentences. Physiologically this is where the slow, structural adaptations happen: more mitochondria, denser capillary beds, a larger stroke volume so each beat moves more blood. **Zone 2 is where autonomic recovery is actually built.**
 
 **Zone 3, 70 to 80 percent.** Moderate to firm effort. Breathing is noticeably up and you speak in short phrases. It is real aerobic work, and it costs more recovery than Z2 for adaptations that are not much larger, which is why endurance coaches often call it the grey zone.
 
@@ -108,7 +114,7 @@ Autonomic estimates your maximum heart rate with **208 minus 0.7 times your age*
 That formula is a better one than the famous "220 minus age" you have seen on gym posters. It comes from a large meta-analysis of measured maximum heart rates and fits real data more closely, especially in older adults, where 220 minus age tends to underestimate badly. But **better does not mean accurate for you.**
 
 <div class="callout callout-note">
-  <strong>Any age formula has a wide spread around it.</strong> Measured maximums scatter roughly 10 to 12 beats per minute either side of the prediction, and the tails are wider still. Two healthy 40-year-olds can genuinely have maximums of 170 and 192. Your zone boundaries are therefore a consistent, repeatable scale for comparing your own sessions to each other, not a physiological fact about your heart.
+  <strong>Any age formula has a wide spread around it.</strong> Measured maximums scatter widely around the prediction. Two healthy 40-year-olds can genuinely have maximums far apart. Your zone boundaries are therefore a consistent, repeatable scale for comparing your own sessions to each other, not a physiological fact about your heart.
 </div>
 
 Three situations break the estimate badly enough to be worth naming.
@@ -188,3 +194,9 @@ Heart rate zones are a good way to make effort legible: five bands off an estima
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. <em>If you have post-exertional malaise, discuss any activity plan with a clinician familiar with ME/CFS before starting or changing it.</em> Talk with a qualified clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Tanaka H, Monahan KD, Seals DR. [Age-predicted maximal heart rate revisited](https://doi.org/10.1016/S0735-1097%2800%2901054-8). *Journal of the American College of Cardiology*, 2001.
+- Fu Q, VanGundy TB, Shibata S, et al. [Exercise training versus propranolol in the treatment of the postural orthostatic tachycardia syndrome](https://doi.org/10.1161/HYPERTENSIONAHA.111.172262). *Hypertension*, 2011.
+- Centers for Disease Control and Prevention. [Strategies to Prevent Worsening of Symptoms (ME/CFS)](https://www.cdc.gov/me-cfs/hcp/clinical-care/treating-the-most-disruptive-symptoms-first-and-preventing-worsening-of-symptoms.html). CDC.

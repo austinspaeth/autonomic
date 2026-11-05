@@ -6,11 +6,17 @@ summary: "A low-histamine diet can calm the flares of MCAS and histamine intoler
 description: "A practical low-histamine diet food list for MCAS and histamine intolerance: which foods to eat, which to test or limit, the freshness rule, and how to reintroduce without over-restricting."
 keywords: "low histamine diet, MCAS food list, histamine intolerance foods, mast cell activation diet, low histamine foods to eat, high histamine foods to avoid, histamine and POTS, low histamine reintroduction"
 date: 2026-06-16
-updated: 2026-06-16
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1488459716781-31db52582fe9?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Jacopo Maiarelli / Unsplash"
-tldr: "A low-histamine diet lowers the total histamine burden that provokes MCAS flares, so it can take real pressure off symptoms. The core moves: eat freshly cooked meat and fish, most fresh vegetables, apples and pears, rice and olive oil; limit aged, cured, fermented and leftover foods. The single biggest lever is freshness, because histamine climbs in stored protein. But it is a short-term diagnostic tool, not a permanent diet. Reintroduce foods systematically to find your own triggers."
+tldr: "A low-histamine diet lowers the total histamine burden that provokes MCAS flares, so it can take real pressure off symptoms. The core moves: eat freshly cooked meat and fish, most fresh vegetables, apples and pears, rice and olive oil; limit aged, cured, fermented and leftover foods. The single biggest lever is freshness, because storage raises the risk of histamine building up in protein. But it is a short-term diagnostic tool, not a permanent diet. Reintroduce foods systematically to find your own triggers."
+question: "What can I eat on a low-histamine diet for MCAS?"
+app:
+  feature: insights
+  hook: "Find which foods line up with flares."
+  line: "Log meals and triggers in Autonomic and it shows which foods line up with your better and worse days."
 categories:
   - food
   - pots
@@ -18,7 +24,7 @@ faq:
   - q: "What foods are low in histamine?"
     a: "Freshly cooked meat and poultry, fresh-caught or flash-frozen fish, most fresh vegetables, apples, blueberries and pears, rice, and olive oil are generally low in histamine. The common thread is freshness: histamine accumulates as protein-rich food ages, so food cooked and eaten soon after buying is usually lower than the same food stored for days."
   - q: "What foods should I avoid with MCAS?"
-    a: "The usual high-histamine culprits are aged and cured meats, aged cheeses, fermented foods, leftovers, tomatoes, spinach and eggplant, citrus, alcohol (especially red wine), and canned or smoked fish. Not everyone reacts to all of these, which is why a low-histamine diet is meant to be tested and personalized rather than followed as a fixed list forever."
+    a: "The usual high-histamine culprits are aged and cured meats, aged cheeses, fermented foods, leftovers, tomatoes, spinach and eggplant, alcohol (especially red wine), and canned or smoked fish. Citrus is a histamine liberator rather than high in histamine itself, so it is a food to test. Not everyone reacts to all of these, which is why a low-histamine diet is meant to be tested and personalized rather than followed as a fixed list forever."
   - q: "Is a low-histamine diet permanent?"
     a: "No. A low-histamine diet is a short-term diagnostic and symptom-management tool, usually run for a few weeks, followed by systematic reintroduction. Staying broadly restricted long-term carries a real risk of nutritional gaps and a needlessly narrow diet. The goal is to identify your specific triggers, ideally with a dietitian, then eat as widely as your body tolerates."
   - q: "Can histamine affect POTS symptoms?"
@@ -41,13 +47,13 @@ A low-histamine diet does not cure any of that. What it does is lower the **tota
 
 Before any food list, understand the rule that governs most of it. Histamine forms as bacteria act on the amino acids in protein-rich food over time. That means **the same food can be low- or high-histamine depending on how long it has been sitting around**.
 
-Fresh-cooked chicken eaten right away is low. That same chicken left in the fridge for three days, then reheated, has climbed considerably. This is why leftovers are often a bigger trigger than the ingredient itself. Two habits carry most of the benefit:
+Fresh-cooked chicken eaten right away is low. The longer that same chicken is stored, the higher the risk that histamine builds up. This is why leftovers are often a bigger trigger than the ingredient itself. Two habits carry most of the benefit:
 
 - Buy and cook protein fresh, and eat it soon after cooking.
-- Freeze extra portions **immediately** after cooking rather than parking them in the fridge, since freezing largely halts histamine buildup while fridge storage does not.
+- Freeze extra portions **immediately** after cooking rather than parking them in the fridge, since storage raises the risk of histamine buildup and freezing stops histamine forming.
 
 <figure class="prose-figure">
-  <svg class="fig-d" viewBox="0 0 720 210" role="img" aria-label="A rising line showing histamine increasing in stored cooked protein over time, staying low if frozen">
+  <svg class="fig-d" viewBox="0 0 720 210" role="img" aria-label="A rising line showing the risk of histamine buildup increasing as cooked protein is stored, staying low if frozen">
     <line x1="70" y1="30" x2="70" y2="170" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="70" y1="170" x2="680" y2="170" stroke="var(--line)" stroke-width="1.5"/>
     <text x="20" y="40" font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">high</text>
@@ -60,7 +66,7 @@ Fresh-cooked chicken eaten right away is low. That same chicken left in the frid
     <path d="M70 160 L 680 156" fill="none" stroke="#54d98a" stroke-width="3" stroke-dasharray="6 5"/>
     <text x="500" y="145" font-family="Space Grotesk, sans-serif" font-size="12" fill="#54d98a">frozen right away</text>
   </svg>
-  <svg class="fig-m" viewBox="0 0 360 224" role="img" aria-label="A rising line showing histamine increasing in stored cooked protein over time, staying low if frozen">
+  <svg class="fig-m" viewBox="0 0 360 224" role="img" aria-label="A rising line showing the risk of histamine buildup increasing as cooked protein is stored, staying low if frozen">
     <line x1="46" y1="30" x2="46" y2="170" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="46" y1="170" x2="344" y2="170" stroke="var(--line)" stroke-width="1.5"/>
     <text x="18" y="36" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">high</text>
@@ -73,23 +79,23 @@ Fresh-cooked chicken eaten right away is low. That same chicken left in the frid
     <text x="344" y="190" text-anchor="end" font-family="Space Grotesk, sans-serif" font-size="11" fill="var(--dim-2)">3 days in fridge</text>
     <text x="196" y="212" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="11" fill="var(--dim-2)">(1 day in fridge, midway)</text>
   </svg>
-  <figcaption>Histamine climbs in stored cooked protein. Freezing leftovers immediately keeps them near the fresh baseline.</figcaption>
+  <figcaption>Illustrative. Storage raises the risk of histamine building up in cooked protein. Freezing leftovers immediately stops histamine forming.</figcaption>
 </figure>
 
 ## A practical eat-versus-test list
 
-Published food lists disagree at the edges, because individual tolerance varies and histamine content depends so heavily on freshness and storage. Use the table below as a starting map, not a law. It draws on the widely used [low-histamine foods list from Mast Cell 360](https://mastcell360.com/low-histamine-foods-list/) and clinical guides like the [Johns Hopkins low-histamine diet handout](https://www.hopkinsmedicine.org/-/media/johns-hopkins-childrens-center/documents/specialties/adolescent-medicine/cfs-low-histamine-diet.pdf).
+Published food lists disagree at the edges, because individual tolerance varies and histamine content depends so heavily on freshness and storage. Use the table below as a starting map, not a law. It draws on [published measurements of histamine in foods](https://doi.org/10.3390/biom10081181) and clinical reviews like [this overview of histamine intolerance](https://doi.org/10.3390/nu13072228).
 
 | Food group | Lower-histamine (enjoy) | Higher-histamine (test / limit) |
 | --- | --- | --- |
 | **Protein** | Freshly cooked meat and poultry; fresh-caught or flash-frozen fish | Aged, cured or smoked meats; canned or smoked fish; anything leftover |
 | **Dairy** | Fresh milk, ricotta, mozzarella eaten fresh | Aged and hard cheeses (parmesan, cheddar, blue) |
 | **Vegetables** | Most fresh vegetables, leafy greens (not spinach), zucchini, carrots | Tomatoes, spinach, eggplant, fermented vegetables like sauerkraut |
-| **Fruit** | Apples, pears, blueberries | Citrus, strawberries, dried fruit |
+| **Fruit** | Apples, pears, blueberries | Citrus and strawberries (histamine liberators, worth testing), dried fruit |
 | **Grains & fats** | Rice, oats, olive oil | Vinegar-based and heavily processed products |
 | **Drinks** | Water, most herbal teas | Alcohol (especially red wine), kombucha, aged/fermented drinks |
 
-Notice how much of the "avoid" column is fermented, aged or stored. Fermentation deliberately grows the bacteria that generate histamine, which is why kombucha, sauerkraut, aged cheese and cured meats sit high. The [RTHM overview of the low-histamine diet](https://www.rthm.com/resources/blogs/low-histamine-diet-mcas) walks through the same logic in more depth.
+Notice how much of the "avoid" column is fermented, aged or stored. Fermentation deliberately grows the bacteria that generate histamine, which is why kombucha, sauerkraut, aged cheese and cured meats sit high. This [review of histamine intolerance](https://doi.org/10.3390/biom10081181) walks through the same logic in more depth.
 
 <div class="callout callout-tip">
   <strong>Start with the biggest offenders.</strong> Rather than overhauling everything at once, many people get most of the benefit by cutting alcohol, aged cheese, cured meats, fermented foods and leftovers first, while keeping the rest of their diet intact. It is easier to sustain and easier to interpret.
@@ -130,3 +136,11 @@ A low-histamine diet is a genuinely useful lever for MCAS and histamine intolera
   for personalized care. <em>Do not follow a restrictive low-histamine diet long-term without guidance from a dietitian or clinician, and remember that MCAS needs proper medical evaluation rather than diet alone.</em> Talk with a qualified
   clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Comas-Basté O, Sánchez-Pérez S, Veciana-Nogués MT, et al. [Histamine intolerance: the current state of the art](https://doi.org/10.3390/biom10081181). *Biomolecules*, 2020.
+- Hrubisko M, Danis R, Huorka M, et al. [Histamine intolerance: the more we know the less we know. A review](https://doi.org/10.3390/nu13072228). *Nutrients*, 2021.
+- Hongpattarakere T, Buntin N, Nuylert A. [Histamine development and bacterial diversity in microbially-challenged tonggol (Thunnus tonggol) under temperature abuse during canning manufacture](https://doi.org/10.1007/s13197-015-2042-6). *Journal of Food Science and Technology*, 2016.
+- Shibao C, Arzubiaga C, Roberts LJ, et al. [Hyperadrenergic postural tachycardia syndrome in mast cell activation disorders](https://doi.org/10.1161/01.HYP.0000158259.68614.40). *Hypertension*, 2005.
+- Mast Cell Action. [Diet and MCAS](https://www.mastcellaction.org/diet-and-mcas).

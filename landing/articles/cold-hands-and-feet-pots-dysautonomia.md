@@ -6,11 +6,17 @@ summary: "Cold, pale hands and feet are one of the most common and least talked 
 description: "Why POTS, dysautonomia and long COVID cause cold hands and feet: sympathetic vasoconstriction, Raynaud's vs acrocyanosis, red flags to check, and what helps you warm up and track the pattern."
 keywords: "cold hands and feet POTS, cold extremities dysautonomia, Raynaud's long COVID, acrocyanosis POTS, peripheral vasoconstriction, cold feet POTS, poor circulation dysautonomia, why are my hands always cold, long COVID cold hands"
 date: 2026-10-11
-updated: 2026-10-11
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1484627147104-f5197bcd6651?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Unsplash"
 tldr: "Cold, pale hands and feet in POTS, dysautonomia and long COVID are usually driven by your sympathetic nervous system tightening the small blood vessels in your skin and shunting blood toward your core, not by a weak heart or clogged arteries. It overlaps with Raynaud's (episodic white-blue-red colour changes) and acrocyanosis (the dusky purple feet of standing). Warming your whole body, moving to run the circulation, steadying stress, and checking iron and thyroid help most. New one-sided coldness, fingertip sores or sudden severe pain need prompt medical review."
+question: "Why are my hands and feet always cold with POTS?"
+app:
+  feature: hrv-readings
+  hook: "Log cold hands and see the bigger picture."
+  line: "Note cold hands and feet as a symptom beside your morning HRV, sleep and water, so the pattern behind them is easier to see."
 categories:
   - pots
   - postviral
@@ -18,7 +24,7 @@ faq:
   - q: "Why are my hands and feet always cold with POTS or dysautonomia?"
     a: "Your sympathetic (fight-or-flight) nerves control the tiny muscles around the blood vessels in your skin. In POTS and dysautonomia that system often runs hot and tightens those vessels, cutting surface blood flow and shunting it toward your core, so your fingers and toes go cold and pale. Low blood volume, sluggish return of pooled blood, and nerve changes all add to it. It is usually a circulation-control problem, not a sign of heart or artery disease."
   - q: "Is Raynaud's the same as the purple feet I get when I stand?"
-    a: "No, they are two different things that often appear together. Raynaud's is an episodic clampdown of the finger or toe arteries, usually triggered by cold or stress, with a fairly sharp colour change from white to blue to red. Acrocyanosis is the steady dusky purple-red of the hands and feet, driven mainly by blood pooling and slow flow, and it tends to show up when you stand and settle when you lie down. Raynaud's hands feel cold; acrocyanotic feet are often warm."
+    a: "No, they are two different things that often appear together. Raynaud's is an episodic clampdown of the finger or toe arteries, usually triggered by cold or stress, with a fairly sharp colour change from white to blue to red. Acrocyanosis is the steady dusky purple-red of the hands and feet, driven mainly by blood pooling and slow flow, and it tends to show up when you stand and settle when you lie down. Raynaud's comes in attacks; acrocyanosis is steadier, and both leave the skin cold."
   - q: "Are cold hands and feet in long COVID dangerous?"
     a: "On their own, cold pale extremities from autonomic dysfunction are uncomfortable but generally not dangerous, and they reverse as you warm up and move. The things that do need prompt attention are a single limb that turns suddenly cold, pale and painful, open sores or ulcers on the fingertips that will not heal, or colour changes in a child or that come with joint pain and rashes. Those point to problems beyond ordinary dysautonomia and should be checked."
   - q: "Can beta-blockers make cold hands and feet worse?"
@@ -99,7 +105,7 @@ There is a second thread in long COVID and some POTS, and it runs the other way.
 | --- | --- | --- | --- | --- |
 | Plain vasoconstriction | Pale, cool, uniform | High sympathetic tone, low volume | Cold | Worse when cold, stressed or run down |
 | Raynaud's phenomenon | Sharp colour change, white then blue then red, often one or two digits | Episodic spasm of the finger or toe arteries | Cold, can sting or throb | Triggered by cold or stress, in attacks |
-| Acrocyanosis | Steady dusky purple-red, blotchy | Blood pooling and slow capillary flow | Often warm | Worse standing, better lying down |
+| Acrocyanosis | Steady dusky purple-red, blotchy | Blood pooling and slow capillary flow | Usually cold | Worse standing, better lying down |
 
 **Raynaud's phenomenon** is the most dramatic. The small arteries in a finger or toe spasm shut, so the digit goes white and numb, then blue as the trapped blood gives up its oxygen, then red and tingling as the clampdown releases and blood rushes back. It is very common, often harmless on its own (primary Raynaud's), and frequently keeps company with dysautonomia.
 
@@ -122,9 +128,9 @@ There is a second thread in long COVID and some POTS, and it runs the other way.
   <figcaption>The classic three-phase Raynaud's colour change. Not everyone gets all three, but the sharp, well-marked shift from pale to dusky to flushed is the signature.</figcaption>
 </figure>
 
-**Acrocyanosis** is the steadier cousin, and it is really a pooling story. When blood collects in the small vessels of the feet and moves through slowly, it gives up more oxygen and the skin turns a dusky purple-red. It tends to appear when you have been upright and ease off when you lie down, and acrocyanotic feet are often warm rather than cold. That standing-and-pooling mechanism is covered in detail in the piece on [blood pooling in POTS legs](/insights/pots/blood-pooling-in-pots-legs/).
+**Acrocyanosis** is the steadier cousin, and it is really a pooling story. When blood collects in the small vessels of the feet and moves through slowly, it gives up more oxygen and the skin turns a dusky purple-red. It tends to appear when you have been upright and ease off when you lie down, and acrocyanotic hands and feet are usually cold to the touch. That standing-and-pooling mechanism is covered in detail in the piece on [blood pooling in POTS legs](/insights/pots/blood-pooling-in-pots-legs/).
 
-The practical point: cold and pale leans toward vasoconstriction, sharp white-blue-red attacks lean toward Raynaud's, and warm dusky purple on standing leans toward acrocyanosis. Many people have a blend, and the response overlaps anyway.
+The practical point: cold and pale leans toward vasoconstriction, sharp white-blue-red attacks lean toward Raynaud's, and steady dusky purple on standing leans toward acrocyanosis. Many people have a blend, and the response overlaps anyway.
 
 ## Is it dangerous, and what else could it be?
 
@@ -168,7 +174,7 @@ A few things make the pattern visible. Your morning [HRV](/insights/hrv/hrv-comp
 
 **Why are my hands and feet always cold with POTS or dysautonomia?** Your sympathetic nerves control the small muscles around the skin's blood vessels. In POTS and dysautonomia that system often runs high and keeps those vessels tightened, cutting surface blood flow and shunting it toward your core, so the fingers and toes go cold and pale. Low blood volume and sluggish return of pooled blood add to it. It is a circulation-control problem, not usually a heart or artery disease.
 
-**Is Raynaud's the same as the purple feet I get when I stand?** No. Raynaud's is an episodic clampdown of the finger or toe arteries, usually triggered by cold or stress, with a fairly sharp white-to-blue-to-red colour change, and the digits feel cold. Acrocyanosis is the steady dusky purple-red of pooling and slow flow, usually warm, that shows up on standing and settles when you lie down. Many people get both.
+**Is Raynaud's the same as the purple feet I get when I stand?** No. Raynaud's is an episodic clampdown of the finger or toe arteries, usually triggered by cold or stress, with a fairly sharp white-to-blue-to-red colour change, and the digits feel cold. Acrocyanosis is the steady dusky purple-red of pooling and slow flow, usually cold, that shows up on standing and settles when you lie down. Many people get both.
 
 **Are cold hands and feet in long COVID dangerous?** On their own, cold pale extremities from autonomic dysfunction are uncomfortable but generally not dangerous and reverse as you warm and move. A single limb that turns suddenly cold, pale and painful, fingertip sores that will not heal, or colour changes with joint pain and rashes are different and need prompt medical review.
 
@@ -183,3 +189,12 @@ Cold hands and feet are not a sign that your heart or arteries are failing you. 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Cold hands and feet are common in dysautonomia, but a suddenly cold and painful limb, non-healing fingertip sores, or colour changes with joint pain, rashes, or in a child need prompt medical evaluation. Discuss any changes to your medications or management with a clinician who knows your history.
 </div>
+
+## Sources
+
+- Charkoudian N. [Skin blood flow in adult human thermoregulation: how it works, when it does not, and why](https://doi.org/10.4065/78.5.603). *Mayo Clinic Proceedings*, 2003.
+- National Institute of Arthritis and Musculoskeletal and Skin Diseases. [Raynaud's phenomenon](https://www.niams.nih.gov/health-topics/raynauds-phenomenon). Reviewed 2024.
+- Kurklinsky AK, Miller VM, Rooke TW. [Acrocyanosis: the Flying Dutchman](https://doi.org/10.1177/1358863X11398519). *Vascular Medicine*, 2011.
+- Gimeno Sánchez I, Granados Ruiz MA, Aymerich de Franceschi C, et al. [Acrocyanosis as the first manifestation of postural orthostatic tachycardia syndrome in two adolescents](https://doi.org/10.5546/aap.2021.e639). *Archivos Argentinos de Pediatría*, 2021.
+- Oaklander AL, Mills AJ, Kelley M, et al. [Peripheral neuropathy evaluations of patients with prolonged long COVID](https://doi.org/10.1212/NXI.0000000000001146). *Neurology: Neuroimmunology and Neuroinflammation*, 2022.
+- Mohokum M, Hartmann P, Schlattmann P. [The association of Raynaud syndrome with beta-blockers: a meta-analysis](https://doi.org/10.1177/0003319711432861). *Angiology*, 2012.

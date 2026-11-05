@@ -6,11 +6,17 @@ summary: "Both make your heart race, but the tell is timing. Inappropriate sinus
 description: "Inappropriate sinus tachycardia (IST) vs POTS: IST is a fast resting heart rate over 100 bpm regardless of posture; POTS is a 30+ bpm rise on standing with a normal resting rate. How to tell them apart at home."
 keywords: "inappropriate sinus tachycardia vs POTS, IST vs POTS, inappropriate sinus tachycardia, IST heart rate, is my fast heart rate POTS or IST, resting tachycardia, high resting heart rate causes, sinus tachycardia POTS difference, IST symptoms"
 date: 2026-09-01
-updated: 2026-09-01
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1515871204537-49a5fe66a31f?q=80&w=1382&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Unsplash"
 tldr: "Inappropriate sinus tachycardia (IST) and POTS both make your heart pound, but they differ in when it happens. IST is a fast resting heart rate, over 100 bpm at rest or a 24-hour average over 90 bpm, that is present whether you are lying down, sitting or standing. POTS is a heart rate that is roughly normal while you rest but rises at least 30 bpm (40 for teens) within ten minutes of standing. The way to tell them apart at home is to measure your heart rate at rest and again after standing, on several calm days, and read the two numbers together. Confirming either one needs a clinician, an ECG and usually a 24-hour monitor."
+question: "Is my fast heart rate IST or POTS?"
+app:
+  feature: pots-stand-test
+  hook: "Measure lying down, then standing."
+  line: "A guided home stand test records your heart rate lying down and after you stand, the two numbers that help tell these apart."
 categories:
   - pots
   - basics
@@ -289,7 +295,7 @@ The reassuring part is that first-line, everyday steps help both, because both a
 - **Cutting stimulants** (caffeine, nicotine, some cold and decongestant medicines) that push resting heart rate up.
 - **Sleep, stress load and pacing**, since sympathetic drive responds to all three.
 
-Medications are where the paths can converge again. **Ivabradine**, a drug that slows the sinus node specifically without lowering blood pressure, has become a common tool for IST and is used off-label for POTS as well; the [ivabradine guide](/insights/pots/ivabradine-for-pots/) covers how it works. Low-dose **beta blockers** can help both by blunting the adrenaline signal. What differs is emphasis: POTS management leans harder on volume expansion and compression to fight the orthostatic pooling, while IST care leans on confirming the rhythm and hunting down any reversible driver of the resting tachycardia. Getting the label right is what points you toward the correct half of that toolkit, which is the whole reason the resting-versus-standing distinction matters.
+Medications are where the paths can converge again. **Ivabradine**, a drug that slows the sinus node specifically without lowering blood pressure, has become a common tool for IST and is used off-label for POTS as well; the [ivabradine guide](/insights/pots/ivabradine-for-pots/) covers how it works. Low-dose **beta blockers** can help in POTS by blunting the adrenaline signal, but they are usually not effective for IST, where ivabradine is the option doctors consider. What differs is emphasis: POTS management leans harder on volume expansion and compression to fight the orthostatic pooling, while IST care leans on confirming the rhythm and hunting down any reversible driver of the resting tachycardia. Getting the label right is what points you toward the correct half of that toolkit, which is the whole reason the resting-versus-standing distinction matters.
 
 <div class="callout callout-tip">
   <strong>Track resting and standing heart rate on one private timeline.</strong> Autonomic lets you log heart rate, HRV, blood pressure and symptoms on your own device, then scores each reading against clinical thresholds and your own rolling baseline, so a stubbornly high resting rate or a clean orthostatic surge shows up as a pattern rather than a single scary number. Bring your chest strap, cuff or ring into one place and read the story across weeks, offline and on your phone alone. <a href="/">See how it works.</a>
@@ -302,3 +308,11 @@ Inappropriate sinus tachycardia and POTS wear the same coat, a heart that races 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational field notes to help you understand and track your own data, not a tool to diagnose or treat anything. <em>Confirming inappropriate sinus tachycardia or POTS, and telling them apart, requires clinical evaluation, an ECG and usually a 24-hour monitor; self-tracking supports that conversation but does not replace it.</em> Talk with a qualified clinician before changing medication, salt or fluid intake, or exercise, and seek care promptly if you have chest pain, fainting, or symptoms that are severe or worsening.
 </div>
+
+## Sources
+
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Freeman R, Wieling W, Axelrod FB, et al. [Consensus statement on the definition of orthostatic hypotension, neurally mediated syncope and the postural tachycardia syndrome](https://doi.org/10.1007/s10286-011-0119-5). *Clinical Autonomic Research*, 2011.
+- Olshansky B, Sullivan RM. [Inappropriate sinus tachycardia](https://doi.org/10.1016/j.jacc.2012.07.074). *Journal of the American College of Cardiology*, 2013.
+- Rubenstein JC, Freher M, Kadish A, et al. [Diurnal heart rate patterns in inappropriate sinus tachycardia](https://doi.org/10.1111/j.1540-8159.2010.02725.x). *Pacing and Clinical Electrophysiology*, 2010.
+- Taub PR, Zadourian A, Lo HC, et al. [Randomized trial of ivabradine in patients with hyperadrenergic postural orthostatic tachycardia syndrome](https://doi.org/10.1016/j.jacc.2020.12.029). *Journal of the American College of Cardiology*, 2021.

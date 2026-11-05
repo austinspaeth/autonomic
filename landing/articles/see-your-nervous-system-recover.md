@@ -10,6 +10,11 @@ updated: 2026-07-23
 author: "Austin Spaeth"
 photoLocation: "https://autonomic.care/og.png"
 tldr: "Recovery from POTS, dysautonomia and long COVID is real but invisible: it moves in months while you live in days, so on any given morning you can't tell whether you're actually getting better. Autonomic makes it visible. You log HRV, heart rate, blood pressure, stand tests, sleep and symptoms; the app scores every reading against medical thresholds, charts it against your personal rolling baseline, warns you when a crash pattern is forming, and turns months of data into a doctor-ready report. Everything stays on your phone: no account, no cloud, no data leaving your device."
+question: "How can I see if my nervous system is recovering?"
+app:
+  feature: hrv-readings
+  hook: "Make your invisible recovery something you can see."
+  line: "Autonomic turns HRV, heart rate, blood pressure, sleep and symptoms into a daily score and a trend, all kept private on your phone."
 categories:
   - app
   - recovery

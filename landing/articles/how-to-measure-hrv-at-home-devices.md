@@ -6,11 +6,17 @@ summary: "Chest straps, finger rings and wrist watches all measure HRV different
 description: "How to measure HRV at home with a chest strap, ring or watch. What the accuracy research says about the Polar H10, Oura and Apple Watch, and how to get readings you can trust."
 keywords: "measure HRV at home, best HRV device, chest strap vs ring vs watch, Polar H10 HRV, Oura HRV accuracy, Apple Watch HRV, RMSSD measurement, how to measure HRV"
 date: 2026-05-30
-updated: 2026-05-30
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1744697307482-0f55e2e0c1b6?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Amanz / Unsplash"
 tldr: "For accuracy, a chest strap like the Polar H10 is the consumer gold standard, correlating almost perfectly with a clinical ECG. Finger rings such as Oura are close behind and excel at overnight HRV. Wrist watches are convenient but tend to underestimate. The catch: how consistently you measure matters far more than which device you own. Take your reading first thing in the morning, in the same posture, before caffeine."
+question: "What is the best device to measure HRV at home?"
+app:
+  feature: hrv-readings
+  hook: "Use the device you already own."
+  line: "Take a morning HRV reading with a chest strap, Apple Watch, Garmin or just your phone camera. Autonomic turns it into a daily score."
 categories:
   - hrv
   - app
@@ -139,3 +145,10 @@ The best HRV device is the one you will use the same way every day. A chest stra
 <div class="callout callout-warn">
 <strong>Not medical advice.</strong> This article is educational and not a substitute for personalized care. <em>Consumer HRV devices are built for tracking your own trends over time, not for diagnosing any heart or autonomic condition.</em> Talk with a qualified clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Gilgen-Ammann R, Schweizer T, Wyss T. [RR interval signal quality of a heart rate monitor and an ECG Holter at rest and during exercise](https://doi.org/10.1007/s00421-019-04142-5). *European Journal of Applied Physiology*, 2019.
+- Dial MB, Hollander ME, Vatne EA, et al. [Validation of nocturnal resting heart rate and heart rate variability in consumer wearables](https://doi.org/10.14814/phy2.70527). *Physiological Reports*, 2025.
+- O'Grady B, Lambe R, Baldwin M, et al. [The validity of Apple Watch Series 9 and Ultra 2 for serial measurements of heart rate variability and resting heart rate](https://doi.org/10.3390/s24196220). *Sensors*, 2024.
+- Laborde S, Mosley E, Thayer JF. [Heart rate variability and cardiac vagal tone in psychophysiological research: recommendations for experiment planning, data analysis, and data reporting](https://doi.org/10.3389/fpsyg.2017.00213). *Frontiers in Psychology*, 2017.

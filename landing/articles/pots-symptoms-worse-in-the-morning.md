@@ -6,17 +6,23 @@ summary: "If your POTS symptoms are at their worst in the first hour after wakin
 description: "POTS symptoms worse in the morning? Overnight fluid loss, a cortisol surge and standing after hours flat combine into a perfect storm. The physiology plus a gentle morning routine."
 keywords: "POTS symptoms worse in the morning, morning POTS, why are POTS symptoms worse in the morning, POTS getting out of bed, orthostatic intolerance morning, morning tachycardia POTS, POTS dizziness morning, dysautonomia morning symptoms, morning stand test, POTS morning routine, blood pooling overnight"
 date: 2026-07-28
-updated: 2026-07-28
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1519643381401-22c77e60520e?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Kinga Howard / Unsplash"
-tldr: "Mornings are the hardest part of the day for many people with POTS because several things stack up at once: you have lost fluid overnight so your blood volume is at its lowest, a natural cortisol surge primes your system, and you go from lying flat for hours to suddenly upright. The fix is rarely one thing. Pre-loading fluids and salt, changing position slowly, and using compression before you stand up all soften the jolt. This is general education, not a diagnosis, so check meaningful changes with your clinician."
+tldr: "Mornings are the hardest part of the day for many people with POTS because several things stack up at once: you have gone hours without fluid, a natural cortisol surge primes your system, and you go from lying flat for hours to suddenly upright. The fix is rarely one thing. Pre-loading fluids and salt, changing position slowly, and using compression before you stand up all soften the jolt. This is general education, not a diagnosis, so check meaningful changes with your clinician."
+question: "Why are my POTS symptoms worse in the morning?"
+app:
+  feature: pots-stand-test
+  hook: "Read your own morning stand test."
+  line: "Autonomic guides a home stand test you can take in the morning, recording your heart rate rise so you can see your own pattern."
 categories:
   - pots
   - recovery
 faq:
   - q: "Why are POTS symptoms worse in the morning?"
-    a: "Mornings combine three things that each strain an already sensitive autonomic system. First, you have gone many hours without drinking, and overnight your kidneys shift fluid out, so your circulating blood volume is at its daily low point when you wake. Second, cortisol rises sharply in the first 30 to 45 minutes after waking, which can leave you feeling wired and shaky. Third, you move from lying flat, where blood is evenly distributed, to standing, where gravity pulls it toward your legs. With POTS, the heart compensates with a large rate spike. All of this lands at once, which is why the first hour is often the worst."
+    a: "Mornings combine three things that each strain an already sensitive autonomic system. First, you have gone many hours without drinking, so you meet the day without any fluid top-up. Second, cortisol rises sharply in the first 30 to 45 minutes after waking, which can leave you feeling wired and shaky. Third, you move from lying flat, where blood is evenly distributed, to standing, where gravity pulls it toward your legs. With POTS, the heart compensates with a large rate spike. All of this lands at once, which is why the first hour is often the worst."
   - q: "How can I make POTS mornings easier?"
     a: "The most reliable moves work before you stand. Keep water and electrolytes by the bed and drink 300 to 500 ml as soon as you wake, then wait a few minutes for it to reach your bloodstream. Sit up gradually rather than springing upright, pump your calves and clench your legs and abdomen for a minute, and put on compression before your feet hit the floor if you use it. Eating some salt early and not skipping breakfast help too. None of these are cures, but together they blunt the morning jolt for a lot of people."
   - q: "Is a fast heart rate in the morning a sign of POTS?"
@@ -24,12 +30,12 @@ faq:
   - q: "Should I drink water before getting out of bed with POTS?"
     a: "For many people, yes, and it is one of the simplest levers. A fast bolus of around 300 to 500 ml of water can temporarily raise blood pressure and reduce standing heart rate within minutes, partly through a reflex response to fluid in the stomach. Adding electrolytes helps you hold onto that volume. Drinking before you stand means the fluid is already working when you take on gravity. Discuss target fluid and salt amounts with your clinician, especially if you have kidney, heart or blood pressure conditions."
   - q: "Why do I wake up needing to urinate with POTS?"
-    a: "When you lie down, fluid that pooled in your legs during the day returns to central circulation, and your kidneys respond by making more urine overnight. This nocturia is common in POTS and it is part of why you wake up with a lower blood volume. It is a normal consequence of the fluid shifts, but persistent nighttime urination is worth mentioning to your clinician so other causes can be ruled out."
+    a: "Waking to urinate can happen for many reasons, and how much it contributes to morning POTS symptoms has not been well studied. Persistent nighttime urination is worth mentioning to your clinician so the cause can be checked."
 social:
   linkedin: |
     A pattern many people with POTS know well: the first hour after waking is the worst of the day. It is not in your head, and it is not random.
 
-    Three things stack up overnight. Your blood volume is at its daily low because you have gone hours without fluids and, lying flat, your kidneys shift fluid out (that middle-of-the-night bathroom trip is part of it). A natural cortisol surge in the first 30 to 45 minutes after waking primes the system. And you move from horizontal, where blood is evenly spread, to vertical, where gravity pulls it into your legs. In POTS the heart answers that with an outsized rate spike.
+    Three things stack up overnight. You have gone hours without fluids, on top of the low blood volume many people with POTS already run on. A natural cortisol surge in the first 30 to 45 minutes after waking primes the system. And you move from horizontal, where blood is evenly spread, to vertical, where gravity pulls it into your legs. In POTS the heart answers that with an outsized rate spike.
 
     What helps is almost always sequencing, not willpower. Drink 300 to 500 ml of water and electrolytes before you stand and give it a few minutes. Sit up in stages. Pump your calves and clench your legs and core for a minute. Put on compression before your feet hit the floor. Each one is small; together they blunt the jolt.
 
@@ -42,15 +48,15 @@ social:
 
     For years I assumed I was just "not a morning person." Turns out there are real reasons POTS mornings hit so hard, and once I understood them the fixes made a lot more sense.
 
-    The short version: overnight you lose fluid (that is why you wake up needing to pee), so your blood volume is at its lowest of the day right when you wake. On top of that, cortisol spikes in the first half hour after waking, which is the wired-but-exhausted feeling. Then you go from flat to upright and gravity dumps blood into your legs, and your heart compensates with a big rate jump.
+    The short version: you go all night without drinking, so you start the day with no fluid top-up. On top of that, cortisol spikes in the first half hour after waking, which is the wired-but-exhausted feeling. Then you go from flat to upright and gravity dumps blood into your legs, and your heart compensates with a big rate jump.
 
     What actually helped me, all done before standing: water and electrolytes by the bed, chug 300 to 500 ml the second I wake and wait a few minutes. Sit up in stages instead of bolting upright. Pump my calves and squeeze my legs and stomach for a minute. Compression on before my feet touch the floor. None of it is a cure but the mornings went from brutal to manageable.
 
     Not medical advice, just a patient sharing what worked, and I ran the changes past my doctor. I wrote up the physiology and a morning stand-test check here if it is useful: https://autonomic.care/insights/pots/pots-symptoms-worse-in-the-morning/?utm_source=reddit&utm_medium=social&utm_campaign=pots-symptoms-worse-in-the-morning
   x: |
-    POTS mornings are brutal for a reason: blood volume bottoms out overnight, cortisol surges, then you stand. Drink first. https://autonomic.care/insights/pots/pots-symptoms-worse-in-the-morning/?utm_source=x&utm_medium=social&utm_campaign=pots-symptoms-worse-in-the-morning #POTS
+    POTS mornings are brutal for a reason: hours without fluid, a cortisol surge, then you stand. Drink first. https://autonomic.care/insights/pots/pots-symptoms-worse-in-the-morning/?utm_source=x&utm_medium=social&utm_campaign=pots-symptoms-worse-in-the-morning #POTS
   facebook: |
-    If mornings are your hardest hour with POTS, here is the calm reason why. Overnight your blood volume drops to its daily low (that is the middle-of-the-night bathroom trip), a natural cortisol surge revs you up, and going from lying flat to standing dumps blood into your legs all at once. It is physiology, not weakness.
+    If mornings are your hardest hour with POTS, here is the calm reason why. You go all night without fluid, a natural cortisol surge revs you up, and going from lying flat to standing dumps blood into your legs all at once. It is physiology, not weakness.
 
     The good news is that the things that help mostly happen before you stand: water and electrolytes by the bed, sitting up in stages, squeezing your legs, compression on first. What is your morning routine that actually helps? We wrote it all up here: https://autonomic.care/insights/pots/pots-symptoms-worse-in-the-morning/?utm_source=facebook&utm_medium=social&utm_campaign=pots-symptoms-worse-in-the-morning
 
@@ -110,13 +116,13 @@ None of this is medical advice. These are educational field notes to help you un
 
 To see why mornings are so hard, follow one night from lights-out to your first step onto the floor. Three separate processes are running in the background.
 
-### 1. Your blood volume drops to its daily low
+### 1. You go hours without a drink
 
-Blood volume is central to POTS. Many people with the condition run on a smaller circulating volume than average, which is exactly why salt and fluids are a first-line strategy. Overnight, that volume shrinks further, for two reasons.
+Blood volume is central to POTS. Many people with the condition run on a smaller circulating volume than average, which is exactly why salt and fluids are a first-line strategy. Overnight, nothing tops it up.
 
-The first is simple: you go seven or eight hours without drinking anything. The second is less obvious. During the day, gravity pulls fluid down and some of it seeps out of your blood vessels into the tissues of your legs. When you finally lie flat at night, that pooled fluid returns to your central circulation. Your body reads the sudden "extra" central volume as a signal to offload it, so your kidneys ramp up urine production. That is why so many people with POTS wake once or twice a night needing the bathroom (a pattern called **nocturia**), and it is a real, measurable drain on the volume you will have to work with in the morning.
+You go seven or eight hours without drinking anything, so none of the fluid you would normally sip across the day arrives.
 
-Put together, no fluid intake plus overnight urine losses mean you wake up with your blood volume at its lowest point of the entire day, right when you are about to ask it to fight gravity.
+Whether that leaves your blood volume measurably lower by morning has not been well studied, but it does mean you meet gravity before you have had a sip of water, which is exactly the gap the morning levers below are built to fill.
 
 ### 2. A cortisol surge revs the system
 
@@ -124,48 +130,17 @@ Cortisol is not just a "stress hormone." It follows a daily rhythm, and its sing
 
 ### 3. You go from flat to upright
 
-The third factor is the trigger that fires all of this off. Lying down, blood is spread fairly evenly through your body and your heart has an easy job. The instant you stand, gravity pulls roughly half a liter of blood downward into your legs and abdomen. In a well-regulated system, blood vessels clamp down and the heart rate ticks up modestly to keep pressure steady. In POTS, that vessel-tightening response is blunted, so the heart compensates the only way it can, by beating much faster. On a morning when your blood volume is already at its lowest, that compensation has to work even harder, which is why the standing heart-rate spike often feels most dramatic first thing.
-
-<figure class="prose-figure">
-  <svg class="fig-d" viewBox="0 0 720 240" role="img" aria-label="A line chart of circulating blood volume across a night, starting high at bedtime and drifting steadily downward through overnight urine losses to reach its lowest point at wake-up, just before standing">
-    <line x1="60" y1="30" x2="60" y2="190" stroke="var(--dim-2)" stroke-width="1"/>
-    <line x1="60" y1="190" x2="690" y2="190" stroke="var(--dim-2)" stroke-width="1"/>
-    <text x="60" y="215" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12" text-anchor="middle">Bedtime</text>
-    <text x="300" y="215" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12" text-anchor="middle">2am</text>
-    <text x="500" y="215" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12" text-anchor="middle">5am</text>
-    <text x="650" y="215" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12" text-anchor="middle">Wake</text>
-    <text x="30" y="45" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12">High</text>
-    <text x="30" y="185" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="12">Low</text>
-    <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="60,55 180,70 300,95 420,120 500,140 600,158 650,170"/>
-    <circle cx="650" cy="170" r="5" fill="#e03127"/>
-    <text x="640" y="160" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13" text-anchor="end">Volume lowest, then you stand</text>
-  </svg>
-  <svg class="fig-m" viewBox="0 0 360 222" role="img" aria-label="A line chart of circulating blood volume across a night, starting high at bedtime and drifting steadily downward through overnight urine losses to reach its lowest point at wake-up, just before standing">
-    <line x1="44" y1="34" x2="44" y2="176" stroke="var(--dim-2)" stroke-width="1"/>
-    <line x1="44" y1="176" x2="344" y2="176" stroke="var(--dim-2)" stroke-width="1"/>
-    <text x="44" y="196" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">Bedtime</text>
-    <text x="158" y="196" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">2am</text>
-    <text x="254" y="196" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">5am</text>
-    <text x="344" y="196" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="end">Wake</text>
-    <text x="16" y="42" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">High</text>
-    <text x="18" y="174" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5">Low</text>
-    <polyline fill="none" stroke="#54d98a" stroke-width="2.5" points="44,56 101,70 158,92 215,114 254,132 301,148 325,158"/>
-    <circle cx="325" cy="158" r="5" fill="#e03127"/>
-    <text x="344" y="218" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="12" text-anchor="end">Volume lowest, then you stand ↑</text>
-  </svg>
-  <figcaption>Circulating blood volume tends to drift down across the night as overnight urine production offloads fluid, reaching its daily low just as you get up and take on gravity.</figcaption>
-</figure>
+The third factor is the trigger that fires all of this off. Lying down, blood is spread fairly evenly through your body and your heart has an easy job. The instant you stand, gravity pulls roughly half a liter of blood downward into your legs and abdomen. In a well-regulated system, blood vessels clamp down and the heart rate ticks up modestly to keep pressure steady. In POTS, that vessel-tightening response is blunted, so the heart compensates the only way it can, by beating much faster. And the spike really is bigger first thing: in one study, standing heart rate in POTS averaged about 108 bpm in the morning against 100 bpm in the evening, and more people met the POTS heart-rate threshold in the morning.
 
 ## The morning perfect storm
 
-Any one of these on its own is manageable. The problem is that they arrive together, in a narrow window, and they compound. Low blood volume makes the standing heart-rate spike bigger. The cortisol surge adds sympathetic tone on top. And you are asking for all of this the moment you sit up, before you have had a sip of water. That is the perfect storm behind morning POTS.
+Any one of these on its own is manageable. The problem is that they arrive together, in a narrow window, and they compound. A low blood volume, already common in POTS, makes the standing heart-rate spike bigger. The cortisol surge adds sympathetic tone on top. And you are asking for all of this the moment you sit up, before you have had a sip of water. That is the perfect storm behind morning POTS.
 
 Here is the same picture as a quick reference: what shifts overnight, why it matters, and the lever that targets it.
 
 | Overnight factor | What it does | Morning lever that targets it |
 | --- | --- | --- |
-| No fluid intake for 7 to 8 hours | Blood volume at daily low | Pre-load water and electrolytes before standing |
-| Nocturia (overnight urine losses) | Further volume loss | Salt and fluids the day and evening before |
+| No fluid intake for 7 to 8 hours | No fluid top-up before you stand | Pre-load water and electrolytes before standing |
 | Cortisol awakening response | Extra sympathetic tone, jittery feeling | Slow, calm wake-up; do not rush |
 | Flat to upright transition | Blood pools in legs, heart rate spikes | Sit up in stages; leg and core muscle pumping |
 | Blood vessels slow to tighten | Blunted standing compensation | Compression on before your feet touch the floor |
@@ -236,7 +211,7 @@ The through-line of every good morning strategy is the same: **the work happens 
 ### Before you sleep
 
 - **Front-load fluids and salt the day and evening before.** Morning volume is partly built the night before. The [science of salt and fluids](/insights/research/science-of-salt-and-fluids-for-pots/) explains why these expand the plasma volume you will draw on. Discuss your targets with your clinician, especially if you have blood pressure, heart or kidney conditions.
-- **Consider a slightly head-up bed.** Sleeping with the head of the bed raised a few inches can reduce overnight urine losses for some people with orthostatic intolerance, leaving more volume in the morning. It is a low-cost experiment worth mentioning to your clinician.
+- **Consider a slightly head-up bed.** Sleeping with the head of the bed raised a few inches is sometimes suggested for orthostatic intolerance, though the evidence in POTS is thin. It is a low-cost experiment worth mentioning to your clinician.
 - **Keep water and electrolytes on the nightstand.** You want them within arm's reach so you do not have to stand to hydrate.
 
 ### The moment you wake
@@ -264,8 +239,16 @@ It is also worth remembering that mornings sit downstream of your nights. Fragme
 
 ## The bottom line
 
-POTS symptoms are worse in the morning for reasons you can name: your blood volume bottoms out overnight, a cortisol surge adds sympathetic drive, and you take on gravity the instant you stand, all in the same short window. That stacking is why the first hour is the hardest, and it is also the key to feeling better, because you can intervene on each layer before you ever get upright. Pre-load fluids and salt, wake up slowly, prime your muscles, change position in stages, and put compression on first. Then let your own morning stand test and HRV trend tell you, over weeks rather than any single reading, whether the routine is working. Mornings may never be your favorite hour, but they do not have to be a wall.
+POTS symptoms are worse in the morning for reasons you can name: you go hours without fluid overnight, a cortisol surge adds sympathetic drive, and you take on gravity the instant you stand, all in the same short window. That stacking is why the first hour is the hardest, and it is also the key to feeling better, because you can intervene on each layer before you ever get upright. Pre-load fluids and salt, wake up slowly, prime your muscles, change position in stages, and put compression on first. Then let your own morning stand test and HRV trend tell you, over weeks rather than any single reading, whether the routine is working. Mornings may never be your favorite hour, but they do not have to be a wall.
 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own nervous system, not to diagnose or treat POTS, dysautonomia or any other condition. Fluid and salt targets, compression and medication should be individualized, and they interact with blood pressure, heart and kidney health. Discuss meaningful changes with a clinician who knows your history, and seek care for fainting, chest pain, or new, severe or unusual symptoms.
 </div>
+
+## Sources
+
+- Brewster JA, Garland EM, Biaggioni I, et al. [Diurnal variability in orthostatic tachycardia: implications for the postural tachycardia syndrome](https://doi.org/10.1042/CS20110077). *Clinical Science*, 2012.
+- Stalder T, Kirschbaum C, Kudielka BM, et al. [Assessment of the cortisol awakening response: expert consensus guidelines](https://doi.org/10.1016/j.psyneuen.2015.10.010). *Psychoneuroendocrinology*, 2016.
+- Shannon JR, Diedrich A, Biaggioni I, et al. [Water drinking as a treatment for orthostatic syndromes](https://doi.org/10.1016/s0002-9343%2802%2901025-2). *American Journal of Medicine*, 2002.
+- Raj SR. [Postural tachycardia syndrome (POTS)](https://doi.org/10.1161/CIRCULATIONAHA.112.144501). *Circulation*, 2013.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.

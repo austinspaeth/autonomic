@@ -6,11 +6,17 @@ summary: "Yoga can genuinely help POTS and dysautonomia, but the risk isn't the 
 description: "A calm, practical guide to yoga for POTS and dysautonomia: floor and supported poses that respect orthostatic intolerance, how slow-exhale breathing raises HRV and vagal tone, why hot yoga backfires, and how to avoid a flare."
 keywords: "yoga for POTS, yoga for dysautonomia, yoga orthostatic intolerance, restorative yoga POTS, legs up the wall POTS, yoga HRV vagal tone, is hot yoga bad for POTS, chair yoga POTS, yoga long COVID, gentle yoga dysautonomia"
 date: 2026-10-27
-updated: 2026-10-27
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1758599879178-e5be0375dee9?q=80&w=1632&auto=format&fit=crop"
 photoAttribution: "Unsplash"
 tldr: "Yoga can help POTS and dysautonomia, mainly through slow breathing that raises vagal tone (and HRV) and through gentle strengthening of the leg and core muscles that pump blood back to your heart. The catch is positional: the danger with POTS is not the stretching, it's the transitions between lying, sitting, and standing, plus heat. Favor floor-based, supported, and recumbent poses (legs-up-the-wall is a standout), move out of every pose slowly, skip hot yoga and fast flows, and if you have hypermobility or post-exertional malaise, protect your joints and pace first."
+question: "Is yoga safe for POTS, and which poses help?"
+app:
+  feature: insights
+  hook: "See whether yoga lines up with better days."
+  line: "Log yoga as an activity in Autonomic, and it looks at whether your HRV and symptoms are better on the days you practice."
 categories:
   - pots
   - recovery
@@ -215,3 +221,12 @@ Yoga is not off-limits in POTS or dysautonomia, and for many people it is one of
   for personalized care. <em>If you faint, have chest pain, or have significant post-exertional malaise or hypermobility, work with a clinician or a yoga therapist experienced in dysautonomia before starting.</em> Talk with a qualified
   clinician before making changes to medication, diet, or exercise.
 </div>
+
+## Sources
+
+- Lehrer PM, Gevirtz R. [Heart rate variability biofeedback: how and why does it work?](https://doi.org/10.3389/fpsyg.2014.00756) *Frontiers in Psychology*, 2014.
+- Tyagi A, Cohen M. [Yoga and heart rate variability: a comprehensive review of the literature](https://doi.org/10.4103/0973-6131.183712). *International Journal of Yoga*, 2016.
+- Fu Q, Vangundy TB, Shibata S, et al. [Exercise training versus propranolol in the treatment of the postural orthostatic tachycardia syndrome](https://doi.org/10.1161/HYPERTENSIONAHA.111.172262). *Hypertension*, 2011.
+- Miller AJ, Stiles LE, Sheehan T, et al. [Prevalence of hypermobile Ehlers-Danlos syndrome in postural orthostatic tachycardia syndrome](https://doi.org/10.1016/j.autneu.2020.102637). *Autonomic Neuroscience*, 2020.
+- Stussman B, Williams A, Snow J, et al. [Characterization of post-exertional malaise in patients with myalgic encephalomyelitis/chronic fatigue syndrome](https://doi.org/10.3389/fneur.2020.01025). *Frontiers in Neurology*, 2020.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.

@@ -6,11 +6,17 @@ summary: "Air travel stacks nearly every POTS trigger into one day: dehydration,
 description: "Flying with POTS or dysautonomia? Learn how cabin altitude, dry air, and immobility affect heart rate and HRV, plus a practical before, during, and after checklist to travel with less crash."
 keywords: "flying with POTS, air travel POTS, traveling with dysautonomia, POTS on a plane, cabin pressure POTS, flying with dysautonomia, POTS travel tips, does flying make POTS worse, long flight POTS, dehydration flying POTS"
 date: 2026-09-10
-updated: 2026-09-10
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1436491865332-7a61a109cc05?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "JESHOOTS.COM / Unsplash"
 tldr: "Flying is hard on POTS and dysautonomia because a single travel day bundles almost every trigger you have: the cabin is pressurized to a mild altitude that lowers your blood oxygen a little and nudges heart rate up, the air is drier than most deserts so you dehydrate fast, and hours of sitting let blood pool in your legs. Add an early alarm, poor sleep, long standing lines, and heavy bags, and the flight itself is often the smallest part of the stress. None of it means you cannot fly. The plan is to load fluids and salt beforehand within your clinician's limits, wear compression, move your legs and flex your calves on a schedule, skip the alcohol, and give yourself a genuinely light day on each end. Track your resting heart rate and HRV around the trip so you can see the dip coming and watch it recover, rather than reading a rough post-flight morning as a setback."
+question: "How can I fly with POTS without crashing afterward?"
+app:
+  feature: pacing-budget
+  hook: "Plan a travel day around your energy budget."
+  line: "Autonomic gives you a daily energy budget in minutes and alerts you when you are nearly spent, so you can plan the days around a flight."
 categories:
   - pots
   - recovery
@@ -186,3 +192,11 @@ Flying with POTS or dysautonomia is hard because a travel day is a trigger sandw
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and plan around your own data, not to diagnose or treat any condition. Changes to fluid, salt, or medication around travel should be made with your clinician, especially if you have any heart, kidney, or pregnancy considerations. If your symptoms after flying are severe, involve fainting or chest pain, or do not settle, seek proper medical evaluation.
 </div>
+
+## Sources
+
+- Centers for Disease Control and Prevention. [Air travel](https://www.cdc.gov/yellow-book/hcp/travel-air-sea/air-travel.html). *CDC Yellow Book*, 2025.
+- Humphreys S, Deyermond R, Bali I, et al. [The effect of high altitude commercial air travel on oxygen saturation](https://doi.org/10.1111/j.1365-2044.2005.04124.x). *Anaesthesia*, 2005.
+- Norbäck D, Lindgren T, Wieslander G. [Changes in ocular and nasal signs and symptoms among air crew in relation to air humidification on intercontinental flights](https://doi.org/10.5271/sjweh.989). *Scandinavian Journal of Work, Environment and Health*, 2006.
+- Raj SR, Biaggioni I, Yamhure PC, et al. [Renin-aldosterone paradox and perturbed blood volume regulation underlying postural tachycardia syndrome](https://doi.org/10.1161/01.CIR.0000160356.97313.5D). *Circulation*, 2005.
+- Raj SR, Fedorowski A, Sheldon RS. [Diagnosis and management of postural orthostatic tachycardia syndrome](https://doi.org/10.1503/cmaj.211373). *CMAJ*, 2022.

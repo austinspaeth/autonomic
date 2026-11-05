@@ -6,11 +6,17 @@ summary: "POTS is diagnosed by a sustained heart-rate rise on standing without a
 description: "How is POTS diagnosed? A plain-language guide to the 30 bpm rule, the tilt-table test, the NASA lean and active stand tests, POTS vs orthostatic hypotension, and how to advocate with your own data."
 keywords: "how is POTS diagnosed, POTS diagnostic criteria, 30 bpm rule, tilt table test, NASA lean test, active stand test, POTS vs orthostatic hypotension, diagnosing dysautonomia"
 date: 2026-05-09
-updated: 2026-05-09
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1758691462651-611d730c5272?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Vitaly Gariev / Unsplash"
 tldr: "A POTS diagnosis rests on four things: a sustained heart-rate rise of 30 bpm or more (40+ in teens) within 10 minutes of standing, no large drop in blood pressure, symptoms present for at least 3 months, and other causes excluded. Doctors confirm it with an active stand test or a tilt-table test. The odyssey is often long, so tracking your own standing heart rate beforehand can shorten it."
+question: "How is POTS diagnosed?"
+app:
+  feature: pots-stand-test
+  hook: "Run a guided stand test at home."
+  line: "Autonomic walks you through a home stand test and records your heart rate rise on standing, so you have real numbers to bring to your doctor."
 categories:
   - pots
   - basics
@@ -137,3 +143,12 @@ POTS has clear, measurable diagnostic criteria: a sustained standing heart-rate 
 <div class="callout callout-warn">
 <strong>Not medical advice.</strong> This article is educational and not a substitute for personalized care. <em>Only a qualified clinician can diagnose POTS; at-home stand tests are for tracking and advocacy, not diagnosis.</em> Talk with a qualified clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Blitshteyn S, Treisman GJ, Ruhoy IS, et al. [Postural orthostatic tachycardia syndrome and other common autonomic disorders are not functional neurologic disorders](https://doi.org/10.3389/fneur.2024.1490744). *Frontiers in Neurology*, 2024.
+- Aboseif A, Bireley JD, Li Y, et al. [Autoimmunity and postural orthostatic tachycardia syndrome: implications in diagnosis and management](https://doi.org/10.3949/ccjm.90a.22093). *Cleveland Clinic Journal of Medicine*, 2023.
+- Dysautonomia International. [Postural orthostatic tachycardia syndrome](https://www.dysautonomiainternational.org/page.php?ID=30).
+- Vanderbilt Autonomic Dysfunction Center. [Head up tilt table testing](https://www.vumc.org/autonomic-dysfunction-center/node/108).
+- Shaw BH, Stiles LE, Bourne K, et al. [The face of postural tachycardia syndrome: insights from a large cross-sectional online community-based survey](https://doi.org/10.1111/joim.12895). *Journal of Internal Medicine*, 2019.

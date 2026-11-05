@@ -6,11 +6,17 @@ summary: "Undiagnosed sleep apnea is one of the most common hidden reasons HRV s
 description: "Does sleep apnea lower HRV? How obstructive sleep apnea and UARS drive nighttime sympathetic surges, flatten overnight HRV, raise resting heart rate, and why POTS and long COVID patients get missed."
 keywords: "sleep apnea and HRV, does sleep apnea lower HRV, sleep apnea heart rate variability, sleep apnea POTS, sleep apnea dysautonomia, UARS, obstructive sleep apnea HRV, low HRV sleep apnea, non-dipping heart rate, CPAP HRV, unrefreshing sleep, snoring HRV"
 date: 2026-08-11
-updated: 2026-08-11
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1520206183501-b80df61043c2?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "bruce mars / Unsplash"
-tldr: "Sleep apnea is repeated airway narrowing during sleep. Each event drops your oxygen and triggers a brief adrenaline arousal that spikes heart rate and blood pressure, so instead of settling into deep parasympathetic repair, your nervous system spends the night in short bursts of fight-or-flight. On paper this shows up as low overnight and morning HRV, a resting heart rate that will not drop at night, and unrefreshing sleep no matter how long you were in bed. POTS and long COVID patients are often missed because they are young and slim, yet milder forms like UARS are common in exactly that group. Only a sleep study can diagnose it, and treatment tends to bring HRV back up over time. If your HRV is stuck low despite good sleep habits, this is worth ruling out with your clinician."
+tldr: "Sleep apnea is repeated airway narrowing during sleep. Each event drops your oxygen and triggers a brief adrenaline arousal that spikes heart rate and blood pressure, so instead of settling into deep parasympathetic repair, your nervous system spends the night in short bursts of fight-or-flight. On paper this shows up as low overnight and morning HRV, a resting heart rate that will not drop at night, and unrefreshing sleep no matter how long you were in bed. POTS and long COVID patients are often missed because they are young and slim, and milder forms like UARS are easy to miss on a standard study. Only a sleep study can diagnose it, and treatment tends to bring HRV back up over time. If your HRV is stuck low despite good sleep habits, this is worth ruling out with your clinician."
+question: "Can sleep apnea keep my HRV low?"
+app:
+  feature: doctor-reports
+  hook: "Show your doctor what your nights look like."
+  line: "Autonomic keeps your overnight heart rate, sleep and morning HRV together and turns them into a summary you can take to a sleep appointment."
 categories:
   - hrv
   - recovery
@@ -33,7 +39,7 @@ social:
 
     The mechanism is clean. Every time the airway narrows in sleep, oxygen falls and the brain triggers a brief arousal to reopen it. That arousal is a jolt of sympathetic activity, adrenaline, a spike in heart rate and blood pressure. Repeat that dozens or hundreds of times a night and the nervous system never really settles into the deep parasympathetic repair that overnight is for. On the data it looks like low overnight and morning HRV, a resting heart rate that will not dip at night, and unrefreshing sleep regardless of hours in bed.
 
-    The part that gets missed: the POTS and long COVID population is often young and slim, so clinicians and patients alike discount apnea. Yet milder forms like upper airway resistance syndrome are common in exactly that group, and they still fragment sleep and drive the same sympathetic arousals. HRV cannot diagnose any of this, but a HRV that stays low despite good sleep habits is a strong prompt to ask about a sleep study.
+    The part that gets missed: the POTS and long COVID population is often young and slim, so clinicians and patients alike discount apnea. Yet milder forms like upper airway resistance syndrome can still fragment sleep and drive the same sympathetic arousals. HRV cannot diagnose any of this, but a HRV that stays low despite good sleep habits is a strong prompt to ask about a sleep study.
 
     Full write-up, with the overnight physiology and what shows up in your own numbers: https://autonomic.care/insights/hrv/sleep-apnea-and-hrv-dysautonomia/?utm_source=linkedin&utm_medium=social&utm_campaign=sleep-apnea-and-hrv-dysautonomia
 
@@ -124,7 +130,7 @@ None of these numbers is proof of apnea on its own. Plenty of things lower HRV: 
 
 The mental image of sleep apnea, an older, heavier man snoring like a chainsaw, does real harm here, because it is not the only face of it. The POTS and dysautonomia population skews young and often slim, so both patients and clinicians tend to wave the possibility away. Two things are worth knowing.
 
-**UARS is the quieter cousin.** Upper airway resistance syndrome is airflow limitation and effort that fragments sleep and triggers sympathetic arousals without meeting the oxygen-drop thresholds that define classic apnea. It is more common in younger, slimmer people, and it disproportionately affects women. It can leave your standard sleep-study "apnea score" looking normal while still shredding your sleep quality, so it takes a clinician who is specifically looking for it.
+**UARS is the quieter cousin.** Upper airway resistance syndrome is airflow limitation and effort that fragments sleep and triggers sympathetic arousals without meeting the oxygen-drop thresholds that define classic apnea. It can leave your standard sleep-study "apnea score" looking normal while still shredding your sleep quality, so it takes a clinician who is specifically looking for it.
 
 **Airway shape matters more than weight.** A narrow or crowded airway, a high-arched palate, a small or set-back jaw, chronic nasal congestion, and connective-tissue differences (which run alongside conditions like hypermobility that often travel with POTS) all raise the odds regardless of the number on the scale. Positional apnea (worse on your back) and REM-related apnea are also easy to miss on a short or partial recording.
 
@@ -137,7 +143,7 @@ You cannot feel an arousal that lasts three seconds, but the fallout is noticeab
 - Loud or habitual snoring, or a bed partner noticing pauses, gasping or choking
 - Waking with a dry mouth, sore throat or a morning headache
 - Unrefreshing sleep and daytime sleepiness that do not match your hours in bed
-- Waking repeatedly to urinate (nighttime sympathetic surges drive this)
+- Waking repeatedly to urinate
 - Jaw clenching or teeth grinding
 - Blood pressure that runs high, or is hard to control
 - Morning HRV stuck below your baseline and a resting heart rate that will not settle, despite good sleep habits
@@ -217,3 +223,10 @@ No. Wearables can flag suggestive patterns like a non-dipping overnight heart ra
 ---
 
 *These are educational field notes about tracking your own nervous system, not medical advice, and they do not diagnose or treat any condition. Sleep apnea is common, treatable and worth taking seriously, so if you recognize the pattern here, bring it to a clinician who can order a sleep study and guide any changes.*
+
+## Sources
+
+- Somers VK, Dyken ME, Clary MP, et al. [Sympathetic neural mechanisms in obstructive sleep apnea](https://doi.org/10.1172/JCI118235). *Journal of Clinical Investigation*, 1995.
+- Wang Z, Jiang F, Xiao J, et al. [Heart rate variability changes in patients with obstructive sleep apnea: a systematic review and meta-analysis](https://doi.org/10.1111/jsr.13708). *Journal of Sleep Research*, 2023.
+- Guo W, Lv T, She F, et al. [The impact of continuous positive airway pressure on heart rate variability in obstructive sleep apnea patients during sleep: a meta-analysis](https://doi.org/10.1016/j.hrtlng.2018.05.019). *Heart and Lung*, 2018.
+- Yeghiazarians Y, Jneid H, Tietjens JR, et al. [Obstructive sleep apnea and cardiovascular disease: a scientific statement from the American Heart Association](https://doi.org/10.1161/CIR.0000000000000988). *Circulation*, 2021.

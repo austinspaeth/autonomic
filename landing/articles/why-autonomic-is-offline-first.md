@@ -2,20 +2,26 @@
 title: "Why We Built Autonomic Offline-First: Privacy as Architecture"
 slug: why-autonomic-is-offline-first
 published: true
-summary: "Health data is some of the most sensitive information you own, yet most apps ship it to the cloud. Autonomic keeps everything on your iPhone. Here is why that is a design choice, not a settings toggle."
+summary: "Health data is some of the most sensitive information you own, yet most apps ship it to the cloud. Autonomic keeps everything on your phone. Here is why that is a design choice, not a settings toggle."
 description: "Why Autonomic is an offline-first, on-device health tracker with no account and no cloud sync. How keeping health data on your phone makes privacy structural, not a promise you have to trust."
 keywords: "private health app, offline health tracker, health data privacy, on-device health data, no cloud health app, POTS app privacy, HRV app privacy, dysautonomia privacy"
 date: 2026-05-12
-updated: 2026-05-12
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1584433144859-1fc3ab64a957?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Dan Nelson / Unsplash"
-tldr: "Autonomic has no account, no cloud sync, and no server that holds your health data. Everything lives on your iPhone and only leaves if you choose to export it. That makes privacy architectural: data that never leaves your device cannot be sold, breached from a server, or handed over without your knowledge."
+tldr: "Autonomic has no account, no cloud sync, and no server that holds your health data. Everything lives on your phone, iPhone or Android, and only leaves if you choose to export it. That makes privacy architectural: data that never leaves your device cannot be sold, breached from a server, or handed over without your knowledge."
+question: "Is there a health tracking app that keeps my data private?"
+app:
+  feature: hrv-readings
+  hook: "Track your health without sending it anywhere."
+  line: "Autonomic keeps your readings and journal on your phone, with no account and no cloud sync. It only leaves if you export it."
 categories:
   - app
 faq:
   - q: "Is Autonomic private?"
-    a: "Yes, by design. Autonomic stores your readings, symptoms and journal entries only on your iPhone. There is no account to create and no server that receives your data, so there is nothing on our end to sell, share or lose in a breach. Your data leaves your phone only when you deliberately export it."
+    a: "Yes, by design. Autonomic stores your readings, symptoms and journal entries only on your phone. There is no account to create and no server that receives your data, so there is nothing on our end to sell, share or lose in a breach. Your data leaves your phone only when you deliberately export it."
   - q: "Where is my health data stored?"
     a: "On your device, in the app's local storage. Autonomic writes everything to on-device storage and reads it back from there. We do not run a cloud database of your health history, and we cannot see your entries."
   - q: "Does Autonomic need an account or internet?"
@@ -26,7 +32,7 @@ faq:
 
 Your health data is some of the most revealing information about you. It hints at your diagnoses, your bad weeks, your medications and how your body is actually doing, not how you say you are doing. So it is worth asking a blunt question about any app you trust with it: where does that data go, and who can reach it?
 
-For Autonomic, the answer is: nowhere, and no one but you. There is no account, no cloud sync and no server holding your history. Everything you log stays on your iPhone. This piece is about why we built it that way on purpose, and why we think privacy should be part of the architecture rather than a checkbox you have to take on faith.
+For Autonomic, the answer is: nowhere, and no one but you. There is no account, no cloud sync and no server holding your history. Everything you log stays on your phone, whether that is an iPhone or an Android. This piece is about why we built it that way on purpose, and why we think privacy should be part of the architecture rather than a checkbox you have to take on faith.
 
 ## The problem with "we take your privacy seriously"
 
@@ -49,7 +55,7 @@ If your data never leaves your phone, then there is no server-side copy to sell,
 That is what "offline-first" means here. Autonomic stores everything locally on your device and reads it back from there. The app does its scoring, trend analysis and [reading grades](/insights/app/how-autonomic-scores-your-readings/) right on your phone, without a round trip to any server. You can log a stand test in airplane mode and it just works, because that is where your data already lives.
 
 <div class="callout callout-tip">
-<strong>A simple test for any health app.</strong> Ask: does it work with no account and no internet? If it needs you to sign up before you can log anything, your data is going somewhere. Autonomic needs neither, because it has nowhere to send it.
+<strong>A simple test for any health app.</strong> Ask: does it work with no account and no internet? If it needs you to sign up before you can log anything, your data is going somewhere. Autonomic needs neither, because your journal has nowhere to go.
 </div>
 
 ## Cloud app vs. offline-first, side by side
@@ -59,7 +65,7 @@ The difference is easiest to see as a direct comparison. Here is how a typical c
 | Question | Typical cloud health app | Autonomic (offline-first) |
 | --- | --- | --- |
 | **Account required?** | Yes, sign-up before you can log | No account, ever |
-| **Where does data live?** | On the company's servers | Only on your iPhone |
+| **Where does data live?** | On the company's servers | Only on your phone |
 | **Who can see it?** | The company, its vendors, partners | Only you, on your device |
 | **What happens in a breach?** | Your records can be exposed at scale | No server, so nothing to breach on our end |
 | **Who owns it?** | Governed by their terms | You do, fully |
@@ -118,6 +124,8 @@ Keeping your data on-device is not free, and it would be dishonest to pretend ot
 
 **You own your backups.** Because we do not hold a copy in the cloud, we cannot restore your history if you lose your phone and never backed it up. You stay in control, which also means you carry the responsibility. Autonomic makes it easy to export a backup file so you can keep your own copy somewhere safe.
 
+**Apple Health and Health Connect are your choice.** If you connect them, Autonomic reads from and writes readings to your phone's own health store, which you control in your phone's settings. Apple Health can sync to iCloud if you have turned that on for your account. Leave them off and your readings stay inside the app.
+
 **Sharing is deliberate, not automatic.** Your data does not silently sync to a portal a clinician can browse. Instead, when you want to share, you [export a clear summary you can bring to an appointment](/insights/recovery/turn-your-data-into-a-doctor-conversation/). It takes one extra step, and in exchange nothing moves without your say-so.
 
 These are the right trade-offs for this audience. If you live with POTS, long COVID or another form of dysautonomia, you may already know the sting of not being believed, and the very real worry about how health information could affect insurance or how you are perceived. Control over your own data is not a luxury feature here. It is part of feeling safe enough to track honestly in the first place.
@@ -131,7 +139,7 @@ Being offline-first is different from being a black box. Autonomic is a personal
 Everything the app does, from [measuring and analyzing your readings](/insights/app/autonomic-app-measure-analyze-monitor-act/) to spotting the trends that separate a bad day from a bad direction, happens on your device. Unlike a [general fitness tracker built around a cloud ecosystem](/insights/app/autonomic-vs-fitness-trackers/), Autonomic is designed so that the data supporting your recovery, including the [triggers and symptoms you log to find your patterns](/insights/recovery/find-your-triggers-symptom-journal/), never becomes someone else's asset.
 
 <div class="callout callout-tip">
-<strong>Try a journal that stays on your phone.</strong> No account, no cloud, no sign-up. Log your HRV, stand tests, sleep and symptoms and watch your trends build, entirely on your iPhone. <a href="/">See how it works.</a>
+<strong>Try a journal that stays on your phone.</strong> No account, no cloud, no sign-up. Log your HRV, stand tests, sleep and symptoms and watch your trends build, entirely on your phone. <a href="/">See how it works.</a>
 </div>
 
 ## The bottom line

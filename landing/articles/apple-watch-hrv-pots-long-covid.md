@@ -6,11 +6,17 @@ summary: "Why Apple Watch HRV looks low or erratic with POTS or long COVID, how 
 description: "Apple Watch HRV looks low with POTS or long COVID? Learn why (SDNN vs RMSSD, timing, posture), how accurate it is, and how to take a reading you can trust."
 keywords: "Apple Watch HRV, Apple Watch HRV low, Apple Watch HRV POTS, Apple Watch HRV long COVID, Apple Watch SDNN, SDNN vs RMSSD, is Apple Watch HRV accurate, how to measure HRV on Apple Watch, Apple Watch Mindfulness HRV, normal Apple Watch HRV"
 date: 2026-10-27
-updated: 2026-10-27
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1485206542366-16d53f333d1c?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Tyler Hendy / Unsplash"
 tldr: "Apple Watch reports HRV as SDNN, while most guides, charts and many other wearables use RMSSD, so the numbers are not directly comparable. Background readings are short and taken at irregular times, often in different positions, which matters a great deal in POTS. A low number on its own tells you very little; what matters is how today compares with your own baseline. For a reading you can track, measure at the same time each morning, in the same position, while still, by starting a short Mindfulness session or a longer guided reading."
+question: "Why is my Apple Watch HRV so low with POTS?"
+app:
+  feature: apple-watch
+  hook: "Turn your Apple Watch into a steady morning reading."
+  line: "Take the same morning reading on your wrist each day, so your numbers are comparable and the trend means something."
 categories:
   - hrv
   - pots
@@ -46,7 +52,7 @@ You can see the results in the Health app under Heart, then Heart Rate Variabili
 
 Most HRV guides, population charts and recovery scores are built on RMSSD, which focuses on the fastest beat-to-beat changes. SDNN looks at the overall spread of beat intervals. The two are related but not interchangeable, so an SDNN value from your Watch cannot be compared directly with an RMSSD chart, with another app's number, or with a friend's Oura or Garmin reading. If you want the detail, see the section on metrics in [the complete guide to HRV](/insights/hrv/hrv-complete-guide/).
 
-SDNN is not a worse choice, just a different one. A [West Virginia University simulation study](https://www.htworld.co.uk/?p=28802) suggested that SDNN may hold up better than RMSSD when HRV is estimated from the wrist rather than from an ECG.
+SDNN is not a worse choice, just a different one. A [West Virginia University simulation study](https://doi.org/10.1007/s40279-024-02066-5) suggested that SDNN may hold up better than RMSSD when HRV is estimated from the wrist rather than from an ECG.
 
 ### Position changes everything in POTS
 
@@ -62,7 +68,7 @@ Age, poor sleep, alcohol, a late meal, dehydration, infection, a crash, the mens
 
 ### Your condition may or may not be part of it
 
-It is tempting to assume that POTS or long COVID simply means low HRV. The research is less clear. A [2026 meta-analysis](https://s4me.info/threads/neurocardiac-autonomic-dysfunction-in-patients-with-post-covid-19-condition-a-systematic-review-and-meta-analysis-2026-schoene-et-al.49313) of 11 studies found only a trend toward lower HRV in post-COVID condition, and studies in POTS have produced mixed results. A low number is not proof of a problem, and a normal one is not proof that you are fine.
+It is tempting to assume that POTS or long COVID simply means low HRV. The research is less clear. A [2026 meta-analysis](https://doi.org/10.1111/ene.70561) of 11 studies found only a trend toward lower HRV in post-COVID condition, and studies in POTS have produced mixed results. A low number is not proof of a problem, and a normal one is not proof that you are fine.
 
 ## Is Apple Watch HRV accurate enough?
 
@@ -138,3 +144,11 @@ Your Apple Watch measures HRV as SDNN, at moments it chooses, in whatever positi
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data. It is not intended to diagnose or treat any condition. Talk to your clinician about any symptoms that concern you.
 </div>
+
+## Sources
+
+- Apple. [Using Apple Watch to measure heart rate, calorimetry, and activity](https://www.apple.com/health/pdf/Heart_Rate_Calorimetry_Activity_on_Apple_Watch_November_2024.pdf). Apple technical paper, 2024.
+- Hernando D, Roca S, Sancho J, et al. [Validation of the Apple Watch for heart rate variability measurements during relax and mental stress in healthy subjects](https://doi.org/10.3390/s18082619). *Sensors*, 2018.
+- Dewig HG, Cohen JN, Renaghan EJ, et al. [Are wearable photoplethysmogram-based heart rate variability measures equivalent to electrocardiogram? A simulation study](https://doi.org/10.1007/s40279-024-02066-5). *Sports Medicine*, 2024.
+- Schoene D, Deckert S, Barlinn K, et al. [Neurocardiac autonomic dysfunction in patients with post-COVID-19 condition: a systematic review and meta-analysis](https://doi.org/10.1111/ene.70561). *European Journal of Neurology*, 2026.
+- Lehrer PM, Gevirtz R. [Heart rate variability biofeedback: how and why does it work?](https://doi.org/10.3389/fpsyg.2014.00756) *Frontiers in Psychology*, 2014.

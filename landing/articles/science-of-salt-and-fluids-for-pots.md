@@ -6,11 +6,17 @@ summary: "\"Drink more, salt more\" is the most repeated advice in POTS. Here is
 description: "An evidence-based look at salt and fluids for POTS: the blood-volume rationale, what research supports, how much sodium and water is recommended, and who should be cautious."
 keywords: "salt for POTS science, does salt help POTS, fluids POTS evidence, blood volume POTS, sodium POTS research, electrolytes POTS, high sodium diet POTS, volume loading"
 date: 2026-05-28
-updated: 2026-05-28
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1590346313583-492cdf7c5f6b?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Maria Petersson / Unsplash"
 tldr: "Many people with POTS have low blood volume, and adding sodium plus fluids expands plasma and can lower standing heart rate. Acute volume loading has clear short-term effects; the long-term high-salt regimen is widely endorsed but rests more on physiology and clinical consensus than large trials. It's a sensible, low-cost first step worth trying with a clinician, and worth tracking to see if it works for you."
+question: "Does extra salt and water actually help POTS?"
+app:
+  feature: insights
+  hook: "Test whether salt and fluids help you."
+  line: "Log your water and salt in Autonomic and it looks at whether your better days line up with them, using your own numbers."
 categories:
   - research
   - pots
@@ -146,3 +152,12 @@ Salt and fluids for POTS are **evidence-informed, not evidence-proven**. The phy
   for personalized care. <em>High-sodium and high-fluid regimens must be individualized with a clinician and are unsafe in some conditions, including high blood pressure and kidney or heart disease.</em> Talk with a qualified
   clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Raj SR, Biaggioni I, Yamhure PC, et al. [Renin-aldosterone paradox and perturbed blood volume regulation underlying postural tachycardia syndrome](https://doi.org/10.1161/01.CIR.0000160356.97313.5D). *Circulation*, 2005.
+- Garland EM, Gamboa A, Nwazue VC, et al. [Effect of high dietary sodium intake in patients with postural tachycardia syndrome](https://doi.org/10.1016/j.jacc.2021.03.005). *Journal of the American College of Cardiology*, 2021.
+- Jordan J, Shannon JR, Black BK, et al. [The pressor response to water drinking in humans: a sympathetic reflex?](https://doi.org/10.1161/01.cir.101.5.504) *Circulation*, 2000.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Harvard Health Publishing. [POTS: Diagnosing and treating this dizzying syndrome](https://www.health.harvard.edu/blog/pots-diagnosing-and-treating-this-dizzying-syndrome-202110062611). Updated 2024.
+- Li X, Chen Y, Sun S, et al. [Association between electrolyte supplementation and cardiac injury in long COVID-19](https://doi.org/10.21037/jtd-2025-689). *Journal of Thoracic Disease*, 2025.

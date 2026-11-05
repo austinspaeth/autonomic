@@ -9,6 +9,11 @@ date: 2026-07-03
 updated: 2026-07-03
 author: "Austin Spaeth"
 tldr: "Autonomic is a private, offline iPhone app for tracking autonomic recovery. It closes the loop that every other article on this site points to: it MEASURES your HRV, heart rate, blood pressure and orthostatic readings, ANALYZES them by scoring each against medical thresholds and charting a rolling baseline, MONITORS trends and flags early warnings, and helps you ACT: pacing, finding triggers, and building doctor-ready summaries. No account, no cloud, no data leaving your phone."
+question: "What does the Autonomic app actually do?"
+app:
+  feature: hrv-readings
+  hook: "Measure, read and track your nervous system daily."
+  line: "Take a morning HRV reading, log how you feel, and get a daily score out of 100 that shows how your body is doing, all kept on your phone."
 categories:
   - app
   - recovery

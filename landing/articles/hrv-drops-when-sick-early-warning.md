@@ -6,11 +6,17 @@ summary: "A day or two before the sore throat or the fatigue, your heart rate va
 description: "Why HRV drops when you are getting sick: the immune and autonomic physiology, why the dip can precede symptoms, how to tell it from other causes, and how to read it as a cue to rest."
 keywords: "HRV when sick, does HRV drop when sick, HRV early warning illness, HRV drop before symptoms, resting heart rate when sick, HRV infection, low HRV illness, HRV recovery after illness, HRV long covid relapse, RMSSD when sick"
 date: 2026-07-30
-updated: 2026-07-30
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1552858725-2758b5fb1286?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Jp Valery / Unsplash"
 tldr: "When your body starts fighting an infection, it shifts toward a sympathetic, inflammatory state: resting heart rate rises and heart rate variability (especially RMSSD and HF power) falls, often a day or two before you feel any symptoms. That dip is your nervous system responding to the immune signal, not a sign that something is wrong with your heart. Read it as a cue to rest, hydrate and pace, not to push through, and expect HRV to climb back toward your baseline as you recover. For people with POTS or long COVID, an illness dip is worth extra caution, because infections can trigger a flare. HRV is not a diagnostic test for any infection, so use the trend to inform rest and discuss anything concerning with your clinician."
+question: "Why does my HRV drop when I'm getting sick?"
+app:
+  feature: hrv-readings
+  hook: "Catch the dip before the symptoms."
+  line: "Take a morning HRV reading and Autonomic tracks it with your resting heart rate, so a dip below your usual stands out early."
 categories:
   - hrv
   - recovery
@@ -218,3 +224,11 @@ A sudden, unexplained drop in HRV, especially with a resting heart rate that has
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. HRV is not a test for any infection. Seek medical care for high or persistent fever, breathing difficulty, chest pain, fainting, or symptoms that are severe or not improving, and discuss changes to your activity or management with a clinician who knows your history.
 </div>
+
+## Sources
+
+- Natarajan A, Su HW, Heneghan C. [Assessment of physiological signs associated with COVID-19 measured using wearable devices](https://doi.org/10.1038/s41746-020-00363-7). *npj Digital Medicine*, 2020.
+- Mishra T, Wang M, Metwally AA, et al. [Pre-symptomatic detection of COVID-19 from smartwatch data](https://doi.org/10.1038/s41551-020-00640-6). *Nature Biomedical Engineering*, 2020.
+- Hirten RP, Danieletto M, Tomalin L, et al. [Use of physiological data from a wearable device to identify SARS-CoV-2 infection and symptoms and predict COVID-19 diagnosis: observational study](https://doi.org/10.2196/26107). *Journal of Medical Internet Research*, 2021.
+- Mason AE, Hecht FM, Davis SK, et al. [Detection of COVID-19 using multimodal data from a wearable device: results from the first TemPredict Study](https://doi.org/10.1038/s41598-022-07314-0). *Scientific Reports*, 2022.
+- Tracey KJ. [The inflammatory reflex](https://doi.org/10.1038/nature01321). *Nature*, 2002.

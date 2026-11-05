@@ -6,11 +6,17 @@ summary: "Under-hydration is one of the quietest reasons your HRV reads low. Her
 description: "Does dehydration lower HRV? Yes: less plasma volume means more sympathetic drive, so RMSSD falls and resting heart rate rises. How much it moves, why POTS makes it worse, and how to track it."
 keywords: "dehydration and HRV, does dehydration lower HRV, hydration heart rate variability, dehydration RMSSD, low HRV dehydration, POTS hydration, blood volume HRV, resting heart rate hydration, HRV dropped"
 date: 2026-08-13
-updated: 2026-08-13
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1523362628745-0c100150b504?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Ethan Sykes / Unsplash"
 tldr: "Dehydration lowers HRV. When plasma volume drops, your heart has less blood to move per beat, so the sympathetic 'fight or flight' branch steps in to hold blood pressure up: heart rate rises, vagal tone falls, and RMSSD drops. The effect is real but usually modest and fully reversible, and it hits harder in POTS because blood volume often starts low. Rehydrate, then read the trend rather than the single morning."
+question: "Does being dehydrated lower my HRV?"
+app:
+  feature: insights
+  hook: "See how your water intake shows in your numbers."
+  line: "Log your water with a tap, and Autonomic shows whether low water days line up with lower HRV and worse days for you."
 categories:
   - hrv
   - pots
@@ -171,3 +177,10 @@ Dehydration lowers HRV, and it does it through simple mechanics: less fluid mean
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Fluid and salt needs are individual, and some conditions require fluid limits, so discuss any changes to your hydration or intake with a clinician who knows your history.
 </div>
+
+## Sources
+
+- Hernandez MI, Jiwan NC, Appell CR, et al. [Dehydration reduces heart rate variability in recreationally resistance-trained men](https://doi.org/10.23736/S0022-4707.26.17774-3). *Journal of Sports Medicine and Physical Fitness*, 2026.
+- Castro-Sepulveda M, Cerda-Kohler H, Pérez-Luco C, et al. [Hydration status after exercise affect resting metabolic rate and heart rate variability](https://doi.org/10.3305/nh.2015.31.3.8523). *Nutrición Hospitalaria*, 2014.
+- Raj SR, Biaggioni I, Yamhure PC, et al. [Renin-aldosterone paradox and perturbed blood volume regulation underlying postural tachycardia syndrome](https://doi.org/10.1161/01.CIR.0000160356.97313.5D). *Circulation*, 2005.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.

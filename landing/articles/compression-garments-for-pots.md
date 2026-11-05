@@ -6,11 +6,17 @@ summary: "Compression is one of the few non-drug tools with real evidence behind
 description: "A practical guide to compression garments for POTS: why abdominal compression beats socks alone, what pressure (mmHg) to look for, waist-high vs. thigh-high, and how to tell if it is working using your stand test."
 keywords: "compression garments POTS, compression for POTS, abdominal compression POTS, compression socks POTS, waist high compression, orthostatic intolerance, blood pooling, dysautonomia, how tight should compression be"
 date: 2026-08-05
-updated: 2026-08-05
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1759476534021-163836fddc50?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Unsplash"
 tldr: "Compression works for POTS by pushing pooled blood back up out of your legs and, more importantly, your abdomen so your heart has something to pump when you stand. The evidence is strongest for abdominal or waist-high garments at roughly 20 to 40 mmHg; knee-high socks alone help far less because most pooling happens in the belly, not the calves. Put it on before you get up, and use your stand test to check whether it is actually lowering your standing heart rate."
+question: "Do compression garments actually help POTS?"
+app:
+  feature: pots-stand-test
+  hook: "Test your compression with a home stand test."
+  line: "Run a guided stand test with and without compression, and compare how much your heart rate rises when you stand."
 categories:
   - pots
   - recovery
@@ -232,3 +238,10 @@ Compression is one of the few non-drug tools for POTS with real trial evidence, 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Compression interacts with circulation and skin health, so discuss adding it, and any changes to your management, with a clinician who knows your history.
 </div>
+
+## Sources
+
+- Bourne KM, Sheldon RS, Hall J, et al. [Compression garment reduces orthostatic tachycardia and symptoms in patients with postural orthostatic tachycardia syndrome](https://doi.org/10.1016/j.jacc.2020.11.040). *Journal of the American College of Cardiology*, 2021.
+- Denq JC, Opfer-Gehrking TL, Giuliani M, et al. [Efficacy of compression of different capacitance beds in the amelioration of orthostatic hypotension](https://doi.org/10.1007/BF02267725). *Clinical Autonomic Research*, 1997.
+- Figueroa JJ, Singer W, Sandroni P, et al. [Effects of patient-controlled abdominal compression on standing systolic blood pressure in adults with orthostatic hypotension](https://doi.org/10.1016/j.apmr.2014.10.012). *Archives of Physical Medicine and Rehabilitation*, 2015.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.

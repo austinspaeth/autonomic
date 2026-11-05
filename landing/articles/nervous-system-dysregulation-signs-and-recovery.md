@@ -6,11 +6,17 @@ summary: "Nervous system dysregulation is when the autonomic balance gets stuck 
 description: "What nervous system dysregulation means, its signs and causes, and how to track recovery using HRV, resting heart rate and orthostatic readings in POTS and long COVID. Non-diagnostic, plain-language guide."
 keywords: "nervous system dysregulation, autonomic dysregulation, dysautonomia, sympathetic dominance, fight or flight stuck, how to regulate nervous system, parasympathetic, vagal tone, HRV, POTS, long COVID, nervous system regulation signs"
 date: 2026-09-11
-updated: 2026-09-11
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1517669375942-946a1f02d705?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&dl=christopher-lemercier-12yvdCiLaVE-unsplash.jpg&w=1920"
 photoAttribution: "Christopher Lemercier / Unsplash"
 tldr: "Nervous system dysregulation means your autonomic nervous system spends too much time in the sympathetic 'fight or flight' state and does not swing back to parasympathetic 'rest and digest' the way it should. You cannot feel the balance directly, but you can measure it: low and unstable HRV, an elevated resting heart rate, and a big heart-rate jump on standing all point the same way. It is common after viral illness and in POTS, it is not a personality flaw or 'just anxiety', and it tends to settle slowly. Track the weekly trend, not any single reading, and discuss changes with a clinician."
+question: "How do I know if my nervous system is dysregulated?"
+app:
+  feature: hrv-readings
+  hook: "Watch your nervous system settle over weeks."
+  line: "A morning HRV reading in Autonomic gives you a daily score out of 100, so you can see your recovery as a trend, not a feeling."
 categories:
   - basics
   - hrv
@@ -25,7 +31,7 @@ faq:
   - q: "Can a dysregulated nervous system be fixed?"
     a: "In many people the autonomic balance recovers substantially over time, especially after a triggering illness, though it can take months and rarely follows a straight line. The general levers are consistent sleep, gentle graded activity within your limits, breathing practice, managing stressors, and for orthostatic problems things like salt, fluids and compression. None of that is a guaranteed cure, individual variation is large, and any treatment plan belongs with a clinician who can evaluate you."
   - q: "How long does it take to recover from nervous system dysregulation?"
-    a: "It varies widely. Post-viral autonomic dysregulation often improves over roughly six to eighteen months, sometimes faster and sometimes longer, and progress usually shows up as a slow climb in your HRV baseline and a slow fall in resting heart rate rather than a sudden switch. Tracking the trend is what makes gradual recovery visible when day to day you may not feel it."
+    a: "It varies widely. Recovery timelines for post-viral autonomic dysregulation differ a great deal from person to person, and progress usually shows up as a slow climb in your HRV baseline and a slow fall in resting heart rate rather than a sudden switch. Tracking the trend is what makes gradual recovery visible when day to day you may not feel it."
 social:
   linkedin: |
     "Nervous system dysregulation" gets used loosely, so it is worth being precise about what it actually means.
@@ -300,7 +306,7 @@ None of the following is a cure, individual responses vary a great deal, and any
 
 **Can it be fixed?** In many people the balance recovers substantially over time, especially after a triggering illness, though it can take months and rarely follows a straight line. The general levers are sleep, gentle graded activity, breathing, managing stressors and, for orthostatic problems, salt, fluids and compression. Any plan belongs with a clinician.
 
-**How long does recovery take?** It varies widely. Post-viral dysregulation often improves over roughly six to eighteen months, and progress usually shows up as a slow climb in your HRV baseline and a slow fall in resting heart rate rather than a sudden switch.
+**How long does recovery take?** It varies widely. Recovery timelines for post-viral dysregulation differ a great deal from person to person, and progress usually shows up as a slow climb in your HRV baseline and a slow fall in resting heart rate rather than a sudden switch.
 
 ## The bottom line
 
@@ -309,3 +315,11 @@ Nervous system dysregulation is a real, physical state, not a mood or a failure 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> These are educational field notes to help you understand and track your own data, not a way to diagnose or treat any condition. The signs described here overlap with many treatable conditions, and HRV varies widely between people and day to day. If your symptoms are new, worsening or concerning, see a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Shaffer F, Ginsberg JP. [An overview of heart rate variability metrics and norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Fedorowski A, Fanciulli A, Raj SR, et al. [Cardiovascular autonomic dysfunction in post-COVID-19 syndrome: a major health-care burden](https://doi.org/10.1038/s41569-023-00962-3). *Nature Reviews Cardiology*, 2024.
+- Zhang S, Niu X, Ma J, et al. [Effects of sleep deprivation on heart rate variability: a systematic review and meta-analysis](https://doi.org/10.3389/fneur.2025.1556784). *Frontiers in Neurology*, 2025.
+- Lehrer PM, Gevirtz R. [Heart rate variability biofeedback: how and why does it work?](https://doi.org/10.3389/fpsyg.2014.00756) *Frontiers in Psychology*, 2014.

@@ -6,11 +6,17 @@ summary: "Feeling full after a few bites, nauseous, and bloated for hours is com
 description: "Gastroparesis and POTS: why delayed gastric emptying causes early fullness, nausea, and bloating in dysautonomia, how to tell it apart from postprandial hypotension, and gastroparesis-friendly eating that helps."
 keywords: "gastroparesis POTS, delayed gastric emptying dysautonomia, POTS nausea, POTS bloating, early satiety POTS, gastroparesis long covid, GI symptoms dysautonomia, vagus nerve stomach, gastroparesis diet, why am I full after a few bites, POTS stomach problems, slow digestion dysautonomia"
 date: 2026-09-06
-updated: 2026-09-06
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1654588831411-5ebbd8245994?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Unsplash"
 tldr: "Gastroparesis means the stomach empties too slowly, and it is common in POTS, long COVID, and other forms of dysautonomia because the same vagus nerve that steadies your heart rate also drives digestion. The signature is feeling full after only a few bites, along with nausea, bloating, and upper-belly discomfort that can last for hours. It overlaps with, but is distinct from, post-meal blood pooling (which hits in the first hour) and reactive blood-sugar swings (two to four hours later). The highest-yield changes are smaller and more frequent meals, going easier on fat and tough fiber, leaning on liquid nutrition when solids feel heavy, and a gentle walk after eating. Persistent vomiting, weight loss, or dehydration is a clinician's conversation, and formal diagnosis uses a gastric emptying study."
+question: "Why do I feel full after a few bites with POTS?"
+app:
+  feature: insights
+  hook: "Find which meals line up with rough days."
+  line: "Log meals, nausea, bloating and bowel movements in a few taps. Autonomic shows which foods and habits line up with your worse gut days."
 categories:
   - pots
   - food
@@ -206,3 +212,11 @@ Feeling full after a few bites, nauseous, and bloated for hours is not a charact
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Persistent nausea and vomiting, weight loss, dehydration, or severe belly pain need a proper medical evaluation, and gastroparesis is formally diagnosed with a gastric emptying study. Discuss any changes, especially to diet or medication, with a clinician who knows your history.
 </div>
+
+## Sources
+
+- Mehr SE, Barbul A, Shibao CA. [Gastrointestinal symptoms in postural tachycardia syndrome: a systematic review](https://doi.org/10.1007/s10286-018-0519-x). *Clinical Autonomic Research*, 2018.
+- Camilleri M, Kuo B, Nguyen L, et al. [ACG Clinical Guideline: Gastroparesis](https://doi.org/10.14309/ajg.0000000000001874). *American Journal of Gastroenterology*, 2022.
+- Olausson EA, Störsrud S, Grundin H, et al. [A small particle size diet reduces upper gastrointestinal symptoms in patients with diabetic gastroparesis: a randomized controlled trial](https://doi.org/10.1038/ajg.2013.453). *American Journal of Gastroenterology*, 2014.
+- National Institute of Diabetes and Digestive and Kidney Diseases. [Eating, Diet, & Nutrition for Gastroparesis](https://www.niddk.nih.gov/health-information/digestive-diseases/gastroparesis/eating-diet-nutrition). NIH.
+- National Institute of Diabetes and Digestive and Kidney Diseases. [Diagnosis of Gastroparesis](https://www.niddk.nih.gov/health-information/digestive-diseases/gastroparesis/diagnosis). NIH.

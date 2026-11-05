@@ -6,11 +6,17 @@ summary: "Your ECG, bloodwork and echo came back normal, but you can barely stan
 description: "Normal test results but still feel sick? Why a normal ECG, bloodwork and echo can miss dysautonomia and POTS, the postural signal standard tests don't capture, and what to do next."
 keywords: "normal test results but still sick, all my tests are normal, normal ECG but racing heart, dysautonomia normal tests, POTS normal ECG, feel sick but tests normal, why are my tests normal, orthostatic intolerance, long COVID normal tests"
 date: 2026-08-31
-updated: 2026-08-31
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1752650735615-9829d8008a01?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&dl=vitaly-gariev-AP7KmJXEVVI-unsplash.jpg"
 photoAttribution: "Vitaly Gariev / Unsplash"
 tldr: "A normal ECG, blood panel and echocardiogram mostly rule out dangerous structural and rhythm disease, which is genuinely good news, but they are still snapshots taken while you sit or lie down. Dysautonomia and POTS are disorders of how your body adjusts to standing, eating and activity, so the abnormality often only appears when you change position. The test that catches it is a simple repeated stand test showing a sustained heart-rate rise of 30 bpm or more, and that measured pattern, not a description of how you feel, is what moves an appointment forward."
+question: "Why are my test results normal when I feel this sick?"
+app:
+  feature: doctor-reports
+  hook: "Bring the evidence your tests missed."
+  line: "Autonomic turns your own HRV, stand tests and symptom logs into a doctor summary, so you walk in with more than how you feel."
 categories:
   - pots
   - postviral
@@ -213,3 +219,10 @@ Measure the objective pattern before your next visit. Do a stand test on several
 Normal tests and a sick body are not a contradiction, they are a mismatch between what got measured and what is actually wrong. Standard tests are still shots taken at rest, and dysautonomia is a disorder of motion: standing, eating, exerting. The fix is not to distrust the normal results, it is to add the one measurement they left out. Do a stand test, do it repeatedly, write down the numbers, and walk into your next appointment with a pattern instead of a plea. That is the difference between being told to relax and being handed a referral.
 
 *These are educational field notes, not medical advice. Autonomic does not diagnose or treat any condition. Discuss any changes to your care, testing or treatment with a qualified clinician who knows your history.*
+
+## Sources
+
+- Vernino S, Bourne KM, Stiles LE, et al. [Postural orthostatic tachycardia syndrome (POTS): State of the science and clinical care from a 2019 National Institutes of Health Expert Consensus Meeting - Part 1](https://doi.org/10.1016/j.autneu.2021.102828). *Autonomic Neuroscience*, 2021.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Freeman R, Wieling W, Axelrod FB, et al. [Consensus statement on the definition of orthostatic hypotension, neurally mediated syncope and the postural tachycardia syndrome](https://doi.org/10.1007/s10286-011-0119-5). *Clinical Autonomic Research*, 2011.
+- Raj SR. [Postural tachycardia syndrome (POTS)](https://doi.org/10.1161/CIRCULATIONAHA.112.144501). *Circulation*, 2013.

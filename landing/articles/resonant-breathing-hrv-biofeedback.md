@@ -6,11 +6,17 @@ summary: "Slowing your breath to about six breaths a minute is one of the few th
 description: "A practical guide to resonant (coherence) breathing and HRV biofeedback: why ~6 breaths per minute boosts vagal tone, a step-by-step protocol, and what the early long COVID evidence shows."
 keywords: "resonant breathing, HRV biofeedback, coherence breathing, 6 breaths per minute, slow breathing vagus, baroreflex, long COVID breathing, paced breathing, vagal tone"
 date: 2026-06-25
-updated: 2026-06-25
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1522075782449-e45a34f1ddfb?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Sage Friedman / Unsplash"
 tldr: "Breathing at roughly 5.5 to 6 breaths per minute (a slow inhale, a slightly longer exhale) synchronizes your heart rate with your breath and drives HRV up while you do it. Practiced 10 to 20 minutes once or twice a day, it is a gentle, low-cost way to nudge a stressed autonomic system toward balance. It is supportive, not curative, and a few people with dysautonomia feel air-hungry or lightheaded, so start short and stay seated."
+question: "Does breathing at six breaths a minute raise HRV?"
+app:
+  feature: hrv-readings
+  hook: "See slow breathing show up in your HRV."
+  line: "Autonomic guides a paced breathing reading and records your HRV while you do it, so you can watch the effect for yourself."
 categories:
   - hrv
   - recovery
@@ -161,3 +167,10 @@ Resonant breathing at around six breaths a minute is one of the simplest, best-s
   for personalized care. <em>Stop any breathing exercise that causes dizziness, breathlessness or air hunger, and remember that resonant breathing is a supportive practice, not a treatment for POTS, long COVID or any other condition.</em> Talk with a qualified
   clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Lehrer PM, Gevirtz R. [Heart rate variability biofeedback: how and why does it work?](https://doi.org/10.3389/fpsyg.2014.00756) *Frontiers in Psychology*, 2014.
+- Corrado J, Iftekhar N, Halpin S, et al. [HEART Rate Variability Biofeedback for LOng COVID Dysautonomia (HEARTLOC): results of a feasibility study](https://doi.org/10.1177/27536351241227261). *Advances in Rehabilitation Science and Practice*, 2024.
+- Polizzi J, Tosto-Mancuso J, Tabacof L, et al. [Resonant breathing improves self-reported symptoms and wellbeing in people with Long COVID](https://doi.org/10.1101/2024.03.25.24304856). *medRxiv* (preprint), 2024.
+- da Silva ALG, Vieira LDP, Dias LS, et al. [Impact of long COVID on the heart rate variability at rest and during deep breathing maneuver](https://doi.org/10.1038/s41598-023-50276-0). *Scientific Reports*, 2023.

@@ -6,11 +6,17 @@ summary: "Surgery with POTS is very doable, but a few predictable things (fastin
 description: "A practical guide to surgery and anesthesia with POTS and dysautonomia: why fasting and lying flat make flares worse, what to ask your anesthesiologist, pre-op IV fluids, positioning, and how to recover without a crash."
 keywords: "surgery with POTS, anesthesia POTS, POTS and surgery, dysautonomia anesthesia, POTS perioperative, POTS pre-op fluids, having surgery with POTS, anesthesia dysautonomia, POTS surgery recovery, general anesthesia POTS"
 date: 2026-10-26
-updated: 2026-10-26
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1640876777002-badf6aee5bcc?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
 photoAttribution: "Unsplash"
 tldr: "People with POTS can have surgery safely, but the perioperative period stacks several POTS triggers at once: overnight fasting and dehydration shrink an already low blood volume, lying flat for hours then sitting up invites a big heart-rate spike, and some anesthetic drugs relax blood vessels and worsen pooling. The fixes are mostly simple and worth asking for in advance: generous IV fluids before and during surgery, careful medication timing, slow repositioning, active warming, compression, and a gentle, paced recovery. Share your resting and standing numbers with the team beforehand so they know your normal, and discuss any plan changes with your clinician."
+question: "How do I prepare for surgery and anesthesia with POTS?"
+app:
+  feature: pacing-budget
+  hook: "Pace your recovery after surgery day by day."
+  line: "Autonomic gives you a daily energy budget in minutes, learned from what your body has handled, and alerts you when you are close to the edge."
 categories:
   - pots
   - recovery
@@ -244,3 +250,11 @@ Surgery with POTS is manageable, and the leverage is almost entirely in the prep
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you prepare and ask informed questions, not to diagnose, treat, or override your surgical team. Decisions about anesthesia, medication timing and your perioperative plan belong to your surgeon and anesthesiologist, who know your full history. Discuss any changes with them.
 </div>
+
+## Sources
+
+- Rabbitts JA, Groenewald CB, Jacob AK, et al. [Postural orthostatic tachycardia syndrome and general anesthesia: a series of 13 cases](https://doi.org/10.1016/j.jclinane.2010.12.013). *Journal of Clinical Anesthesia*, 2011.
+- Kernan S, Tobias JD. [Perioperative care of an adolescent with postural orthostatic tachycardia syndrome](https://doi.org/10.4103/1658-354X.62611). *Saudi Journal of Anaesthesia*, 2010.
+- Raj SR, Biaggioni I, Yamhure PC, et al. [Renin-aldosterone paradox and perturbed blood volume regulation underlying postural tachycardia syndrome](https://doi.org/10.1161/01.CIR.0000160356.97313.5D). *Circulation*, 2005.
+- American Society of Anesthesiologists Task Force on Preoperative Fasting. [Practice guidelines for preoperative fasting and the use of pharmacologic agents to reduce the risk of pulmonary aspiration: an updated report](https://doi.org/10.1097/ALN.0000000000001452). *Anesthesiology*, 2017.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.

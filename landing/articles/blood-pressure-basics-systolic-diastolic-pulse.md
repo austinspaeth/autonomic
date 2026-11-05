@@ -6,11 +6,17 @@ summary: "The three numbers on a blood-pressure reading each tell a different st
 description: "What systolic, diastolic and pulse pressure mean, the AHA blood pressure categories, and why low readings matter in POTS and orthostatic intolerance recovery."
 keywords: "blood pressure basics, systolic, diastolic, pulse, what is systolic, what is diastolic, blood pressure chart, AHA blood pressure, low blood pressure POTS, orthostatic intolerance"
 date: 2026-07-09
-updated: 2026-07-09
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1723764881665-5b40cea01c9b?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Alex Moliski / Unsplash"
 tldr: "A blood-pressure reading has three numbers. Systolic (the top) is the peak pressure as your heart contracts; diastolic (the bottom) is the resting pressure between beats; pulse is how many times that cycle repeats per minute. The AHA calls under 120/80 normal, but recovery tracking uses a tighter optimum band, and it treats low readings as meaningful too, because in POTS and orthostatic intolerance the problem is often too little pressure and pooling blood, not too much. Track your own numbers over weeks rather than chasing a single ideal."
+question: "What do systolic, diastolic and pulse numbers mean?"
+app:
+  feature: hrv-readings
+  hook: "Keep every blood pressure reading in one place."
+  line: "Log blood pressure and pulse in your journal, and see each reading next to your HRV, sleep and symptoms for that day."
 categories:
   - basics
 faq:
@@ -250,3 +256,9 @@ Systolic is the peak of each heartbeat's push, diastolic is the steady pressure 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Blood-pressure readings that concern you, or symptoms that are worsening, deserve evaluation by a clinician who can examine you properly.
 </div>
+
+## Sources
+
+- Whelton PK, Carey RM, Aronow WS, et al. [2017 ACC/AHA/AAPA/ABC/ACPM/AGS/APhA/ASH/ASPC/NMA/PCNA guideline for the prevention, detection, evaluation, and management of high blood pressure in adults](https://doi.org/10.1161/HYP.0000000000000065). *Hypertension*, 2018.
+- Banach M, Aronow WS. [Blood pressure j-curve: current concepts](https://doi.org/10.1007/s11906-012-0314-3). *Current Hypertension Reports*, 2012.
+- Dysautonomia International. [Postural Orthostatic Tachycardia Syndrome](https://www.dysautonomiainternational.org/page.php?ID=30).

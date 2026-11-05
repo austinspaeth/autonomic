@@ -11,6 +11,11 @@ author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1734009027745-a3ae6804c6e3?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&dl=romain-water-iwQudHOR3Go-unsplash.jpg"
 photoAttribution: "Romain Water / Unsplash"
 tldr: "The late-night window where MCAS symptoms lift is genuine. By evening your trigger exposures have stopped, you have been off your feet for hours, and your circadian alerting signal peaks in the three or four hours before your usual bedtime. On top of that, the adrenaline that keeps you awake past your bedtime binds beta-2 receptors on your mast cells, raises intracellular cAMP and physically suppresses degranulation, which is a weak version of what an epinephrine injector does in anaphylaxis. So you really do feel better. The problem is that this is a borrowed brake, not a repair. Mast cells run on a circadian clock that is gated by your cortisol rhythm, and pushing your sleep later degrades that gating, raises inflammatory signaling, and drops next-morning HRV. The relief is real and the bill is real, and they arrive on different days. Educational field notes, not medical advice."
+question: "Why do I feel better at night with MCAS?"
+app:
+  feature: insights
+  hook: "See what late nights cost you later."
+  line: "Log your bedtimes and symptoms in Autonomic, and it looks at how late nights line up with your HRV and symptoms in the days after."
 categories:
   - recovery
   - postviral

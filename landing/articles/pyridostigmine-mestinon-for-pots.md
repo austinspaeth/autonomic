@@ -6,11 +6,17 @@ summary: "Pyridostigmine lowers the standing tachycardia of POTS from an unusual
 description: "How pyridostigmine (Mestinon) treats POTS: it inhibits acetylcholinesterase, raising vagal tone to lower standing heart rate without dropping blood pressure. Evidence, GI side effects, and how it changes your stand test and HRV."
 keywords: "pyridostigmine for POTS, Mestinon POTS, pyridostigmine POTS heart rate, acetylcholinesterase inhibitor POTS, pyridostigmine standing heart rate, Mestinon dysautonomia, pyridostigmine side effects, does pyridostigmine lower blood pressure, pyridostigmine vs beta blocker, pyridostigmine HRV, Mestinon orthostatic intolerance, pyridostigmine vagal tone"
 date: 2026-09-07
-updated: 2026-09-07
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1587854692152-cbe660dbde88?q=80&w=1469&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Unsplash"
 tldr: "Pyridostigmine (Mestinon) is an acetylcholinesterase inhibitor. By stopping the enzyme that clears acetylcholine, it lets that signal linger, which strengthens vagal tone at the heart's pacemaker and eases transmission through the autonomic ganglia. The practical result in POTS is a lower standing heart rate without lowering blood pressure, which is why it is often useful for people who also run low or who cannot tolerate a beta blocker. Its main drawback is cholinergic side effects, mostly gut cramping and loose stools. It treats the fast heart rate, not the cause of POTS, so track your resting heart rate, your stand-test jump, and how you feel, and keep every dose decision with your clinician."
+question: "How does Mestinon lower heart rate in POTS?"
+app:
+  feature: pots-stand-test
+  hook: "See how your stand test looks on Mestinon."
+  line: "Run the same home stand test before and after starting pyridostigmine, so you and your doctor can compare your standing heart rate rise."
 categories:
   - pots
   - hrv
@@ -260,3 +266,11 @@ These effects are usually **dose related**, which is why clinicians often start 
 ## The bottom line
 
 Pyridostigmine (Mestinon) lowers a POTS heart rate from the opposite direction of the usual options. Rather than quieting the sympathetic surge, it raises acetylcholine by blocking the enzyme that clears it, which strengthens the vagal brake on the pacemaker and eases transmission through the autonomic ganglia. The payoff is a lower standing heart rate that does not come with a blood-pressure drop, which is why it is worth understanding if you run low, cannot tolerate a beta blocker, or have orthostatic intolerance alongside the tachycardia. The evidence, led by a randomized crossover study, is modest but consistent, and its honest limits are real: it treats the fast heart rate rather than the cause, its main side effects are cholinergic and mostly in the gut, and the benefit is often moderate. Track your stand-test jump, your resting heart rate, your blood pressure, and how you actually feel, read an HRV rise as at least partly a genuine vagal signal here, and keep every dose decision a conversation with the clinician who prescribes it.
+
+## Sources
+
+- Raj SR, Black BK, Biaggioni I, et al. [Acetylcholinesterase inhibition improves tachycardia in postural tachycardia syndrome](https://doi.org/10.1161/CIRCULATIONAHA.104.497594). *Circulation*, 2005.
+- Kanjwal K, Karabin B, Sheikh M, et al. [Pyridostigmine in the treatment of postural orthostatic tachycardia: a single-center experience](https://doi.org/10.1111/j.1540-8159.2011.03047.x). *Pacing and Clinical Electrophysiology*, 2011.
+- Singer W, Sandroni P, Opfer-Gehrking TL, et al. [Pyridostigmine treatment trial in neurogenic orthostatic hypotension](https://doi.org/10.1001/archneur.63.4.noc50340). *Archives of Neurology*, 2006.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- U.S. National Library of Medicine, DailyMed. [Mestinon (pyridostigmine bromide) prescribing information](https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=a851795e-b7a8-40c3-9922-5e79d3eb4d92).

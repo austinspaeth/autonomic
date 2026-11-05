@@ -6,11 +6,17 @@ summary: "POTS is usually grouped into three overlapping patterns: neuropathic, 
 description: "The three POTS subtypes explained: neuropathic, hyperadrenergic and hypovolemic POTS, how they differ, why most people overlap, and what your home blood pressure and heart rate can hint."
 keywords: "POTS subtypes, hyperadrenergic POTS, neuropathic POTS, hypovolemic POTS, types of POTS, what type of POTS do I have, POTS mechanisms, dysautonomia, orthostatic intolerance, standing norepinephrine"
 date: 2026-07-23
-updated: 2026-07-23
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1709316010534-23646d72ed2e?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Unsplash"
 tldr: "POTS is not a single mechanism. Clinicians often describe three overlapping patterns: neuropathic POTS (partial nerve damage lets blood pool in the legs and belly on standing), hyperadrenergic POTS (an oversized sympathetic surge, with tremor, palpitations and blood pressure that often rises on standing), and hypovolemic POTS (low blood and plasma volume). These are not tidy boxes: most people show features of more than one, and the labels guide treatment rather than deliver a diagnosis. Your at-home stand test, especially with blood pressure, can hint at which pattern dominates, but confirming a subtype needs a clinician."
+question: "What are the POTS subtypes and which one do I have?"
+app:
+  feature: pots-stand-test
+  hook: "See what your stand test hints at."
+  line: "Autonomic guides a home stand test and records your heart rate rise, so you have real numbers to discuss with your doctor."
 categories:
   - pots
   - basics
@@ -225,3 +231,11 @@ POTS is not one thing. The three subtypes, neuropathic, hyperadrenergic, and hyp
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> These are educational field notes to help you understand and track your own data, not a way to diagnose or classify yourself. POTS subtyping, and any change to treatment, should be done with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Vernino S, Bourne KM, Stiles LE, et al. [Postural orthostatic tachycardia syndrome (POTS): State of the science and clinical care from a 2019 National Institutes of Health Expert Consensus Meeting - Part 1](https://doi.org/10.1016/j.autneu.2021.102828). *Autonomic Neuroscience*, 2021.
+- Raj SR. [Postural tachycardia syndrome (POTS)](https://doi.org/10.1161/CIRCULATIONAHA.112.144501). *Circulation*, 2013.
+- Jacob G, Costa F, Shannon JR, et al. [The neuropathic postural tachycardia syndrome](https://doi.org/10.1056/NEJM200010053431404). *New England Journal of Medicine*, 2000.
+- Raj SR, Biaggioni I, Yamhure PC, et al. [Renin-aldosterone paradox and perturbed blood volume regulation underlying postural tachycardia syndrome](https://doi.org/10.1161/01.CIR.0000160356.97313.5D). *Circulation*, 2005.
+- Fu Q, VanGundy TB, Galbreath MM, et al. [Cardiac origins of the postural orthostatic tachycardia syndrome](https://doi.org/10.1016/j.jacc.2010.02.043). *Journal of the American College of Cardiology*, 2010.

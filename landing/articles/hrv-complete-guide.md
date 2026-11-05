@@ -6,10 +6,16 @@ summary: "Heart rate variability is the single clearest at-home window into your
 description: "The complete guide to heart rate variability (HRV) for POTS, dysautonomia and long COVID recovery: RMSSD vs SDNN, HF and LF power, normal ranges, how to measure, what raises HRV, and how to read the trend."
 keywords: "HRV, heart rate variability, RMSSD, SDNN, HF power, LF power, vagal tone, parasympathetic, how to improve HRV, HRV normal range, POTS, long COVID"
 date: 2026-07-09
-updated: 2026-07-09
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1719550371336-7bb64b5cacfa?q=80&w=1760&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 tldr: "HRV is the beat-to-beat variation in the time between heartbeats, and more of it usually means a better-regulated nervous system. The number worth watching daily is RMSSD (your parasympathetic 'recovery' signal); SDNN is a broader capacity measure. HRV is deeply personal, so ignore population 'normal' charts and track your own baseline. Measure the same way every morning, watch a 7–14 day trend, never react to one day, and use it as one input among heart rate and the stand test, not a grade on your worth."
+question: "What is HRV and how do I read mine?"
+app:
+  feature: hrv-readings
+  hook: "Read your nervous system every morning."
+  line: "Autonomic takes a morning HRV reading with your phone camera, a strap or a watch, explains RMSSD and more, and gives you a daily score."
 categories:
   - hrv
   - recovery
@@ -19,7 +25,7 @@ faq:
   - q: "What's the difference between RMSSD and SDNN?"
     a: "RMSSD reflects rapid beat-to-beat changes driven mainly by the parasympathetic (vagus) nerve; it's your day-to-day recovery signal. SDNN captures the overall spread of variability across a reading and blends both branches, a broader capacity measure. For daily tracking, RMSSD is usually the more useful number."
   - q: "Why is my HRV so low with POTS or long COVID?"
-    a: "In POTS, dysautonomia and long COVID the autonomic nervous system is often biased toward sympathetic 'fight or flight' activation, which suppresses the parasympathetic tone that drives HRV. A lower HRV than before you got sick is common and expected; the goal isn't a textbook number, it's watching your own baseline climb back over time."
+    a: "In POTS the autonomic nervous system is often biased toward sympathetic 'fight or flight' activation, which suppresses the parasympathetic tone that drives HRV, and studies find lower HRV than in healthy people. In long COVID the research is mixed, with only a small difference on average. Either way, the goal isn't a textbook number, it's watching your own baseline climb back over time."
   - q: "How do I raise my HRV?"
     a: "The biggest levers are sleep, pacing to avoid overexertion, limiting alcohol, gentle consistent movement within your limits, hydration and electrolytes (especially in POTS), and slow breathing or coherence practice. But the honest answer is that in post-viral illness, HRV rises mostly as the underlying dysregulation heals; chasing the number directly is less useful than removing what suppresses it and tracking the trend."
   - q: "When should I measure HRV?"
@@ -110,7 +116,7 @@ That means population "normal range" charts are close to useless for you. What's
 - **Your own trend**: which direction it's moving over 7 to 14 days.
 
 <div class="callout callout-note">
-  In POTS, dysautonomia and long COVID, HRV is often <em>lower</em> than it was before you got sick, because the system is biased toward sympathetic activation. That's expected. Recovery isn't hitting a universal target; it's watching <em>your</em> baseline slowly climb back toward where it used to be.
+  In POTS, HRV tends to run <em>lower</em> than in healthy people, because the system is biased toward sympathetic activation. In long COVID the research is mixed, with only a small difference on average, so a low number is possible but not a given. Either way, recovery isn't hitting a universal target; it's watching <em>your</em> baseline slowly climb back toward where it used to be.
 </div>
 
 ## How to measure HRV well
@@ -164,3 +170,14 @@ HRV is not a grade on your worth or even your effort. It's a window into how reg
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> HRV is an educational signal for tracking your own patterns, not a diagnostic tool. Discuss any health concerns with a qualified clinician.
 </div>
+
+## Sources
+
+- Task Force of the European Society of Cardiology and the North American Society of Pacing and Electrophysiology. [Heart rate variability: standards of measurement, physiological interpretation, and clinical use](https://doi.org/10.1161/01.CIR.93.5.1043). *Circulation*, 1996.
+- Shaffer F, Ginsberg JP. [An overview of heart rate variability metrics and norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.
+- Billman GE. [The LF/HF ratio does not accurately measure cardiac sympatho-vagal balance](https://doi.org/10.3389/fphys.2013.00026). *Frontiers in Physiology*, 2013.
+- Nunan D, Sandercock GRH, Brodie DA. [A quantitative systematic review of normal values for short-term heart rate variability in healthy adults](https://doi.org/10.1111/j.1540-8159.2010.02841.x). *Pacing and Clinical Electrophysiology*, 2010.
+- Swai JD, Hu Z, Zhao X, et al. [Heart rate and heart rate variability comparison between postural orthostatic tachycardia syndrome versus healthy participants; a systematic review and meta-analysis](https://doi.org/10.1186/s12872-019-01298-y). *BMC Cardiovascular Disorders*, 2019.
+- Schoene D, Deckert S, Barlinn K, et al. [Neurocardiac autonomic dysfunction in patients with post-COVID-19 condition: a systematic review and meta-analysis](https://doi.org/10.1111/ene.70561). *European Journal of Neurology*, 2026.
+- Pietilä J, Helander E, Korhonen I, et al. [Acute effect of alcohol intake on cardiovascular autonomic regulation during the first hours of sleep in a large real-world sample of Finnish employees: observational study](https://doi.org/10.2196/mental.9519). *JMIR Mental Health*, 2018.
+- Lehrer PM, Gevirtz R. [Heart rate variability biofeedback: how and why does it work?](https://doi.org/10.3389/fpsyg.2014.00756). *Frontiers in Psychology*, 2014.

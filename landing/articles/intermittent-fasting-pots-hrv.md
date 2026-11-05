@@ -6,11 +6,17 @@ summary: "Intermittent fasting is everywhere, but POTS and dysautonomia change t
 description: "Does intermittent fasting help or hurt POTS and HRV? The real physiology behind fasting, blood volume, blood sugar and orthostatic symptoms, plus a safer way to test your own response."
 keywords: "intermittent fasting POTS, intermittent fasting and HRV, fasting dysautonomia, time restricted eating POTS, does fasting lower HRV, fasting blood volume POTS, fasting blood sugar POTS, 16:8 POTS, skipping breakfast POTS, intermittent fasting orthostatic intolerance"
 date: 2026-10-03
-updated: 2026-10-03
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1659352155635-aef81d690cd4?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Unsplash"
 tldr: "Intermittent fasting has real metabolic appeal, but POTS and dysautonomia change the calculation. In a healthy body a fasting window often nudges vagal activity and HRV up a little. In a dysautonomic one, the same fast can push the other way, because going long without food tends to drop blood volume (you skip fluids and salt along with the meal), dip blood sugar enough to trigger an adrenaline surge, and then concentrate eating into fewer, larger meals that worsen post-meal blood pooling. The riskiest pattern is skipping breakfast and fasting straight through the morning, which is already the worst part of the POTS day. If you still want to try it, a gentle window (12:12 or 14:10), eating earlier rather than later, and keeping salt and fluids up during the fast are far safer than a long or late fast. Watch your morning HRV, resting heart rate and stand test, and discuss it with your clinician if you take medication."
+question: "Is intermittent fasting OK if I have POTS?"
+app:
+  feature: insights
+  hook: "See how fasting days really go."
+  line: "Log meals and fasting windows beside your morning readings. Autonomic shows how your numbers and symptoms line up with them."
 categories:
   - food
   - pots
@@ -298,3 +304,12 @@ Intermittent fasting is not inherently good or bad for POTS; it is a stressor wh
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Fasting can be risky with certain medications and conditions, including insulin and diabetes drugs, blood-pressure and heart-rate medication, pregnancy, and a history of disordered eating. Talk to a clinician before changing how or when you eat, and stop if fasting worsens your symptoms.
 </div>
+
+## Sources
+
+- Gonzalez JE, Cooke WH. [Influence of an acute fast on ambulatory blood pressure and autonomic cardiovascular control](https://doi.org/10.1152/ajpregu.00283.2021). *American Journal of Physiology: Regulatory, Integrative and Comparative Physiology*, 2022.
+- Gonzalez JE, Cooke WH. [Acute fasting reduces tolerance to progressive central hypovolemia in humans](https://doi.org/10.1152/japplphysiol.00622.2023). *Journal of Applied Physiology*, 2024.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Brewster JA, Garland EM, Biaggioni I, et al. [Diurnal variability in orthostatic tachycardia: implications for the postural tachycardia syndrome](https://doi.org/10.1042/CS20110077). *Clinical Science*, 2012.
+- Breier NC, Paranjape SY, Scudder S, et al. [Worsening postural tachycardia syndrome is associated with increased glucose-dependent insulinotropic polypeptide secretion](https://doi.org/10.1161/HYPERTENSIONAHA.121.17852). *Hypertension*, 2022.
+- Schwartz NS, Clutter WE, Shah SD, et al. [Glycemic thresholds for activation of glucose counterregulatory systems are higher than the threshold for symptoms](https://doi.org/10.1172/JCI112884). *Journal of Clinical Investigation*, 1987.

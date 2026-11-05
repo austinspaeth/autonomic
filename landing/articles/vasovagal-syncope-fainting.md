@@ -6,11 +6,17 @@ summary: "Vasovagal syncope is the most common reason people faint: a reflex tha
 description: "Vasovagal syncope explained: why the fainting reflex drops your blood pressure and heart rate, how to spot the warning signs early, and the counter-pressure maneuvers that help stop a faint."
 keywords: "vasovagal syncope, fainting, reflex syncope, neurally mediated syncope, why do i faint, how to stop fainting, counter-pressure maneuvers, presyncope warning signs, vasodepressor cardioinhibitory, neurocardiogenic syncope, passing out when standing"
 date: 2026-08-21
-updated: 2026-08-21
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1758691030894-b8d6fda73d38?q=80&w=2664&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Kinga Howard / Unsplash"
 tldr: "Vasovagal syncope is a reflex faint. A trigger (long standing, heat, pain, the sight of blood, strong emotion, dehydration) sets off a miswired autonomic response that widens your blood vessels and slows your heart at the same time, so your blood pressure falls, your brain briefly runs short of blood, and you black out for a few seconds. It is the most common cause of fainting and is usually not dangerous, but it almost always comes with a short warning: lightheadedness, warmth, nausea, sweating, ringing ears and greying vision. The single most useful skill is catching that warning early and lying down with your legs up, or using a counter-pressure maneuver like crossing and tensing your legs or gripping your hands hard, to push blood back to your brain before you go down. Fainting during exertion, while lying flat, or with no warning at all is different and needs prompt medical evaluation."
+question: "Why do I faint, and how can I stop it?"
+app:
+  feature: insights
+  hook: "Spot what lines up with your near faints."
+  line: "Log faints and near faints in Autonomic, and it looks at what lines up with them, like heat, sleep, water and triggers."
 categories:
   - basics
   - pots
@@ -176,9 +182,9 @@ Vasovagal syncope is not identical for everyone, because the reflex can weight i
   <figcaption>The same reflex, weighted three ways. The cardioinhibitory pattern, with a big heart-rate drop, is the one occasionally treated with a pacemaker in carefully selected, older patients.</figcaption>
 </figure>
 
-- **Vasodepressor:** blood pressure falls as the dominant event while heart rate stays relatively steady. This is the most common single pattern.
+- **Vasodepressor:** blood pressure falls as the dominant event while heart rate stays relatively steady.
 - **Cardioinhibitory:** the heart rate slows sharply (sometimes with a pause of several seconds) and drives the drop. In a small, carefully selected group, usually older adults with documented long pauses, a pacemaker is considered.
-- **Mixed:** both a blood-pressure fall and a heart-rate slowing contribute, which is what many people show.
+- **Mixed:** both a blood-pressure fall and a heart-rate slowing contribute. This is the most common pattern on tilt testing.
 
 You do not need to know your subtype to use the practical steps below; they help across all three. The distinction mostly matters for a clinician deciding whether a specific medication or, rarely, a pacemaker fits your case.
 
@@ -190,7 +196,7 @@ When your prodrome starts, you have two goals: get your head level with or below
 2. **Sit and drop your head.** If lying down is not possible, sit and put your head between your knees.
 3. **Use a counter-pressure maneuver.** If you have to stay upright (a checkout line, a train), squeeze large muscle groups hard to raise your pressure.
 
-Physical counter-pressure maneuvers are not folk wisdom. In a randomized trial (the Physical Counterpressure Manoeuvres Trial, van Dijk and colleagues, 2006), people taught to use them had meaningfully fewer faints than those given standard advice alone, roughly a third fewer recurrences. They work by mechanically boosting venous return and blood pressure for the crucial half-minute.
+Physical counter-pressure maneuvers are not folk wisdom. In a randomized trial (the Physical Counterpressure Manoeuvres Trial, van Dijk and colleagues, 2006), people taught to use them had meaningfully fewer faints than those given standard advice alone, about 39% fewer recurrences. They work by mechanically boosting venous return and blood pressure for the crucial half-minute.
 
 | Maneuver | How to do it | Notes |
 | --- | --- | --- |
@@ -279,3 +285,11 @@ Vasovagal syncope is the body's fainting reflex, and for most people it is far l
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational field notes to help you understand and track your own experience, not a tool to diagnose or treat anything. <em>Fainting has many causes, some of which need urgent care, and only a clinician can confirm which one is yours.</em> Seek medical attention if you faint during exertion or while lying down, without warning, with chest pain or palpitations, if you injure yourself, or if faints are frequent or worsening, and talk with a qualified clinician before changing salt, fluids, exercise or medication.
 </div>
+
+## Sources
+
+- Brignole M, Moya A, de Lange FJ, et al. [2018 ESC Guidelines for the diagnosis and management of syncope](https://doi.org/10.1093/eurheartj/ehy037). *European Heart Journal*, 2018.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- van Dijk N, Quartieri F, Blanc JJ, et al. [Effectiveness of physical counterpressure maneuvers in preventing vasovagal syncope: the Physical Counterpressure Manoeuvres Trial (PC-Trial)](https://doi.org/10.1016/j.jacc.2006.06.059). *Journal of the American College of Cardiology*, 2006.
+- Sheldon R, Connolly S, Rose S, et al. [Prevention of Syncope Trial (POST): a randomized, placebo-controlled study of metoprolol in the prevention of vasovagal syncope](https://doi.org/10.1161/CIRCULATIONAHA.105.535161). *Circulation*, 2006.
+- Xu L, Cao X, Wang R, et al. [Clinical features of patients undergoing the head-up tilt test and its safety and efficacy in diagnosing vasovagal syncope in 4,873 patients](https://doi.org/10.3389/fcvm.2021.781157). *Frontiers in Cardiovascular Medicine*, 2021.

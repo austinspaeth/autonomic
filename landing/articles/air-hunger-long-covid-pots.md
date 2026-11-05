@@ -6,11 +6,17 @@ summary: "Air hunger, the feeling that you can't get a full, satisfying breath, 
 description: "Why long COVID and POTS cause air hunger and shortness of breath, why your oxygen saturation stays normal, how breathing pattern dysfunction and low CO2 drive the feeling, and how to track and calm it."
 keywords: "air hunger, air hunger long covid, shortness of breath POTS, breathlessness long covid, can't get a full breath, dysfunctional breathing, breathing pattern disorder, hypocapnia, dyspnea long covid, POTS shortness of breath, air hunger anxiety"
 date: 2026-08-25
-updated: 2026-08-25
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1596236978986-f6e54632cc2a?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Unsplash"
 tldr: "Air hunger is the feeling that a breath won't complete, an unsatisfied urge to breathe deeper. In long COVID and POTS it is usually driven by dysfunctional breathing and a dysregulated autonomic nervous system, not by low blood oxygen, which is why a pulse oximeter so often reads a reassuring 97 to 99 percent while you still feel starved for air. Rapid, shallow, upper-chest breathing blows off carbon dioxide, and low CO2 is itself a powerful trigger for the sensation. The pattern is often trainable: slow, low, nasal, diaphragmatic breathing raises CO2 back into range and calms the signal. Sudden, severe breathlessness, chest pain or a genuinely low oxygen reading is different and needs urgent medical care."
+question: "Why do I feel like I can't get a full breath?"
+app:
+  feature: hrv-readings
+  hook: "Track air hunger without spiraling over it."
+  line: "Log air hunger as a symptom with how bad it was, beside your morning HRV and sleep, so you see the bigger picture instead of one scary moment."
 categories:
   - postviral
   - pots
@@ -220,3 +226,12 @@ Air hunger is real, it is common in long COVID and POTS, and it is genuinely fri
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own experience, not to diagnose or treat any condition. Breathlessness can also be caused by serious heart and lung problems, so new, sudden, severe or worsening shortness of breath, or a low oxygen reading, should be evaluated by a clinician promptly. Discuss any changes to your management with the professionals who know your case.
 </div>
+
+## Sources
+
+- Frésard I, Genecand L, Altarelli M, et al. [Dysfunctional breathing diagnosed by cardiopulmonary exercise testing in 'long COVID' patients with persistent dyspnoea](https://doi.org/10.1136/bmjresp-2021-001126). *BMJ Open Respiratory Research*, 2022.
+- Motiejunaite J, Balagny P, Arnoult F, et al. [Hyperventilation: a possible explanation for long-lasting exercise intolerance in mild COVID-19 survivors?](https://doi.org/10.3389/fphys.2020.614590) *Frontiers in Physiology*, 2020.
+- Boulding R, Stacey R, Niven R, et al. [Dysfunctional breathing: a review of the literature and proposal for classification](https://doi.org/10.1183/16000617.0088-2015). *European Respiratory Review*, 2016.
+- Stewart JM, Pianosi P, Shaban MA, et al. [Postural hyperventilation as a cause of postural tachycardia syndrome: increased systemic vascular resistance and decreased cardiac output when upright in all postural tachycardia syndrome variants](https://doi.org/10.1161/JAHA.118.008854). *Journal of the American Heart Association*, 2018.
+- Lehrer PM, Gevirtz R. [Heart rate variability biofeedback: how and why does it work?](https://doi.org/10.3389/fpsyg.2014.00756) *Frontiers in Psychology*, 2014.
+- Sjoding MW, Dickson RP, Iwashyna TJ, et al. [Racial bias in pulse oximetry measurement](https://doi.org/10.1056/NEJMc2029240). *New England Journal of Medicine*, 2020.

@@ -6,11 +6,17 @@ summary: "A fingertip pulse oximeter measures how much oxygen your blood is carr
 description: "How to read a pulse oximeter in long COVID and POTS: normal SpO2 ranges, why breathlessness happens with normal oxygen, exertional desaturation, accuracy limits, and what actually deserves a call."
 keywords: "pulse oximeter long covid, SpO2 POTS, blood oxygen long covid, oxygen saturation normal range, exertional desaturation, pulse oximeter accuracy, breathless normal oxygen, silent hypoxia, dysautonomia breathing"
 date: 2026-09-26
-updated: 2026-09-26
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1559854397-0d8634edcba8?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Ronaldo de Oliveira / Unsplash"
 tldr: "A pulse oximeter estimates the percentage of your red blood cells carrying oxygen. In long COVID and POTS resting SpO2 is almost always normal, roughly 95 to 100 percent, even when you feel short of breath, because the breathlessness usually comes from breathing pattern, deconditioning, and autonomic dysregulation rather than from low oxygen. Read the trend at rest, know that a single low number is often a bad signal rather than a bad body (cold hands, motion, poor fit), and treat a genuine drop below 94 percent, a clear fall with light activity, or blue lips as reasons to be seen. A normal reading does not mean your symptoms are not real."
+question: "Why do I feel short of breath when my oxygen reads normal?"
+app:
+  feature: hrv-readings
+  hook: "Track the breathless days your oximeter calls normal."
+  line: "Log breathlessness beside your morning HRV and heart rate in Autonomic, so the days that feel wrong have a record even when SpO2 looks fine."
 categories:
   - postviral
   - pots
@@ -22,7 +28,7 @@ faq:
   - q: "Can a pulse oximeter be wrong?"
     a: "Yes, often. Cold hands and poor circulation (common in POTS and Raynaud's), motion, nail polish, bright ambient light, and a loose fit all pull the number down or make it jump. Pulse oximeters also read less accurately on darker skin tones and can overestimate true oxygen levels, which is well documented. Treat a single odd reading as a possible measurement problem first: warm your hand, sit still, and recheck before you react."
   - q: "What is exertional desaturation and how do I check for it?"
-    a: "Exertional desaturation is a drop in blood oxygen when you move, even if your resting level is normal. A simple home version is to record your resting SpO2, then do a gentle, safe activity you can tolerate (some clinicians use a one-minute sit-to-stand or a short walk) and record again. A fall of about 3 percent or more, or dropping below 94 percent with light activity, is worth reporting to your clinician. If you have post-exertional malaise, do not push into exertion just to test this; ask your clinician for a supervised version."
+    a: "Exertional desaturation is a drop in blood oxygen when you move, even if your resting level is normal. A simple home version is to record your resting SpO2, then do a gentle, safe activity you can tolerate (some clinicians use a one-minute sit-to-stand or a short walk) and record again. Studies of people recovering from COVID have counted a drop of 4 percentage points or more on exertion as significant; use the threshold your clinician gives you, and report any clear drop with light activity. If you have post-exertional malaise, do not push into exertion just to test this; ask your clinician for a supervised version."
   - q: "Should I buy a pulse oximeter if I have POTS or long COVID?"
     a: "It can be reassuring to confirm your oxygen is normal, and the pulse-rate readout is genuinely useful for tracking heart rate. But for autonomic recovery, oxygen saturation is rarely the number that moves. Resting heart rate, the heart-rate rise when you stand, and heart rate variability track your nervous system far more closely, so most people get more from tracking those than from watching a SpO2 that sits at 98 percent every day."
 social:
@@ -170,7 +176,7 @@ The common thread is that a fingertip oximeter cannot see any of these, so it ke
 
 There is one pattern where a pulse oximeter earns its place: **exertional desaturation**, a drop in oxygen when you move even though your resting level is normal. It shows up in some post-viral lung involvement and is worth knowing about because it can be invisible at rest.
 
-A cautious home version is to record your resting SpO2 with a warm, still hand, then do a gentle activity you can safely tolerate and record again. Some clinicians use a one-minute sit-to-stand test or a short flat walk. A fall of roughly **3 percentage points or more**, or dropping **below 94 percent** with light activity, is worth reporting.
+A cautious home version is to record your resting SpO2 with a warm, still hand, then do a gentle activity you can safely tolerate and record again. Some clinicians use a one-minute sit-to-stand test or a short flat walk. Studies of people recovering from COVID have counted a drop of **4 percentage points or more** on exertion as significant. Use the threshold your clinician gives you, and report any clear drop with light activity.
 
 <figure class="prose-figure">
   <svg viewBox="0 0 720 220" role="img" aria-label="Two lines showing oxygen saturation over a short activity test. A green line stays flat near 98 percent, labeled the usual long COVID and POTS pattern. A red line starts at 97 and falls to 92 percent during activity, labeled exertional desaturation, worth reporting.">
@@ -231,3 +237,10 @@ For everything short of that, the calmer path is to describe your breathing prec
 A pulse oximeter answers one narrow question: is your blood well loaded with oxygen right now? In long COVID and POTS the answer is almost always yes, even on the worst days, because the breathlessness comes from breathing mechanics, deconditioning, low blood volume, and autonomic dysregulation rather than from low oxygen. Read the device calmly, know that most low or jumpy numbers are cold hands and motion rather than a failing body, learn your own resting range, and reserve your attention for a genuine sustained drop, a fall with light activity, or blue lips. Then spend the energy you were spending on a number that never moves on the ones that do: heart rate, the standing rise, and HRV, tracked over weeks and brought to the clinician who manages your care.
 
 *These are educational field notes, not medical advice. Blood oxygen has many determinants and individual situations vary. Discuss any low readings, worsening breathlessness, or changes to your management with your own clinician, and seek urgent care for the warning signs above.*
+
+## Sources
+
+- U.S. Food and Drug Administration. [Pulse Oximeter Basics](https://www.fda.gov/consumers/consumer-updates/pulse-oximeter-basics). Updated 2025.
+- Sjoding MW, Dickson RP, Iwashyna TJ, et al. [Racial bias in pulse oximetry measurement](https://doi.org/10.1056/NEJMc2029240). *New England Journal of Medicine*, 2020.
+- Núñez-Cortés R, Rivera-Lillo G, Arias-Campoverde M, et al. [Use of sit-to-stand test to assess the physical capacity and exertional desaturation in patients post COVID-19](https://doi.org/10.1177/1479973121999205). *Chronic Respiratory Disease*, 2021.
+- Motiejunaite J, Balagny P, Arnoult F, et al. [Hyperventilation as one of the mechanisms of persistent dyspnoea in SARS-CoV-2 survivors](https://doi.org/10.1183/13993003.01578-2021). *European Respiratory Journal*, 2021.

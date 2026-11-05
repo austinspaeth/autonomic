@@ -6,10 +6,16 @@ summary: "Your autonomic nervous system runs everything you never think about: h
 description: "A complete, plain-language guide to the autonomic nervous system and dysautonomia: the sympathetic and parasympathetic branches, what dysregulation looks like in POTS, long COVID and MCAS, and the signals you can actually measure at home."
 keywords: "autonomic nervous system, dysautonomia, sympathetic, parasympathetic, POTS, long COVID, dysautonomia symptoms, autonomic dysfunction, vagal tone"
 date: 2026-07-02
-updated: 2026-07-02
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1506126613408-eca07ce68773?q=80&w=1760&auto=format&fit=crop"
 tldr: "The autonomic nervous system is the automatic control layer for your body: two branches, sympathetic ('fight or flight') and parasympathetic ('rest and digest'), constantly balancing heart rate, blood pressure, digestion and more. Dysautonomia is what happens when that balancing breaks down, and it sits underneath POTS, long COVID and MCAS. You can't feel the regulation directly, but you can measure its fingerprints: HRV, heart rate, and the orthostatic response, and that's what makes recovery trackable."
+question: "What is the autonomic nervous system, and what is dysautonomia?"
+app:
+  feature: hrv-readings
+  hook: "See your autonomic nervous system in numbers."
+  line: "A short morning HRV reading gives you a daily score out of 100, so you can watch how your nervous system is doing over time."
 categories:
   - basics
   - pots
@@ -183,3 +189,10 @@ The autonomic nervous system is the automatic control layer for your whole body:
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This guide is educational and is meant to help you understand and track your own data, not to diagnose or treat any condition. If you have symptoms of dysautonomia, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Cleveland Clinic. [Dysautonomia: What It Is, Symptoms, Types & Treatment](https://my.clevelandclinic.org/health/diseases/6004-dysautonomia). Updated 2023.
+- Raj SR, Arnold AC, Barboi A, et al. [Long-COVID postural tachycardia syndrome: an American Autonomic Society statement](https://doi.org/10.1007/s10286-021-00798-2). *Clinical Autonomic Research*, 2021.
+- Kohno R, Cannom DS, Olshansky B, et al. [Mast Cell Activation Disorder and Postural Orthostatic Tachycardia Syndrome: A Clinical Association](https://doi.org/10.1161/JAHA.121.021002). *Journal of the American Heart Association*, 2021.
+- Shaffer F, Ginsberg JP. [An Overview of Heart Rate Variability Metrics and Norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.

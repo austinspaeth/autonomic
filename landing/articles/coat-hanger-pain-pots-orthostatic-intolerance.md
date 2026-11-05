@@ -6,11 +6,17 @@ summary: "Coat hanger pain is the aching band across the back of the neck and sh
 description: "What coat hanger pain is: the neck and shoulder ache of orthostatic intolerance and POTS, why standing brings it on, how it differs from a migraine, and how to track it at home."
 keywords: "coat hanger pain, coat hanger headache, POTS neck pain, orthostatic intolerance, neck and shoulder pain standing, dysautonomia, orthostatic hypotension, muscle hypoperfusion"
 date: 2026-08-27
-updated: 2026-08-27
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1643237131522-bbf79b062ca1?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&dl=camila-seves-espasandin-N1b617BsQJs-unsplash.jpg"
 photoAttribution: "Camila Seves Espasandin / Unsplash"
-tldr: "Coat hanger pain is an aching, tight band across the base of the skull, the back of the neck, and the tops of the shoulders, shaped roughly like a coat hanger. It builds the longer you are upright and fades within minutes of lying down. The leading explanation is that the postural muscles holding your head up are not getting enough blood flow while you stand, the same underperfusion behind other orthostatic symptoms. It is a recognized sign of orthostatic intolerance and shows up in POTS and orthostatic hypotension. Because it tracks upright time and blood flow, it responds to the same measures that help the rest of orthostatic intolerance, and it is worth logging beside your stand test."
+tldr: "Coat hanger pain is an aching, tight band across the base of the skull, the back of the neck, and the tops of the shoulders, shaped roughly like a coat hanger. It builds the longer you are upright and fades within minutes of lying down. A common explanation is that the postural muscles holding your head up are not getting enough blood flow while you stand, though this is not proven. It is a recognized sign of orthostatic intolerance, best described in orthostatic hypotension, and evidence for it in POTS is limited. Because it tracks upright time and blood flow, it responds to the same measures that help the rest of orthostatic intolerance, and it is worth logging beside your stand test."
+question: "Why do my neck and shoulders ache when I stand?"
+app:
+  feature: pots-stand-test
+  hook: "Turn that standing ache into real numbers."
+  line: "Log coat hanger pain as a symptom, and run a guided stand test to see your heart rate rise the longer you stay upright."
 categories:
   - pots
   - basics
@@ -18,18 +24,18 @@ faq:
   - q: "What does coat hanger pain feel like?"
     a: "A dull, tight ache across the base of the skull, the back of the neck, and the tops of the shoulders, in a pattern shaped like a coat hanger. It is usually not sharp or throbbing. The defining feature is timing: it builds the longer you stay upright and eases within a few minutes of lying down, which is what separates it from most ordinary neck pain."
   - q: "Is coat hanger pain a sign of POTS?"
-    a: "It is a recognized sign of orthostatic intolerance, the broader category POTS belongs to. It was first described in autonomic failure and orthostatic hypotension, and it is also reported by many people with POTS. On its own it does not diagnose anything, but a neck and shoulder ache that reliably comes on with standing and clears on lying down is worth mentioning to a clinician who manages your dysautonomia."
+    a: "It is a recognized sign of orthostatic intolerance, the broader category POTS belongs to. It was first described in autonomic failure and orthostatic hypotension, and evidence for it in POTS is limited. On its own it does not diagnose anything, but a neck and shoulder ache that reliably comes on with standing and clears on lying down is worth mentioning to a clinician who manages your dysautonomia."
   - q: "Why does lying down make the pain go away?"
-    a: "The leading explanation is that the muscles holding your head and shoulders upright are underperfused while you stand, meaning they are not getting enough blood flow, and that underperfusion causes the ache. Lying down removes the gravitational challenge, blood flow to those muscles recovers, and the pain settles, usually within a few minutes. That rapid relief on reclining is the classic fingerprint of the pattern."
+    a: "A common explanation is that the muscles holding your head and shoulders upright are underperfused while you stand, meaning they are not getting enough blood flow, though this has not been proven. Lying down removes the gravitational challenge, blood flow to those muscles recovers, and the pain settles, usually within a few minutes. That rapid relief on reclining is the classic fingerprint of the pattern."
   - q: "How is coat hanger pain different from a tension headache or migraine?"
     a: "A tension headache or muscle knot does not care much about your posture and does not reliably clear when you lie flat. A migraine tends to throb, often on one side, with light or sound sensitivity, and can last many hours regardless of position. Coat hanger pain is posture-locked: it grows with upright time and eases on reclining. If your neck pain does not follow that up-down pattern, it is probably something else, and it is worth having checked."
   - q: "What helps coat hanger pain?"
     a: "The same measures that help orthostatic intolerance in general tend to help: staying well hydrated, adequate salt if your clinician agrees, compression garments, and pacing your upright time so you are not standing still for long stretches. Sitting or lying down when it builds gives the muscles a chance to reperfuse. Some people also find gentle position changes and support for the head and arms help. Always discuss a plan with the clinician who manages your condition."
 social:
   linkedin: |
-    There is a symptom many people with POTS and orthostatic intolerance carry for years without a name: a dull ache across the base of the skull, the back of the neck, and the tops of the shoulders, in a shape that looks like a coat hanger. Hence the name, coat hanger pain.
+    There is a symptom many people with orthostatic intolerance carry for years without a name: a dull ache across the base of the skull, the back of the neck, and the tops of the shoulders, in a shape that looks like a coat hanger. Hence the name, coat hanger pain.
 
-    The tell is timing. It builds the longer you are upright and eases within minutes of lying down. The leading explanation is that the postural muscles holding your head up are underperfused while you stand, the same reduced blood flow behind other orthostatic symptoms. That is why it responds to the usual orthostatic measures rather than to the painkillers people often reach for first.
+    The tell is timing. It builds the longer you are upright and eases within minutes of lying down. A common explanation is that the postural muscles holding your head up are underperfused while you stand, though this is not proven. That is why it responds to the usual orthostatic measures rather than to the painkillers people often reach for first.
 
     For anyone tracking recovery, the practical move is to log it beside a stand test and note how long you had been upright when it started. Read as posture-locked data, it stops being a mystery ache and becomes one more orthostatic signal you can follow.
 
@@ -40,7 +46,7 @@ social:
     Subreddit: r/POTS
     Title: If your neck and shoulders ache the longer you stand and it clears when you lie down, that has a name: coat hanger pain
 
-    Sharing because it took me too long to connect the dots. For ages I thought I just had a bad neck. Then I noticed the pattern: a dull band of ache across the base of my skull and the tops of my shoulders (roughly a coat hanger shape) that got worse the longer I was upright and faded within a few minutes of lying flat. Turns out that posture-locked timing is the classic sign of coat hanger pain, which comes from the neck and shoulder muscles not getting enough blood flow while you stand.
+    Sharing because it took me too long to connect the dots. For ages I thought I just had a bad neck. Then I noticed the pattern: a dull band of ache across the base of my skull and the tops of my shoulders (roughly a coat hanger shape) that got worse the longer I was upright and faded within a few minutes of lying flat. Turns out that posture-locked timing is the classic sign of coat hanger pain, which is thought to come from the neck and shoulder muscles not getting enough blood flow while you stand.
 
     What changed things for me was treating it as an orthostatic symptom instead of a muscle problem. The stuff that helps the rest of my orthostatic intolerance (fluids, salt with my doctor's ok, compression, pacing my standing time, sitting before it builds) helped this too, in a way that stretching and painkillers never did. I also started noting how long I had been on my feet when it kicked in, which made it obvious it was about upright time and not about doing something wrong.
 
@@ -57,7 +63,7 @@ social:
 
 ## The ache with a shape
 
-There is a particular kind of neck pain that a lot of people with POTS and orthostatic intolerance live with for years before they learn it has a name. It sits across the base of the skull, runs down the back of the neck, and spreads out over the tops of the shoulders. Drawn on the body, that pattern looks a lot like a coat hanger, which is exactly where the name **coat hanger pain** comes from.
+There is a particular kind of neck pain that a lot of people with orthostatic intolerance live with for years before they learn it has a name. It sits across the base of the skull, runs down the back of the neck, and spreads out over the tops of the shoulders. Drawn on the body, that pattern looks a lot like a coat hanger, which is exactly where the name **coat hanger pain** comes from.
 
 It is easy to write off as bad posture, a pulled muscle, or the general stiffness of a rough week. What sets it apart is not how it feels, which is usually a dull, heavy ache rather than a sharp or throbbing pain. What sets it apart is **when** it happens. Coat hanger pain builds the longer you stay upright and eases, often within a few minutes, once you lie down. That posture-locked timing is the fingerprint, and it points at the same underlying problem behind the rest of orthostatic intolerance: your body is not moving blood the way it should when you stand.
 
@@ -81,13 +87,13 @@ It is easy to write off as bad posture, a pulled muscle, or the general stiffnes
 
 ## TL;DR
 
-Coat hanger pain is an aching, tight band across the base of the skull, the back of the neck, and the tops of the shoulders. It builds the longer you stand and fades within minutes of lying down. The leading explanation is that the muscles holding your head up are underperfused (not getting enough blood flow) while you are upright. It is a recognized sign of orthostatic intolerance and appears in both POTS and orthostatic hypotension. Because it tracks upright time and blood flow, it responds to the same measures that help the rest of orthostatic intolerance, and it is worth logging next to your stand test.
+Coat hanger pain is an aching, tight band across the base of the skull, the back of the neck, and the tops of the shoulders. It builds the longer you stand and fades within minutes of lying down. A common explanation is that the muscles holding your head up are underperfused (not getting enough blood flow) while you are upright, though this is not proven. It is a recognized sign of orthostatic intolerance, best described in orthostatic hypotension, and evidence for it in POTS is limited. Because it tracks upright time and blood flow, it responds to the same measures that help the rest of orthostatic intolerance, and it is worth logging next to your stand test.
 
 ## Why standing brings it on
 
 To hold your head up and your shoulders square against gravity, a set of postural muscles at the back of your neck and across your upper back work continuously whenever you are upright. Working muscle needs a steady supply of oxygen-rich blood. That is usually not a problem, because your circulation adjusts moment to moment to keep flow where it is needed.
 
-In orthostatic intolerance, that adjustment falls short. When you stand, gravity pulls blood down into your legs and abdomen. A healthy system clamps down on those vessels and nudges the heart to compensate, keeping blood pressure and flow steady. When the autonomic nervous system is not doing that job well, upward blood flow to the head and to those hard-working postural muscles drops. Muscles that are asked to keep working on a reduced blood supply start to ache, in the same way any muscle protests when its supply cannot keep up with its demand. The leading explanation for coat hanger pain is exactly this: a **local underperfusion of the neck and shoulder muscles** during upright posture.
+In orthostatic intolerance, that adjustment falls short. When you stand, gravity pulls blood down into your legs and abdomen. A healthy system clamps down on those vessels and nudges the heart to compensate, keeping blood pressure and flow steady. When the autonomic nervous system is not doing that job well, upward blood flow to the head and to those hard-working postural muscles drops. Muscles that are asked to keep working on a reduced blood supply start to ache, in the same way any muscle protests when its supply cannot keep up with its demand. A common explanation for coat hanger pain is exactly this: a **local underperfusion of the neck and shoulder muscles** during upright posture. It is not proven, and one study found the ache came on during a tilt test in only a few of the people who had it in daily life.
 
 That model explains the two things patients notice most. First, the pain gets worse the longer you are upright, because the mismatch between what the muscles need and what they are getting accumulates over minutes. Second, it eases quickly when you lie down, because reclining removes the gravitational challenge, blood flow to those muscles recovers, and the ache lets go.
 
@@ -116,7 +122,7 @@ That model explains the two things patients notice most. First, the pain gets wo
 
 Coat hanger pain was first described in people with **autonomic failure and orthostatic hypotension**, where blood pressure drops on standing. In that setting the mechanism is easy to picture: pressure falls, perfusion to the postural muscles falls with it, and the ache follows. It has been one of the more specific clues that a person's headaches or neck pain are orthostatic in origin rather than musculoskeletal.
 
-Since then it has been recognized well beyond classic orthostatic hypotension. Many people with **POTS** describe the same posture-locked neck and shoulder ache, even though their defining problem is an excessive heart rate rise rather than a blood pressure drop. In POTS the upright challenge still leaves the head and upper body underperfused in ways that can strain those muscles, so the coat hanger pattern fits. You do not need a formal blood pressure drop to have it.
+It is still best described in orthostatic hypotension. Some people with **POTS** describe a similar posture-locked neck and shoulder ache, even though their defining problem is an excessive heart rate rise rather than a blood pressure drop, but research on coat hanger pain in POTS is limited.
 
 This is worth saying plainly: coat hanger pain does not, by itself, diagnose any condition. It is a **symptom pattern**, one clue among several. But it is a useful clue, because it is specific. A neck ache that reliably worsens with upright time and clears on lying down is behaving like an orthostatic symptom, and that is exactly the kind of detail a clinician managing dysautonomia wants to hear about.
 
@@ -162,6 +168,14 @@ None of this is a cure, and coat hanger pain that is frequent, severe, or new de
 
 ## The bottom line
 
-Coat hanger pain is a real, recognized pattern: an aching band across the neck and shoulders that grows with upright time and eases on lying down, driven by underperfusion of the postural muscles during standing. It shows up in POTS and orthostatic hypotension and is a useful, specific clue that a neck ache is orthostatic rather than musculoskeletal. Read it as posture-locked data, treat it with the same measures that help the rest of orthostatic intolerance, and bring the pattern to the clinician who manages your condition.
+Coat hanger pain is a real, recognized pattern: an aching band across the neck and shoulders that grows with upright time and eases on lying down, thought to be driven by underperfusion of the postural muscles during standing. It is best described in orthostatic hypotension, evidence in POTS is limited, and it is a useful, specific clue that a neck ache is orthostatic rather than musculoskeletal. Read it as posture-locked data, treat it with the same measures that help the rest of orthostatic intolerance, and bring the pattern to the clinician who manages your condition.
 
 *These are educational field notes, not medical advice. Coat hanger pain has several possible causes and individual experiences vary. Discuss any new or worsening symptoms, and any changes to your management, with your own clinician.*
+
+## Sources
+
+- Bleasdale-Barr KM, Mathias CJ. [Neck and other muscle pains in autonomic failure: their association with orthostatic hypotension](https://doi.org/10.1177/014107689809100704). *Journal of the Royal Society of Medicine*, 1998.
+- Mathias CJ, Mallipeddi R, Bleasdale-Barr K. [Symptoms associated with orthostatic hypotension in pure autonomic failure and multiple system atrophy](https://doi.org/10.1007/s004150050479). *Journal of Neurology*, 1999.
+- Khurana RK. [Coat-hanger ache in orthostatic hypotension](https://doi.org/10.1177/0333102412449932). *Cephalalgia*, 2012.
+- Khurana RK. [Syncope and headache](https://doi.org/10.1007/s11916-018-0706-4). *Current Pain and Headache Reports*, 2018.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.

@@ -6,11 +6,17 @@ summary: "If you feel shaky, sweaty, and your heart races a couple of hours afte
 description: "Reactive hypoglycemia and POTS: why blood-sugar swings trigger adrenaline surges, racing heart, and shakiness a few hours after eating, how it differs from postprandial hypotension, and how to flatten the curve and track it."
 keywords: "reactive hypoglycemia, blood sugar POTS, POTS blood sugar swings, dysautonomia low blood sugar, shaky after eating POTS, adrenaline dump blood sugar, glycemic variability HRV, POTS diet blood sugar, why do I feel shaky hours after eating, blood sugar crash symptoms"
 date: 2026-09-04
-updated: 2026-09-04
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1490645935967-10de6ba17061?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Anna Pelzer / Unsplash"
 tldr: "A fast rise and fall in blood sugar after a carb-heavy meal can trigger a counter-regulatory surge of adrenaline. That surge feels exactly like a POTS flare: shakiness, sweating, a racing heart, and anxiety, usually two to four hours after eating. It is a different mechanism from postprandial hypotension, which hits within the first hour from blood pooling in the gut. Flattening the glucose curve (protein, fat, and fiber before or alongside carbs, smaller balanced meals, a short walk after eating) is the highest-yield fix, and a same-time morning HRV reading plus an occasional post-meal heart-rate check shows you your own pattern. True hypoglycemia is a medical finding worth a clinician's input."
+question: "Why do I get shaky and my heart races hours after eating?"
+app:
+  feature: insights
+  hook: "Turn your post-meal crashes into a pattern."
+  line: "Log meals and symptoms in Autonomic and it looks for what lines up with your worse days, so a hunch about carbs becomes something you can see."
 categories:
   - food
   - pots
@@ -24,7 +30,7 @@ faq:
   - q: "How do I stop blood-sugar crashes with POTS?"
     a: "Flatten the curve. Do not eat fast carbs alone: pair them with protein, fat, and fiber, or eat those first, so glucose rises more gently and the insulin overshoot is smaller. Favor smaller, balanced, more frequent meals over big carb-heavy ones, keep a protein-forward breakfast, and take a gentle five to ten minute walk after eating to help your muscles soak up glucose. Stay hydrated and keep salt up if your clinician agrees, since dehydration worsens both problems. Most people notice a real difference within a week or two of eating this way."
   - q: "Does blood sugar affect HRV?"
-    a: "Yes. A sharp glucose swing triggers a sympathetic (fight-or-flight) surge, and sympathetic activation lowers short-term HRV metrics like RMSSD and HF power while raising heart rate. Research consistently links greater glycemic variability, the size of your sugar swings, to lower heart rate variability. It is one reason a same-time-of-day morning HRV reading and a steadier way of eating tend to move together over a few weeks."
+    a: "Yes. A sharp glucose swing triggers a sympathetic (fight-or-flight) surge, and sympathetic activation lowers short-term HRV metrics like RMSSD and HF power while raising heart rate. Research links greater glycemic variability, the size of your sugar swings, to lower heart rate variability, though mainly in people with diabetes and not consistently. It is one reason a same-time-of-day morning HRV reading and a steadier way of eating tend to move together over a few weeks."
 social:
   linkedin: |
     A quietly common driver of afternoon POTS flares gets missed because the timing throws people off: it hits two to four hours after eating, not right after.
@@ -33,7 +39,7 @@ social:
 
     This is distinct from postprandial hypotension, which hits within the first hour from splanchnic (gut) blood pooling. The tell is timing and relief: reactive swings come later and ease when you eat again.
 
-    The levers are unglamorous and effective: never eat fast carbs alone, lead with protein, fat, and fiber, keep meals smaller and more frequent, and take a short walk after eating. Greater glycemic variability tracks with lower HRV in the literature, so a same-time morning reading tends to move with a steadier way of eating.
+    The levers are unglamorous and effective: never eat fast carbs alone, lead with protein, fat, and fiber, keep meals smaller and more frequent, and take a short walk after eating. Greater glycemic variability has been linked to lower HRV, mainly in people with diabetes and not consistently, so a same-time morning reading tends to move with a steadier way of eating.
 
     Full write-up with the mechanism, a timing comparison, and a self-check: https://autonomic.care/insights/food/reactive-hypoglycemia-blood-sugar-pots/?utm_source=linkedin&utm_medium=social&utm_campaign=reactive-hypoglycemia-blood-sugar-pots
 
@@ -141,7 +147,7 @@ Everyone can get a blood-sugar swing. The reason it matters more in dysautonomia
 
 In POTS and related conditions, resting sympathetic tone often runs high, the baroreflex that steadies heart rate and blood pressure is blunted, and many people already sit close to their symptom threshold on an ordinary day. Add a pulse of adrenaline from a falling glucose and you are not starting from calm. The surge stacks on top of an already-activated system, so the same swing that gives an unaffected person a mild jittery moment can give you a full flare: a heart rate that jumps 20 or 30 beats, tremor, air hunger, and the anxiety that so often gets mislabeled. If that adrenaline-flare feeling is familiar, the piece on [adrenaline dumps in POTS](/insights/pots/adrenaline-dumps-pots/) covers the same surge from the autonomic side, and the overlap with anxiety is worth reading in [is it POTS or anxiety](/insights/pots/is-it-pots-or-anxiety/).
 
-There is a measurable footprint, too. A sharp glucose swing is a sympathetic event, and sympathetic activation lowers your short-term HRV. Research on glycemic variability, the size and frequency of your sugar swings, consistently ties bigger swings to lower heart rate variability. That is one reason a steadier way of eating and a slowly improving morning [RMSSD](/insights/basics/rmssd-and-pnn50-vagal-tone-metrics/) tend to travel together over a few weeks.
+There is a measurable footprint, too. A sharp glucose swing is a sympathetic event, and sympathetic activation lowers your short-term HRV. Research on glycemic variability, the size and frequency of your sugar swings, has tied bigger swings to lower heart rate variability, though mainly in people with diabetes and not consistently. That is one reason a steadier way of eating and a slowly improving morning [RMSSD](/insights/basics/rmssd-and-pnn50-vagal-tone-metrics/) tend to travel together over a few weeks.
 
 ## Blood-sugar swing or post-meal blood pooling?
 
@@ -264,3 +270,11 @@ A racing heart, shakiness, and sweating that arrive two to four hours after a ca
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Post-meal symptoms have several possible causes, and documented low blood sugar, recurrent lows, or new and severe symptoms deserve a proper medical evaluation. Discuss any changes, especially to diet or medication, with a clinician who knows your history.
 </div>
+
+## Sources
+
+- Mayo Clinic. [Reactive hypoglycemia: What causes it?](https://www.mayoclinic.org/diseases-conditions/diabetes/expert-answers/reactive-hypoglycemia/faq-20057778)
+- American Diabetes Association Professional Practice Committee. [6. Glycemic goals and hypoglycemia: Standards of Care in Diabetes 2025](https://doi.org/10.2337/dc25-S006). *Diabetes Care*, 2025.
+- American Diabetes Association Professional Practice Committee. [2. Diagnosis and classification of diabetes: Standards of Care in Diabetes 2025](https://doi.org/10.2337/dc25-S002). *Diabetes Care*, 2025.
+- Shukla AP, Iliescu RG, Thomas CE, et al. [Food order has a significant impact on postprandial glucose and insulin levels](https://doi.org/10.2337/dc15-0429). *Diabetes Care*, 2015.
+- Fleischer J, Lebech Cichosz S, Hoeyem P, et al. [Glycemic variability is associated with reduced cardiac autonomic modulation in women with type 2 diabetes](https://doi.org/10.2337/dc14-0654). *Diabetes Care*, 2015.

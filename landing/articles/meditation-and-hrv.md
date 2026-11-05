@@ -6,11 +6,17 @@ summary: "Meditation does nudge heart rate variability up, but most of the lift 
 description: "Does meditation improve HRV? What the physiology and evidence actually show about meditation, vagal tone and RMSSD, which styles help most, and how to track the effect at home in POTS and long COVID."
 keywords: "meditation and HRV, does meditation improve HRV, meditation vagal tone, mindfulness HRV, meditation RMSSD, meditation parasympathetic, meditation heart rate variability, POTS, long COVID"
 date: 2026-10-05
-updated: 2026-10-05
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1602254473438-fc0ee47d9715?q=80&w=987&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Unsplash"
 tldr: "Meditation does raise HRV, but the effect is modest and most of the within-session lift comes from the slow breathing that meditation encourages, not from stillness alone. During a session, RMSSD and HF power usually climb as your breath slows. A lasting rise in your resting baseline is possible over weeks of regular practice, but it is smaller and more variable, so judge it by your own multi-week trend measured the same way each day, not by one calm sitting."
+question: "Does meditation actually raise my HRV?"
+app:
+  feature: insights
+  hook: "Test whether meditation moves your baseline."
+  line: "Take a morning HRV reading in Autonomic and log your sessions. Over weeks it shows whether your baseline lines up with the practice."
 categories:
   - hrv
   - recovery
@@ -31,7 +37,7 @@ social:
 
     Half one: during a session, yes. As you settle, your breath naturally slows and deepens, and slow breathing strongly amplifies respiratory sinus arrhythmia, the beat-to-beat rhythm that RMSSD and HF power are built to measure. So the number climbs while you sit. Much of that lift is the breathing, not the stillness, which is why paced resonant breathing often moves HRV even more.
 
-    Half two is the one people actually want: does your resting baseline go up over time? Sometimes, and more modestly. A trait-level rise in HRV from regular practice is real but smaller and more variable than the in-the-moment effect, and it shows up as a gentle upward trend over weeks, not a single calm sitting.
+    Half two is the one people actually want: does your resting baseline go up over time? Sometimes, and more modestly. A trait-level rise in HRV from regular practice is possible, but trials are mixed and it is smaller and more variable than the in-the-moment effect, and it shows up as a gentle upward trend over weeks, not a single calm sitting.
 
     The practical takeaway: keep your daily HRV reading standardized (same time, same posture) to track the baseline, and if you want to see the acute effect, run a separate before-and-after. Full write-up, with how to read the two effects apart in your own data:
     https://autonomic.care/insights/hrv/meditation-and-hrv/?utm_source=linkedin&utm_medium=social&utm_campaign=meditation-and-hrv
@@ -47,7 +53,7 @@ social:
 
     A few things that helped: sit or recline rather than stand (orthostatic stuff will wreck the reading), don't force the breath so slow it makes you feel worse, and treat it as part of pacing, not another task to grind. Not medical advice, just what sorted out my data. Wrote up the two effects and how to read them apart: https://autonomic.care/insights/hrv/meditation-and-hrv/?utm_source=reddit&utm_medium=social&utm_campaign=meditation-and-hrv
   x: |
-    Does meditation raise HRV? During a session, yes, but mostly from the slow breathing, not the stillness. A lasting baseline rise is real but smaller and takes weeks. Measure your morning baseline the same way daily to see it.
+    Does meditation raise HRV? During a session, yes, but mostly from the slow breathing, not the stillness. A lasting baseline rise is possible, but studies are mixed and it takes weeks. Measure your morning baseline the same way daily to see it.
 
     https://autonomic.care/insights/hrv/meditation-and-hrv/?utm_source=x&utm_medium=social&utm_campaign=meditation-and-hrv
 
@@ -148,7 +154,7 @@ None of this makes the effect fake. Deliberately spending time each day in a hig
 
 The question that actually matters for recovery is whether your **resting baseline** moves, meaning your HRV when you are not mid-session. Does weeks of practice leave you with a calmer default state?
 
-The honest answer from the research literature is a qualified yes. Reviews and meta-analyses of meditation and mindfulness training generally find small-to-moderate increases in resting HRV, with high-frequency power and RMSSD the markers that move most. But the effects are modest, they vary a lot between people and studies, and the strongest, most consistent findings are still the acute, in-session ones. A trait-level rise is plausible and worth pursuing; it is not a large, guaranteed number you can bank on.
+The honest answer from the research literature is that results are mixed. Some trials of meditation and mindfulness training find increases in resting HRV, with high-frequency power and RMSSD the markers that move most, but the largest meta-analysis of randomized trials found no reliable rise in resting HRV compared with control groups. Where effects do appear they are modest, they vary a lot between people and studies, and the strongest, most consistent findings are still the acute, in-session ones. A trait-level rise is plausible and worth pursuing; it is not a large, guaranteed number you can bank on.
 
 Three things make the trait effect hard to see in your own data:
 
@@ -241,3 +247,10 @@ Meditation and HRV are genuinely connected, in two ways worth keeping straight. 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Meditation is not a substitute for medical care. If your symptoms are worsening or your readings concern you, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Brown L, Rando AA, Eichel K, et al. [The effects of mindfulness and meditation on vagally mediated heart rate variability: a meta-analysis](https://doi.org/10.1097/PSY.0000000000000900). *Psychosomatic Medicine*, 2021.
+- Rådmark L, Sidorchuk A, Osika W, et al. [A systematic review and meta-analysis of the impact of mindfulness based interventions on heart rate variability and inflammatory markers](https://doi.org/10.3390/jcm8101638). *Journal of Clinical Medicine*, 2019.
+- Zaccaro A, Piarulli A, Laurino M, et al. [How breath-control can change your life: a systematic review on psycho-physiological correlates of slow breathing](https://doi.org/10.3389/fnhum.2018.00353). *Frontiers in Human Neuroscience*, 2018.
+- Lehrer PM, Gevirtz R. [Heart rate variability biofeedback: how and why does it work?](https://doi.org/10.3389/fpsyg.2014.00756). *Frontiers in Psychology*, 2014.

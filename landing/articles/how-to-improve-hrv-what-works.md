@@ -6,11 +6,17 @@ summary: "The honest, evidence-based guide to raising heart rate variability, ra
 description: "How to improve HRV naturally: the levers that actually raise heart rate variability, ranked by impact, plus what to skip. Sleep, pacing, breathing, electrolytes and more for POTS and long COVID."
 keywords: "how to improve HRV, increase HRV naturally, raise HRV, HRV and sleep, electrolytes HRV, breathing HRV, POTS, long COVID, resonant breathing, pacing"
 date: 2026-06-18
-updated: 2026-06-18
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1534413298607-48ba59e8a06d?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Sasha Freemind / Unsplash"
 tldr: "The biggest levers on HRV are unglamorous: sleep, pacing to avoid crashes, slow breathing, hydration and electrolytes, less alcohol, gentle movement and a steady daily rhythm. In post-viral illness, HRV climbs mostly as the underlying dysregulation heals, so you stack the deck rather than force a number. Track the trend, not the day."
+question: "How can I improve my HRV?"
+app:
+  feature: insights
+  hook: "See which habits move your HRV."
+  line: "Log sleep, water, breathing and supplements beside a morning reading. Autonomic shows which habits line up with your higher HRV days."
 categories:
   - hrv
   - recovery
@@ -20,7 +26,7 @@ faq:
   - q: "What's the fastest way to raise HRV?"
     a: "The fastest single move is protecting your sleep, since one bad night visibly dents HRV and one good stretch lifts it. Cutting alcohol and doing a few minutes of slow, resonant breathing also show up quickly. But 'fast' is relative: meaningful, durable change is measured in weeks of consistency, not one hero session."
   - q: "Does breathing really improve HRV?"
-    a: "Slow breathing at roughly six breaths per minute directly and measurably increases HRV during the session by strengthening the vagal brake. Whether that carries into a higher resting baseline is less certain, but small trials in long COVID have found breathing practice improved symptoms and wellbeing, and it is low-risk to try."
+    a: "Slow breathing at roughly six breaths per minute directly and measurably increases HRV during the session by strengthening the vagal brake. Whether that carries into a higher resting baseline is less certain, but one uncontrolled analysis in long COVID found that symptoms and wellbeing improved after a breathing program, and it is low-risk to try."
   - q: "Why won't my HRV go up no matter what I do?"
     a: "If you are doing the right things and HRV is flat, the most likely reason is that the underlying dysautonomia has not healed yet, which no habit forces on a timeline. Overexertion, poor sleep, illness, alcohol or a new stressor can also cap it. Zoom out to the multi-week trend rather than judging single days, and treat a stubborn plateau as information, not failure."
 ---
@@ -91,13 +97,13 @@ Pacing means staying inside your energy envelope: breaking activity into smaller
 
 ## Slow breathing, done regularly
 
-Breathing at roughly six breaths per minute, sometimes called resonant or coherent breathing, directly increases HRV during the session by syncing your heart rate with your breath and strengthening the vagal brake. A small long COVID study found that [slow resonant breathing improved symptoms and wellbeing](https://www.medrxiv.org/content/10.1101/2024.03.25.24304856) over several weeks.
+Breathing at roughly six breaths per minute, sometimes called resonant or coherent breathing, directly increases HRV during the session by syncing your heart rate with your breath and strengthening the vagal brake. One uncontrolled analysis of people with long COVID found that [self-reported symptoms and wellbeing improved after a resonant breathing program](https://doi.org/10.3389/fresc.2024.1411344).
 
 A caveat worth keeping: post-viral illness can [blunt the HRV response even during deep breathing](https://www.nature.com/articles/s41598-023-50276-0), so do not judge the practice by one flat reading. Start with five minutes, once or twice a day; the [resonant breathing and HRV biofeedback](/insights/hrv/resonant-breathing-hrv-biofeedback/) guide has a full protocol.
 
 ## Hydration, electrolytes, and less alcohol
 
-If you have POTS, blood volume and salt are not optional. Adequate fluids and electrolytes support the circulation your autonomic system is struggling to manage, and a randomized study found that [electrolyte supplementation improved HRV parameters in long COVID](https://pmc.ncbi.nlm.nih.gov/articles/PMC12433138/). The [salt, fluids and compression approach to POTS](/insights/pots/pots-treatment-salt-fluids-compression-medication/) covers how much and how.
+If you have POTS, blood volume and salt are not optional. Adequate fluids and electrolytes support the circulation your autonomic system is struggling to manage, and an observational study linked [potassium and magnesium supplementation with better HRV parameters in long COVID](https://pmc.ncbi.nlm.nih.gov/articles/PMC12433138/), an association rather than proof. The [salt, fluids and compression approach to POTS](/insights/pots/pots-treatment-salt-fluids-compression-medication/) covers how much and how.
 
 Alcohol is the mirror image. Even a single drink reliably lowers HRV that night and often into the next day, because it disrupts sleep and nudges you toward the sympathetic side. For most people chasing recovery, less alcohol is one of the clearest wins available.
 
@@ -142,3 +148,11 @@ The real levers are unglamorous and they are ranked: sleep first, then pacing, t
   for personalized care. <em>Changes to fluids, salt, exercise intensity or alcohol can interact with conditions like POTS, heart disease and kidney disease.</em> Talk with a qualified
   clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Lehrer PM, Gevirtz R. [Heart rate variability biofeedback: how and why does it work?](https://doi.org/10.3389/fpsyg.2014.00756). *Frontiers in Psychology*, 2014.
+- Polizzi J, Tosto-Mancuso J, Tabacof L, et al. [Resonant breathing improves self-reported symptoms and wellbeing in people with Long COVID](https://doi.org/10.3389/fresc.2024.1411344). *Frontiers in Rehabilitation Sciences*, 2024.
+- da Silva ALG, Vieira LDP, Dias LS, et al. [Impact of long COVID on the heart rate variability at rest and during deep breathing maneuver](https://doi.org/10.1038/s41598-023-50276-0). *Scientific Reports*, 2023.
+- Li X, Chen Y, Sun S, et al. [Association between electrolyte supplementation and cardiac injury in long COVID-19](https://doi.org/10.21037/jtd-2025-689). *Journal of Thoracic Disease*, 2025.
+- Pietilä J, Helander E, Korhonen I, et al. [Acute effect of alcohol intake on cardiovascular autonomic regulation during the first hours of sleep in a large real-world sample of Finnish employees: observational study](https://doi.org/10.2196/mental.9519). *JMIR Mental Health*, 2018.

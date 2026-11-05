@@ -6,11 +6,17 @@ summary: "From three simple numbers (systolic, diastolic and pulse) you can deri
 description: "The Kérdő, Robinson (rate-pressure product), Kvas and BCE indices explained: formulas, meaning, and how to read cardiovascular efficiency and autonomic balance from blood pressure and pulse."
 keywords: "Kerdo index, vegetative index, Robinson index, rate pressure product, double product, Kvas index, blood circulation efficiency, autonomic balance, cardiovascular efficiency"
 date: 2026-07-09
-updated: 2026-07-09
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1521729839347-131a32f9abcb?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Willian Justen de Vasconcellos / Unsplash"
 tldr: "Four derived indices squeeze extra meaning from a simple blood-pressure-plus-pulse reading. The Kérdő vegetative index reads autonomic balance (near zero is balanced, positive leans sympathetic, negative leans parasympathetic). The Robinson index (rate-pressure product) estimates the heart's workload. The Kvas index and BCE both gauge circulatory efficiency, where lower is better. None of these are routine clinical tests (they are older physiology formulas), so their real value is watching your own trend, not one number."
+question: "What do the Kerdo and Robinson blood pressure indices mean?"
+app:
+  feature: hrv-readings
+  hook: "Get more out of every blood pressure reading."
+  line: "Log your blood pressure and pulse in your journal, and follow your own trend over weeks instead of judging one reading."
 categories:
   - basics
 faq:
@@ -336,3 +342,10 @@ The Kérdő, Robinson, Kvas and BCE indices extract extra meaning from a plain b
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. These indices are not diagnostic tools; if your readings concern you or your symptoms are worsening, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Kérdö I. [An index for the evaluation of vegetative tonus calculated from the data of blood circulation](https://doi.org/10.1007/BF01269900). *Acta Neurovegetativa*, 1966.
+- Vaguine YE, Deunezhewa SM, Khlytina AA. [Kérdö Autonomic Index: Role of Initial Parameters, Areas, and Limitations of the Use](https://doi.org/10.1134/S0362119720060122). *Human Physiology*, 2021.
+- Robinson BF. [Relation of heart rate and systolic blood pressure to the onset of pain in angina pectoris](https://doi.org/10.1161/01.cir.35.6.1073). *Circulation*, 1967.
+- Gobel FL, Norstrom LA, Nelson RR, et al. [The rate-pressure product as an index of myocardial oxygen consumption during exercise in patients with angina pectoris](https://doi.org/10.1161/01.cir.57.3.549). *Circulation*, 1978.

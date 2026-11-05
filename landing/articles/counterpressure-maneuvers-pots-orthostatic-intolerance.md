@@ -6,11 +6,17 @@ summary: "Counterpressure maneuvers are simple, drug-free muscle moves that sque
 description: "A practical guide to physical counterpressure maneuvers for POTS and orthostatic intolerance: leg crossing, muscle tensing, squatting and handgrip, why they work, and how to tell if they help using your stand test."
 keywords: "counterpressure maneuvers, physical counterpressure maneuvers POTS, orthostatic intolerance, how to stop feeling faint when standing, leg crossing muscle tensing, squatting for POTS, prevent fainting, dysautonomia, standing heart rate spike"
 date: 2026-10-17
-updated: 2026-10-17
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1552196563-55cd4e45efb3?q=80&w=1326&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
 photoAttribution: "Alora Griffiths / Unsplash"
 tldr: "Counterpressure maneuvers are brief, forceful contractions of your leg, buttock, abdominal or arm muscles that push pooled blood back up toward your heart and raise your blood pressure within seconds. Crossing your legs and tensing, squatting, clenching your buttocks and gripping your hands all work by driving the muscle pump. They are strongest as evidence-based tools for vasovagal (fainting) warning signs, and they help many people with POTS blunt the standing heart-rate spike and lightheadedness while longer-term measures do their work. Use them early, before symptoms peak."
+question: "What moves stop my heart rate spiking when I stand?"
+app:
+  feature: pots-stand-test
+  hook: "Check whether your counterpressure moves are working."
+  line: "Run a guided stand test with and without the moves, and see how much your heart rate rise changes."
 categories:
   - pots
   - recovery
@@ -189,3 +195,12 @@ Counterpressure maneuvers are the most immediate tool you have for the standing 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Counterpressure maneuvers are a recognized self-management tool, but if you faint without warning, have new or severe symptoms, or are unsure whether these moves are safe for you, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- van Dijk N, Quartieri F, Blanc JJ, et al. [Effectiveness of physical counterpressure maneuvers in preventing vasovagal syncope: the Physical Counterpressure Manoeuvres Trial (PC-Trial)](https://doi.org/10.1016/j.jacc.2006.06.059). *Journal of the American College of Cardiology*, 2006.
+- Krediet CT, van Dijk N, Linzer M, et al. [Management of vasovagal syncope: controlling or aborting faints by leg crossing and muscle tensing](https://doi.org/10.1161/01.cir.0000030939.12646.8f). *Circulation*, 2002.
+- Smit AA, Halliwill JR, Low PA, et al. [Pathophysiological basis of orthostatic hypotension in autonomic failure](https://doi.org/10.1111/j.1469-7793.1999.0001o.x). *The Journal of Physiology*, 1999.
+- Bradley JG, Davis KA. [Orthostatic hypotension](https://www.aafp.org/pubs/afp/issues/2003/1215/p2393.html). *American Family Physician*, 2003.
+- Brignole M, Moya A, de Lange FJ, et al. [2018 ESC Guidelines for the diagnosis and management of syncope](https://doi.org/10.1093/eurheartj/ehy037). *European Heart Journal*, 2018.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.

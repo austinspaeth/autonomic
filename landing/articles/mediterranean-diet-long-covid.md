@@ -6,11 +6,17 @@ summary: "Long COVID involves persistent, low-grade inflammation, and the Medite
 description: "A calm, evidence-based look at the Mediterranean diet for long COVID recovery: the 2025 research on inflammation, metabolic markers and the gut microbiome, plus a gentle way to begin."
 keywords: "Mediterranean diet long COVID, anti-inflammatory diet long COVID, best diet for long COVID, long COVID nutrition, olive oil inflammation, gut microbiome long COVID, post-viral diet"
 date: 2026-07-03
-updated: 2026-07-03
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1523071290596-8ad02685dcc0?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Jessica Lewis thepaintedsquare / Unsplash"
 tldr: "The Mediterranean diet is a whole-food, plant-forward, olive-oil-rich pattern that is naturally anti-inflammatory. Early 2025 research links it to better metabolic markers and less symptom burden in long COVID, likely by lowering inflammation and reshaping the gut microbiome. It supports recovery, but the evidence is still early and it is not a cure. Start small, adapt it for your own sensitivities, and watch your trends over weeks."
+question: "Does the Mediterranean diet help long COVID?"
+app:
+  feature: insights
+  hook: "See how your days change as you eat differently."
+  line: "Log meals in Autonomic and it shows what lines up with your better and worse days, plus how your numbers look since you changed how you eat."
 categories:
   - food
   - postviral
@@ -21,7 +27,7 @@ faq:
   - q: "What is the best diet for long COVID?"
     a: "There is no single official diet for long COVID, but the pattern with the most supporting evidence is an anti-inflammatory, whole-food one, and the Mediterranean diet is the best-studied version of that. It emphasises vegetables, fruit, legumes, whole grains, olive oil, fish and nuts, with little processed food or red meat. Some people also need to adapt it for histamine or FODMAP sensitivities."
   - q: "How does diet reduce long COVID inflammation?"
-    a: "Foods rich in polyphenols, omega-3 fats and fibre appear to lower inflammatory signalling and feed beneficial gut bacteria. Olive oil and a Mediterranean pattern have been linked to shifts in the gut microbiome, including bacteria like Oscillibacter, that are associated with lower inflammation. The exact mechanisms in long COVID are still being worked out."
+    a: "Foods rich in polyphenols, omega-3 fats and fibre appear to lower inflammatory signalling and feed beneficial gut bacteria. Olive oil and a Mediterranean pattern have been linked to shifts in the gut microbiome, including lower levels of bacteria like Oscillibacter, alongside lower inflammation markers. The exact mechanisms in long COVID are still being worked out."
   - q: "How long before diet changes help long COVID?"
     a: "Diet works slowly. Metabolic and inflammatory changes tend to unfold over weeks to months, not days, and long COVID recovery is non-linear regardless. Give any dietary shift several weeks and track your trends rather than judging it by a single good or bad day."
 ---
@@ -58,11 +64,11 @@ Notice there is nothing exotic here. Most of it is affordable, shelf-stable, and
 
 This is where honesty counts, because the evidence is genuinely encouraging but still early.
 
-A [2025 analysis of roughly 305 long COVID patients](https://www.mdpi.com/2072-6643/17/11/1802) found that those following a Mediterranean-style diet had measurably better metabolic health: lower uric acid, lower BMI, higher HDL ("good") cholesterol, and fewer components of metabolic syndrome overall. Metabolic dysfunction and inflammation tend to travel together, so a cleaner metabolic profile is a reasonable proxy for a calmer inflammatory state.
+A [2025 analysis of roughly 305 long COVID patients](https://doi.org/10.3390/nu17040656) found that those following a Mediterranean-style diet had measurably better metabolic health: lower uric acid, lower BMI, higher HDL ("good") cholesterol, and fewer components of metabolic syndrome overall. Metabolic dysfunction and inflammation tend to travel together, so a cleaner metabolic profile is a reasonable proxy for a calmer inflammatory state.
 
 Zoom out, and a [scoping review of diet and nutrition in long COVID](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12157204/) found that around three-quarters of the studies it examined reported improvements in symptoms (fatigue, mood, physical function, and inflammatory markers) following dietary changes. That consistency across different studies is more persuasive than any single result.
 
-On mechanism, research on the [Mediterranean diet, olive oil, and the gut microbiome in long COVID](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11591431/) points to the gut as a likely middleman. The pattern appears to shift the microbiome toward beneficial bacteria (including groups like *Oscillibacter*) that are associated with lower inflammation. In other words, the food may be feeding the bugs that help calm your immune system down.
+On mechanism, research on the [Mediterranean diet, olive oil, and the gut microbiome in long COVID](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC11591431/) points to the gut as a likely middleman. People who followed the pattern most closely had a different microbiome, including less *Oscillibacter*, and lower markers of inflammation and oxidative stress, with *Oscillibacter* levels tied to one of those markers. In other words, the food may be reshaping your gut bacteria in ways that help calm your immune system down.
 
 <figure class="prose-figure">
   <svg class="fig-d" viewBox="0 0 720 210" role="img" aria-label="A three-step diagram showing how a Mediterranean diet may lead to a shifted gut microbiome, then lower inflammation, then supported recovery in long COVID.">
@@ -146,3 +152,9 @@ The Mediterranean diet is a safe, affordable, anti-inflammatory way to eat, and 
   for personalized care. <em>A dietary pattern can support recovery, but it does not replace medical treatment, and foods that help one person may trigger symptoms in another with histamine or FODMAP sensitivities.</em> Talk with a qualified
   clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Suárez-Moreno N, Gómez-Sánchez L, Navarro-Caceres A, et al. [Association of Mediterranean diet with cardiovascular risk factors and with metabolic syndrome in subjects with long COVID: BioICOPER study](https://doi.org/10.3390/nu17040656). *Nutrients*, 2025.
+- Bigman G, Rusu ME, Shelawala N, et al. [A comprehensive scoping review on diet and nutrition in relation to long COVID-19 symptoms and recovery](https://doi.org/10.3390/nu17111802). *Nutrients*, 2025.
+- Cuevas-Sierra A, de la O V, Higuera-Gómez A, et al. [Mediterranean diet and olive oil redox interactions on lactate dehydrogenase mediated by gut Oscillibacter in patients with long-COVID-19 syndrome](https://doi.org/10.3390/antiox13111358). *Antioxidants*, 2024.

@@ -10,6 +10,11 @@ updated: 2026-09-11
 author: "Austin Spaeth"
 photoLocation: "/articles/pacing-budget-know-how-much-today-can-take/cover.jpg"
 tldr: "The pacing budget turns your morning HRV, resting heart rate, sleep and your own history into a daily allowance of effort minutes. Workouts, steps, time on your feet and minutes with your heart rate above your own line spend it; legs up and breathwork buy some back. A white pace marker shows where an even day would be by now, alerts reach you with the app closed, and every estimate is checked against the next two days, because post-exertional malaise arrives late. It is on your Journal, your home screen widgets and your Apple Watch."
+question: "How much activity can I handle today?"
+app:
+  feature: pacing-budget
+  hook: "Know how much today can take."
+  line: "Autonomic turns your morning readings into a daily pacing budget in minutes, and alerts you when you are nearly spent or over."
 categories:
   - app
   - recovery

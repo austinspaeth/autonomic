@@ -6,11 +6,17 @@ summary: "Does coffee make POTS worse? Caffeine is a stimulant that raises heart
 description: "How caffeine affects POTS, heart rate, HRV, and orthostatic symptoms: the real physiology, why the HRV evidence is mixed, the sleep pathway that reliably lowers next-day HRV, and how to test your own tolerance."
 keywords: "caffeine and POTS, does caffeine affect HRV, coffee POTS, caffeine heart rate variability, caffeine orthostatic intolerance, caffeine dysautonomia, caffeine tachycardia, how much caffeine POTS, caffeine before bed HRV"
 date: 2026-07-18
-updated: 2026-07-18
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1521868212215-fb62189f1889?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Nathan Dumlao / Unsplash"
 tldr: "Caffeine blocks adenosine and mildly raises sympathetic drive, so it can lift heart rate and worsen palpitations and jitter in POTS, while also nudging blood pressure up (which a few people find steadies standing symptoms). Its direct effect on HRV is inconsistent across studies and highly individual, but its indirect effect through disrupted sleep reliably lowers the next morning's reading. Because the response varies so much person to person, the useful move is to test your own: hold your dose and timing steady, and watch your resting heart rate, HRV, and stand test against your baseline."
+question: "Does coffee make POTS worse?"
+app:
+  feature: insights
+  hook: "Test what your morning coffee does to you."
+  line: "Log your caffeine each day, and Autonomic checks whether it lines up with your better or worse days and your HRV."
 categories:
   - pots
   - hrv
@@ -318,3 +324,14 @@ Caffeine is a stimulant that blocks adenosine, lifts sympathetic drive, and can 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This is educational content to help you understand and track your own data, not a diagnosis or a treatment plan. Caffeine interacts with heart-rate and blood-pressure medications, and everyone's autonomic system is different, so discuss any real change with a clinician who knows your history.
 </div>
+
+## Sources
+
+- Porto AA, Benjamim CJR, Gonzaga LA, et al. [Caffeine intake and its influences on heart rate variability recovery in healthy active adults after exercise: a systematic review and meta-analysis](https://doi.org/10.1016/j.numecd.2022.01.015). *Nutrition, Metabolism and Cardiovascular Diseases*, 2022.
+- Rauh R, Burkert M, Siepmann M, et al. [Acute effects of caffeine on heart rate variability in habitual caffeine consumers](https://doi.org/10.1111/j.1475-097X.2006.00663.x). *Clinical Physiology and Functional Imaging*, 2006.
+- Gardiner C, Weakley J, Burke LM, et al. [The effect of caffeine on subsequent sleep: a systematic review and meta-analysis](https://doi.org/10.1016/j.smrv.2023.101764). *Sleep Medicine Reviews*, 2023.
+- Drake C, Roehrs T, Shambroom J, et al. [Caffeine effects on sleep taken 0, 3, or 6 hours before going to bed](https://doi.org/10.5664/jcsm.3170). *Journal of Clinical Sleep Medicine*, 2013.
+- Mort JR, Kruse HR. [Timing of blood pressure measurement related to caffeine consumption](https://doi.org/10.1345/aph.1K337). *Annals of Pharmacotherapy*, 2008.
+- Nehlig A. [Interindividual differences in caffeine metabolism and factors driving caffeine consumption](https://doi.org/10.1124/pr.117.014407). *Pharmacological Reviews*, 2018.
+- Maughan RJ, Griffin J. [Caffeine ingestion and fluid balance: a review](https://doi.org/10.1046/j.1365-277X.2003.00477.x). *Journal of Human Nutrition and Dietetics*, 2003.
+- US Food and Drug Administration. [Spilling the beans: how much caffeine is too much?](https://www.fda.gov/consumers/consumer-updates/spilling-beans-how-much-caffeine-too-much). Updated 2024.

@@ -6,11 +6,17 @@ summary: "Ivabradine slows the heart's own pacemaker directly, so it can bring d
 description: "How ivabradine treats POTS: it lowers heart rate by blocking the sinoatrial node's funny current without dropping blood pressure. Evidence, side effects like phosphenes, and how it changes your stand test and HRV readings."
 keywords: "ivabradine for POTS, ivabradine POTS, ivabradine heart rate, Corlanor POTS, ivabradine vs beta blocker, funny current ivabradine, ivabradine hyperadrenergic POTS, ivabradine standing heart rate, ivabradine side effects phosphenes, does ivabradine lower blood pressure, ivabradine HRV"
 date: 2026-08-26
-updated: 2026-08-26
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1624727828489-a1e03b79bba8?q=80&w=1171&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Unsplash"
 tldr: "Ivabradine lowers heart rate by slowing the sinoatrial node's pacemaker current directly, so it can calm the standing tachycardia of POTS without lowering blood pressure or reducing how hard the heart contracts. That selectivity is why it is often tried when beta blockers cause too much fatigue or drop blood pressure too far. It does not fix what is underneath POTS, and it needs heart-rate-guided titration, so track your resting heart rate, your stand-test jump, and your symptoms rather than one number. It is prescription-only, has a distinctive visual side effect called phosphenes, and every dose decision belongs with your clinician."
+question: "How does ivabradine work for POTS?"
+app:
+  feature: pots-stand-test
+  hook: "See your stand test on ivabradine."
+  line: "Take a home stand test and morning readings while on it. Autonomic lets you see how your numbers look, to share with your doctor."
 categories:
   - pots
   - hrv
@@ -18,7 +24,7 @@ faq:
   - q: "How does ivabradine treat POTS?"
     a: "Ivabradine lowers heart rate by slowing the sinoatrial node, the heart's natural pacemaker. It blocks a specific pacemaker current (the funny current) that sets how quickly the pacemaker cells recharge and fire the next beat. Slowing that recharge lowers the resting and standing heart rate. In POTS, especially the hyperadrenergic type and cases overlapping with inappropriate sinus tachycardia, that can reduce the racing heartbeat and the palpitations that make standing miserable, without the blood-pressure drop a beta blocker can cause."
   - q: "Does ivabradine lower blood pressure?"
-    a: "Not in any meaningful way. This is the feature that sets it apart. Ivabradine acts only on the pacemaker current in the sinoatrial node, so it slows heart rate while leaving blood pressure, the force of each heartbeat, and conduction through the rest of the heart essentially untouched. That is why it is often considered for people who cannot tolerate beta blockers because those drugs left them too fatigued or dropped their blood pressure too low. Discuss any change with your clinician, because individual responses vary."
+    a: "Not in any meaningful way. This is the feature that sets it apart. Ivabradine acts only on the pacemaker current in the sinoatrial node, so it slows heart rate while leaving blood pressure and the force of each heartbeat essentially unchanged. That is why it is often considered for people who cannot tolerate beta blockers because those drugs left them too fatigued or dropped their blood pressure too low. Discuss any change with your clinician, because individual responses vary."
   - q: "Is ivabradine better than a beta blocker for POTS?"
     a: "Better is the wrong frame; they do different jobs. A beta blocker blunts the whole sympathetic 'fight or flight' signal, which lowers heart rate and blood pressure and softens contractility. Ivabradine lowers only heart rate, through the pacemaker. That makes ivabradine attractive when low blood pressure or fatigue is the problem, and a beta blocker attractive when there is a broader adrenergic surge to calm. Some people do best on a low dose of one, some need a different agent, and some need neither. This is a clinician-guided decision, not a ranking."
   - q: "What are the side effects of ivabradine?"
@@ -110,7 +116,7 @@ Your heart rate is set by a small patch of cells called the **sinoatrial (SA) no
 
 A big part of that recharge is carried by a current with an unusually casual name: the **funny current**, written **I<sub>f</sub>**. It was called funny because it behaves oddly compared to other cardiac currents, activating when the cell is hyperpolarized rather than depolarized. Practically, the funny current is one of the main dials on how quickly the pacemaker recharges between beats.
 
-Ivabradine blocks the funny current. With that channel partly shut, the pacemaker recharges more slowly, threshold is reached later, and the heart beats less often. Crucially, it acts **only** on the SA node's pacemaker current. It does not touch blood pressure, it does not reduce the force of each contraction, and it does not slow conduction through the rest of the heart. It is close to a pure heart-rate lever.
+Ivabradine blocks the funny current. With that channel partly shut, the pacemaker recharges more slowly, threshold is reached later, and the heart beats less often. Crucially, it acts **only** on the SA node's pacemaker current. It does not touch blood pressure and it does not reduce the force of each contraction, though it can slow the electrical signal through other parts of the heart's wiring a little too. It is close to a pure heart-rate lever.
 
 <figure class="prose-figure">
   <svg viewBox="0 0 720 250" role="img" aria-label="Two pacemaker recharge traces from the sinoatrial node. The faster trace has a steep slope that reaches the firing threshold often, producing a high heart rate. On ivabradine the slope is gentler, so threshold is reached less often, producing a slower heart rate.">
@@ -251,3 +257,10 @@ Beyond that, the effects follow from the mechanism. Because it lowers heart rate
 ## The bottom line
 
 Ivabradine is the rate-lowering drug that does its job through an unusual door: it slows the heart's own pacemaker by blocking the funny current, so it can bring down a racing standing heart rate in POTS without lowering blood pressure or weakening the heartbeat. That selectivity is exactly why it is worth understanding, especially if beta blockers left you too fatigued or too low. The evidence, led by a randomized trial in hyperadrenergic POTS, is encouraging for the right patient, but it treats the fast heart rate rather than the cause, and it needs heart-rate-guided titration. Track your resting heart rate, your stand-test jump, and how you actually feel, read any HRV rise as partly the slower rate rather than a cure, and keep every dose decision a conversation with the clinician who prescribes it.
+
+## Sources
+
+- Taub PR, Zadourian A, Lo HC, et al. [Randomized trial of ivabradine in patients with hyperadrenergic postural orthostatic tachycardia syndrome](https://doi.org/10.1016/j.jacc.2020.12.029). *Journal of the American College of Cardiology*, 2021.
+- McDonald C, Frith J, Newton JL. [Single centre experience of ivabradine in postural orthostatic tachycardia syndrome](https://doi.org/10.1093/europace/euq390). *Europace*, 2011.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- US National Library of Medicine, DailyMed. [Corlanor (ivabradine) tablets and oral solution: prescribing information](https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=92018a65-38f6-45f7-91d4-a34921b81d0d). Amgen, revised 2021.

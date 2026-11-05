@@ -6,11 +6,17 @@ summary: "Upright exercise often backfires early in POTS. The recumbent-first ap
 description: "How to exercise with POTS using the Levine (Dallas) and CHOP recumbent-first protocols: why upright exercise backfires, how to start horizontal, and how to move within your energy envelope without triggering post-exertional malaise."
 keywords: "exercise for POTS, Levine protocol, CHOP protocol, POTS exercise program, recumbent exercise, POTS rowing swimming, exercise intolerance POTS, Dallas protocol, graded exercise POTS"
 date: 2026-05-23
-updated: 2026-05-23
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1536331568701-0b15cbb1a918?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Briana Tozour / Unsplash"
-tldr: "In POTS, standing exercise often makes symptoms worse because gravity pulls blood into your legs and your heart races to compensate. Structured recumbent-first programs like the Levine and CHOP protocols start you horizontal (rowing, recumbent bike, swimming) and progress toward upright over about 6 to 8 months. Start very low, build slowly, strengthen legs and core, and if you have ME/CFS or post-exertional malaise, pace first and never push through a crash."
+tldr: "In POTS, standing exercise often makes symptoms worse because gravity pulls blood into your legs and your heart races to compensate. Structured recumbent-first programs like the Levine and CHOP protocols start you horizontal (rowing, recumbent bike, swimming) and progress toward upright over about 3 months in the trials, though some programs run longer. Start very low, build slowly, strengthen legs and core, and if you have ME/CFS or post-exertional malaise, pace first and never push through a crash."
+question: "How do I start exercising with POTS without crashing?"
+app:
+  feature: pacing-budget
+  hook: "Build up exercise inside your daily energy budget."
+  line: "Autonomic learns how much activity your body handles and gives you a daily budget in minutes, with an alert when you are nearly spent."
 categories:
   - pots
   - recovery
@@ -18,7 +24,7 @@ faq:
   - q: "What is the best exercise for POTS?"
     a: "Early on, the best exercise is one that keeps you horizontal or semi-reclined so gravity isn't working against you: a recumbent bike, a rowing machine, or swimming. These let you build cardiovascular fitness without the standing-up spike in heart rate that provokes symptoms. Leg and core strengthening also helps, because stronger leg muscles pump blood back toward the heart. Upright exercise is usually a later goal, not a starting point."
   - q: "What is the Levine protocol for POTS?"
-    a: "The Levine protocol (also called the Dallas protocol) is a structured, months-long exercise program designed for POTS. It begins with recumbent aerobic exercise (rowing or recumbent cycling) plus lower-body strength work, and gradually increases duration and intensity before transitioning to upright exercise over roughly six to eight months. The gradual, seated-first design is the whole point: it retrains the cardiovascular system without repeatedly triggering orthostatic symptoms."
+    a: "The Levine protocol (also called the Dallas protocol) is a structured, months-long exercise program designed for POTS. It begins with recumbent aerobic exercise (rowing or recumbent cycling) plus lower-body strength work, and gradually increases duration and intensity before transitioning to upright exercise over about 3 months in the trials, though some programs run longer. The gradual, seated-first design is the whole point: it retrains the cardiovascular system without repeatedly triggering orthostatic symptoms."
   - q: "Can exercise cure POTS?"
     a: "Exercise is one of the most effective tools for managing POTS, and many people see meaningful improvement in symptoms and function with a structured program. But it is a treatment, not a guaranteed cure, and results vary a lot between individuals. It also is not right for everyone: if you have significant post-exertional malaise or ME/CFS overlap, graded exercise can make things worse, and pacing has to come first."
   - q: "Why do I feel worse after exercising with POTS?"
@@ -42,43 +48,43 @@ This is the insight behind the structured programs. Instead of starting upright,
 The two best-known programs are the [Levine protocol (also called the Dallas protocol) and the CHOP protocol](https://incitefulmed.com/resources/guides/pots-comprehensive-guide/pots-lifestyle-exercise-treatment/). Both begin with recumbent aerobic exercise (a recumbent bike, a rowing machine, or swimming) because in all three your torso is level or supported and blood doesn't pool the way it does when you stand. Over months, as your heart and blood volume adapt, you gradually add duration, then intensity, then finally the upright positions you couldn't tolerate at the start.
 
 <figure class="prose-figure">
-  <svg class="fig-d" viewBox="0 0 720 230" role="img" aria-label="A timeline showing exercise progression for POTS from fully recumbent in months one and two, to semi-recumbent in the middle months, to upright by month six to eight.">
+  <svg class="fig-d" viewBox="0 0 720 230" role="img" aria-label="A timeline showing exercise progression for POTS from fully recumbent in month one, to semi-recumbent in month two, to upright by month three, the length the trials used; some programs run longer.">
     <line x1="40" y1="150" x2="680" y2="150" stroke="var(--line)" stroke-width="2"/>
     <!-- stage 1 -->
     <circle cx="140" cy="150" r="7" fill="#38bdf8"/>
-    <text x="140" y="185" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">Months 1–2</text>
+    <text x="140" y="185" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">Month 1</text>
     <text x="140" y="110" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="15" font-weight="700" fill="#38bdf8">Recumbent</text>
     <text x="140" y="86" text-anchor="middle" font-family="Space Mono, monospace" font-size="12" fill="var(--dim-2)">row · bike · swim</text>
     <!-- stage 2 -->
     <circle cx="360" cy="150" r="7" fill="#54d98a"/>
-    <text x="360" y="185" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">Months 3–5</text>
+    <text x="360" y="185" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">Month 2</text>
     <text x="360" y="110" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="15" font-weight="700" fill="#54d98a">Semi-recumbent</text>
     <text x="360" y="86" text-anchor="middle" font-family="Space Mono, monospace" font-size="12" fill="var(--dim-2)">longer · a little harder</text>
     <!-- stage 3 -->
     <circle cx="580" cy="150" r="7" fill="var(--accent)"/>
-    <text x="580" y="185" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">Month 6–8</text>
+    <text x="580" y="185" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="15" fill="var(--dim-2)">Month 3</text>
     <text x="580" y="110" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="15" font-weight="700" fill="var(--accent)">Upright</text>
     <text x="580" y="86" text-anchor="middle" font-family="Space Mono, monospace" font-size="12" fill="var(--dim-2)">walk · jog · cycle</text>
     <!-- arrow -->
     <path d="M660 150 l-12 -6 v12 z" fill="var(--line)"/>
   </svg>
-  <svg class="fig-m" viewBox="0 0 360 250" role="img" aria-label="A timeline showing exercise progression for POTS from fully recumbent in months one and two, to semi-recumbent in the middle months, to upright by month six to eight.">
+  <svg class="fig-m" viewBox="0 0 360 250" role="img" aria-label="A timeline showing exercise progression for POTS from fully recumbent in month one, to semi-recumbent in month two, to upright by month three, the length the trials used; some programs run longer.">
     <line x1="34" y1="24" x2="34" y2="222" stroke="var(--line)" stroke-width="2"/>
     <path d="M34 232 l-6 -12 h12 z" fill="var(--line)"/>
     <circle cx="34" cy="44" r="7" fill="#38bdf8"/>
-    <text x="56" y="34" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">Months 1–2</text>
+    <text x="56" y="34" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">Month 1</text>
     <text x="56" y="56" font-family="Space Grotesk, sans-serif" font-size="16" font-weight="700" fill="#38bdf8">Recumbent</text>
     <text x="56" y="74" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">row · bike · swim</text>
     <circle cx="34" cy="124" r="7" fill="#54d98a"/>
-    <text x="56" y="114" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">Months 3–5</text>
+    <text x="56" y="114" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">Month 2</text>
     <text x="56" y="136" font-family="Space Grotesk, sans-serif" font-size="16" font-weight="700" fill="#54d98a">Semi-recumbent</text>
     <text x="56" y="154" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">longer · a little harder</text>
     <circle cx="34" cy="204" r="7" fill="var(--accent)"/>
-    <text x="56" y="194" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">Month 6–8</text>
+    <text x="56" y="194" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">Month 3</text>
     <text x="56" y="216" font-family="Space Grotesk, sans-serif" font-size="16" font-weight="700" fill="var(--accent)">Upright</text>
     <text x="56" y="234" font-family="Space Mono, monospace" font-size="11.5" fill="var(--dim-2)">walk · jog · cycle</text>
   </svg>
-  <figcaption>The arc of a recumbent-first program: train the heart lying down, then slowly stand it up over roughly six to eight months.</figcaption>
+  <figcaption>The arc of a recumbent-first program: train the heart lying down, then slowly stand it up over about 3 months in the trials, though some programs run longer.</figcaption>
 </figure>
 
 ## Strengthen the legs that pump your blood
@@ -124,3 +130,12 @@ Exercise can genuinely improve POTS, but the path runs through the floor, not th
   for personalized care. <em>Start any exercise program under clinical guidance, especially if you have post-exertional malaise or ME/CFS overlap, where graded exercise can be harmful.</em> Talk with a qualified
   clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Fu Q, VanGundy TB, Galbreath MM, et al. [Cardiac origins of the postural orthostatic tachycardia syndrome](https://doi.org/10.1016/j.jacc.2010.02.043). *Journal of the American College of Cardiology*, 2010.
+- Fu Q, VanGundy TB, Shibata S, et al. [Exercise training versus propranolol in the treatment of the postural orthostatic tachycardia syndrome](https://doi.org/10.1161/HYPERTENSIONAHA.111.172262). *Hypertension*, 2011.
+- George SA, Bivens TB, Howden EJ, et al. [The international POTS registry: evaluating the efficacy of an exercise training intervention in a community setting](https://doi.org/10.1016/j.hrthm.2015.12.012). *Heart Rhythm*, 2016.
+- Fu Q, Levine BD. [Exercise and non-pharmacological treatment of POTS](https://doi.org/10.1016/j.autneu.2018.07.001). *Autonomic Neuroscience*, 2018.
+- Raj SR, Fedorowski A, Sheldon RS. [Diagnosis and management of postural orthostatic tachycardia syndrome](https://doi.org/10.1503/cmaj.211373). *CMAJ*, 2022.
+- National Institute for Health and Care Excellence. [Myalgic encephalomyelitis (or encephalopathy)/chronic fatigue syndrome: diagnosis and management (NG206)](https://www.nice.org.uk/guidance/ng206). 2021.

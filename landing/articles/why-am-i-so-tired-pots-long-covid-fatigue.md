@@ -6,11 +6,17 @@ summary: "Fatigue is the most common and most dismissed symptom in POTS, long CO
 description: "Why am I so tired? A calm look at fatigue in POTS, long COVID and dysautonomia: what drives it, how HRV and resting heart rate help you read it, and how to pace."
 keywords: "why am I so tired, fatigue POTS, long COVID fatigue, dysautonomia fatigue, autonomic fatigue, orthostatic fatigue, post-exertional malaise, wired but tired, HRV fatigue, chronic fatigue POTS, always exhausted long covid"
 date: 2026-10-17
-updated: 2026-10-17
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1606162296115-21a9cf2e685b?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Alexander Grey / Unsplash"
 tldr: "In POTS, long COVID and dysautonomia, fatigue usually comes from several overlapping causes at once: the extra work of staying upright (orthostatic intolerance), a nervous system stuck in 'fight or flight' with low vagal tone, unrefreshing sleep, deconditioning, and for many people post-exertional malaise, a delayed crash after overdoing it. It is rarely laziness or simple deconditioning alone. The useful path is to track the trend (morning HRV and resting heart rate), ask your clinician to rule out reversible contributors like low iron or thyroid trouble, and pace within your energy envelope rather than pushing through."
+question: "Why am I always so tired with POTS or long COVID?"
+app:
+  feature: pacing-budget
+  hook: "Spend your energy before it spends you."
+  line: "Autonomic learns how much activity your body has handled and gives you a daily budget in minutes, with an alert when it is nearly spent."
 categories:
   - postviral
   - pots
@@ -270,3 +276,12 @@ Once you can name which kinds of tired you are dealing with, the response become
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own experience, not to diagnose or treat any condition. Fatigue can also be caused by serious medical problems, so new, severe or worsening fatigue, or any of the red flags above, should be evaluated by a clinician. Discuss any changes to your management with the professionals who know your case.
 </div>
+
+## Sources
+
+- Institute of Medicine. [Beyond myalgic encephalomyelitis/chronic fatigue syndrome: redefining an illness](https://doi.org/10.17226/19012). *National Academies Press*, 2015.
+- Stussman B, Williams A, Snow J, et al. [Characterization of post-exertional malaise in patients with myalgic encephalomyelitis/chronic fatigue syndrome](https://doi.org/10.3389/fneur.2020.01025). *Frontiers in Neurology*, 2020.
+- Davis HE, Assaf GS, McCorkell L, et al. [Characterizing long COVID in an international cohort: 7 months of symptoms and their impact](https://doi.org/10.1016/j.eclinm.2021.101019). *EClinicalMedicine*, 2021.
+- Khan MS, Miller AJ, Ejaz A, et al. [Cerebral blood flow in orthostatic intolerance](https://doi.org/10.1161/JAHA.124.036752). *Journal of the American Heart Association*, 2025.
+- Swai J, Hu Z, Zhao X, et al. [Heart rate and heart rate variability comparison between postural orthostatic tachycardia syndrome versus healthy participants; a systematic review and meta-analysis](https://doi.org/10.1186/s12872-019-01298-y). *BMC Cardiovascular Disorders*, 2019.
+- Jarjour IT, Jarjour LK. [Low iron storage and mild anemia in postural tachycardia syndrome in adolescents](https://doi.org/10.1007/s10286-013-0198-6). *Clinical Autonomic Research*, 2013.

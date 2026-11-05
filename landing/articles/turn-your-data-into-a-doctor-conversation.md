@@ -6,9 +6,16 @@ summary: "Appointments are short and symptoms are hard to describe from memory. 
 description: "How people with POTS, dysautonomia and long COVID can turn tracked HRV, heart rate and orthostatic data into a concise, doctor-ready summary, and use AI to draft it without sending data anywhere."
 keywords: "doctor appointment, POTS, dysautonomia, patient advocacy, HRV report, long COVID, AI health summary"
 date: 2026-05-14
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1758691461990-03b49d969495?q=80&w=1760&auto=format&fit=crop"
 tldr: "Clinicians get a few minutes and you get nervous, so months of nuance collapse into \"I've been tired.\" Tracked data fixes that. Bring a one-page summary of your trends, your worst and best days, and your specific questions. You will get a far more useful appointment, and your clinician gets something concrete to work with."
+question: "How do I explain months of symptoms in a short appointment?"
+app:
+  feature: doctor-reports
+  hook: "Turn months of data into one page."
+  line: "Autonomic builds an AI prompt from your own tracked data that becomes a clear doctor summary of your trends, best and worst days."
 categories:
   - recovery
   - basics
@@ -52,3 +59,9 @@ The key is that **the data assembly happens on your side.** In Autonomic, the ap
 ## Walk in prepared
 
 You know your body better than any ten-minute visit can capture, but only if you bring the receipts. Tracked data turns a vague, anxious appointment into a specific, collaborative one. Bring the trend, the extremes, and your questions, and let the months of quiet noticing finally speak for you.
+
+## Sources
+
+- Redelmeier DA, Kahneman D. [Patients' memories of painful medical treatments: real-time and retrospective evaluations of two minimally invasive procedures](https://doi.org/10.1016/0304-3959(96)02994-6). *Pain*, 1996.
+- Kessels RP. [Patients' memory for medical information](https://doi.org/10.1177/014107680309600504). *Journal of the Royal Society of Medicine*, 2003.
+- Brandes K, Linn AJ, Butow PN, et al. [The characteristics and effectiveness of Question Prompt List interventions in oncology: a systematic review of the literature](https://doi.org/10.1002/pon.3637). *Psycho-Oncology*, 2015.

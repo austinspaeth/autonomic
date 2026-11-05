@@ -6,11 +6,17 @@ summary: "A low HRV reading rarely means something is wrong on its own. Here are
 description: "Why is my HRV low? The common causes of low heart rate variability, from poor sleep, alcohol and stress to POTS and long COVID, plus how to tell a one-day dip from a real trend."
 keywords: "why is my HRV low, low HRV, low heart rate variability, causes of low HRV, HRV dropped, low HRV causes, HRV low but feel fine, HRV and stress, HRV and alcohol, POTS low HRV, long COVID HRV, how to raise HRV"
 date: 2026-08-01
-updated: 2026-08-01
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1541199249251-f713e6145474?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Kinga Howard / Unsplash"
-tldr: "Low HRV usually reflects a temporary load on your nervous system, most often poor sleep, alcohol, stress, illness, dehydration or hard exercise the day before, rather than anything permanent. A single low reading is almost always last night, not a trend. What matters is whether your own baseline stays suppressed for days or weeks. In POTS and long COVID a chronically lower HRV is expected because the system is biased toward sympathetic activation, and that baseline is still trackable and often climbs with recovery."
+tldr: "Low HRV usually reflects a temporary load on your nervous system, most often poor sleep, alcohol, stress, illness, dehydration or hard exercise the day before, rather than anything permanent. A single low reading is almost always last night, not a trend. What matters is whether your own baseline stays suppressed for days or weeks. In POTS a chronically lower HRV is expected because the system is biased toward sympathetic activation (in long COVID the evidence is more mixed), and that baseline is still trackable and often climbs with recovery."
+question: "Why is my HRV low?"
+app:
+  feature: insights
+  hook: "Find what lines up with your low HRV days."
+  line: "Autonomic compares your HRV with your sleep, meds, food and triggers to show what lines up with your lower days."
 categories:
   - hrv
   - basics
@@ -31,7 +37,7 @@ social:
 
     A single low HRV reading is almost always a response to the last 24 hours: a short night, a glass of wine, a late meal, an oncoming cold, dehydration, a hard workout, a stressful day. Your parasympathetic system pulls back under any load, and HRV drops with it. That is the metric working as designed, not a warning light. HRV is supposed to move.
 
-    What actually deserves attention is a baseline that stays suppressed for a week or two, especially alongside a climbing resting heart rate. In POTS and long COVID a chronically lower HRV is expected, because the system sits biased toward sympathetic activation, and the encouraging thing is that this baseline is still trackable and often rises slowly with pacing and recovery.
+    What actually deserves attention is a baseline that stays suppressed for a week or two, especially alongside a climbing resting heart rate. In POTS a chronically lower HRV is expected, because the system sits biased toward sympathetic activation (in long COVID the evidence is more mixed), and the encouraging thing is that this baseline is still trackable and often rises slowly with pacing and recovery.
 
     So the rule that saves a lot of needless worry: never read a single morning. Watch the 7 to 14 day trend, measured the same way each time, next to your heart rate and how you feel.
 
@@ -46,7 +52,7 @@ social:
 
     Basically HRV falls whenever your nervous system is under load, and load is everything: short sleep, alcohol, a late heavy meal, a cold coming on, being dehydrated, a hard day physically or emotionally. Any one of those can knock a morning reading down, and it usually comes back up in a day or two on its own. So one low value tells you almost nothing. It is the metric doing its job.
 
-    The thing that actually matters is the trend. If your baseline stays down for a week or two, especially if your resting heart rate is creeping up at the same time, that is worth paying attention to. With POTS and long COVID a lower HRV is kind of expected because the system is stuck in sympathetic mode, but it is still trackable and mine has slowly climbed as I got better at pacing.
+    The thing that actually matters is the trend. If your baseline stays down for a week or two, especially if your resting heart rate is creeping up at the same time, that is worth paying attention to. With POTS a lower HRV is kind of expected because the system is stuck in sympathetic mode (with long COVID the research is more mixed), but it is still trackable and mine has slowly climbed as I got better at pacing.
 
     Not medical advice, just what helped me stop reacting to single readings. I wrote up the common causes and how to tell a dip from a trend here: https://autonomic.care/insights/hrv/why-is-my-hrv-low/?utm_source=reddit&utm_medium=social&utm_campaign=why-is-my-hrv-low
   x: |
@@ -54,7 +60,7 @@ social:
   facebook: |
     If you have ever seen a low HRV reading and felt your stomach drop, this might help. A single low number is almost always a response to the last day: a short night, a drink, a late meal, a cold coming on, being a bit dehydrated, or a hard or stressful day. HRV is supposed to move, so one low morning is the metric doing its job, not a red flag.
 
-    The part worth watching is the trend over a week or two, especially next to your resting heart rate. With POTS and long COVID a lower HRV is expected, and the good news is it is still trackable and often climbs as you recover. Do you check yours every morning? It might be worth zooming out to the weekly view instead. We wrote up the common causes and how to read a dip here: https://autonomic.care/insights/hrv/why-is-my-hrv-low/?utm_source=facebook&utm_medium=social&utm_campaign=why-is-my-hrv-low
+    The part worth watching is the trend over a week or two, especially next to your resting heart rate. With POTS a lower HRV is expected (with long COVID the research is more mixed), and the good news is it is still trackable and often climbs as you recover. Do you check yours every morning? It might be worth zooming out to the weekly view instead. We wrote up the common causes and how to read a dip here: https://autonomic.care/insights/hrv/why-is-my-hrv-low/?utm_source=facebook&utm_medium=social&utm_campaign=why-is-my-hrv-low
 
     #HRV #POTS #Dysautonomia #LongCovid
 ---
@@ -118,7 +124,7 @@ If you opened your app to a low HRV number and your first thought was "what is w
 Heart rate variability reflects the constant tug-of-war between your two autonomic branches: the sympathetic "fight or flight" side and the parasympathetic "rest and digest" side. When the parasympathetic side is relaxed and in charge, the spacing between your heartbeats varies more from beat to beat, and HRV reads higher. When something pushes you toward sympathetic activation, that beat-to-beat flicker shrinks and HRV falls. Almost everything that makes HRV "low" does so through that single mechanism.
 
 <div class="callout callout-note">
-  <strong>The short answer.</strong> A low HRV reading almost always reflects a temporary load: poor sleep, alcohol, stress, dehydration, an oncoming illness, or hard exercise the day before. One low reading is expected noise. What matters is whether your own baseline stays suppressed for days or weeks. In POTS and long COVID a chronically lower HRV is expected and still trackable.
+  <strong>The short answer.</strong> A low HRV reading almost always reflects a temporary load: poor sleep, alcohol, stress, dehydration, an oncoming illness, or hard exercise the day before. One low reading is expected noise. What matters is whether your own baseline stays suppressed for days or weeks. In POTS a chronically lower HRV is expected and still trackable; in long COVID the evidence is more mixed.
 </div>
 
 This article walks through the everyday causes first, then the condition-related ones, then the part most people skip: how to tell a meaningless one-day dip from a trend actually worth watching.
@@ -249,7 +255,7 @@ In [POTS and other forms of dysautonomia](/insights/basics/autonomic-nervous-sys
 
 ### Long COVID and post-viral dysautonomia
 
-Post-viral illness frequently disrupts autonomic regulation, and a lowered HRV is one of the more consistent findings. The reassuring part, which we follow in [recovery from post-viral dysautonomia](/insights/recovery/recovery-from-post-viral-dysautonomia/), is that this baseline often climbs slowly over months of careful pacing, and it sometimes moves before you feel the improvement. A low starting point is a place to track from, not a ceiling.
+Post-viral illness can disrupt autonomic regulation, but the evidence on HRV in long COVID is mixed: some studies find it lower, and pooled results so far show only a weak trend. The reassuring part, which we follow in [recovery from post-viral dysautonomia](/insights/recovery/recovery-from-post-viral-dysautonomia/), is that this baseline often climbs slowly over months of careful pacing, and it sometimes moves before you feel the improvement. A low starting point is a place to track from, not a ceiling.
 
 ### Overtraining and chronic stress
 
@@ -305,7 +311,7 @@ This small helper compares today's short RMSSD reading to your usual baseline an
 | Dehydration | Small to moderate | Same day | Fluids and salt, especially with POTS |
 | Late heavy meal / caffeine | Small | Overnight | Shift timing earlier |
 | POTS / dysautonomia | Sustained lower baseline | Ongoing, trackable | Track your own trend, not a chart |
-| Long COVID / post-viral | Sustained lower baseline | Months, often climbing | Pace carefully; baseline often rises |
+| Long COVID / post-viral | Sometimes lower; evidence mixed | Months, often climbing | Pace carefully; baseline often rises |
 | Beta blockers, some meds | Shifts the number | While taking | Interpret with your clinician |
 
 ## How to raise a low HRV (without obsessing over it)
@@ -326,8 +332,18 @@ The full menu, with what the evidence actually supports, is in [how to improve H
 
 ## The bottom line
 
-A low HRV reading is usually your nervous system honestly reporting a load, most often a short night, a drink, stress, dehydration, an oncoming illness or a hard effort the day before, and it typically recovers on its own within a day or two. That is the metric working as intended, not a warning. What deserves attention is a baseline that stays suppressed for a week or more, especially alongside a rising resting heart rate. In POTS and long COVID a lower HRV is expected because the system sits biased toward sympathetic activation, and even then it is trackable and often climbs with recovery. Read the trend, not the morning, and let a single low number be exactly what it usually is: nothing much.
+A low HRV reading is usually your nervous system honestly reporting a load, most often a short night, a drink, stress, dehydration, an oncoming illness or a hard effort the day before, and it typically recovers on its own within a day or two. That is the metric working as intended, not a warning. What deserves attention is a baseline that stays suppressed for a week or more, especially alongside a rising resting heart rate. In POTS a lower HRV is expected because the system sits biased toward sympathetic activation (in long COVID the evidence is more mixed), and even then it is trackable and often climbs with recovery. Read the trend, not the morning, and let a single low number be exactly what it usually is: nothing much.
 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. HRV varies by individual and by measurement method, and a low reading is not a diagnosis. If your readings concern you, or your symptoms are worsening, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Shaffer F, Ginsberg JP. [An overview of heart rate variability metrics and norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.
+- Pietilä J, Helander E, Korhonen I, et al. [Acute effect of alcohol intake on cardiovascular autonomic regulation during the first hours of sleep in a large real-world sample of Finnish employees: observational study](https://doi.org/10.2196/mental.9519). *JMIR Mental Health*, 2018.
+- Stanley J, Peake JM, Buchheit M. [Cardiac parasympathetic reactivation following exercise: implications for training prescription](https://doi.org/10.1007/s40279-013-0083-4). *Sports Medicine*, 2013.
+- Sanches CA, Silva GA, Librantz AFH, et al. [Wearable devices to diagnose and monitor the progression of COVID-19 through heart rate variability measurement: systematic review and meta-analysis](https://doi.org/10.2196/47112). *Journal of Medical Internet Research*, 2023.
+- Swai J, Hu Z, Zhao X, et al. [Heart rate and heart rate variability comparison between postural orthostatic tachycardia syndrome versus healthy participants; a systematic review and meta-analysis](https://doi.org/10.1186/s12872-019-01298-y). *BMC Cardiovascular Disorders*, 2019.
+- Schoene D, Deckert S, Barlinn K, et al. [Neurocardiac autonomic dysfunction in patients with post-COVID-19 condition: a systematic review and meta-analysis](https://doi.org/10.1111/ene.70561). *European Journal of Neurology*, 2026.
+- Plews DJ, Laursen PB, Stanley J, et al. [Training adaptation and heart rate variability in elite endurance athletes: opening the door to effective monitoring](https://doi.org/10.1007/s40279-013-0071-8). *Sports Medicine*, 2013.

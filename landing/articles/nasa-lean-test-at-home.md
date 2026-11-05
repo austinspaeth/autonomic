@@ -6,11 +6,17 @@ summary: "How to do the NASA 10-minute lean test safely at home, what to record 
 description: "Step-by-step NASA lean test at home: safety, what you need, a printable log, and how clinicians read heart rate and blood pressure for POTS and orthostatic hypotension."
 keywords: "NASA lean test, NASA lean test at home, 10 minute lean test, how to do the NASA lean test, lean test POTS, orthostatic intolerance test at home, POTS test at home, NASA lean test results, orthostatic hypotension test, ME/CFS lean test"
 date: 2026-10-27
-updated: 2026-10-27
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1666932520939-d0b0e852c3e8?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Dmitry Ganin / Unsplash"
 tldr: "You lie down until your readings settle, then stand with only your shoulder blades against a wall and your heels about 6 inches (15 cm) from it, without moving, for ten minutes. Someone records your heart rate, blood pressure and symptoms every minute. A sustained heart rate rise of 30 beats per minute or more (40 or more for ages 12 to 19), without a significant drop in blood pressure, is the pattern clinicians look for in POTS, but a home test is a screen, not a diagnosis. Never do it alone, stop the moment you feel faint, and bring your log to a clinician."
+question: "How do I do a NASA lean test at home?"
+app:
+  feature: pots-stand-test
+  hook: "Let the app guide your stand test."
+  line: "Autonomic walks you through a home stand test and records your heart rate rise with an Apple Watch or chest strap, or by hand."
 categories:
   - pots
   - basics
@@ -33,7 +39,7 @@ The NASA lean test is a simple way to see what happens to your heart rate and bl
 
 The test grew out of NASA research on how the body handles being upright, and it was adapted for patients by clinicians at the Bateman Horne Center, which [recommends it for people with ME/CFS and fibromyalgia](https://batemanhornecenter.org/nasa-10-minute-lean-test-2/) as a practical way to look for orthostatic intolerance. Leaning lightly against a wall takes away some of the muscle work of standing, so blood pools more like it does on a tilt table, without needing one.
 
-It is important to be clear about its limits. A [2025 letter in Clinical Autonomic Research](https://www.s4me.info/threads/is-the-nasa-lean-test-a-suitable-tool-to-diagnose-cardiovascular-autonomic-disorders-2025-teuschl.42082) from a group of autonomic specialists pointed out that the lean test has not been properly validated against tilt table or standard active stand testing, and argued that it should not be used on its own to diagnose anything. Many clinicians still find it a useful screen. Both things can be true: it is a good way to gather evidence, and a poor way to reach a conclusion.
+It is important to be clear about its limits. A [2025 letter in Clinical Autonomic Research](https://doi.org/10.1007/s10286-024-01097-2) from a group of autonomic specialists pointed out that the lean test has not been properly validated against tilt table or standard active stand testing, and argued that it should not be used on its own to diagnose anything. Many clinicians still find it a useful screen. Both things can be true: it is a good way to gather evidence, and a poor way to reach a conclusion.
 
 <div class="table-wrap">
 
@@ -165,3 +171,10 @@ The NASA lean test is ten minutes against a wall, a helper, a cuff and a careful
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data. It is not intended to diagnose or treat any condition. Talk to your clinician before doing orthostatic testing at home if you have heart disease or a history of fainting.
 </div>
+
+## Sources
+
+- Bateman Horne Center. [10-Minute NASA Lean Test: clinician instructions](https://batemanhornecenter.org/wp-content/uploads/filebase/providers/mecfs/10-Minute-NASA-Lean-Test-Clinician-Instructions-06_12_2022.pdf). 2022.
+- Teuschl Y, Fanciulli A, Pavy-Le Traon A, et al. [Is the NASA Lean Test a suitable tool to diagnose cardiovascular autonomic disorders?](https://doi.org/10.1007/s10286-024-01097-2) *Clinical Autonomic Research*, 2025.
+- Raj SR, Fedorowski A, Sheldon RS. [Diagnosis and management of postural orthostatic tachycardia syndrome](https://doi.org/10.1503/cmaj.211373). *CMAJ*, 2022.
+- Freeman R, Wieling W, Axelrod FB, et al. [Consensus statement on the definition of orthostatic hypotension, neurally mediated syncope and the postural tachycardia syndrome](https://doi.org/10.1007/s10286-011-0119-5). *Clinical Autonomic Research*, 2011.

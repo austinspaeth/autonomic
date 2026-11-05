@@ -6,11 +6,17 @@ summary: "A practical guide to the affordable devices that capture POTS at home 
 description: "Compare the best wearables and home tools for tracking POTS: heart rate and HRV, blood pressure, pulse oximetry and stand tests. What each device reveals, its limits, and what to buy."
 keywords: "best wearable for POTS, track POTS at home, POTS heart rate monitor, blood pressure monitor POTS, pulse oximeter, POTS tracking device, Apple Watch POTS, chest strap HRV"
 date: 2026-06-30
-updated: 2026-06-30
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1780461159687-281752b8a85a?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Opeoluwa Fasanya / Unsplash"
 tldr: "The best POTS tracking tools capture the standing heart-rate rise, HRV, blood pressure and symptoms. A chest strap gives the truest heart-rate and HRV signal, a ring or watch makes daily trends effortless, and a home blood-pressure cuff separates POTS from orthostatic hypotension. But the single most useful test, a stand test, needs nothing but two fingers and a clock. Consistency and logging context beat buying the fanciest device."
+question: "What are the best devices for tracking POTS at home?"
+app:
+  feature: pots-stand-test
+  hook: "Run a real stand test with what you own."
+  line: "Do a guided stand test with an Apple Watch or chest strap, or enter the numbers by hand, and see your heart rate rise on standing."
 categories:
   - pots
   - app
@@ -126,3 +132,10 @@ Don't start by shopping. Start by doing a stand test with two fingers and a cloc
   for personalized care. <em>Consumer wearables and home tools track patterns and trends. They do not diagnose POTS, which requires evaluation by a clinician.</em> Talk with a qualified
   clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Gilgen-Ammann R, Schweizer T, Wyss T. [RR interval signal quality of a heart rate monitor and an ECG Holter at rest and during exercise](https://doi.org/10.1007/s00421-019-04142-5). *European Journal of Applied Physiology*, 2019.
+- Schäfer A, Vagedes J. [How accurate is pulse rate variability as an estimate of heart rate variability? A review on studies comparing photoplethysmographic technology with an electrocardiogram](https://doi.org/10.1016/j.ijcard.2012.03.119). *International Journal of Cardiology*, 2013.
+- O'Grady B, Lambe R, Baldwin M, et al. [The validity of Apple Watch Series 9 and Ultra 2 for serial measurements of heart rate variability and resting heart rate](https://doi.org/10.3390/s24196220). *Sensors*, 2024.

@@ -6,11 +6,17 @@ summary: "What heart rate variability does before, during and after a PEM crash,
 description: "Can HRV warn you about a PEM crash? What the research shows about HRV before, during and after crashes in long COVID and ME/CFS, and how to use it for pacing."
 keywords: "HRV and PEM, HRV before a crash, post-exertional malaise HRV, PEM crash warning, HRV long COVID, HRV ME/CFS, can HRV predict PEM, HRV pacing, morning HRV crash, HRV after exertion"
 date: 2026-10-27
-updated: 2026-10-27
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1567016420071-ec27a7835119?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Inside Weather / Unsplash"
 tldr: "HRV will not predict every crash, but it is one of the few signals you can check every morning. In the largest study so far, a morning HRV lower than your usual, together with a resting heart rate higher than your usual, went with worse symptoms later that day. After exertion, HRV in long COVID can stay suppressed for at least 24 hours. During a crash, HRV sometimes rises again while you feel worse, so a higher number is not proof you have recovered. Compare against your own baseline, look at two or three mornings rather than one, and decide in advance what a warning sign changes about your day."
+question: "Does HRV drop before a PEM crash?"
+app:
+  feature: pacing-budget
+  hook: "See your limit before you cross it."
+  line: "Autonomic sets a daily energy budget from your morning readings and what your body has handled, and alerts you when it is nearly spent."
 categories:
   - hrv
   - postviral
@@ -150,3 +156,12 @@ HRV cannot tell you exactly when a crash is coming. It can tell you, most mornin
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data. It is not intended to diagnose or treat any condition. Talk to your clinician before changing your treatment or activity plan.
 </div>
+
+## Sources
+
+- National Institute for Health and Care Excellence. [Myalgic encephalomyelitis (or encephalopathy)/chronic fatigue syndrome: diagnosis and management (NG206)](https://www.nice.org.uk/guidance/ng206/chapter/Recommendations). *NICE guideline*, 2021.
+- Aitken A, Sawyer A, Iwasaki A, et al. [Digital physiological biomarkers predict within-person symptom changes in complex chronic illness](https://doi.org/10.1038/s41746-026-02543-3). *npj Digital Medicine*, 2026.
+- Ruijgt T, Slaghekke A, Ellens A, et al. [Wearable heart rate variability monitoring identifies autonomic dysfunction and thresholds for post-exertional malaise in Long COVID](https://doi.org/10.1101/2025.03.18.25320115). *medRxiv* (preprint), 2025.
+- Schoene D, Deckert S, Barlinn K, et al. [Neurocardiac autonomic dysfunction in patients with post-COVID-19 condition: a systematic review and meta-analysis](https://doi.org/10.1111/ene.70561). *European Journal of Neurology*, 2026.
+- Clague-Baker N, Davenport TE, Wickens B, et al. [Pacing with a heart rate monitor for people with myalgic encephalomyelitis/chronic fatigue syndrome and long COVID: a feasibility study](https://doi.org/10.1080/21641846.2025.2565103). *Fatigue: Biomedicine, Health & Behavior*, 2025.
+- Shaffer F, Ginsberg JP. [An overview of heart rate variability metrics and norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.

@@ -6,11 +6,17 @@ summary: "Your resting respiratory rate is a vital sign most people never track,
 description: "Normal respiratory rate is 12 to 20 breaths per minute at rest. Learn why breathing rate runs high in long COVID and POTS, how it links to HRV, and how to read your baseline."
 keywords: "respiratory rate, normal respiratory rate, breathing rate, breaths per minute, respiratory rate while sleeping, elevated respiratory rate long covid, fast breathing POTS, tachypnea, dysfunctional breathing, respiratory rate and HRV, resting respiratory rate"
 date: 2026-10-23
-updated: 2026-10-23
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1624292420533-da15fe3a4857?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
 photoAttribution: "Unsplash"
 tldr: "A normal resting respiratory rate for an adult is 12 to 20 breaths per minute, and many healthy people sit between 12 and 16. In long COVID and POTS it often runs faster and shallower than it should, which both reflects and worsens an over-revved nervous system and drags your HRV down. The single most useful number is not any textbook range but your own stable baseline, read over weeks, so that a night which drifts upward stands out."
+question: "What is a normal breathing rate, and why is mine high?"
+app:
+  feature: hrv-readings
+  hook: "Read your overnight breathing beside your HRV."
+  line: "Autonomic shows your overnight respiratory rate from your watch next to sleep and morning HRV, so a fast baseline is easier to notice."
 categories:
   - basics
   - postviral
@@ -316,3 +322,11 @@ Respiratory rate is a quiet, powerful vital sign. For an adult at rest it runs 1
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Persistent changes in your breathing, or any new or worsening shortness of breath, deserve evaluation by a clinician who can examine you properly.
 </div>
+
+## Sources
+
+- MedlinePlus. [Rapid shallow breathing](https://medlineplus.gov/ency/article/007198.htm). U.S. National Library of Medicine, reviewed 2025.
+- Cretikos MA, Bellomo R, Hillman K, et al. [Respiratory rate: the neglected vital sign](https://doi.org/10.5694/j.1326-5377.2008.tb01825.x). *Medical Journal of Australia*, 2008.
+- Miller DJ, Capodilupo JV, Lastella M, et al. [Analyzing changes in respiratory rate to predict the risk of COVID-19 infection](https://doi.org/10.1371/journal.pone.0243693). *PLoS One*, 2020.
+- Hirsch JA, Bishop B. [Respiratory sinus arrhythmia in humans: how breathing pattern modulates heart rate](https://doi.org/10.1152/ajpheart.1981.241.4.H620). *American Journal of Physiology*, 1981.
+- Motiejunaite J, Balagny P, Arnoult F, et al. [Hyperventilation as one of the mechanisms of persistent dyspnoea in SARS-CoV-2 survivors](https://doi.org/10.1183/13993003.01578-2021). *European Respiratory Journal*, 2021.

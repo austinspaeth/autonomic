@@ -6,11 +6,17 @@ summary: "Slow resonant breathing is one of the gentlest things you can try for 
 description: "An evidence-first look at HRV biofeedback and resonant breathing for long COVID dysautonomia: what feasibility and pilot studies found, the real limits of that research, and who should be cautious."
 keywords: "HRV biofeedback long COVID, does breathing help long COVID, resonant breathing evidence, HRV biofeedback study, long COVID dysautonomia treatment, vagal breathing evidence, HEARTLOC"
 date: 2026-06-22
-updated: 2026-06-22
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1587056946549-b4a1b679e1b5?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Jay Mullings / Unsplash"
 tldr: "Early studies of HRV biofeedback and slow resonant breathing in long COVID are promising but small. A home feasibility trial found the approach practical and well tolerated with encouraging symptom signals, and other pilot work links resonant breathing to better self-reported symptoms and wellbeing. None of it is a large randomized trial, so the honest verdict is 'promising, not proven.' Because it is low-cost and low-risk for most people, it is reasonable to try while tracking whether your own HRV trend actually moves."
+question: "Does HRV biofeedback work for long COVID?"
+app:
+  feature: hrv-readings
+  hook: "Try paced breathing and watch your own numbers."
+  line: "Autonomic guides a paced breathing HRV session with your phone, a strap or a watch, and keeps it beside your morning readings."
 categories:
   - research
   - hrv
@@ -47,7 +53,7 @@ Here is the current evidence, laid out honestly. Read the caveat column as caref
 | Study / finding | What it looked at | What it found | Caveat |
 | --- | --- | --- | --- |
 | [HEARTLOC feasibility study](https://pmc.ncbi.nlm.nih.gov/articles/PMC10826406/) | A home-delivered HRV-biofeedback breathing programme for people with long COVID dysautonomia | The programme was **feasible and acceptable** to deliver at home, with promising early signals on symptoms | A feasibility study, not an efficacy trial: small, designed to test whether the approach is practical, not to prove it works |
-| [Resonant breathing pilot](https://www.medrxiv.org/content/10.1101/2024.03.25.24304856) | Slow resonant breathing practiced by people with long COVID | Participants reported **improved symptoms and wellbeing** | Small sample, mostly self-reported outcomes, and a preprint. Findings can shift after peer review |
+| [Resonant breathing pilot](https://doi.org/10.3389/fresc.2024.1411344) | Slow resonant breathing practiced by people with long COVID | Participants reported **improved symptoms and wellbeing** | Small sample and mostly self-reported outcomes. Now peer reviewed (*Frontiers in Rehabilitation Sciences*, 2024), but still a small pilot |
 | [HRV in long COVID](https://www.nature.com/articles/s41598-023-50276-0) | Resting HRV and HRV during deep breathing, long COVID vs controls | Long COVID was linked to **blunted HRV**, including during deep-breathing maneuvers | Observational: shows an association and a target, not that breathing training fixes it |
 
 <div class="callout callout-note">
@@ -121,3 +127,11 @@ HRV biofeedback for long COVID is a genuinely promising idea with genuinely earl
   for personalized care. <em>The evidence for HRV biofeedback in long COVID is early, and breathing training is not a proven treatment; it should complement, not replace, medical evaluation of your dysautonomia.</em> Talk with a qualified
   clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Corrado J, Iftekhar N, Halpin S, et al. [HEART Rate Variability Biofeedback for LOng COVID Dysautonomia (HEARTLOC): results of a feasibility study](https://doi.org/10.1177/27536351241227261). *Advances in Rehabilitation Science and Practice*, 2024.
+- Polizzi J, Tosto-Mancuso J, Tabacof L, et al. [Resonant breathing improves self-reported symptoms and wellbeing in people with Long COVID](https://doi.org/10.3389/fresc.2024.1411344). *Frontiers in Rehabilitation Sciences*, 2024.
+- da Silva ALG, Vieira LDP, Dias LS, et al. [Impact of long COVID on the heart rate variability at rest and during deep breathing maneuver](https://doi.org/10.1038/s41598-023-50276-0). *Scientific Reports*, 2023.
+- Treadwell JR, Wagner J, Reston JT, et al. [Treatments for Long COVID autonomic dysfunction: a scoping review](https://doi.org/10.1007/s10286-024-01081-w). *Clinical Autonomic Research*, 2025.
+- Lehrer PM, Gevirtz R. [Heart rate variability biofeedback: how and why does it work?](https://doi.org/10.3389/fpsyg.2014.00756) *Frontiers in Psychology*, 2014.

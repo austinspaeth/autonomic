@@ -6,11 +6,17 @@ summary: "Long COVID brain fog is not just fatigue in disguise. A large part of 
 description: "Long COVID brain fog explained: why standing can reduce blood flow to the brain, how the autonomic nervous system drives cognitive symptoms, and how to track and manage the pattern at home."
 keywords: "long covid brain fog, brain fog, brain fog dysautonomia, brain fog when standing, cognitive dysfunction long covid, POTS brain fog, cerebral blood flow orthostatic, why do I get foggy when I stand, long covid cognitive symptoms, how to fix brain fog, post viral brain fog"
 date: 2026-07-27
-updated: 2026-07-27
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "/articles/long-covid-brain-fog/cover.webp"
 photoAttribution: "Autonomic"
 tldr: "Long COVID brain fog is a real, physical symptom, not a lack of effort. A big driver is autonomic: when you are upright, blood can pool in your legs and belly, cerebral blood flow can dip, and thinking gets harder. Many people find their fog eases when they lie down and worsens after standing, sitting up too long, big meals, poor sleep, or overexertion. You cannot always fix it overnight, but you can map when it hits and match a strategy to the cause. None of this is a diagnosis; rule out other causes with your clinician."
+question: "Why is my long COVID brain fog worse when I stand?"
+app:
+  feature: insights
+  hook: "Find what lines up with foggy days."
+  line: "Log brain fog with your sleep, food and activity. Autonomic shows what lines up with your foggier days and your clearer ones."
 categories:
   - postviral
   - recovery
@@ -244,3 +250,11 @@ Long COVID brain fog is distressing but is not the same as a progressive dementi
 - [The orthostatic stand test at home](/insights/pots/the-orthostatic-stand-test-at-home/)
 - [Pacing 101: the energy envelope](/insights/recovery/pacing-101-energy-envelope/)
 - [Recovery from post-viral dysautonomia](/insights/recovery/recovery-from-post-viral-dysautonomia/)
+
+## Sources
+
+- Davis HE, Assaf GS, McCorkell L, et al. [Characterizing long COVID in an international cohort: 7 months of symptoms and their impact](https://doi.org/10.1016/j.eclinm.2021.101019). *EClinicalMedicine*, 2021.
+- van Campen CLMC, Rowe PC, Visser FC. [Orthostatic symptoms and reductions in cerebral blood flow in long-haul COVID-19 patients: similarities with ME/CFS](https://doi.org/10.3390/medicina58010028). *Medicina*, 2021.
+- Khan MS, Miller AJ, Ejaz A, et al. [Cerebral blood flow in orthostatic intolerance](https://doi.org/10.1161/JAHA.124.036752). *Journal of the American Heart Association*, 2025.
+- Ocon AJ, Messer ZR, Medow MS, Stewart JM. [Increasing orthostatic stress impairs neurocognitive functioning in chronic fatigue syndrome with postural tachycardia syndrome](https://doi.org/10.1042/CS20110241). *Clinical Science*, 2012.
+- Centers for Disease Control and Prevention. [Strategies to prevent worsening of symptoms (ME/CFS)](https://www.cdc.gov/me-cfs/hcp/clinical-care/treating-the-most-disruptive-symptoms-first-and-preventing-worsening-of-symptoms.html). 2024.

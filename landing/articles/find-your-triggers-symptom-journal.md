@@ -6,11 +6,17 @@ summary: "Scattered logs rarely reveal what sets off a crash. Here is how to kee
 description: "A practical guide to finding your POTS, long COVID and MCAS triggers with a symptom journal: what to record, how delayed reactions mislead you, and how to spot real patterns over weeks."
 keywords: "symptom journal, how to find triggers, symptom tracker, POTS triggers, long COVID triggers, food triggers, trigger tracking, health journaling, delayed symptoms"
 date: 2026-05-26
-updated: 2026-05-26
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1774354669545-6265156237d4?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Alehandra / Unsplash"
 tldr: "A good symptom journal records more than symptoms: it captures severity, key readings, food, activity, sleep, stress and cycle so you can line up cause and effect. The catch is timing. Many triggers surface as a crash one or two days later, so single-day thinking misleads. Look for the same pairing repeating over weeks, change one variable at a time, and you end up with a short, personal list of triggers you can actually act on."
+question: "How do I find my triggers with a symptom journal?"
+app:
+  feature: insights
+  hook: "Let your journal point to your triggers."
+  line: "Log symptoms, food, sleep and activity, and Autonomic finds what lines up with your worse days, including effects that show up a day later."
 categories:
   - recovery
   - app
@@ -127,7 +133,7 @@ You don't have to start from nothing. A handful of categories account for most f
 | **Poor sleep** | Broad next-day symptom bump, lower HRV | Hours, quality, morning readings |
 | **Specific foods / histamine** | Flushing, gut symptoms, headache, sometimes delayed | Suspect foods, timing, symptom lag |
 
-Food is where journaling earns its keep, because reactions are individual and often delayed. If flushing, hives or gut symptoms keep appearing, a [low-histamine approach](/insights/food/low-histamine-diet-mcas/) is worth exploring. The [Mast Cell Action](https://www.mastcellaction.org/diet-and-mcas) guidance is a sober place to start. Systematic self-tracking of this kind is increasingly recognized in [long COVID management](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC10103775/), where symptom monitoring helps guide pacing and avoid setbacks.
+Food is where journaling earns its keep, because reactions are individual and often delayed. If flushing, hives or gut symptoms keep appearing, a [low-histamine approach](/insights/food/low-histamine-diet-mcas/) is worth exploring. The [Mast Cell Action](https://www.mastcellaction.org/diet-and-mcas) guidance is a sober place to start. Systematic self-tracking of this kind is recognized in [ME/CFS management guidance](https://www.nice.org.uk/guidance/ng206), where self-monitoring of activity helps guide pacing and avoid setbacks.
 
 ## How Autonomic helps
 
@@ -148,3 +154,10 @@ You are not looking for a perfect diary. You are looking for a short list (three
   for personalized care. <em>A symptom journal reveals correlations, not proof of causation. A pattern is a hypothesis, not a diagnosis.</em> Talk with a qualified
   clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- National Institute for Health and Care Excellence. [Myalgic encephalomyelitis (or encephalopathy)/chronic fatigue syndrome: diagnosis and management (NG206)](https://www.nice.org.uk/guidance/ng206). 2021.
+- Chu L, Valencia IJ, Garvert DW, et al. [Deconstructing post-exertional malaise in myalgic encephalomyelitis/chronic fatigue syndrome: a patient-centered, cross-sectional survey](https://doi.org/10.1371/journal.pone.0197811). *PLoS One*, 2018.
+- Raj SR, Fedorowski A, Sheldon RS. [Diagnosis and management of postural orthostatic tachycardia syndrome](https://doi.org/10.1503/cmaj.211373). *CMAJ*, 2022.
+- Cleveland Clinic. [Postural orthostatic tachycardia syndrome (POTS)](https://my.clevelandclinic.org/health/diseases/16560-postural-orthostatic-tachycardia-syndrome-pots). Reviewed 2026.

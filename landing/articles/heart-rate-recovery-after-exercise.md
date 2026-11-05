@@ -6,17 +6,23 @@ summary: "Heart rate recovery is how fast your pulse falls in the first minute a
 description: "What heart rate recovery means: how fast your pulse should drop after exercise, how to measure HRR1 at home, normal ranges, and how vagal reactivation reads in POTS and long COVID recovery."
 keywords: "heart rate recovery, HRR, heart rate recovery after exercise, HRR1, vagal reactivation, parasympathetic recovery, heart rate recovery normal range, how to measure heart rate recovery, heart rate recovery POTS, long COVID, vagal tone"
 date: 2026-08-03
-updated: 2026-08-03
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1536331568701-0b15cbb1a918?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Briana Tozour / Unsplash"
-tldr: "Heart rate recovery (HRR) is how many beats per minute your pulse falls in the first minute after you stop exercising. That fast drop is driven mainly by vagal reactivation, the parasympathetic 'brake' switching back on, so a bigger, faster fall reflects healthier autonomic flexibility. As a rough guide for a sit-still-immediately reading, a one-minute drop of 25+ bpm is strong, 18 to 24 is healthy, and 12 or fewer beats is the research red flag worth raising with a clinician. Thresholds vary with how you cool down, and your own trend over weeks matters more than any single number. In POTS and long COVID, HRR is often blunted, and it can recover with careful, paced reconditioning."
+tldr: "Heart rate recovery (HRR) is how many beats per minute your pulse falls in the first minute after you stop exercising. That fast drop is driven mainly by vagal reactivation, the parasympathetic 'brake' switching back on, so a bigger, faster fall reflects healthier autonomic flexibility. As a rough guide for a sit-still-immediately reading, a one-minute drop of 25+ bpm is strong, 19 to 24 is healthy, and 18 or fewer beats is the research red flag worth raising with a clinician (12 or fewer if you cool down with a slow walk). Thresholds vary with how you cool down, and your own trend over weeks matters more than any single number. In POTS and long COVID, HRR can be blunted, and it can recover with careful, paced reconditioning."
+question: "How fast should my heart rate drop after exercise?"
+app:
+  feature: hrv-readings
+  hook: "Track your recovery, not just your workout."
+  line: "Autonomic imports your workouts with their heart rate trace and puts them beside your morning HRV, so you can see how your body bounced back."
 categories:
   - basics
   - hrv
 faq:
   - q: "What is a good heart rate recovery after exercise?"
-    a: "For a reading where you sit or lie still the moment you stop, a drop of 25 or more beats in the first minute is strong, 18 to 24 is healthy, and 13 to 17 is on the low side. A one-minute fall of 12 beats or fewer is the classic research red flag and worth discussing with a clinician. These are population guides, not diagnoses: cooling down by walking slowly gives smaller numbers than stopping abruptly, and your own trend over weeks matters more than any single reading."
+    a: "For a reading where you sit or lie still the moment you stop, a drop of 25 or more beats in the first minute is strong and 19 to 24 is healthy. A one-minute fall of 18 beats or fewer is the research red flag for a sudden stop and worth discussing with a clinician; with a slow cool-down walk, the cutoff is 12 or fewer. These are population guides, not diagnoses: cooling down by walking slowly gives smaller numbers than stopping abruptly, and your own trend over weeks matters more than any single reading."
   - q: "Is heart rate recovery the same as heart rate variability?"
     a: "No, but they are cousins. Both are driven largely by the vagus nerve. HRV looks at the tiny beat-to-beat timing differences while your heart is at rest, so it reads your parasympathetic tone in a steady state. Heart rate recovery looks at how quickly the vagus can slam the brake back on after exercise, so it reads your autonomic responsiveness. A person can score well on one and less well on the other, which is why reading them together gives a fuller picture than either alone."
   - q: "How do I measure heart rate recovery at home?"
@@ -29,7 +35,7 @@ social:
   linkedin: |
     A quiet autonomic test runs every time you finish a workout, and most people never read it: heart rate recovery, the drop in your pulse in the first minute after you stop.
 
-    That first minute is dominated by vagal reactivation, the parasympathetic "brake" re-engaging. So a fast fall reflects healthy autonomic responsiveness, while a shallow one points to deconditioning or autonomic strain. As a rough guide for a sit-still-immediately reading: a one-minute drop of 25+ bpm is strong, 18 to 24 is healthy, and 12 or fewer is the classic research red flag worth raising with a clinician.
+    That first minute is dominated by vagal reactivation, the parasympathetic "brake" re-engaging. So a fast fall reflects healthy autonomic responsiveness, while a shallow one points to deconditioning or autonomic strain. As a rough guide for a sit-still-immediately reading: a one-minute drop of 25+ bpm is strong, 19 to 24 is healthy, and 18 or fewer is the research red flag worth raising with a clinician.
 
     For anyone tracking recovery in POTS or long COVID, the useful move is to read it beside resting heart rate, HRV and the stand test. Any one number wobbles day to day; the four moving together is the signal. And heart rate recovery is trainable, which makes it a quietly motivating thing to watch during careful, paced reconditioning.
 
@@ -46,7 +52,7 @@ social:
 
     One big caution: if you get post-exertional malaise, do NOT deliberately push your heart rate to test this. It can trigger a crash for days. Only ever use the everyday movement you already tolerate, and let your doctor guide any exercise. Not medical advice, just a patient. Wrote up the physiology, ranges and a home method here if it helps: https://autonomic.care/insights/basics/heart-rate-recovery-after-exercise/?utm_source=reddit&utm_medium=social&utm_campaign=heart-rate-recovery-after-exercise
   x: |
-    Heart rate recovery = how far your pulse drops in the first minute after you stop. That fast fall is your vagus nerve switching the brake back on. 25+ bpm is strong, 12 or fewer is a flag. How to read it: https://autonomic.care/insights/basics/heart-rate-recovery-after-exercise/?utm_source=x&utm_medium=social&utm_campaign=heart-rate-recovery-after-exercise #HRV
+    Heart rate recovery = how far your pulse drops in the first minute after you stop. That fast fall is your vagus nerve switching the brake back on. 25+ bpm is strong, 18 or fewer is a flag. How to read it: https://autonomic.care/insights/basics/heart-rate-recovery-after-exercise/?utm_source=x&utm_medium=social&utm_campaign=heart-rate-recovery-after-exercise #HRV
   facebook: |
     Here is a simple autonomic number you can read after any walk or workout: heart rate recovery, the drop in your pulse in the first minute after you stop. Note your heart rate when you stop, read it again after 60 seconds, and subtract. A bigger, faster drop means your calming "rest and digest" system is switching back on well.
 
@@ -69,8 +75,8 @@ social:
   var card = document.getElementById('hrr-calc');
   function band(d) {
     if (d >= 25) return ['Strong', '#54d98a', 'Robust vagal reactivation. Your brake snaps back fast.'];
-    if (d >= 18) return ['Healthy', '#22c55e', 'A normal, healthy one-minute drop.'];
-    if (d >= 13) return ['Below average', '#eab308', 'On the low side. Watch the weekly trend.'];
+    if (d >= 19) return ['Healthy', '#22c55e', 'A normal, healthy one-minute drop.'];
+    if (d >= 13) return ['Below average', '#eab308', 'At or under the 18 bpm research flag for a sudden stop. Worth raising with a clinician if it persists.'];
     if (d >= 1) return ['Blunted', '#f97316', 'A slow fall. Common with deconditioning or autonomic strain.'];
     return ['Very low', '#ef4444', 'Little to no drop. Worth raising with a clinician.'];
   }
@@ -154,22 +160,22 @@ As a working guide for the easy home method, stopping and sitting still immediat
 
 <div class="metric-scale">
   <span class="ms-seg" style="background:#ef4444">Very low<small>0</small></span>
-  <span class="ms-seg" style="background:#f97316">Blunted<small>1–12</small></span>
-  <span class="ms-seg" style="background:#eab308">Low<small>13–17</small></span>
-  <span class="ms-seg" style="background:#22c55e">Healthy<small>18–24</small></span>
+  <span class="ms-seg" style="background:#f97316">Blunted<small>1-12</small></span>
+  <span class="ms-seg" style="background:#eab308">Low<small>13-18</small></span>
+  <span class="ms-seg" style="background:#22c55e">Healthy<small>19-24</small></span>
   <span class="ms-seg" style="background:#54d98a">Strong<small>25+</small></span>
 </div>
 
 | One-minute drop (HRR1) | Read | What it usually reflects |
 | --- | --- | --- |
 | 25+ bpm | Strong | Robust vagal reactivation, good autonomic flexibility |
-| 18 to 24 bpm | Healthy | A normal, healthy first-minute recovery |
-| 13 to 17 bpm | Low | On the low side, watch the trend |
+| 19 to 24 bpm | Healthy | A normal, healthy first-minute recovery |
+| 13 to 18 bpm | Low | At or under the research flag for a sudden stop, worth raising with a clinician |
 | 1 to 12 bpm | Blunted | Slow brake, common with deconditioning or autonomic strain |
 | 0 bpm | Very low | Little to no fall, worth raising with a clinician |
 
 <div class="callout callout-note">
-  <strong>Protocol changes the number.</strong> The widely cited research cutoff of 12 beats or fewer at one minute comes from studies where people did a slow cool-down walk, not an abrupt stop. If you keep moving to cool down, expect smaller drops and read them on a gentler scale. The single most useful thing you can do is pick one method and stick to it, so your readings are comparable to each other.
+  <strong>Protocol changes the number.</strong> The widely cited research cutoff of 12 beats or fewer at one minute comes from studies where people did a slow cool-down walk, not an abrupt stop. After a sudden stop, the research cutoff is about 18 beats or fewer, which is the scale this article uses for the sit-still method. If you keep moving to cool down, expect smaller drops and read them on a gentler scale. The single most useful thing you can do is pick one method and stick to it, so your readings are comparable to each other.
 </div>
 
 ## How to measure heart rate recovery at home
@@ -255,7 +261,7 @@ A recovery story is far more convincing when these move together: a rising resti
 
 ## Heart rate recovery in POTS, long COVID and post-viral recovery
 
-In [POTS, long COVID and post-viral dysautonomia](/insights/recovery/recovery-from-post-viral-dysautonomia/), heart rate recovery is often blunted. Two things tend to be going on at once. Deconditioning reduces the vagal tone that drives the fast drop, and autonomic dysfunction itself can weaken vagal reactivation directly. The result is a familiar cluster: a high resting heart rate, a slow post-exercise recovery, and a large rise on standing.
+In [POTS, long COVID and post-viral dysautonomia](/insights/recovery/recovery-from-post-viral-dysautonomia/), heart rate recovery can be blunted, though few studies have measured it directly in these conditions. Two things can be going on at once. Deconditioning reduces the vagal tone that drives the fast drop, and autonomic dysfunction itself can weaken vagal reactivation directly. The result is a familiar cluster: a high resting heart rate, a slow post-exercise recovery, and a large rise on standing.
 
 The genuinely hopeful part is that heart rate recovery is trainable. Careful, graded aerobic reconditioning, of the kind used in the [Levine protocol for POTS](/insights/pots/exercise-for-pots-levine-protocol/), tends to speed the drop over months, often before symptoms fully settle. Watching that number improve can be quietly motivating when progress otherwise feels invisible.
 
@@ -279,8 +285,14 @@ The same habits that lift vagal tone tend to speed recovery, because they are th
 
 ## The bottom line
 
-Heart rate recovery is the drop in your pulse in the first minute after you stop moving, and that fast fall is mostly your vagus nerve switching the brake back on. A bigger, quicker drop reflects better autonomic flexibility; a shallow one points to deconditioning or autonomic strain. Measure it the same way each time (peak at the stop, again at 60 seconds, subtract), read 25 or more as strong and 12 or fewer as a flag to discuss with a clinician, and judge yourself by the multi-week trend rather than any single session. In POTS and long COVID the number often starts blunted and improves with careful, paced reconditioning, especially when you read it beside resting heart rate, HRV and your stand test.
+Heart rate recovery is the drop in your pulse in the first minute after you stop moving, and that fast fall is mostly your vagus nerve switching the brake back on. A bigger, quicker drop reflects better autonomic flexibility; a shallow one points to deconditioning or autonomic strain. Measure it the same way each time (peak at the stop, again at 60 seconds, subtract), read 25 or more as strong and 18 or fewer as a flag to discuss with a clinician, and judge yourself by the multi-week trend rather than any single session. In POTS and long COVID the number can start blunted and improve with careful, paced reconditioning, especially when you read it beside resting heart rate, HRV and your stand test.
 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. A slow heart rate recovery has many causes and is not a diagnosis by itself. If your readings concern you or your symptoms are worsening, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Cole CR, Blackstone EH, Pashkow FJ, et al. [Heart-rate recovery immediately after exercise as a predictor of mortality](https://doi.org/10.1056/NEJM199910283411804). *New England Journal of Medicine*, 1999.
+- Imai K, Sato H, Hori M, et al. [Vagally mediated heart rate recovery after exercise is accelerated in athletes but blunted in patients with chronic heart failure](https://doi.org/10.1016/0735-1097%2894%2990150-3). *Journal of the American College of Cardiology*, 1994.
+- Watanabe J, Thamilarasan M, Blackstone EH, et al. [Heart rate recovery immediately after treadmill exercise and left ventricular systolic dysfunction as predictors of mortality: the case of stress echocardiography](https://doi.org/10.1161/circ.104.16.1911). *Circulation*, 2001.

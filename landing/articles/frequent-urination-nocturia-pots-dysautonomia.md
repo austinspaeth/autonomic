@@ -6,11 +6,17 @@ summary: "Frequent urination, urgency and waking up at night to pee are common i
 description: "Why POTS and dysautonomia cause frequent urination and nocturia: autonomic bladder control, fluid shifts, nocturnal polyuria, the salt-and-water paradox, red flags, and what actually helps."
 keywords: "frequent urination POTS, nocturia POTS, POTS peeing a lot, dysautonomia bladder, POTS urination at night, nocturnal polyuria POTS, overactive bladder dysautonomia, POTS frequent urination treatment, why do I pee so much POTS, long COVID frequent urination"
 date: 2026-10-19
-updated: 2026-10-19
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1581310152154-c7cc480bca61?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=NHwxMjA3fDA%3D"
 photoAttribution: "Giorgio Trovato / Unsplash"
 tldr: "Frequent urination and nighttime peeing in POTS and dysautonomia usually come from two things working together: an autonomic nervous system that mishandles bladder signals, and fluid that pools in your legs while you are upright, then shifts back when you lie down so your kidneys dump it. Nocturia and the hypovolemic mornings that follow are the classic pattern. Steady salt and fluids, timing drinks, raising the head of the bed, compression, treating any overactive bladder, and ruling out infection or diabetes all help. Burning, fever, blood, inability to urinate, or constant thirst with weight loss need prompt care."
+question: "Why do I pee so much with POTS?"
+app:
+  feature: hrv-readings
+  hook: "Log water and night wakings side by side."
+  line: "Log your water, food and sleep in your journal, so you can see how what you drink and when lines up with nights up to pee."
 categories:
   - pots
   - postviral
@@ -69,7 +75,7 @@ social:
   var card = document.getElementById('npi-calc');
   function band(pct) {
     if (pct > 33) return ['#ef4444', 'Suggests nocturnal polyuria: a large share of your daily urine is made overnight. Worth discussing with a clinician.'];
-    if (pct >= 20) return ['#eab308', 'Borderline. Above about 20% is common in POTS and in older adults; above 33% is the usual flag. Watch the pattern over several nights.'];
+    if (pct > 20) return ['#f97316', 'Suggests nocturnal polyuria if you are under 65, where the flag is over 20%. For adults 65 and older the flag is over 33%. Worth discussing with a clinician.'];
     return ['#54d98a', 'Within the usual daytime-weighted range. Most urine is being made while you are awake and upright.'];
   }
   function update() {
@@ -175,7 +181,7 @@ There is a cruel twist to it. The fluid your kidneys flush overnight is fluid th
 
 ### Check your own nocturnal polyuria index
 
-Clinicians use a simple ratio called the **nocturnal polyuria index**: the volume of urine you make overnight divided by your total output over 24 hours. Over about one third (33%) is the usual flag for nocturnal polyuria in adults, and above roughly 20% is often noted in younger people and in POTS. Nighttime volume means everything you pass while asleep plus your first morning void, since that urine was made overnight. This is a rough, educational check, not a diagnosis, but it can show you how daytime-weighted or nighttime-weighted your pattern really is.
+Clinicians use a simple ratio called the **nocturnal polyuria index**: the volume of urine you make overnight divided by your total output over 24 hours. The flag for nocturnal polyuria depends on age: over 20% in younger adults, and over 33% in older adults (65 and up). Nighttime volume means everything you pass while asleep plus your first morning void, since that urine was made overnight. This is a rough, educational check, not a diagnosis, but it can show you how daytime-weighted or nighttime-weighted your pattern really is.
 
 <div class="metric-calc" id="npi-calc">
   <p class="mc-head">Nocturnal polyuria index</p>
@@ -232,10 +238,10 @@ There is a wide normal range, so use these as rough anchors rather than hard rul
 | Measure | Typical adult range |
 | --- | --- |
 | Daytime voids | About 4 to 7 times |
-| Overnight voids | 0 to 1 time (waking 2 or more is clinical nocturia) |
+| Overnight voids | Usually 0 (waking 1 or more times to urinate counts as nocturia) |
 | 24-hour urine volume | Roughly 1 to 2 liters, depending on intake |
 | Time between voids | Usually 3 to 4 hours when awake |
-| Nocturnal polyuria index | Over about 33% suggests nocturnal polyuria |
+| Nocturnal polyuria index | Over 20% (younger adults) or over 33% (65 and older) suggests nocturnal polyuria |
 
 ## Red flags: when it is not just dysautonomia
 
@@ -295,3 +301,12 @@ Frequent urination and nocturia are not a sign that you are drinking too much or
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Frequent urination and nocturia are common in dysautonomia, but burning or pain when you urinate, fever, blood in the urine, an inability to pass urine, or constant thirst with weight loss need prompt medical evaluation. Discuss any changes to your fluids, salt, supplements or medications with a clinician who knows your history.
 </div>
+
+## Sources
+
+- van Kerrebroeck P, Abrams P, Chaikin D, et al. [The standardisation of terminology in nocturia: report from the Standardisation Sub-committee of the International Continence Society](https://doi.org/10.1002/nau.10053). *Neurourology and Urodynamics*, 2002.
+- Fine ND, Weiss JP, Wein AJ. [Nocturia: consequences, classification, and management](https://doi.org/10.12688/f1000research.11979.1). *F1000Research*, 2017.
+- Kaufman MR, Chang-Kit L, Raj SR, et al. [Overactive bladder and autonomic dysfunction: lower urinary tract symptoms in females with postural tachycardia syndrome](https://doi.org/10.1002/nau.22971). *Neurourology and Urodynamics*, 2017.
+- Faure Walker N, Gall R, Gall N, et al. [The postural tachycardia syndrome (PoTS) bladder: urodynamic findings](https://doi.org/10.1016/j.urology.2021.02.028). *Urology*, 2021.
+- Raj SR, Biaggioni I, Yamhure PC, et al. [Renin-aldosterone paradox and perturbed blood volume regulation underlying postural tachycardia syndrome](https://doi.org/10.1161/01.CIR.0000160356.97313.5D). *Circulation*, 2005.
+- Raj SR, Fedorowski A, Sheldon RS. [Diagnosis and management of postural orthostatic tachycardia syndrome](https://doi.org/10.1503/cmaj.211373). *CMAJ*, 2022.

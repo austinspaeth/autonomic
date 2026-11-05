@@ -6,11 +6,17 @@ summary: "Internal tremors are a shaking or buzzing you feel inside your body wi
 description: "Why long COVID and dysautonomia cause internal tremors and vibrations: the autonomic and adrenaline link, common triggers, what to rule out, and how to track the pattern at home without spiraling."
 keywords: "internal tremors, internal vibrations, long COVID tremors, internal tremors dysautonomia, buzzing feeling in body, internal shaking, enhanced physiological tremor, POTS tremors, adrenaline tremor, internal vibration when waking up"
 date: 2026-09-23
-updated: 2026-09-23
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1595178156906-2396ef837b0f?q=80&w=1170&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Unsplash"
 tldr: "Internal tremors are a felt vibration or shaking inside the body, often in the chest, torso, or limbs, with little or no movement anyone can see. In long COVID, POTS, and dysautonomia they are usually a form of enhanced physiological tremor: everyone has a faint background tremor, and adrenaline and a revved sympathetic nervous system amplify it until you can feel it from the inside. They tend to spike on waking, on an empty stomach, after poor sleep, and during a crash. They are usually not dangerous, but because thyroid problems, low blood sugar, B12 deficiency, medications, stimulants, and neurological conditions can also cause tremor, a new or one-sided or visibly worsening tremor should be checked by a clinician. Track when yours happens beside your heart rate and HRV, ease the sympathetic load, and bring the pattern to an appointment."
+question: "Why do I feel internal tremors or vibrations with long COVID?"
+app:
+  feature: insights
+  hook: "Find the pattern behind the buzzing."
+  line: "Log tremors with your sleep, food and triggers. Autonomic shows what lines up with the days they show up."
 categories:
   - postviral
   - pots
@@ -199,3 +205,13 @@ Internal tremors and vibrations are a real, common, and usually benign feature o
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own body, not to diagnose or treat any condition. A tremor that is new, one-sided, present at rest, visibly worsening, or accompanied by weakness, numbness, speech changes, weight loss, or heat intolerance needs proper medical evaluation. If your symptoms are new or worsening, work with a clinician who can assess you.
 </div>
+
+## Sources
+
+- Zhou T, Sawano M, Arun AS, et al. [Internal tremors and vibrations in long COVID: a cross-sectional study](https://doi.org/10.1016/j.amjmed.2024.07.008). *American Journal of Medicine*, 2025.
+- Hallett M. [Overview of human tremor physiology](https://doi.org/10.1002/mds.870131308). *Movement Disorders*, 1998.
+- Morgan JC, Kurek JA, Davis JL, et al. [Insights into pathophysiology from medication-induced tremor](https://doi.org/10.7916/D8FJ2V9Q). *Tremor and Other Hyperkinetic Movements*, 2017.
+- Baker MR, Baker SN. [Beta-adrenergic modulation of tremor and corticomuscular coherence in humans](https://doi.org/10.1371/journal.pone.0049088). *PLoS One*, 2012.
+- Crawford P, Zimmerman EE. [Tremor: sorting through the differential diagnosis](https://www.aafp.org/pubs/afp/issues/2018/0201/p180.html). *American Family Physician*, 2018.
+- Oaklander AL, Mills AJ, Kelley M, et al. [Peripheral neuropathy evaluations of patients with prolonged long COVID](https://doi.org/10.1212/NXI.0000000000001146). *Neurology: Neuroimmunology and Neuroinflammation*, 2022.
+- Schwartz NS, Clutter WE, Shah SD, et al. [Glycemic thresholds for activation of glucose counterregulatory systems are higher than the threshold for symptoms](https://doi.org/10.1172/JCI112884). *Journal of Clinical Investigation*, 1987.

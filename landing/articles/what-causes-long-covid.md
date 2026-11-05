@@ -6,11 +6,17 @@ summary: "The leading 2026 theories for what drives long COVID overlap rather th
 description: "A plain-language guide to what causes long COVID: microclots, neuroinflammation, small-fiber neuropathy, autoantibodies and autonomic injury, and why so many people develop POTS-like dysautonomia."
 keywords: "what causes long COVID, long COVID mechanism, microclots, neuroinflammation, small fiber neuropathy, autonomic dysfunction long COVID, viral persistence, endothelial dysfunction, autoantibodies, POTS"
 date: 2026-06-13
-updated: 2026-06-13
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1631048005696-9d1148f0a932?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "National Cancer Institute / Unsplash"
 tldr: "There is no single cause of long COVID. The strongest current hypotheses (persistent immune activation, microclots that impair blood flow, small-fiber nerve damage, autoantibodies, endothelial injury and lingering viral fragments) appear to overlap and reinforce each other. Together they help explain why dysautonomia and POTS are so common downstream, and why symptoms cluster instead of appearing one at a time."
+question: "What actually causes long COVID?"
+app:
+  feature: hrv-readings
+  hook: "Track how your own body is doing today."
+  line: "Whatever the cause, Autonomic gives you a short morning HRV reading and a daily score, and keeps your symptoms logged beside it."
 categories:
   - postviral
   - research
@@ -163,3 +169,14 @@ The science is moving quickly, including early work on [emerging management such
   for personalized care. <em>The mechanisms behind long COVID are an active area of research, and this piece is not a diagnosis or a treatment guide.</em> Talk with a qualified
   clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Davis HE, McCorkell L, Vogel JM, et al. [Long COVID: major findings, mechanisms and recommendations](https://doi.org/10.1038/s41579-022-00846-2). *Nature Reviews Microbiology*, 2023.
+- Astin R, Banerjee A, Baker MR, et al. [Long COVID: mechanisms, risk factors and recovery](https://doi.org/10.1113/EP090802). *Experimental Physiology*, 2023.
+- Schultheiss C, Willscher E, Paschold L, et al. [The IL-1β, IL-6, and TNF cytokine triad is associated with post-acute sequelae of COVID-19](https://doi.org/10.1016/j.xcrm.2022.100663). *Cell Reports Medicine*, 2022.
+- Pretorius E, Vlok M, Venter C, et al. [Persistent clotting protein pathology in Long COVID/Post-Acute Sequelae of COVID-19 (PASC) is accompanied by increased levels of antiplasmin](https://doi.org/10.1186/s12933-021-01359-7). *Cardiovascular Diabetology*, 2021.
+- Oaklander AL, Mills AJ, Kelley M, et al. [Peripheral neuropathy evaluations of patients with prolonged long COVID](https://doi.org/10.1212/NXI.0000000000001146). *Neurology: Neuroimmunology & Neuroinflammation*, 2022.
+- Wallukat G, Hohberger B, Wenzel K, et al. [Functional autoantibodies against G-protein coupled receptors in patients with persistent Long-COVID-19 symptoms](https://doi.org/10.1016/j.jtauto.2021.100100). *Journal of Translational Autoimmunity*, 2021.
+- Proal AD, VanElzakker MB, Aleman S, et al. [SARS-CoV-2 reservoir in post-acute sequelae of COVID-19 (PASC)](https://doi.org/10.1038/s41590-023-01601-2). *Nature Immunology*, 2023.
+- Novak P, Systrom DM, Witte A, et al. [Shared autonomic phenotype of long COVID and myalgic encephalomyelitis/chronic fatigue syndrome](https://doi.org/10.1371/journal.pone.0341278). *PLoS One*, 2026.

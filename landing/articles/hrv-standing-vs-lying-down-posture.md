@@ -6,11 +6,17 @@ summary: "Your HRV falls when you stand up, and that is normal physiology, not a
 description: "Why HRV drops when you stand up: the vagal withdrawal behind standing vs lying-down heart rate variability, typical changes, what it means in POTS, and how to measure consistently."
 keywords: "HRV standing, HRV lying down vs standing, does HRV drop when standing, posture and HRV, orthostatic HRV, standing heart rate variability, HRV supine vs standing, vagal withdrawal, HRV posture POTS, heart rate variability position"
 date: 2026-09-16
-updated: 2026-09-16
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1758599878236-47f6a918aed2?q=80&w=1632&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Unsplash"
 tldr: "Heart rate variability drops sharply when you stand up because standing pools blood in your legs, venous return falls, and your nervous system responds by withdrawing vagal (parasympathetic) tone and adding sympathetic drive. That vagal withdrawal is normal and expected. In POTS and orthostatic intolerance the response is exaggerated, so standing HRV falls further and heart rate rises more. Because posture moves HRV so much, the most important rule for a readable trend is to measure in the same position, at the same time, every day."
+question: "Why is my HRV lower standing than lying down?"
+app:
+  feature: hrv-readings
+  hook: "Same position, every morning."
+  line: "Autonomic guides a morning HRV reading taken the same way each day, so posture stops muddying your trend."
 categories:
   - hrv
   - pots
@@ -235,3 +241,12 @@ HRV falling when you stand up is not a glitch and not a bad sign. It is the visi
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> These are educational field notes to help you understand and track your own data, not a way to diagnose or treat any condition. Orthostatic symptoms, HRV and heart rate vary widely between people and from day to day. If standing makes you faint, if your readings concern you, or if your symptoms are changing, stop and discuss it with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Smit AA, Halliwill JR, Low PA, et al. [Pathophysiological basis of orthostatic hypotension in autonomic failure](https://doi.org/10.1111/j.1469-7793.1999.0001o.x). *Journal of Physiology*, 1999.
+- Montano N, Gnecchi-Ruscone T, Porta A, et al. [Power spectrum analysis of heart rate variability to assess the changes in sympathovagal balance during graded orthostatic tilt](https://doi.org/10.1161/01.CIR.90.4.1826). *Circulation*, 1994.
+- Task Force of the European Society of Cardiology and the North American Society of Pacing and Electrophysiology. [Heart rate variability: standards of measurement, physiological interpretation and clinical use](https://doi.org/10.1161/01.CIR.93.5.1043). *Circulation*, 1996.
+- Shaffer F, Ginsberg JP. [An overview of heart rate variability metrics and norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Swai J, Hu Z, Zhao X, et al. [Heart rate and heart rate variability comparison between postural orthostatic tachycardia syndrome versus healthy participants; a systematic review and meta-analysis](https://doi.org/10.1186/s12872-019-01298-y). *BMC Cardiovascular Disorders*, 2019.

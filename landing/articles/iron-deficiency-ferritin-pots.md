@@ -6,11 +6,17 @@ summary: "Low iron stores are common in POTS and can quietly amplify tachycardia
 description: "Iron deficiency and POTS: how low ferritin worsens tachycardia and fatigue, why the normal lab range misses it, iron labs to ask for, and what to track at home. Educational, non-diagnostic."
 keywords: "iron deficiency POTS, ferritin POTS, low ferritin symptoms, iron deficiency without anemia, POTS fatigue, ferritin normal range, transferrin saturation, dysautonomia iron, restless legs POTS, how to raise ferritin"
 date: 2026-08-06
-updated: 2026-08-06
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1508061461508-cb18c242f556?q=80&w=1469&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Anna Pelzer / Unsplash"
 tldr: "Iron does two jobs that matter for POTS: it carries oxygen in your blood and it helps build the catecholamines that run your autonomic nervous system. Ferritin, your iron-storage marker, can sit low enough to cause fatigue, faster heart rate and lightheadedness while a routine complete blood count still looks normal, because stores empty before anemia shows up. Many clinicians treat symptomatic iron deficiency below a ferritin of roughly 50 ng/mL, well above the lab's lower cutoff. Ask for ferritin and transferrin saturation, not just hemoglobin, and never self-supplement iron without labs, because iron overload is real."
+question: "Can low ferritin make POTS worse even if my labs look normal?"
+app:
+  feature: insights
+  hook: "See how your numbers look on iron."
+  line: "Log your iron supplement next to your morning readings. Autonomic shows how your HRV and heart rate changed since you started it."
 categories:
   - pots
   - recovery
@@ -351,3 +357,13 @@ Iron deficiency is common in POTS, its symptoms are nearly identical to a flare,
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Iron testing and treatment, and any changes to your management, belong with a clinician who knows your history. Do not start or stop iron supplements on your own.
 </div>
+
+## Sources
+
+- Jarjour IT, Jarjour LK. [Low iron storage and mild anemia in postural tachycardia syndrome in adolescents](https://doi.org/10.1007/s10286-013-0198-6). *Clinical Autonomic Research*, 2013.
+- Truong J, Naveed K, Beriault D, et al. [The origin of ferritin reference intervals: a systematic review](https://doi.org/10.1016/S2352-3026(24)00103-0). *Lancet Haematology*, 2024.
+- World Health Organization. [WHO guideline on use of ferritin concentrations to assess iron status in individuals and populations](https://www.who.int/publications/i/item/9789240000124). 2020.
+- Winkelman JW, Berkowski JA, DelRosso LM, et al. [Treatment of restless legs syndrome and periodic limb movement disorder: an American Academy of Sleep Medicine clinical practice guideline](https://doi.org/10.5664/jcsm.11390). *Journal of Clinical Sleep Medicine*, 2025.
+- Stoffel NU, Cercamondi CI, Brittenham G, et al. [Iron absorption from oral iron supplements given on consecutive versus alternate days and as single morning doses versus twice-daily split dosing in iron-depleted women: two open-label, randomised controlled trials](https://doi.org/10.1016/S2352-3026(17)30182-5). *Lancet Haematology*, 2017.
+- Kamath S, Parveen RS, Hegde S, et al. [Daily versus alternate day oral iron therapy in iron deficiency anemia: a systematic review](https://doi.org/10.1007/s00210-023-02817-7). *Naunyn-Schmiedeberg's Archives of Pharmacology*, 2024.
+- Dysautonomia International. [Postural Orthostatic Tachycardia Syndrome](https://www.dysautonomiainternational.org/page.php?ID=30).

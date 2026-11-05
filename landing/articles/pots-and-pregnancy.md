@@ -6,11 +6,17 @@ summary: "Most people with POTS have healthy pregnancies, but symptoms shift as 
 description: "POTS and pregnancy explained: how symptoms change by trimester, why resting heart rate rises and HRV falls normally, medication and stand-test caveats, and how to track your data calmly."
 keywords: "POTS and pregnancy, dysautonomia pregnancy, POTS pregnant, is it safe to be pregnant with POTS, HRV in pregnancy, resting heart rate pregnancy, POTS symptoms first trimester, POTS medication pregnancy, postpartum POTS"
 date: 2026-09-12
-updated: 2026-09-12
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: https://images.unsplash.com/photo-1576105629072-943bbe9d5c1d?q=80&w=1760&auto=format&fit=crop
 photoAttribution: "Jonathan Borba / Unsplash"
-tldr: "Most people with POTS carry healthy pregnancies. Symptoms are genuinely mixed: some worsen (often in the first trimester, when nausea and vasodilation fight against the blood-volume rise), some improve as volume expands, and some stay about the same. A rising resting heart rate and a falling HRV are normal features of any healthy pregnancy, so read them against the pregnancy arc rather than as a crash, and make every medication decision with your obstetric and cardiology team."
+tldr: "Most people with POTS carry healthy pregnancies. Symptoms most often worsen in the first trimester (when nausea and vasodilation fight against the blood-volume rise), again in the third, and after birth, and in the largest survey about 4 in 5 people worsened at some point. The second trimester can be easier for some, and some people stay about the same. A rising resting heart rate and a falling HRV are normal features of any healthy pregnancy, so read them against the pregnancy arc rather than as a crash, and make every medication decision with your obstetric and cardiology team."
+question: "How does POTS change during pregnancy?"
+app:
+  feature: hrv-readings
+  hook: "Read your numbers calmly through each trimester."
+  line: "A morning HRV reading in Autonomic tracks your resting heart rate and HRV over time, so changes have context to share with your care team."
 categories:
   - pots
   - recovery
@@ -18,7 +24,7 @@ faq:
   - q: "Is it safe to be pregnant with POTS?"
     a: "For most people, yes. POTS is not a contraindication to pregnancy, and the large majority carry healthy pregnancies and deliver healthy babies. It does take more active management of hydration, salt, positioning and symptoms, and it is best done with an obstetric team that knows about your dysautonomia and, ideally, a cardiologist or autonomic specialist involved. Pre-conception planning, especially a medication review, makes the biggest difference."
   - q: "Does POTS get worse during pregnancy?"
-    a: "It varies a lot and cannot be reliably predicted in advance. Surveys and case series describe a real split: some people worsen, most often in the first trimester when nausea and progesterone-driven vasodilation work against the rising blood volume; some improve, often in the second and third trimesters as blood volume expands; and some stay about the same. Postpartum is a common time for symptoms to return as blood volume normalizes."
+    a: "It varies a lot and cannot be reliably predicted in advance. In the largest survey, most people worsened in the first trimester, when nausea and progesterone-driven vasodilation work against the rising blood volume, and again in the third trimester and the months after birth; about 4 in 5 worsened at some point. The second trimester can be easier for some, and some people stay about the same."
   - q: "Why is my resting heart rate so high and my HRV so low in pregnancy?"
     a: "Because that is what a healthy pregnancy does to the cardiovascular system. Resting heart rate typically climbs 10 to 20 beats per minute by the third trimester, and heart rate variability, including RMSSD and HF power, declines steadily as pregnancy progresses. This happens to everyone, not just people with POTS, so a lower HRV reading in the third trimester is usually the pregnancy talking rather than a sign you are crashing."
   - q: "Can I take my POTS medication while pregnant?"
@@ -31,7 +37,7 @@ social:
   linkedin: |
     People with POTS are often told two contradictory things about pregnancy: that the extra blood volume will fix everything, and that they should be terrified. Neither is quite right.
 
-    The reality is more useful. Most people with POTS carry healthy pregnancies. But the course is genuinely mixed: symptoms often worsen in the first trimester (nausea and progesterone-driven vasodilation fighting the blood-volume rise), frequently ease in the second and third as volume expands, and commonly return postpartum. And here is the part that trips up anyone tracking their data: a rising resting heart rate and a falling HRV are normal features of every healthy pregnancy, not a personal crash.
+    The reality is more useful. Most people with POTS carry healthy pregnancies. But the course is genuinely mixed: symptoms most often worsen in the first trimester (nausea and progesterone-driven vasodilation fighting the blood-volume rise), again in the third, and postpartum, though the second trimester can be easier for some. And here is the part that trips up anyone tracking their data: a rising resting heart rate and a falling HRV are normal features of every healthy pregnancy, not a personal crash.
 
     I wrote a calm, non-diagnostic guide to what tends to happen trimester by trimester, why the numbers move the way they do, and how to read your own data without spiraling. It is educational, not medical advice, and every medication decision belongs with your OB and cardiology team.
 
@@ -44,7 +50,7 @@ social:
 
     When I went looking for straight answers about POTS and pregnancy I mostly found either "you'll be fine, the blood volume fixes it" or full-on doom. The truth sits in between and is a lot less scary once you understand the mechanics.
 
-    The short version from what I've read and pulled together: most people with POTS have healthy pregnancies. But the course is all over the map. First trimester is often the worst because nausea and dehydration plus progesterone relaxing your blood vessels work against you before your blood volume has really expanded. A lot of people feel better in the second and third as volume ramps up. Postpartum is a common time for symptoms to come back.
+    The short version from what I've read and pulled together: most people with POTS have healthy pregnancies. But the course is all over the map. First trimester is often the worst because nausea and dehydration plus progesterone relaxing your blood vessels work against you before your blood volume has really expanded. The second trimester can be easier for some, but in the biggest survey most people got worse again in the third trimester and after birth, and about 4 in 5 got worse at some point.
 
     The thing I wish someone had told me: a healthy pregnancy raises your resting heart rate 10 to 20 bpm and drives your HRV down across all three trimesters. That happens to everyone, POTS or not. So if you track HRV and watch it fall, that is usually the pregnancy, not you crashing.
 
@@ -71,7 +77,7 @@ social:
 
 If you have POTS and you are pregnant or planning to be, you have probably heard two opposite things. One camp says the extra blood volume of pregnancy will melt your symptoms away. The other treats the whole idea as dangerous. Neither is right, and living between them is stressful.
 
-Here is the grounded version. **POTS and pregnancy are compatible for the large majority of people.** Most carry healthy pregnancies and deliver healthy babies. What changes is not usually your safety but your *symptom course*, and that course is genuinely mixed: some people feel worse (most often early), some feel better (most often later), and some barely change. A lot of this comes down to a tug-of-war between the things pregnancy adds (blood volume, which tends to help POTS) and the things it also brings (nausea, dehydration and blood-vessel relaxation, which tend to hurt).
+Here is the grounded version. **POTS and pregnancy are compatible for the large majority of people.** Most carry healthy pregnancies and deliver healthy babies. What changes is not usually your safety but your *symptom course*, and that course is genuinely mixed: most people feel worse at some point (most often early, late and after birth), some feel better for a stretch (the second trimester can be easier), and some barely change. A lot of this comes down to a tug-of-war between the things pregnancy adds (blood volume, which tends to help POTS) and the things it also brings (nausea, dehydration and blood-vessel relaxation, which tend to hurt).
 
 This is educational field notes, not medical advice, and it is not a substitute for care. Pregnancy with dysautonomia is best managed actively, ideally with an obstetric team that knows about your condition and a cardiologist or autonomic specialist in the loop. The single highest-value step is a **pre-conception medication review**, because that is the decision that cannot be undone later.
 
@@ -79,18 +85,18 @@ This is educational field notes, not medical advice, and it is not a substitute 
 
 The honest answer is that it varies, and it cannot be reliably predicted in advance. Surveys and case series of people with POTS describe a real three-way split:
 
-- **Worse:** often in the first trimester, sometimes throughout. This is common enough that a rough first trimester should not alarm you on its own.
-- **Better:** often in the second and third trimesters, as blood volume expands and, for some, the body adapts.
+- **Worse:** the most common course. In the largest survey, most people worsened in the first trimester (63%), the third (59%) and the three months after birth (59%), and 81% worsened at some point. A rough first trimester should not alarm you on its own.
+- **Better:** some people, often in the second trimester, as blood volume expands and, for some, the body adapts.
 - **About the same:** a steady middle group whose baseline holds up across the pregnancy.
 
-No blood test or scan tells you in advance which group you will land in, and your experience in one pregnancy does not perfectly predict the next. What you *can* do is prepare for the hardest stretch (usually early), build your hydration and salt habits before you need them, and keep your care team close.
+No blood test or scan tells you in advance which group you will land in, and your experience in one pregnancy does not perfectly predict the next. What you *can* do is prepare for the hardest stretches (usually early, and again late), build your hydration and salt habits before you need them, and keep your care team close.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 200" role="img" aria-label="Horizontal timeline across four segments, before pregnancy, first, second and third trimester, and postpartum, shaded to show that the first trimester and postpartum are commonly the hardest while the second and third often stabilize, with a note that the pattern is highly individual">
+  <svg viewBox="0 0 720 200" role="img" aria-label="Horizontal timeline across four segments, before pregnancy, first, second and third trimester, and postpartum, shaded to show that the first trimester, third trimester and postpartum are commonly the hardest while the second is often steadier, with a note that the pattern is highly individual">
     <text x="20" y="28" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="14">A common (not universal) symptom course</text>
     <rect x="20"  y="52" width="150" height="46" rx="8" fill="#f97316" opacity="0.75" />
     <rect x="182" y="52" width="150" height="46" rx="8" fill="#eab308" opacity="0.7" />
-    <rect x="344" y="52" width="150" height="46" rx="8" fill="#54d98a" opacity="0.65" />
+    <rect x="344" y="52" width="150" height="46" rx="8" fill="#f97316" opacity="0.75" />
     <rect x="506" y="52" width="150" height="46" rx="8" fill="#eab308" opacity="0.7" />
     <text x="95"  y="80" fill="#0b0b0c" font-family="Space Grotesk, sans-serif" font-weight="700" font-size="13" text-anchor="middle">1st trimester</text>
     <text x="257" y="80" fill="#0b0b0c" font-family="Space Grotesk, sans-serif" font-weight="700" font-size="13" text-anchor="middle">2nd trimester</text>
@@ -98,11 +104,11 @@ No blood test or scan tells you in advance which group you will land in, and you
     <text x="581" y="80" fill="#0b0b0c" font-family="Space Grotesk, sans-serif" font-weight="700" font-size="13" text-anchor="middle">postpartum</text>
     <text x="95"  y="122" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">often hardest</text>
     <text x="257" y="122" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">often steadier</text>
-    <text x="419" y="122" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">often best</text>
+    <text x="419" y="122" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">often hard again</text>
     <text x="581" y="122" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">watch for flare</text>
     <text x="20" y="164" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12.5">Your own course may be the opposite of this. Read it as a rough map, not a prediction.</text>
   </svg>
-  <figcaption>The pattern many people describe: a harder first trimester, steadier middle, and a postpartum window worth pacing. Individual courses vary widely.</figcaption>
+  <figcaption>The pattern many people describe: a harder first trimester, a steadier second, a harder third, and a postpartum window worth pacing. Individual courses vary widely.</figcaption>
 </figure>
 
 ## Why the first trimester is often the hardest
@@ -113,7 +119,7 @@ It seems backwards. Pregnancy expands your blood volume, and low blood volume is
 2. **Progesterone relaxes your blood vessels.** Rising progesterone widens blood vessels and lowers vascular resistance, which encourages blood to pool in your legs and abdomen when you stand. That pooling is exactly the mechanism behind orthostatic tachycardia.
 3. **Blood pressure often dips early.** For many people blood pressure runs a little lower in the first half of pregnancy, which can worsen lightheadedness on standing.
 
-Put together, the first trimester can feel like your worst POTS days stacked on top of morning sickness, before the helpful blood-volume rise has arrived. If that is where you are, it is not a sign the whole pregnancy will go this way. For most, it is the low point. The salt, fluid and positioning tools in [POTS treatment: salt, fluids, compression and medication](/insights/pots/pots-treatment-salt-fluids-compression-medication/) matter more now than at any other time.
+Put together, the first trimester can feel like your worst POTS days stacked on top of morning sickness, before the helpful blood-volume rise has arrived. If that is where you are, it is not a sign the whole pregnancy will go this way. For many, the second trimester is easier. The salt, fluid and positioning tools in [POTS treatment: salt, fluids, compression and medication](/insights/pots/pots-treatment-salt-fluids-compression-medication/) matter more now than at any other time.
 
 ## What happens to your HRV and resting heart rate
 
@@ -147,8 +153,8 @@ What does that mean for reading your own numbers? Mostly, it means you need a di
 | Stage | What is changing physiologically | What people with POTS often notice | Practical focus |
 | --- | --- | --- | --- |
 | **1st trimester** | Blood volume rising slowly; progesterone relaxing vessels; nausea and dehydration risk high | Often the hardest stretch: more lightheadedness, tachycardia, fatigue | Aggressive hydration and salt, small frequent meals, treat nausea early |
-| **2nd trimester** | Blood volume expanding meaningfully; cardiac output up; energy often returns | Many stabilize or improve; some notice tachycardia easing | Keep hydration and compression steady; watch for lying-flat lightheadedness later |
-| **3rd trimester** | Blood volume near peak; resting HR at its highest; the uterus can compress a major vein when lying flat | Symptoms often best of the pregnancy, but standing tolerance and heat can be limiting | Left-side lying to rest, avoid overheating, plan for delivery with your team |
+| **2nd trimester** | Blood volume expanding meaningfully; cardiac output up; energy often returns | Some stabilize or improve; others stay worse | Keep hydration and compression steady; watch for lying-flat lightheadedness later |
+| **3rd trimester** | Blood volume near peak; resting HR at its highest; the uterus can compress a major vein when lying flat | Symptoms often worsen again; standing tolerance and heat can be limiting | Left-side lying to rest, avoid overheating, plan for delivery with your team |
 | **Postpartum** | Extra blood volume resolves over weeks; sleep disrupted; large hormone shift | Common time for symptoms to return or briefly worsen | Do not stop pacing; maintain salt and fluids; flag flares to your care team |
 
 ## Managing symptoms without medication
@@ -198,7 +204,7 @@ If you already track HRV, resting heart rate or stand tests, pregnancy is the mo
 For most people, yes. POTS is not a contraindication to pregnancy, and the large majority carry healthy pregnancies and deliver healthy babies. It does take more active management of hydration, salt, positioning and symptoms, best done with an obstetric team that knows your history and, ideally, a cardiologist or autonomic specialist involved.
 
 **Does POTS get worse during pregnancy?**
-It varies and cannot be predicted in advance. Some people worsen (most often in the first trimester), some improve (most often later), and some stay about the same. Postpartum is a common time for symptoms to return.
+It varies and cannot be predicted in advance. Most people worsen at some point, most often in the first and third trimesters and after birth; some improve for a stretch, often in the second trimester, and some stay about the same. Postpartum is a common time for symptoms to return.
 
 **Why is my resting heart rate so high and my HRV so low?**
 Because a healthy pregnancy does exactly that. Resting heart rate typically climbs 10 to 20 beats per minute by the third trimester, and HRV declines steadily across pregnancy, in everyone, not just people with POTS. A lower reading is usually the pregnancy, not a crash.
@@ -211,8 +217,15 @@ For some it eases, but many find symptoms return or briefly worsen postpartum as
 
 ## The bottom line
 
-POTS and pregnancy are compatible for the vast majority of people, and the fear that fills the gap where good information should be does more harm than the condition usually does. Expect a mixed course: often a harder first trimester as nausea and vasodilation outrun the blood-volume rise, frequently a steadier middle and later, and a postpartum window worth pacing. Expect your resting heart rate to rise and your HRV to fall, because that is what a healthy pregnancy does to anyone. Lean hard on the non-drug tools, settle your medications with your team before you need to, and read your data against the pregnancy arc rather than the person you were before it. Tracked calmly and shared with a clinician who knows your history, your numbers become a source of reassurance instead of alarm.
+POTS and pregnancy are compatible for the vast majority of people, and the fear that fills the gap where good information should be does more harm than the condition usually does. Expect a mixed course: often a harder first trimester as nausea and vasodilation outrun the blood-volume rise, sometimes a steadier second trimester, and a third trimester and postpartum window that are often hard again and worth pacing. Expect your resting heart rate to rise and your HRV to fall, because that is what a healthy pregnancy does to anyone. Lean hard on the non-drug tools, settle your medications with your team before you need to, and read your data against the pregnancy arc rather than the person you were before it. Tracked calmly and shared with a clinician who knows your history, your numbers become a source of reassurance instead of alarm.
 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition or to guide medication or pregnancy decisions. Pregnancy with POTS or dysautonomia should be managed with your obstetric team and, where appropriate, a cardiologist or autonomic specialist. New or worsening symptoms, fainting, severe headaches, high blood pressure, reduced fetal movement or any bleeding are reasons to contact your care team promptly.
 </div>
+
+## Sources
+
+- Bourne KM, Nerenberg KA, Stiles LE, et al. [Symptoms of postural orthostatic tachycardia syndrome in pregnancy: a cross-sectional, community-based survey](https://doi.org/10.1111/1471-0528.17437). *BJOG*, 2023.
+- Morgan K, Smith A, Blitshteyn S. [POTS and pregnancy: a review of literature and recommendations for evaluation and treatment](https://doi.org/10.2147/IJWH.S366667). *International Journal of Women's Health*, 2022.
+- Soma-Pillay P, Nelson-Piercy C, Tolppanen H, et al. [Physiological changes in pregnancy](https://doi.org/10.5830/CVJA-2016-021). *Cardiovascular Journal of Africa*, 2016.
+- Bester M, Joshi R, Mischi M, et al. [Longitudinally tracking maternal autonomic modulation during normal pregnancy with comprehensive heart rate variability analyses](https://doi.org/10.3389/fphys.2022.874684). *Frontiers in Physiology*, 2022.

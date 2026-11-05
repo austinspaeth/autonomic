@@ -6,11 +6,17 @@ summary: "Low-dose naltrexone is the same drug used at 50 mg for addiction, give
 description: "Low-dose naltrexone (LDN) for long COVID: how a tiny dose of an opioid blocker may quiet glial neuroinflammation, the real evidence, side effects, and how to track HRV and symptoms against your own baseline."
 keywords: "low-dose naltrexone, LDN, LDN long COVID, low dose naltrexone long covid, LDN ME/CFS, LDN dosing, LDN fibromyalgia, naltrexone neuroinflammation, LDN side effects, does LDN work for long covid, LDN dysautonomia, LDN and HRV"
 date: 2026-09-18
-updated: 2026-09-18
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1624948465121-96e87ae34a87?w=1760&h=990&fit=crop&crop=entropy&auto=format&q=80"
 photoAttribution: "Unsplash"
-tldr: "Low-dose naltrexone (LDN) is the same molecule prescribed at 50 mg for addiction, given at roughly a tenth of that (about 0.5 to 4.5 mg) for a completely different purpose: dampening the low-grade neuroinflammation that may sit underneath long COVID, ME/CFS, and fibromyalgia. The leading theory is that it briefly blocks opioid receptors and quiets overactive glial cells in the nervous system. The evidence in long COVID is early and mostly uncontrolled, with randomized trials underway, so it is best thought of as a reasonable, well-tolerated thing to try with a clinician, not a proven cure. It works slowly over weeks to months, and because response varies so much person to person, the sensible move is to track your symptoms, resting heart rate, and HRV against your own baseline rather than expecting one number to change."
+tldr: "Low-dose naltrexone (LDN) is the same molecule prescribed at 50 mg for addiction, given at roughly a tenth of that (about 0.5 to 4.5 mg) for a completely different purpose: dampening the low-grade neuroinflammation that may sit underneath long COVID, ME/CFS, and fibromyalgia. The leading theory is that it briefly blocks opioid receptors and quiets overactive glial cells in the nervous system. The evidence is low certainty: the largest fibromyalgia trial and the first randomized long COVID trial found no clear benefit over placebo, so it is not a proven treatment, and whether it is worth trying is a conversation to have with your doctor. It works slowly over weeks to months, and because response varies so much person to person, the sensible move is to track your symptoms, resting heart rate, and HRV against your own baseline rather than expecting one number to change."
+question: "Does low-dose naltrexone help long COVID, and what should I track?"
+app:
+  feature: insights
+  hook: "See how your days look since starting LDN."
+  line: "Log LDN in Autonomic and it shows how your HRV, sleep and symptoms look since you started, so you and your doctor can judge it."
 categories:
   - postviral
   - recovery
@@ -20,7 +26,7 @@ faq:
   - q: "How does LDN work for long COVID?"
     a: "The two leading theories are linked. At a low dose, naltrexone briefly blocks opioid receptors, and the body responds by making more of its own endorphins and enkephalins, which have roles in immune balance. Separately, naltrexone appears to calm glial cells (the immune cells of the nervous system) by blocking a receptor called TLR4, reducing the release of inflammatory signals. In long COVID and related conditions, that low-grade nervous-system inflammation is a suspected driver of pain, fatigue, brain fog, and autonomic symptoms. LDN is aimed at quieting that, not at killing a virus."
   - q: "Does LDN actually help long COVID?"
-    a: "The honest answer is that it might, for some people, and the evidence is still early. The strongest data are in fibromyalgia, where small randomized trials showed reduced pain. In long COVID and ME/CFS the published reports are mostly uncontrolled case series and patient surveys that are encouraging but cannot prove cause and effect, and randomized controlled trials are underway. It is generally low-risk and well tolerated, which is why many clinicians are willing to trial it, but it is not a proven cure and it does not help everyone."
+    a: "The honest answer is that the evidence is low certainty, and the best trials so far have not shown a clear benefit. Early small trials in fibromyalgia reported less pain, but the largest fibromyalgia trial found no clear benefit over placebo. In long COVID and ME/CFS the published reports are mostly uncontrolled case series and patient surveys that cannot prove cause and effect, and the first randomized long COVID trial found no clear benefit for fatigue. It is generally well tolerated, but it is not a proven treatment, so whether it makes sense for you is a conversation to have with your doctor."
   - q: "What are the side effects of LDN?"
     a: "LDN is usually well tolerated. The most common early effect is vivid dreams or disrupted sleep, which often settles or can be managed by changing the time of day you take it. Some people get headaches or mild stomach upset in the first week or two. The important caution is that naltrexone blocks opioids, so it cannot be combined with opioid pain medication, and it needs to be paused before any surgery or procedure that will use opioids. Every dose decision belongs with your clinician and pharmacist."
   - q: "How long does LDN take to work?"
@@ -33,7 +39,7 @@ social:
 
     Naltrexone is an old, cheap, opioid-blocking drug approved at 50 mg for addiction. At roughly a tenth of that dose it is used off-label for a completely different reason. The leading theory is that a brief, partial block of opioid receptors nudges the body to make more of its own endorphins, and that naltrexone also quiets glial cells in the nervous system by antagonizing TLR4, lowering the inflammatory signaling that is a suspected driver of post-viral fatigue, pain, and autonomic symptoms.
 
-    The evidence deserves care. It is strongest in fibromyalgia (small randomized trials showing reduced pain) and still early in long COVID, where the published reports are mostly uncontrolled and randomized trials are ongoing. It is generally low-risk and well tolerated, which is why many clinicians will trial it, but it is not a proven cure, it works slowly over weeks to months, and it cannot be combined with opioid pain medication.
+    The evidence deserves care. The largest fibromyalgia trial and the first randomized long COVID trial both found no clear benefit over placebo, and the evidence overall is low certainty. It is generally well tolerated, but it is not a proven treatment, whether to try it is a conversation to have with a doctor, it works slowly over weeks to months, and it cannot be combined with opioid pain medication.
 
     Full write-up with the mechanism, the honest evidence table, the side effects to know, and what to actually track at home: https://autonomic.care/insights/postviral/low-dose-naltrexone-ldn-long-covid/?utm_source=linkedin&utm_medium=social&utm_campaign=low-dose-naltrexone-ldn-long-covid
 
@@ -44,11 +50,11 @@ social:
 
     Sharing this because LDN comes up constantly here and the mechanism is genuinely interesting once it clicks. Naltrexone is a normal opioid blocker at 50 mg. At a tiny dose (most people land somewhere around 1.5 to 4.5 mg) it seems to do something different: a brief block of opioid receptors that makes your body upregulate its own endorphins, plus a calming effect on the glial cells in your nervous system through a receptor called TLR4. That glial neuroinflammation is one of the leading suspects behind the fatigue, pain, brain fog, and autonomic stuff a lot of us deal with.
 
-    Two honest things. The best evidence is actually in fibromyalgia (small randomized trials), and in long COVID it is still early and mostly uncontrolled with trials ongoing, so it is a reasonable thing to try with a doctor, not a guaranteed fix. And it is slow: think weeks to a couple of months, started low and titrated up. Big practical caution: it does not mix with opioid painkillers.
+    Two honest things. The largest fibromyalgia trial and the first randomized long COVID trial both found no clear benefit over placebo, and the evidence is low certainty, so it is a conversation to have with a doctor, not a proven fix. And it is slow: think weeks to a couple of months, started low and titrated up. Big practical caution: it does not mix with opioid painkillers.
 
     Because it is slow and individual, tracking helps a lot. I kept a simple log of symptoms, resting heart rate, and HRV against my own baseline so I could actually see whether it was doing anything instead of guessing. Not medical advice, just a patient who reads too much. Wrote up the mechanism, an evidence table, the side effects, and what to track here if it is useful: https://autonomic.care/insights/postviral/low-dose-naltrexone-ldn-long-covid/?utm_source=reddit&utm_medium=social&utm_campaign=low-dose-naltrexone-ldn-long-covid
   x: |
-    Low-dose naltrexone (LDN) for long COVID: same drug used at 50mg for addiction, given at ~1/10th to quiet glial neuroinflammation. Promising, early, slow to work. What it is and what to track: https://autonomic.care/insights/postviral/low-dose-naltrexone-ldn-long-covid/?utm_source=x&utm_medium=social&utm_campaign=low-dose-naltrexone-ldn-long-covid #LongCovid
+    Low-dose naltrexone (LDN) for long COVID: same drug used at 50mg for addiction, given at ~1/10th to quiet glial neuroinflammation. Low-certainty evidence, slow to work. What it is and what to track: https://autonomic.care/insights/postviral/low-dose-naltrexone-ldn-long-covid/?utm_source=x&utm_medium=social&utm_campaign=low-dose-naltrexone-ldn-long-covid #LongCovid
   facebook: |
     If you have seen "LDN" mentioned in long COVID or ME/CFS groups and wondered what it actually is, here is a calm explainer. Low-dose naltrexone is a very small dose of an old, cheap medication, used to quiet the low-grade nervous-system inflammation that may sit underneath post-viral fatigue, pain, and dizziness. It works slowly, over weeks to months, and it is not a cure, but it is generally well tolerated.
 
@@ -121,21 +127,21 @@ Notice what LDN is not. It is not an antiviral, so it is not aimed at any leftov
 
 ## Does LDN actually help long COVID?
 
-Here is where honesty matters more than enthusiasm. The evidence is real but uneven, and it is strongest in a condition next door to long COVID rather than in long COVID itself.
+Here is where honesty matters more than enthusiasm. The evidence is low certainty, and the largest trials so far have not shown a clear benefit.
 
-The clearest data are in **fibromyalgia**, a chronic pain condition with a lot of overlapping biology (see [fibromyalgia and dysautonomia](/insights/recovery/fibromyalgia-dysautonomia-pots-hrv/)). Small randomized, placebo-controlled trials from researchers at Stanford (Younger and colleagues) found that LDN reduced pain compared with placebo. These were small studies, but they were properly controlled, which is why fibromyalgia is often cited as the proof of concept.
+The clearest data are in **fibromyalgia**, a chronic pain condition with a lot of overlapping biology (see [fibromyalgia and dysautonomia](/insights/recovery/fibromyalgia-dysautonomia-pots-hrv/)). Small randomized, placebo-controlled trials from researchers at Stanford (Younger and colleagues) found that LDN reduced pain compared with placebo. But the largest fibromyalgia trial since then, in 99 women, found no clear benefit for pain over placebo, and a 12-month trial in 2026 found the same.
 
-In **ME/CFS** and **long COVID**, the published evidence is younger and weaker: mostly uncontrolled case series, retrospective chart reviews, and patient surveys. Several report meaningful improvements in fatigue, pain, and cognitive symptoms in a subset of people, which is genuinely encouraging, but uncontrolled reports cannot separate a real drug effect from natural recovery, hope, or the ordinary ups and downs of these illnesses. **Randomized controlled trials of LDN for long COVID are underway**, and those are the studies that will actually settle whether, and for whom, it helps.
+In **ME/CFS** and **long COVID**, the published evidence is younger and weaker: mostly uncontrolled case series, retrospective chart reviews, and patient surveys. Several report meaningful improvements in fatigue, pain, and cognitive symptoms in a subset of people, which is genuinely encouraging, but uncontrolled reports cannot separate a real drug effect from natural recovery, hope, or the ordinary ups and downs of these illnesses. **The first randomized controlled trial of LDN for long COVID fatigue found no clear benefit over placebo.** It has been posted as a preprint and not yet peer reviewed, and a 2026 review rated the long COVID evidence low certainty.
 
 <div class="callout callout-note">
-  <strong>Why a low-risk trial can still be reasonable.</strong> When a treatment is cheap, generic, well tolerated, and mechanistically plausible, many clinicians are willing to trial it even before large trials report, as long as expectations stay honest. That is a very different thing from a proven cure. Treat LDN as a careful experiment on yourself, run with a clinician, and let your own tracked data tell you whether it is doing anything.
+  <strong>A conversation to have with your doctor.</strong> LDN is cheap, generic and well tolerated, but the controlled trials so far have not shown a clear benefit, so it is not a proven treatment. If you and your doctor decide to try it anyway, keep expectations honest and let your own tracked data tell you whether it is doing anything.
 </div>
 
 | Condition | State of the evidence | How to read it |
 | --- | --- | --- |
-| Fibromyalgia | Small randomized, placebo-controlled trials showing reduced pain | Strongest evidence; the proof of concept for LDN |
+| Fibromyalgia | Early small trials reported less pain; the largest trial found no clear benefit over placebo | Mixed; the best trials show no clear benefit |
 | ME/CFS | Case series, retrospective reviews, patient surveys | Encouraging but uncontrolled; cannot prove cause and effect |
-| Long COVID | Early uncontrolled reports; randomized trials underway | Plausible and low-risk to trial; not yet proven |
+| Long COVID | Uncontrolled reports; the first randomized trial (preprint) found no clear benefit | Low certainty; not proven, a conversation to have with your doctor |
 | Other (Crohn's, MS, chronic pain) | Mixed, mostly small studies | Active research area; results vary by condition |
 
 ## How is LDN taken, and how long does it take?
@@ -204,7 +210,7 @@ None of these are diagnostic, and none of them will move in a straight line. HRV
 
 **How does LDN work for long COVID?** The two leading theories are a brief opioid-receptor block that prompts a rebound rise in your own endorphins, and a calming of activated glial cells in the nervous system by blocking a receptor called TLR4, which lowers inflammatory signaling. It targets the sensitized, inflamed state of the nervous system, not a virus.
 
-**Does LDN actually help long COVID?** It might, for some people, but the evidence is early. It is strongest in fibromyalgia (small randomized trials), and in long COVID and ME/CFS the reports are mostly uncontrolled, with randomized trials underway. It is low-risk and well tolerated, which is why it gets trialed, but it is not a proven cure.
+**Does LDN actually help long COVID?** The evidence is low certainty. The largest fibromyalgia trial and the first randomized long COVID trial found no clear benefit over placebo, and the other long COVID and ME/CFS reports are mostly uncontrolled. It is well tolerated, but it is not a proven treatment, so it is a conversation to have with your doctor.
 
 **What are the side effects of LDN?** Usually mild: vivid dreams or disrupted sleep early on (often helped by changing the dose timing), sometimes headache or stomach upset. The key caution is that it cannot be combined with opioid pain medication and must be paused before opioid-based surgery.
 
@@ -214,4 +220,13 @@ None of these are diagnostic, and none of them will move in a straight line. HRV
 
 ## The bottom line
 
-Low-dose naltrexone is an old, cheap drug used in a genuinely clever way: a tiny dose of an opioid blocker aimed not at addiction but at the low-grade neuroinflammation that may sit underneath long COVID, ME/CFS, and fibromyalgia. The mechanism, a brief opioid-receptor block that raises your own endorphins plus a calming of the nervous system's glial cells through TLR4, is plausible and interesting. The evidence is strongest in fibromyalgia and still early in long COVID, so it is best treated as a reasonable, well-tolerated experiment run with a clinician rather than a proven cure. It works slowly, it does not mix with opioids, and it does not replace pacing, sleep, and the rest of recovery. Because the change is gradual and so individual, the honest way to know if it is helping is to track your symptoms, resting heart rate, and HRV against your own baseline, and to give the trend enough weeks to speak.
+Low-dose naltrexone is an old, cheap drug used in a genuinely clever way: a tiny dose of an opioid blocker aimed not at addiction but at the low-grade neuroinflammation that may sit underneath long COVID, ME/CFS, and fibromyalgia. The mechanism, a brief opioid-receptor block that raises your own endorphins plus a calming of the nervous system's glial cells through TLR4, is plausible and interesting. The evidence is low certainty, and the largest fibromyalgia trial and the first randomized long COVID trial found no clear benefit, so it is not a proven treatment and whether to try it is a conversation to have with your doctor. It works slowly, it does not mix with opioids, and it does not replace pacing, sleep, and the rest of recovery. Because the change is gradual and so individual, the honest way to know if it is helping is to track your symptoms, resting heart rate, and HRV against your own baseline, and to give the trend enough weeks to speak.
+
+## Sources
+
+- Younger J, Parkitny L, McLain D. [The use of low-dose naltrexone (LDN) as a novel anti-inflammatory treatment for chronic pain](https://doi.org/10.1007/s10067-014-2517-2). *Clinical Rheumatology*, 2014.
+- Due Bruun K, Christensen R, Amris K, et al. [Naltrexone 6 mg once daily versus placebo in women with fibromyalgia: a randomised, double-blind, placebo-controlled trial](https://doi.org/10.1016/S2665-9913(23)00278-3). *The Lancet Rheumatology*, 2024.
+- Rodríguez-Freire C, Navarrete J, Rozadilla-Sacanell A, et al. [Efficacy of low-dose naltrexone in women with fibromyalgia syndrome: a 12-month randomised, double-blind, placebo-controlled single-centre clinical trial (INNOVA study)](https://doi.org/10.1002/ejp.70321). *European Journal of Pain*, 2026.
+- Byambasuren O, Atkins T, Baptista S, et al. [Effect of low-dose naltrexone for long COVID: a systematic review and meta-analysis](https://doi.org/10.1136/bmjopen-2025-111253). *BMJ Open*, 2026.
+- Naik H, Boulter T, Cooke E, et al. [Low dose naltrexone for post-COVID fatigue syndrome: a randomized controlled trial](https://www.medrxiv.org/content/10.64898/2026.10.22.26363582v1). *medRxiv* (preprint, not peer reviewed), 2026.
+- Gouda AHK, Aitcheson NEC, Steadman KJ. [Low-dose naltrexone: what is the evidence? A narrative review](https://doi.org/10.1007/s12325-026-03612-5). *Advances in Therapy*, 2026.

@@ -11,6 +11,11 @@ author: "Austin Spaeth"
 photoLocation: "/articles/sjogrens-dysautonomia-pots/cover.webp"
 photoAttribution: "Autonomic"
 tldr: "Sjögren's is a systemic autoimmune disease that mainly attacks the glands that make tears and saliva, so dry eyes and a dry mouth are its hallmark. It can also reach the autonomic nerves. In one study, 45 percent of people with primary Sjögren's had autonomic symptom scores well above healthy controls, including orthostatic intolerance, and in a Mayo Clinic series every patient whose autonomic problems were traced to Sjögren's had lightheadedness on standing. Sjögren's is one of the main causes of small fiber neuropathy, whose pain can come before the dryness and often appears without the usual antibodies. Dry eyes can also come from dysautonomia itself, so the overlap runs both ways. If you have POTS or dysautonomia plus persistent dryness, it is worth asking about Sjögren's testing, and tracking your standing heart rate, HRV, fatigue and symptoms helps your clinician see the whole picture."
+question: "Can Sjögren's cause POTS and dizziness when I stand?"
+app:
+  feature: doctor-reports
+  hook: "Bring your autonomic symptoms to your appointment."
+  line: "Autonomic turns your logged symptoms, heart rate and stand tests into a doctor summary, so the whole picture reaches the person testing you."
 categories:
   - pots
   - basics

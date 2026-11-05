@@ -6,11 +6,17 @@ summary: "Resting heart rate is the plainest read on your autonomic load, and a 
 description: "Resting heart rate and mean RR interval explained: why lying runs lower than sitting, how mean RR relates to heart rate, and what a creeping resting HR signals in POTS and long COVID recovery."
 keywords: "resting heart rate, mean RR interval, resting HR POTS, what is a good resting heart rate, mean RR, RR interval, resting heart rate position, orthostatic intolerance, POTS, long COVID"
 date: 2026-07-09
-updated: 2026-07-09
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1568617935424-49ab968826d7?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Dan Burton / Unsplash"
 tldr: "Resting heart rate is the simplest autonomic signal there is: it rises with sympathetic load, so a creeping baseline is often the first hint of illness, a bad stretch, or overreaching. Position matters (lying runs lower than sitting), so the app grades them on separate scales. Mean RR is the same information in beat-to-beat space: the average gap between beats in milliseconds, equal to 60000 divided by heart rate, and the number all HRV math is built on. Read your own trend, measured the same way each time."
+question: "What does a rising resting heart rate mean in POTS?"
+app:
+  feature: hrv-readings
+  hook: "Catch a creeping resting heart rate early."
+  line: "Log resting heart rate or take a morning reading, and Autonomic grades it and charts your baseline so a slow rise stands out."
 categories:
   - basics
   - hrv
@@ -22,7 +28,7 @@ faq:
   - q: "What is mean RR?"
     a: "Mean RR is the average length of the gaps between your heartbeats in a reading, measured in milliseconds. It's the same information as heart rate seen from the other direction: mean RR equals 60000 divided by your heart rate in bpm. A heart rate of 60 bpm is a mean RR of 1000 ms. HRV is calculated from these RR intervals, so mean RR is the baseline the variability sits on."
   - q: "Is a high resting heart rate a sign of POTS?"
-    a: "A high resting heart rate alone isn't diagnostic, but resting tachycardia and a large heart-rate jump on standing are common in POTS. What defines POTS is a sustained rise of 30 bpm or more when moving from lying to standing, which is why a stand test matters more than the resting number by itself. Persistent resting tachycardia is worth raising with a clinician."
+    a: "A high resting heart rate alone isn't diagnostic, and in POTS the lying-down rate is not reliably raised: the hallmark is a large heart-rate jump on standing. What defines POTS is a sustained rise of 30 bpm or more when moving from lying to standing, which is why a stand test matters more than the resting number by itself. Persistent resting tachycardia is worth raising with a clinician."
 ---
 
 <script>
@@ -205,9 +211,9 @@ Pick your position and check your own number against the same bands the app uses
 
 ## Reading resting HR in POTS and recovery
 
-In POTS and other forms of orthostatic intolerance, resting heart rate is often elevated even before you stand, because the sympathetic branch is already working overtime to hold blood pressure together. That's why it pairs so naturally with the stand test: the resting rate sets the floor, and the [orthostatic rise](/insights/pots/the-orthostatic-stand-test-at-home/) measures how much further the system has to reach.
+In POTS and other forms of orthostatic intolerance, resting heart rate lying down is not reliably raised; the defining rise comes when you stand. That's why it pairs so naturally with the stand test: the resting rate sets the floor, and the [orthostatic rise](/insights/pots/the-orthostatic-stand-test-at-home/) measures how much further the system has to reach.
 
-The hopeful side is that resting heart rate is also one of the **clearest recovery signals** you have. As the autonomic system settles over months of pacing and careful rebuilding, a **falling resting HR** is one of the most common and encouraging patterns people see, often moving steadily downward before energy and symptoms catch up. We trace that arc in [recovery from post-viral dysautonomia](/insights/recovery/recovery-from-post-viral-dysautonomia/), and it's a number worth bringing to appointments, as covered in [turning your data into a doctor conversation](/insights/recovery/turn-your-data-into-a-doctor-conversation/).
+The hopeful side is that resting heart rate can also be a **useful recovery signal**. As the autonomic system settles over months of pacing and careful rebuilding, some people see a **falling resting HR**, which for some can move downward before energy and symptoms catch up. We trace that arc in [recovery from post-viral dysautonomia](/insights/recovery/recovery-from-post-viral-dysautonomia/), and it's a number worth bringing to appointments, as covered in [turning your data into a doctor conversation](/insights/recovery/turn-your-data-into-a-doctor-conversation/).
 
 <div class="callout callout-tip">
   <strong>Autonomic tracks it automatically.</strong> Every reading logs resting HR and mean RR against the right posture scale and charts them beside your HRV and stand test, so a creeping baseline or a slow recovery shows up as a line you can actually see. <a href="/">See how it works →</a>
@@ -215,8 +221,15 @@ The hopeful side is that resting heart rate is also one of the **clearest recove
 
 ## The bottom line
 
-Resting heart rate is the simplest window into autonomic load: it rises with sympathetic strain, so a creeping baseline is often the earliest warning you'll get, and a falling one is among the most reassuring recovery signals. Because position changes the number, measure the same way every time and compare lying to lying, sitting to sitting. Mean RR is the very same signal expressed in the beat-to-beat space where HRV is calculated: 60000 divided by your heart rate. Watch your own trend rather than a population chart, read it beside your HRV and stand test, and this plain, familiar number becomes one of the most useful you can track.
+Resting heart rate is the simplest window into autonomic load: it rises with sympathetic strain, so a creeping baseline is often the earliest warning you'll get, and a falling one can be a reassuring recovery signal. Because position changes the number, measure the same way every time and compare lying to lying, sitting to sitting. Mean RR is the very same signal expressed in the beat-to-beat space where HRV is calculated: 60000 divided by your heart rate. Watch your own trend rather than a population chart, read it beside your HRV and stand test, and this plain, familiar number becomes one of the most useful you can track.
 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. If your readings concern you or your symptoms are worsening, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Mishra T, Wang M, Metwally AA, et al. [Pre-symptomatic detection of COVID-19 from smartwatch data](https://doi.org/10.1038/s41551-020-00640-6). *Nature Biomedical Engineering*, 2020.
+- Radin JM, Wineinger NE, Topol EJ, et al. [Harnessing wearable device data to improve state-level real-time surveillance of influenza-like illness in the USA: a population-based study](https://doi.org/10.1016/S2589-7500(19)30222-5). *Lancet Digital Health*, 2020.
+- Task Force of the European Society of Cardiology and the North American Society of Pacing and Electrophysiology. [Heart rate variability: standards of measurement, physiological interpretation and clinical use](https://doi.org/10.1161/01.CIR.93.5.1043). *Circulation*, 1996.
+- Swai J, Hu Z, Zhao X, et al. [Heart rate and heart rate variability comparison between postural orthostatic tachycardia syndrome versus healthy participants; a systematic review and meta-analysis](https://doi.org/10.1186/s12872-019-01298-y). *BMC Cardiovascular Disorders*, 2019.

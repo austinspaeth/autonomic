@@ -6,11 +6,17 @@ summary: "The baroreflex is the fast feedback loop that steadies your blood pres
 description: "Baroreflex sensitivity explained: how the reflex that steadies blood pressure works, why it falters in POTS and long COVID, its units (ms/mmHg), and how HRV and the stand test reflect it at home."
 keywords: "baroreflex sensitivity, baroreflex, baroreceptor reflex, what is the baroreflex, baroreflex POTS, baroreflex long COVID, orthostatic intolerance, HRV baroreflex, cardiovagal baroreflex, blood pressure regulation, resonance breathing baroreflex"
 date: 2026-08-10
-updated: 2026-08-10
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1518611012118-696072aa579a?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Ophelia Aldana / Unsplash"
 tldr: "The baroreflex is a fast feedback loop: pressure sensors in your neck and chest sense each rise and fall in blood pressure and, within a beat or two, adjust your heart rate and vessel tone to hold pressure steady. Baroreflex sensitivity (BRS) measures how strongly it responds, in milliseconds of heart-rate change per mmHg of pressure change. A responsive baroreflex is why a healthy person barely notices standing up. In POTS, long COVID and post-viral dysautonomia this loop often responds less crisply, which is part of why standing feels so hard. You cannot measure true BRS at home, but your resting HRV, your heart-rate recovery, and your stand test all move with it, so tracking them over time shows you the trend."
+question: "What is baroreflex sensitivity, and why is it low in POTS?"
+app:
+  feature: pots-stand-test
+  hook: "See how your body handles standing up."
+  line: "A guided stand test at home measures how much your heart rate rises when you stand, so you can follow it over time."
 categories:
   - basics
   - pots
@@ -18,7 +24,7 @@ faq:
   - q: "What is baroreflex sensitivity in simple terms?"
     a: "Baroreflex sensitivity is a measure of how strongly your body corrects a change in blood pressure. Pressure sensors in your carotid arteries and aortic arch feel each rise and fall in pressure, and the brainstem responds within a beat or two by speeding or slowing the heart and tightening or relaxing your blood vessels. Baroreflex sensitivity captures how much heart-rate change you get per unit of pressure change: a sensitive baroreflex makes a big, quick correction, which is what keeps blood pressure steady when you stand, exercise or get startled."
   - q: "What are the units of baroreflex sensitivity?"
-    a: "Cardiovagal baroreflex sensitivity is usually reported in milliseconds per millimetre of mercury (ms/mmHg): how much the interval between heartbeats lengthens for each 1 mmHg rise in blood pressure. Higher numbers mean a more responsive reflex. Healthy young adults are often in the region of 10 to 20 ms/mmHg, and values tend to fall with age, deconditioning and many chronic conditions. Exact figures depend heavily on the lab method, so treat any single number as method-specific rather than absolute."
+    a: "Cardiovagal baroreflex sensitivity is usually reported in milliseconds per millimetre of mercury (ms/mmHg): how much the interval between heartbeats lengthens for each 1 mmHg rise in blood pressure. Higher numbers mean a more responsive reflex. In one large study of healthy adults, the typical value fell with age, from roughly 14 ms/mmHg at 20 to about 8 at 40 and 4 at 60, and values also tend to be lower with a sedentary lifestyle and many chronic conditions. Exact figures depend heavily on the lab method, so a single number is read against your age and the lab's method, not against a fixed scale."
   - q: "Is baroreflex sensitivity low in POTS and long COVID?"
     a: "Research on POTS, long COVID and post-viral dysautonomia frequently reports altered or reduced baroreflex function, though the picture is not identical for everyone: some people show blunted cardiovagal responses, others show an over-driven sympathetic branch (the hyperadrenergic pattern). Deconditioning and low blood volume, both common in these conditions, also lower baroreflex gain. The practical takeaway is that the reflex that should smooth out standing is working less crisply, which fits the lived experience of orthostatic intolerance."
   - q: "Can I measure baroreflex sensitivity at home?"
@@ -163,7 +169,7 @@ Orthostatic intolerance is, at its core, a story of the baroreflex being asked t
 - **Blood pooling.** Excessive [pooling in the legs and abdomen](/insights/pots/blood-pooling-in-pots-legs/) means more blood is stranded below the heart on standing, a bigger challenge for the loop to correct.
 - **Deconditioning.** Loss of fitness lowers baroreflex gain, which is one reason graded [reconditioning](/insights/pots/exercise-for-pots-levine-protocol/) is a first-line treatment, and part of the honest overlap in [POTS versus deconditioning](/insights/pots/pots-vs-deconditioning/).
 - **A sympathetically biased state.** In the hyperadrenergic pattern, the sympathetic branch runs hot and the vagal brake is weak, so the heart rate over-responds while blood pressure stays poorly controlled. That over-drive is the same physiology behind [adrenaline surges](/insights/pots/adrenaline-dumps-pots/).
-- **Post-viral autonomic disruption.** After COVID and other viral illnesses, autonomic reflexes can be transiently or persistently altered, which shows up as reduced or erratic baroreflex behaviour. The [current research picture](/insights/research/long-covid-dysautonomia-research-2026/) is still developing, but reduced or abnormal baroreflex function is a recurring finding.
+- **Post-viral autonomic disruption.** After COVID and other viral illnesses, autonomic reflexes can be transiently or persistently altered, which shows up as reduced or erratic baroreflex behaviour. The [current research picture](/insights/research/long-covid-dysautonomia-research-2026/) is still developing and the evidence is mixed: some studies find a less sensitive heart-rate side of the baroreflex, while at least one found the blood-vessel (sympathetic) side working normally.
 
 The result is the familiar experience: stand, and instead of a smooth, invisible correction, you get a big heart-rate jump, a wave of lightheadedness, and a system that never quite settles. The stand test makes that visible.
 
@@ -173,16 +179,18 @@ The result is the familiar experience: stand, and instead of a smooth, invisible
 
 ## What a healthy versus blunted baroreflex looks like
 
-Exact BRS numbers are lab-specific and not something to self-diagnose from, so treat the table below as a way to picture the *pattern*, not a scorecard. The middle column shows typical, widely cited cardiovagal BRS ranges; the right column is what you tend to notice and can actually track at home.
+Exact BRS numbers are lab-specific and not something to self-diagnose from, and there is no fixed scale that says what counts as blunted. Baroreflex sensitivity falls naturally with age, so a single number is read against your age, not against one set of cutoffs. The table below shows the typical value in healthy adults by age from one large study using the sequence method; individual values spread widely around it.
 
-| Baroreflex state | Cardiovagal BRS (ms/mmHg, method-dependent) | What you tend to see at home |
-| --- | --- | --- |
-| Responsive | Roughly 10 to 20+ | Standing is a non-event, small stand-test rise, quick recovery, healthy resting HRV |
-| Middling | Roughly 6 to 10 | Occasional lightheadedness, moderate stand-test rise, HRV that dips on bad days |
-| Blunted | Below ~6 | Standing is hard, large sustained stand-test rise, slow recovery, low resting vagal HRV |
+| Age | Typical cardiovagal BRS in healthy adults (ms/mmHg, sequence method) |
+| --- | --- |
+| 20 | Roughly 14 |
+| 40 | Roughly 8 |
+| 60 | Roughly 4 |
+
+At home you cannot see this number, but you can see the pattern that goes with it. A responsive reflex tends to show up as standing being a non-event, a small stand-test rise, quick recovery and healthy resting HRV. A blunted one tends to show up as standing being hard, a large sustained stand-test rise, slow recovery and low resting vagal HRV.
 
 <div class="callout callout-warn">
-  <strong>Do not chase a BRS number.</strong> These ranges vary widely between labs and methods, drop naturally with age, and mean nothing out of context. They are here to explain the concept. The home signals below are what you should actually follow.
+  <strong>Do not chase a BRS number.</strong> These values vary widely between labs and methods, drop naturally with age, and mean nothing out of context. They are here to explain the concept. The home signals below are what you should actually follow.
 </div>
 
 ## The home signals that track it
@@ -229,3 +237,13 @@ The baroreflex is the fast feedback loop that keeps your blood pressure steady w
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Baroreflex sensitivity is a clinical measurement, and orthostatic symptoms can have many causes. If your readings concern you or your symptoms are worsening, work with a clinician who can evaluate you properly and guide any changes.
 </div>
+
+## Sources
+
+- Lanier JB, Mote MB, Clay EC. [Evaluation and management of orthostatic hypotension](https://www.aafp.org/pubs/afp/issues/2011/0901/p527.html). *American Family Physician*, 2011.
+- La Rovere MT, Pinna GD, Raczak G. [Baroreflex sensitivity: measurement and clinical implications](https://doi.org/10.1111/j.1542-474X.2008.00219.x). *Annals of Noninvasive Electrocardiology*, 2008.
+- Kardos A, Watterich G, de Menezes R, et al. [Determinants of spontaneous baroreflex sensitivity in a healthy working population](https://doi.org/10.1161/01.hyp.37.3.911). *Hypertension*, 2001.
+- Raj SR, Biaggioni I, Yamhure PC, et al. [Renin-aldosterone paradox and perturbed blood volume regulation underlying postural tachycardia syndrome](https://doi.org/10.1161/01.CIR.0000160356.97313.5D). *Circulation*, 2005.
+- Sáinz-Jiménez A, Romero Fragoso I, Salazar Calderon GE, et al. [Baroreflex sensitivity impairment in Long-COVID patients: a diagnostic tool for classifying the autonomic dysfunction spectrum](https://doi.org/10.3389/fcvm.2026.1830347). *Frontiers in Cardiovascular Medicine*, 2026.
+- Howden EJ, Sesa-Ashton G, Foulkes SJ, et al. [Orthostatic and exercise intolerance in post-acute sequelae of COVID-19 occur with intact sympathetic neural control and preserved cardiac reserve](https://doi.org/10.1152/ajpheart.90275.2026). *American Journal of Physiology: Heart and Circulatory Physiology*, 2026.
+- Lehrer PM, Gevirtz R. [Heart rate variability biofeedback: how and why does it work?](https://doi.org/10.3389/fpsyg.2014.00756) *Frontiers in Psychology*, 2014.

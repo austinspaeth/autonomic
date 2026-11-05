@@ -6,11 +6,17 @@ summary: "Heart rate variability swings with the clock, so when you measure matt
 description: "The best time to measure HRV is first thing in the morning, right after you wake. Here is why the morning reading wins and how to take a clean one each day."
 keywords: "best time to measure HRV, when to measure HRV, morning HRV, what time to take HRV reading, HRV time of day, overnight HRV, HRV lying down or sitting, HRV morning vs night, POTS, long COVID"
 date: 2026-10-08
-updated: 2026-10-08
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1552650272-b8a34e21bc4b?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Bruce Mars / Unsplash"
 tldr: "Measure HRV first thing in the morning, right after you wake, before you get out of bed and before coffee. That window captures your overnight recovery under the one set of conditions you can repeat every day, which is what makes readings comparable. Overnight averages from a ring or watch are an equally good alternative. Pick one method and one posture, keep them constant, and read the multi-week trend rather than any single number."
+question: "What is the best time of day to measure HRV?"
+app:
+  feature: hrv-readings
+  hook: "Make your morning reading a two minute habit."
+  line: "Autonomic guides a morning HRV reading with your phone camera, a chest strap or a watch, and turns it into a daily score you can compare."
 categories:
   - hrv
   - basics
@@ -190,3 +196,10 @@ Whatever window you choose, the single most important habit is comparing today o
 <div class="callout callout-warn">
   <strong>These are educational field notes, not medical advice.</strong> HRV tracking is a way to see patterns in your own data over time, not a diagnostic test. It does not diagnose or treat any condition, and individual variation is large. Discuss any changes to your care, medication or activity with your clinician.
 </div>
+
+## Sources
+
+- Bonnemeier H, Richardt G, Potratz J, et al. [Circadian profile of cardiac autonomic nervous modulation in healthy subjects: differing effects of aging and gender on heart rate variability](https://doi.org/10.1046/j.1540-8167.2003.03078.x). *Journal of Cardiovascular Electrophysiology*, 2003.
+- Stalder T, Kirschbaum C, Kudielka BM, et al. [Assessment of the cortisol awakening response: expert consensus guidelines](https://doi.org/10.1016/j.psyneuen.2015.10.010). *Psychoneuroendocrinology*, 2016.
+- Buchheit M. [Monitoring training status with HR measures: do all roads lead to Rome?](https://doi.org/10.3389/fphys.2014.00073) *Frontiers in Physiology*, 2014.
+- Shaffer F, Ginsberg JP. [An overview of heart rate variability metrics and norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.

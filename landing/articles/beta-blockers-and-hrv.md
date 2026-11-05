@@ -6,11 +6,17 @@ summary: "Starting a beta blocker usually lowers your resting heart rate and pus
 description: "Do beta blockers raise or lower HRV? How propranolol, metoprolol and other beta blockers change RMSSD, SDNN, resting heart rate and your stand test, and how to read your readings honestly after starting one."
 keywords: "beta blockers and HRV, do beta blockers lower HRV, propranolol HRV, metoprolol heart rate variability, beta blocker resting heart rate, beta blocker RMSSD, beta blockers POTS HRV, medication effect on HRV, does propranolol increase HRV, heart rate variability on beta blocker"
 date: 2026-07-31
-updated: 2026-07-31
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1559538733-914540eace75?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Marek Rucinski / Unsplash"
 tldr: "Beta blockers usually lower your resting heart rate and make your HRV numbers (RMSSD, SDNN, HF power) go up. Some of that rise is a genuine shift toward parasympathetic balance, but a large part is arithmetic: at a slower heart rate the intervals between beats are longer, so the same variability reads as bigger numbers. The practical rule is to treat a dose change as the start of a new baseline, compare readings only within your current regimen and time of day, and watch the multi-week trend and your symptoms rather than one number. Never stop a beta blocker to get a cleaner reading, and discuss any change with your clinician."
+question: "Why did my HRV go up when I started a beta blocker?"
+app:
+  feature: hrv-readings
+  hook: "Read your HRV honestly on a beta blocker."
+  line: "Log your beta blocker next to your morning readings, so you can see how your numbers look on it and talk it through with your doctor."
 categories:
   - hrv
   - pots
@@ -222,3 +228,12 @@ Beta blockers also do not fix the things underneath POTS or dysautonomia. They c
 ## The bottom line
 
 Beta blockers and HRV interact in a way that is easy to misread. The drug lowers your resting heart rate and lifts your HRV numbers, and both a genuine autonomic shift and plain heart-rate arithmetic are responsible. Read the initial jump for what it is, reset your baseline at every dose change, measure consistently relative to your dose, and follow the multi-week trend and your symptoms rather than one flattering morning. And keep any change in medication a conversation with your clinician, not a solo experiment run against a chart.
+
+## Sources
+
+- Niemelä MJ, Airaksinen KE, Huikuri HV. [Effect of beta-blockade on heart rate variability in patients with coronary artery disease](https://doi.org/10.1016/0735-1097(94)90379-4). *Journal of the American College of Cardiology*, 1994.
+- Monfredi O, Lyashkov AE, Johnsen AB, et al. [Biophysical characterization of the underappreciated and important relationship between heart rate variability and heart rate](https://doi.org/10.1161/HYPERTENSIONAHA.114.03782). *Hypertension*, 2014.
+- Raj SR, Black BK, Biaggioni I, et al. [Propranolol decreases tachycardia and improves symptoms in the postural tachycardia syndrome: less is more](https://doi.org/10.1161/CIRCULATIONAHA.108.846501). *Circulation*, 2009.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Nattel S, Rangno RE, Van Loon G. [Mechanism of propranolol withdrawal phenomena](https://doi.org/10.1161/01.CIR.59.6.1158). *Circulation*, 1979.
+- Cleveland Clinic. [Beta-blockers: uses and side effects](https://my.clevelandclinic.org/health/treatments/22318-beta-blockers). Reviewed 2025.

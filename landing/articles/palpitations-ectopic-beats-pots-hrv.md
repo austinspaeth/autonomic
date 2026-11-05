@@ -6,11 +6,17 @@ summary: "Palpitations, that pounding, fluttering or skipped-beat feeling, are o
 description: "Heart palpitations and ectopic beats in POTS and dysautonomia: what pounding, fluttering and skipped beats mean, which are benign, red flags to check, and how ectopics affect HRV."
 keywords: "heart palpitations POTS, ectopic beats, PVC, PAC, skipped beat, palpitations dysautonomia, long COVID palpitations, palpitations HRV, premature ventricular contraction, premature atrial contraction, palpitations anxiety, heart flutter POTS"
 date: 2026-08-23
-updated: 2026-08-23
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1463736932348-4915535cf6f9?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&dl=giulia-bertelli-dvXGnwnYweM-unsplash.jpg"
 photoAttribution: "Giulia Bertelli / Unsplash"
 tldr: "Palpitations are just awareness of your own heartbeat, and in POTS and long COVID they are extremely common. Most fall into two harmless groups: sinus tachycardia (a fast but steady rhythm from an adrenaline-primed nervous system) and ectopic beats (single early beats, PACs or PVCs, that feel like a skip, flip or thud). In a structurally normal heart these are almost always benign. The real red flags are palpitations with fainting, chest pain, or severe breathlessness, or a sustained very fast regular racing that will not stop. Ectopic beats also quietly corrupt HRV: one early beat throws off RMSSD and SDNN, which is why good HRV tools correct artifacts before scoring a reading."
+question: "What do heart palpitations and skipped beats mean in POTS?"
+app:
+  feature: hrv-readings
+  hook: "Log palpitations beside your heart numbers."
+  line: "Log palpitations in Autonomic next to your morning HRV and heart rate, so you have a record to show your doctor."
 categories:
   - pots
   - hrv
@@ -186,7 +192,7 @@ HRV is built entirely from the *gaps between beats*, the RR intervals. Metrics l
   <figcaption>An uncorrected ectopic beat looks like a huge swing in variability. Correction repairs the two rogue intervals so the metric reflects your rhythm, not the ectopic.</figcaption>
 </figure>
 
-This is exactly why serious HRV analysis does not compute metrics from raw beats. It first runs **artifact correction**: the algorithm flags intervals that deviate too far from their neighbors, marks them as ectopic or as a missed or spurious detection, and repairs them (usually by interpolating what a normal interval would have been) before any number is calculated. A widely used rule of thumb is that a reliable HRV reading should have under about 5 percent artifacts; above that, the reading is better discarded than trusted. If you understand the underlying signal, the guide to [RR intervals and the tachogram](/insights/basics/rr-intervals-and-the-tachogram-explained/) shows exactly what these intervals are and why a single rogue one carries so much weight.
+This is exactly why serious HRV analysis does not compute metrics from raw beats. It first runs **artifact correction**: the algorithm flags intervals that deviate too far from their neighbors, marks them as ectopic or as a missed or spurious detection, and repairs them (usually by interpolating what a normal interval would have been) before any number is calculated. There is no standard cutoff for how many corrected beats is too many, and studies edit very different amounts, but the principle is simple: the fewer artifacts a reading needed fixing, the more you can trust it, and a reading riddled with them is better discarded than trusted. If you understand the underlying signal, the guide to [RR intervals and the tachogram](/insights/basics/rr-intervals-and-the-tachogram-explained/) shows exactly what these intervals are and why a single rogue one carries so much weight.
 
 The practical takeaway: if you felt a lot of skipped beats during a reading, do not take that morning's HRV number at face value, even after correction. And when you compare devices, remember that the ones that expose and correct artifacts are telling you the truth, while the ones that silently smooth everything may be hiding it. This is a good reason to [measure HRV carefully and consistently](/insights/basics/how-to-measure-hrv-accurately-at-home/), at the same time of day, in the same posture, so the occasional ectopy-heavy reading stands out as the outlier it is.
 
@@ -211,3 +217,11 @@ Palpitations are one of the loudest symptoms in POTS and long COVID and, in a no
   <strong>Not medical advice.</strong> This article is educational and not a substitute
   for personalized care. <em>Palpitations with fainting, chest pain or severe breathlessness, or a new or worsening pattern, should be evaluated by a clinician.</em> Talk with a qualified clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Marcus GM. [Evaluation and management of premature ventricular complexes](https://doi.org/10.1161/CIRCULATIONAHA.119.042434). *Circulation*, 2020.
+- Raviele A, Giada F, Bergfeldt L, et al. [Management of patients with palpitations: a position paper from the European Heart Rhythm Association](https://doi.org/10.1093/europace/eur130). *Europace*, 2011.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Task Force of the European Society of Cardiology and the North American Society of Pacing and Electrophysiology. [Heart rate variability: standards of measurement, physiological interpretation and clinical use](https://doi.org/10.1161/01.CIR.93.5.1043). *Circulation*, 1996.
+- Peltola MA. [Role of editing of R-R intervals in the analysis of heart rate variability](https://doi.org/10.3389/fphys.2012.00148). *Frontiers in Physiology*, 2012.

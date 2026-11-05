@@ -6,11 +6,17 @@ summary: "Three numbers the app shows side by side to describe autonomic balance
 description: "PNS index, SNS index and the Baevsky stress index explained: what each measures, why they see-saw, good target ranges, and how to read them together in POTS and long COVID recovery."
 keywords: "PNS index, SNS index, stress index, Baevsky stress index, autonomic balance, parasympathetic index, sympathetic index, Kubios, HRV, POTS, long COVID"
 date: 2026-07-09
-updated: 2026-07-09
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1516739063901-94072f684dfc?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Max Nguyen / Unsplash"
 tldr: "The PNS index scores your rest-and-recover (parasympathetic) activity, the SNS index scores your fight-or-flight (sympathetic) activity, and the Baevsky stress index measures how rigid and concentrated your rhythm has become under load. When you are recovered they sit in a healthy pattern: PNS positive, SNS negative, stress index low. Under strain the pattern flips: SNS and the stress index climb while PNS drops. They are not perfect mirror images, and after a hard day both indices can be suppressed at once, so read the trio together rather than any one alone."
+question: "What do the PNS index, SNS index and stress index mean?"
+app:
+  feature: hrv-readings
+  hook: "See your balance trio every morning."
+  line: "A morning HRV reading in Autonomic shows your PNS index, SNS index and stress index side by side, and tracks them over time."
 categories:
   - basics
   - hrv
@@ -67,7 +73,7 @@ faq:
 
 Open a reading in Autonomic and you will see three balance figures sitting together: the **PNS index**, the **SNS index**, and the **stress index**. They are the app's compact readout of where your [autonomic nervous system](/insights/basics/autonomic-nervous-system-and-dysautonomia-guide/) is sitting right now: how much of your rhythm is being driven by the rest-and-recover brake, how much by the fight-or-flight accelerator, and how much overall strain the system is under.
 
-They are computed the way the widely used <a href="https://www.kubios.com/hrv-analysis-methods/" target="_blank" rel="noopener">Kubios HRV analysis methods</a> define them, so the numbers you see line up with the clinical literature. The point of showing all three is that no single HRV metric captures balance on its own. Read together, they tell a clearer story than any one number can.
+They are the app's own calculation, built from standard HRV inputs. Kubios, a widely used HRV analysis tool, shows indices with the same names but uses a different formula (its SNS index is built from SD2 rather than RMSSD, and its stress index is the square root of Baevsky's), so the numbers are not comparable across tools. The point of showing all three is that no single HRV metric captures balance on its own. Read together, they tell a clearer story than any one number can.
 
 ## The PNS index: your rest-and-recover side
 
@@ -233,3 +239,10 @@ The PNS index, SNS index and stress index are three views of one balancing act: 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. If your readings concern you or your symptoms are worsening, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Baevsky RM, Chernikova AG. [Heart rate variability analysis: physiological foundations and main methods](https://doi.org/10.12710/cardiometry.2017.10.6676). *Cardiometry*, 2017.
+- Shaffer F, Ginsberg JP. [An overview of heart rate variability metrics and norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.
+- Task Force of the European Society of Cardiology and the North American Society of Pacing and Electrophysiology. [Heart rate variability: standards of measurement, physiological interpretation and clinical use](https://doi.org/10.1161/01.CIR.93.5.1043). *Circulation*, 1996.
+- Brisinda D, Picerni M, Fenici P, et al. [Rapid assessment of cardiac autonomic modulation and adaptive stress responses: automatic calculation of time-varying parasympathetic, sympathetic, and Baevsky stress indexes](https://doi.org/10.36922/bh.3503). *Brain & Heart*, 2024.

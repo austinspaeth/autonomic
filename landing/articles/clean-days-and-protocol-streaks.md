@@ -6,11 +6,17 @@ summary: "A clean day is one that met the protocol you set for yourself. Autonom
 description: "How the Clean Days card works: protocol streaks, the 30-day clean rate, why tracking compliance beats tracking symptoms in POTS and long COVID recovery, and how to avoid protocol perfectionism."
 keywords: "clean days, protocol streak, habit streak chronic illness, compliance tracking, POTS protocol, long COVID recovery habits, 30 day adherence, salt and fluids protocol, pacing protocol, streak broken"
 date: 2026-08-11
-updated: 2026-08-11
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1516210938721-0703012a297a?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Andrej Lišakov / Unsplash"
 tldr: "A clean day is a day that met the protocol you defined: your own short list of the things you have decided to do daily. Autonomic shows two numbers, the current run of consecutive clean days ending today and the share of the last 30 days that were clean. The streak is motivating and fragile; the 30-day rate is the honest one, because it survives the days illness takes from you. Set a protocol of three or four items you can hit on a bad day, not a good one. A broken streak tells you something about the day, not about you, and in an illness where crashes are not your fault, a protocol you can only complete when you feel well is measuring the wrong thing."
+question: "How do I track whether I am sticking to my protocol?"
+app:
+  feature: insights
+  hook: "See what your clean days add up to."
+  line: "Log the habits you set for yourself, and Autonomic shows which ones line up with your better and worse days over time."
 categories:
   - recovery
 faq:
@@ -244,3 +250,10 @@ Clean days measure the one part of recovery you actually control: whether you di
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Decide the contents of your protocol with a clinician who knows your case, and talk with a qualified clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Fu Q, VanGundy TB, Galbreath MM, et al. [Cardiac origins of the postural orthostatic tachycardia syndrome](https://doi.org/10.1016/j.jacc.2010.02.043). *Journal of the American College of Cardiology*, 2010.
+- Chu L, Valencia IJ, Garvert DW, et al. [Deconstructing post-exertional malaise in myalgic encephalomyelitis/chronic fatigue syndrome: a patient-centered, cross-sectional survey](https://doi.org/10.1371/journal.pone.0197811). *PLoS One*, 2018.
+- Centers for Disease Control and Prevention. [Symptoms of ME/CFS](https://www.cdc.gov/me-cfs/signs-symptoms/index.html). Updated 2024.

@@ -6,11 +6,17 @@ summary: "Every colored tint in the app traces back to one system: a 0–100 rea
 description: "How the Autonomic app turns raw HRV metrics into one 0–100 readiness score and a color grade: the weighting, the grade bands from Excellent to Crash, and the violet Warning flag explained."
 keywords: "autonomic score, readiness score, HRV composite, grade bands, HRV score, recovery score, what is a good HRV score, HRV weighting, warning zone, POTS, long COVID"
 date: 2026-07-09
-updated: 2026-07-09
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1754944014696-e8b3a3d3605c?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Tom Nazaret / Unsplash"
-tldr: "The app rolls a reading's key metrics into a single weighted 0–100 readiness score, then maps it to a color grade: Excellent, Good, Moderate, Compromised, Bad, or Crash, plus a violet Warning band for scores so high they usually mean illness or an artifact rather than fitness. Unstructured and paced readings use slightly different weightings. Treat the score as your quick 'how recovered am I?' number, then drill into the individual metrics to see why, and trust the trend over any single day."
+tldr: "The app rolls a reading's key metrics into a single weighted 0–100 readiness score, then maps it to a color grade: Excellent, Good, Moderate, Compromised, Bad, or Crash, plus a violet Warning band for scores so far above your baseline that they deserve a second look, most often because of a measurement problem rather than fitness. Unstructured and paced readings use slightly different weightings. Treat the score as your quick 'how recovered am I?' number, then drill into the individual metrics to see why, and trust the trend over any single day."
+question: "How is the Autonomic score out of 100 calculated?"
+app:
+  feature: hrv-readings
+  hook: "Get one clear number for your morning."
+  line: "Take a morning reading and Autonomic rolls your HRV and heart rate into a score out of 100 with a grade, and shows what moved it."
 categories:
   - basics
   - app
@@ -18,7 +24,7 @@ faq:
   - q: "What is a good autonomic or readiness score?"
     a: "On the app's 0–100 scale, 70 to 85 is Excellent and 60 to 69 is Good, while below 50 signals a compromised or crashed day. But the score is designed to be read against your own baseline: a 62 that's ten points above your usual is great news, and a 62 that's ten points down is worth noticing. Direction over weeks matters more than the absolute number."
   - q: "Why can a very high score be a warning?"
-    a: "Above about 86 the app flags a violet Warning instead of celebrating. A readiness score that spikes far above your normal usually isn't peak fitness: it more often reflects an oncoming illness, a measurement artifact, or an unusually low heart rate from something like a fever brewing. The Warning band is a nudge to check the raw reading rather than trust the high number at face value."
+    a: "Above about 86 the app flags a violet Warning instead of celebrating. A readiness score that spikes far above your normal usually isn't peak fitness: it is unusual for you, and the most common cause is a measurement problem, such as extra or missed beats in the recording. The Warning band is a nudge to check the raw reading rather than trust the high number at face value."
   - q: "How is the readiness score calculated?"
     a: "It's a weighted blend of the reading's key HRV metrics, each first graded on its own scale and then combined. An unstructured reading leans most on RMSSD and pNN50; a paced breathing reading shifts weight toward the LF and HF peaks, since those reflect whether the breathing actually drove the rhythm. The weighted pieces sum to a single 0–100 number."
   - q: "What do the grade colors mean?"
@@ -38,7 +44,7 @@ faq:
   function band(n) {
     if (isNaN(n)) return null;
     if (n > 100 || n < 0) return ['Out of range', '', 'The score runs from 0 to 100.'];
-    if (n >= 86) return ['Warning', '#a78bfa', 'Unusually high, often illness or an artifact, not peak fitness. Check the raw reading.'];
+    if (n >= 86) return ['Warning', '#a78bfa', 'Unusually high, often a measurement problem such as extra or missed beats, not peak fitness. Check the raw reading.'];
     if (n >= 70) return ['Excellent', '#54d98a', 'A strong, well-recovered reading.'];
     if (n >= 60) return ['Good', '#22c55e', 'A solid, healthy readiness score.'];
     if (n >= 50) return ['Moderate', '#eab308', 'Middle of the range, watch the weekly trend.'];
@@ -111,10 +117,10 @@ Every metric and every overall reading gets sorted into one of six grades, runni
 
 The six ranked grades follow a traffic-light logic: **Excellent** and **Good** in green, **Moderate** in yellow, **Compromised** in orange, and **Bad** then **Crash** in deepening red. Greener means more recovered; redder means more strained.
 
-The seventh, **Warning**, is different. Rendered in violet, it isn't a rank: it's a **too-high flag.** When a readiness score climbs far above your normal, that usually isn't a sign of extraordinary fitness. More often it means something is *off*: an oncoming illness dropping your heart rate, a measurement artifact, or an unusually quiet reading that the math over-rewards. The Warning band exists to stop you from celebrating a number that deserves a second look instead. This mirrors the "blue zone" concept used on individual metrics, where a value can be too high as well as too low.
+The seventh, **Warning**, is different. Rendered in violet, it isn't a rank: it's a **too-high flag.** When a readiness score climbs far above your normal, that usually isn't a sign of extraordinary fitness. More often it means something is *off*: a measurement problem such as extra or missed beats, or an unusually quiet reading that the math over-rewards. The Warning band exists to stop you from celebrating a number that deserves a second look instead. This mirrors the "blue zone" concept used on individual metrics, where a value can be too high as well as too low.
 
 <div class="callout callout-note">
-  <strong>Higher isn't always better.</strong> HRV in particular has a ceiling past which more is suspicious, not superior. A single reading that towers over your baseline is the classic signature of a brewing infection or a noisy recording, which is exactly what the violet Warning is there to catch.
+  <strong>Higher isn't always better.</strong> HRV in particular has a ceiling past which more is suspicious, not superior. A single reading that towers over your baseline is unusual and worth a second look, and the most common cause is a noisy recording with extra or missed beats, which is exactly what the violet Warning is there to catch.
 </div>
 
 ## How the readiness score is built
@@ -165,7 +171,7 @@ Here's how the 0–100 composite maps to grades. Note the violet Warning sitting
 
 | Grade | Score | What it usually reflects |
 | --- | --- | --- |
-| Warning | 86+ | Suspiciously high, likely illness or an artifact |
+| Warning | 86+ | Suspiciously high, most often a measurement problem |
 | Excellent | 70–85 | A strong, well-recovered reading |
 | Good | 60–69 | Solid, healthy readiness |
 | Moderate | 50–59 | Middle of the range, watch the trend |
@@ -215,3 +221,9 @@ The autonomic score is the app's way of turning a scatter of HRV metrics into on
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. If your readings concern you or your symptoms are worsening, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Shaffer F, Ginsberg JP. [An overview of heart rate variability metrics and norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.
+- Laborde S, Mosley E, Thayer JF. [Heart rate variability and cardiac vagal tone in psychophysiological research: recommendations for experiment planning, data analysis, and data reporting](https://doi.org/10.3389/fpsyg.2017.00213). *Frontiers in Psychology*, 2017.
+- Task Force of the European Society of Cardiology and the North American Society of Pacing and Electrophysiology. [Heart rate variability: standards of measurement, physiological interpretation and clinical use](https://pubmed.ncbi.nlm.nih.gov/8598068/). *Circulation*, 1996.

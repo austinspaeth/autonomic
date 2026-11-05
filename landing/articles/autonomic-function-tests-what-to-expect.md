@@ -6,11 +6,17 @@ summary: "Referred for autonomic testing and not sure what happens? Here is a pl
 description: "What to expect at autonomic function testing for POTS and dysautonomia: the deep breathing test, Valsalva maneuver, tilt table and QSART sweat test, how each is read, and how to prepare. Educational, non-diagnostic."
 keywords: "autonomic function tests, autonomic reflex screen, autonomic testing, deep breathing test, Valsalva maneuver, Valsalva ratio, QSART, sudomotor test, E:I ratio, cardiovagal testing, dysautonomia testing, autonomic lab, composite autonomic severity score"
 date: 2026-09-05
-updated: 2026-09-05
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1624727828489-a1e03b79bba8?q=80&w=1471&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Unsplash"
 tldr: "Autonomic function testing is a short battery of non-invasive tests that check how your nervous system controls heart rate, blood pressure and sweating. The core four are the deep breathing test (paced slow breathing while your heart rate is watched), the Valsalva maneuver (a hard, sustained blow against resistance), a tilt table or standing test, and the QSART sweat test. None involves needles into nerves and none is painful in the way people fear. Together they build a picture of your parasympathetic (vagal) and sympathetic function, often summarized as a composite score. Results vary with hydration, medications, caffeine and sleep, so preparation matters and no single test is read alone."
+question: "What happens during autonomic function testing?"
+app:
+  feature: doctor-reports
+  hook: "Bring your own data to your autonomic testing."
+  line: "Autonomic turns your readings and symptom log into a clear summary you can take to the appointment and the follow up."
 categories:
   - pots
   - basics
@@ -22,7 +28,7 @@ faq:
   - q: "What is the deep breathing test in autonomic testing?"
     a: "The deep breathing test, or heart rate response to deep breathing, measures how much your heart rate speeds up on each inhale and slows on each exhale while you breathe slowly, usually about six breaths per minute. That rhythmic rise and fall is respiratory sinus arrhythmia, and it is driven almost entirely by the vagus nerve, so a healthy swing means good cardiovagal (parasympathetic) function. The lab reports the beat-to-beat heart rate range or the expiratory-to-inspiratory (E:I) ratio, both of which normally shrink with age."
   - q: "How do I prepare for autonomic function testing?"
-    a: "Follow your lab's written instructions first, because they override any general advice. Common requests include avoiding caffeine, nicotine and alcohol for at least a day, holding certain medications that affect heart rate, blood pressure or sweating (only with your clinician's approval, never stop a prescription on your own), staying well hydrated unless told otherwise, avoiding heavy meals right before, and skipping lotions on test day for the sweat test. Wear comfortable clothing and bring a list of your medications and symptoms."
+    a: "Follow your lab's written instructions first, because they override any general advice. Common requests include avoiding caffeine and nicotine for a few hours beforehand and alcohol for longer, holding certain medications that affect heart rate, blood pressure or sweating (only with your clinician's approval, never stop a prescription on your own), staying well hydrated unless told otherwise, avoiding heavy meals right before, and skipping lotions on test day for the sweat test. Wear comfortable clothing and bring a list of your medications and symptoms."
   - q: "Can autonomic testing be normal and you still be sick?"
     a: "Yes. Autonomic function tests are sensitive to some patterns and blind to others, and results shift with the day, hydration, medications and how you slept. A normal or borderline result does not mean your symptoms are imagined. Many people with real orthostatic intolerance have subtle or intermittent findings, which is why clinicians read the battery alongside your history, your at-home stand tests and other testing rather than treating one afternoon in the lab as the final word."
 social:
@@ -176,7 +182,7 @@ A crucial caveat: these numbers move. Hydration, caffeine, nicotine, alcohol, sl
 
 Your lab will send written instructions, and those always win over general advice. That said, most autonomic labs ask for some version of the following.
 
-- **Avoid caffeine, nicotine and alcohol** for at least 24 hours, and often longer for caffeine. All three change heart rate and blood vessel tone and can distort results.
+- **Avoid caffeine, nicotine and alcohol** before the test. Caffeine and nicotine are usually withheld for a few hours and alcohol for longer, but labs set different windows, so follow your lab's own instructions. All three change heart rate and blood vessel tone and can distort results.
 - **Ask about your medications.** Beta blockers, [midodrine](/insights/pots/midodrine-for-pots/), stimulants, anticholinergics and others directly affect what the tests measure. Your team may ask you to hold specific ones for a set window. Never stop a prescription on your own; confirm each with your clinician.
 - **Hydrate normally** unless told otherwise, and avoid a heavy meal right before, since digestion pulls blood to the gut and can nudge orthostatic numbers.
 - **Skip lotions, creams and powders** on test day, especially on your arms and legs, because they interfere with the sweat test.
@@ -205,7 +211,7 @@ That is the gap home tracking fills. A consistent morning [stand test](/insights
 
 **What is the deep breathing test?** It measures how much your heart rate speeds up on the inhale and slows on the exhale while you breathe slowly, about six breaths a minute. That swing, respiratory sinus arrhythmia, is driven by the vagus nerve, so a healthy swing means good cardiovagal function. Results are age-adjusted.
 
-**How do I prepare for autonomic testing?** Follow your lab's instructions first. Commonly: avoid caffeine, nicotine and alcohol for at least a day; hold certain medications only with your clinician's approval; hydrate normally; avoid heavy meals right before; and skip lotions for the sweat test.
+**How do I prepare for autonomic testing?** Follow your lab's instructions first. Commonly: avoid caffeine and nicotine for a few hours and alcohol for longer, using your lab's own timing; hold certain medications only with your clinician's approval; hydrate normally; avoid heavy meals right before; and skip lotions for the sweat test.
 
 **Can autonomic testing be normal and you still be sick?** Yes. The tests catch some patterns and miss others, and results vary with the day, hydration, medications and sleep. A normal result does not mean your symptoms are imagined, which is why the battery is read alongside your history and your at-home tracking.
 
@@ -214,3 +220,12 @@ That is the gap home tracking fills. A consistent morning [stand test](/insights
 Autonomic function testing sounds intimidating and mostly is not. It is a short battery of gentle, non-invasive checks, breathing in time with a cue, a hard blow into a tube, a tilt or stand, and a mild sweat test, that together read the two branches of your autonomic nervous system. Each probes a different piece, and the pattern across them is what tells your clinician which part of the system is struggling and how much.
 
 These are educational field notes, not medical advice. Autonomic tests are ordered and interpreted by a clinician, and any changes to your care, medications or activity should be discussed with your own doctor. The single most useful thing you can bring to the appointment is context: a clear, consistent record of how your heart rate, blood pressure and HRV behave on an ordinary day, so the snapshot in the lab has a story to stand next to.
+
+## Sources
+
+- Cheshire WP, Freeman R, Gibbons CH, et al. [Electrodiagnostic assessment of the autonomic nervous system: A consensus statement endorsed by the American Autonomic Society, American Academy of Neurology, and the International Federation of Clinical Neurophysiology](https://doi.org/10.1016/j.clinph.2020.11.024). *Clinical Neurophysiology*, 2021.
+- Novak P. [Quantitative autonomic testing](https://doi.org/10.3791/2502). *Journal of Visualized Experiments*, 2011.
+- Zygmunt A, Stanczyk J. [Methods of evaluation of autonomic nervous system function](https://doi.org/10.5114/aoms.2010.13500). *Archives of Medical Science*, 2010.
+- Low PA. [Composite autonomic scoring scale for laboratory quantification of generalized autonomic failure](https://pubmed.ncbi.nlm.nih.gov/8392653/). *Mayo Clinic Proceedings*, 1993.
+- Raj SR, Arnold AC, Barboi A, et al. [Long-COVID postural tachycardia syndrome: an American Autonomic Society statement](https://doi.org/10.1007/s10286-021-00798-2). *Clinical Autonomic Research*, 2021.
+- Lanier JB, Mote MB, Clay EC. [Evaluation and management of orthostatic hypotension](https://www.aafp.org/pubs/afp/issues/2011/0901/p527.html). *American Family Physician*, 2011.

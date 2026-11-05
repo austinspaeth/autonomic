@@ -6,11 +6,17 @@ summary: "POTS and anxiety share almost every symptom: racing heart, dizziness, 
 description: "Is it POTS or anxiety? Both cause a racing heart and dizziness, but POTS tachycardia is posture-driven (a sustained 30+ bpm rise on standing) while anxiety is trigger-driven. How to tell them apart at home."
 keywords: "POTS or anxiety, POTS vs anxiety, is it POTS or a panic attack, POTS misdiagnosed as anxiety, POTS anxiety difference, orthostatic tachycardia vs anxiety, POTS panic attack, dysautonomia anxiety"
 date: 2026-08-02
-updated: 2026-08-02
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1527236438218-d82077ae1f85?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Sage Friedman / Unsplash"
-tldr: "Both POTS and anxiety can race your heart, make you dizzy and short of breath, and leave you feeling wired. The reliable difference is the trigger: POTS tachycardia is driven by posture (a sustained rise of at least 30 bpm within ten minutes of standing, which settles when you lie down), while anxiety tachycardia is driven by fear, thoughts or situations and does not track with standing and lying. An at-home stand test measures the orthostatic rise; a clinician confirms it. And the two often coexist, so it is frequently 'and,' not 'or.'"
+tldr: "Both POTS and anxiety can race your heart, make you dizzy and short of breath, and leave you feeling wired. The reliable difference is the trigger: POTS tachycardia is driven by posture (a sustained rise of at least 30 bpm within ten minutes of standing, which settles when you lie down), while anxiety tachycardia is driven by fear, thoughts or situations and does not track with standing and lying. An at-home stand test measures the orthostatic rise; a clinician confirms it. And anxiety symptoms are common and the two can coexist, so it can be 'and,' not 'or.'"
+question: "Is it POTS or anxiety?"
+app:
+  feature: pots-stand-test
+  hook: "Let a stand test show the difference."
+  line: "A guided home stand test records your heart rate as you stand, so you have numbers to show your doctor, not just feelings."
 categories:
   - pots
   - postviral
@@ -20,7 +26,7 @@ faq:
   - q: "How do I know if it's POTS or a panic attack?"
     a: "Look at what set it off and how it behaves. A panic attack usually builds from a frightening thought or situation, peaks within about ten minutes, often carries a sense of dread or unreality, and can happen sitting or lying down. A POTS surge is tied to being upright: it starts within a few minutes of standing, is worse in heat, after meals or when dehydrated, and reliably improves when you sit or lie back down. If your heart consistently races the moment you stand, regardless of your mood, that points toward an orthostatic cause."
   - q: "Can you have both POTS and anxiety?"
-    a: "Yes, and it is common. Living with an unpredictable racing heart is genuinely anxiety-provoking, so real anxiety often develops on top of POTS. And the adrenaline surges of hyperadrenergic POTS can feel exactly like panic attacks. The two are not mutually exclusive, so the honest answer for many people is 'both.' Measuring the orthostatic pattern does not rule anxiety out; it just confirms whether a physiological, posture-driven mechanism is also in play."
+    a: "Yes. Anxiety symptoms are common in POTS and the two can coexist. Living with an unpredictable racing heart is genuinely anxiety-provoking, so real anxiety can develop on top of POTS. And the adrenaline surges of hyperadrenergic POTS can feel exactly like panic attacks. The two are not mutually exclusive, so the honest answer for some people is 'both.' Measuring the orthostatic pattern does not rule anxiety out; it just confirms whether a physiological, posture-driven mechanism is also in play."
   - q: "Will anxiety make my heart rate rise 30 bpm on standing?"
     a: "Anxiety can raise your resting heart rate and cause spikes, but it does not reliably produce a sustained 30 bpm rise that appears every time you stand and settles every time you lie down. That repeatable, posture-locked pattern is the signature of POTS. A one-off anxious standing measurement can look high, which is exactly why the stand test is meant to be repeated across several calm mornings rather than judged from a single reading."
   - q: "Does low HRV mean POTS or anxiety?"
@@ -46,21 +52,21 @@ social:
 
     What actually helped was ignoring the symptoms for a second and watching the trigger. Panic for me builds from a thought, peaks in about ten minutes, and can hit me sitting or lying in bed. The POTS thing is different: it fires the moment I stand up, it is worse in heat or after eating, and it calms down the second I lie back down. Once I started doing a basic stand test (lie down a few minutes, check HR, stand, check again at 1/3/5/10 min) the 30+ bpm jump showed up over and over, on calm mornings, no panic involved.
 
-    Two things I wish someone had told me sooner: one reading is not proof, you want to see the pattern repeat across days. And it is genuinely often both, not either/or, so getting the orthostatic part measured did not mean the anxiety was fake. It just gave me something concrete to bring to a doctor instead of "I feel awful." Not medical advice, just what worked for me.
+    Two things I wish someone had told me sooner: one reading is not proof, you want to see the pattern repeat across days. And it can genuinely be both, not either/or, so getting the orthostatic part measured did not mean the anxiety was fake. It just gave me something concrete to bring to a doctor instead of "I feel awful." Not medical advice, just what worked for me.
   x: |
     Is it POTS or anxiety? Same symptoms, different trigger.
 
     POTS: heart races when you STAND, settles when you lie down.
     Anxiety: heart races with fear/thoughts, not posture.
 
-    A repeatable 30+ bpm standing rise is the tell. And often it's both.
+    A repeatable 30+ bpm standing rise is the tell. And it can be both.
 
     https://autonomic.care/insights/pots/is-it-pots-or-anxiety/?utm_source=x&utm_medium=social&utm_campaign=is-it-pots-or-anxiety
     #POTS #Dysautonomia
   facebook: |
     If you have ever been told your racing heart and dizziness are "just anxiety," this one is for you. POTS and anxiety share almost every symptom, so the mix-up is incredibly common. The difference that actually helps: POTS makes your heart race when you stand up and eases when you lie down, while anxiety follows fear and situations, not posture.
 
-    Have you ever tracked what your heart rate does when you stand versus lie down? Here is a calm, non-scary walk-through of how to tell them apart at home, and why it is often both at once.
+    Have you ever tracked what your heart rate does when you stand versus lie down? Here is a calm, non-scary walk-through of how to tell them apart at home, and why it can be both at once.
 
     https://autonomic.care/insights/pots/is-it-pots-or-anxiety/?utm_source=facebook&utm_medium=social&utm_campaign=is-it-pots-or-anxiety
 
@@ -114,7 +120,7 @@ If you have spent any time online trying to work out whether your racing heart i
 Here is the reassuring part. You do not have to untangle the symptoms one by one. There is a single, reliable difference between POTS and anxiety, and it is not how the racing heart feels. It is what **triggers** it. POTS tachycardia is driven by **posture**. Anxiety tachycardia is driven by **fear and situations**. Once you watch for the trigger instead of the sensation, the two start to separate cleanly.
 
 <div class="callout callout-note">
-<strong>The one-line version:</strong> if your heart reliably races the moment you stand up and calms down when you lie back down, that points toward an orthostatic cause like POTS. If it races in response to a frightening thought or situation and can happen sitting or lying still, that points toward anxiety. And plenty of people have both.
+<strong>The one-line version:</strong> if your heart reliably races the moment you stand up and calms down when you lie back down, that points toward an orthostatic cause like POTS. If it races in response to a frightening thought or situation and can happen sitting or lying still, that points toward anxiety. And the two can coexist.
 </div>
 
 ## Why POTS gets mislabeled as anxiety
@@ -259,14 +265,14 @@ What HRV is good for is the *trend* once you know what you are tracking. Watched
 
 ## Why it's often "and," not "or"
 
-The framing of "POTS **or** anxiety" hides the most common reality: many people have both. Two honest reasons.
+The framing of "POTS **or** anxiety" hides something worth knowing: anxiety symptoms are common and the two can coexist. Two honest reasons.
 
-First, POTS causes anxiety. Living with a heart that races unpredictably, in public, at work, in the middle of the night, is a genuinely frightening experience. Health anxiety and hypervigilance about symptoms grow naturally out of that, and they are a reasonable response to a body that keeps surprising you, not a character flaw.
+First, POTS can cause anxiety. Living with a heart that races unpredictably, in public, at work, in the middle of the night, is a genuinely frightening experience. Health anxiety and hypervigilance about symptoms grow naturally out of that, and they are a reasonable response to a body that keeps surprising you, not a character flaw.
 
 Second, some POTS surges *are* indistinguishable from panic at the level of chemistry. In hyperadrenergic POTS especially, standing can set off large [adrenaline surges](/insights/pots/adrenaline-dumps-pots/) that produce tremor, chest pounding, a flushed and jittery feeling, and a wave of dread. Calling that "a panic attack" is not entirely wrong; it is just incomplete, because a posture-driven adrenaline dump has a physical trigger you can measure and manage.
 
 <div class="callout callout-note">
-Getting the orthostatic part measured does not mean your anxiety is imaginary, and treating anxiety does not mean your POTS is not real. The most accurate picture, for a lot of people, holds both at once. That is not a diagnostic failure; it is usually the truest description.
+Getting the orthostatic part measured does not mean your anxiety is imaginary, and treating anxiety does not mean your POTS is not real. The most accurate picture, for some people, holds both at once. That is not a diagnostic failure; it is the truest description.
 </div>
 
 ## What to do with all this
@@ -279,8 +285,18 @@ You cannot diagnose yourself from an article, and you should not try. But you ca
 
 ## The bottom line
 
-POTS and anxiety wear the same clothes: racing heart, dizziness, breathlessness, that wired feeling. The reliable difference is not how the symptoms feel, it is what sets them off. POTS is driven by posture, a sustained rise of at least 30 bpm when you stand that settles when you lie down, repeatable on calm days and stressful ones alike. Anxiety is driven by fear and situations and does not follow that posture rhythm. Measure the stand test, watch the pattern over a couple of weeks, and let the trend narrow it down. And if the honest answer turns out to be "both," that is common, manageable, and a far better starting point than either label alone.
+POTS and anxiety wear the same clothes: racing heart, dizziness, breathlessness, that wired feeling. The reliable difference is not how the symptoms feel, it is what sets them off. POTS is driven by posture, a sustained rise of at least 30 bpm when you stand that settles when you lie down, repeatable on calm days and stressful ones alike. Anxiety is driven by fear and situations and does not follow that posture rhythm. Measure the stand test, watch the pattern over a couple of weeks, and let the trend narrow it down. And if the honest answer turns out to be "both," that is manageable, and a far better starting point than either label alone.
 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational field notes to help you understand and track your own data, not a tool to diagnose or treat anything. <em>Distinguishing POTS from anxiety, and confirming either, requires clinical evaluation; self-tracking supports that conversation but does not replace it.</em> Talk with a qualified clinician before making changes to medication, diet or exercise, and seek care promptly if symptoms are severe or worsening.
 </div>
+
+## Sources
+
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Freeman R, Wieling W, Axelrod FB, et al. [Consensus statement on the definition of orthostatic hypotension, neurally mediated syncope and the postural tachycardia syndrome](https://doi.org/10.1007/s10286-011-0119-5). *Clinical Autonomic Research*, 2011.
+- Dysautonomia International. [Postural Orthostatic Tachycardia Syndrome](https://www.dysautonomiainternational.org/page.php?ID=30).
+- Shaw BH, Stiles LE, Bourne K, et al. [The face of postural tachycardia syndrome: insights from a large cross-sectional online community-based survey](https://doi.org/10.1111/joim.12895). *Journal of Internal Medicine*, 2019.
+- Anderson JW, Lambert EA, Sari CI, et al. [Cognitive function, health-related quality of life, and symptoms of depression and anxiety sensitivity are impaired in patients with the postural orthostatic tachycardia syndrome (POTS)](https://doi.org/10.3389/fphys.2014.00230). *Frontiers in Physiology*, 2014.
+- Raj V, Haman KL, Raj SR, et al. [Psychiatric profile and attention deficits in postural tachycardia syndrome](https://doi.org/10.1136/jnnp.2008.144360). *Journal of Neurology, Neurosurgery and Psychiatry*, 2009.
+- Cleveland Clinic. [Panic attacks and panic disorder](https://my.clevelandclinic.org/health/diseases/4451-panic-attack-panic-disorder). Reviewed 2023.

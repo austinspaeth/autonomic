@@ -6,11 +6,17 @@ summary: "The vagus nerve is the main line of your parasympathetic 'rest and dig
 description: "How to stimulate the vagus nerve, graded by evidence: slow breathing, exercise, sleep, cold on the face, humming and taVNS. What raises vagal tone, what is overhyped, and how HRV reads it."
 keywords: "how to stimulate the vagus nerve, vagus nerve stimulation, vagal tone, how to increase vagal tone, vagus nerve exercises, vagus nerve breathing, does humming stimulate the vagus nerve, cold exposure vagus nerve, taVNS, vagus nerve HRV, parasympathetic nervous system, vagus nerve POTS"
 date: 2026-07-26
-updated: 2026-07-26
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1650056201297-4a6d7ec6ca6c?q=80&w=1546&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Jared Rice / Unsplash"
 tldr: "The single most reliable way to stimulate your vagus nerve is slow breathing with a long exhale, around five to six breaths a minute, which acutely raises vagal tone and HRV within minutes. Over the longer term, regular exercise within your limits and consistent sleep do the most. Cold water on the face triggers a real vagal reflex, humming and gargling are low-risk but weakly evidenced, and ear-clip 'taVNS' devices are promising but still investigational. Chasing a bigger HRV number is not the goal; steadier regulation is. None of this diagnoses or treats a condition, and if you have POTS or dysautonomia, check big changes with your clinician."
+question: "What actually works to stimulate the vagus nerve?"
+app:
+  feature: insights
+  hook: "Test vagus nerve tricks on yourself."
+  line: "Log what you try, like breathing or cold water, beside your morning HRV. Autonomic shows what lines up with better readings for you."
 categories:
   - hrv
   - recovery
@@ -248,3 +254,12 @@ The vagus nerve deserves its reputation, just not the miracle framing. It is the
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own nervous system, not to diagnose or treat any condition. Vagal tone, HRV and how you respond to breathing, cold or exercise vary a lot from person to person. Discuss meaningful changes, and any device-based stimulation, with a clinician who knows your history, and seek care for new, severe or unusual symptoms.
 </div>
+
+## Sources
+
+- Breit S, Kupferberg A, Rogler G, et al. [Vagus nerve as modulator of the brain-gut axis in psychiatric and inflammatory disorders](https://doi.org/10.3389/fpsyt.2018.00044). *Frontiers in Psychiatry*, 2018.
+- Laborde S, Mosley E, Thayer JF. [Heart rate variability and cardiac vagal tone in psychophysiological research: recommendations for experiment planning, data analysis, and data reporting](https://doi.org/10.3389/fpsyg.2017.00213). *Frontiers in Psychology*, 2017.
+- Lehrer PM, Gevirtz R. [Heart rate variability biofeedback: how and why does it work?](https://doi.org/10.3389/fpsyg.2014.00756). *Frontiers in Psychology*, 2014.
+- Sandercock GR, Bromley PD, Brodie DA. [Effects of exercise on heart rate variability: inferences from meta-analysis](https://doi.org/10.1249/01.mss.0000155388.39002.9d). *Medicine & Science in Sports & Exercise*, 2005.
+- Godek D, Freeman AM. [Physiology, diving reflex](https://www.ncbi.nlm.nih.gov/books/NBK538245/). *StatPearls*, 2022.
+- Stavrakis S, Chakraborty P, Farhat K, et al. [Noninvasive vagus nerve stimulation in postural tachycardia syndrome: a randomized clinical trial](https://doi.org/10.1016/j.jacep.2023.10.015). *JACC: Clinical Electrophysiology*, 2024.

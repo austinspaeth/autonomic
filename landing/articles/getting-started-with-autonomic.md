@@ -11,6 +11,11 @@ author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1516210938721-0703012a297a?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Andrej Lišakov / Unsplash"
 tldr: "Your first week is about establishing a baseline, not chasing results. Set up your profile, take one baseline morning reading and one orthostatic stand test on day one, then keep a short, consistent daily rhythm. Don't over-read the early numbers: a real trend needs one to two weeks. A few metrics done consistently beat everything done sporadically."
+question: "How do I start tracking my POTS or long COVID symptoms?"
+app:
+  feature: hrv-readings
+  hook: "Start with one reading tomorrow morning."
+  line: "Take a morning HRV reading with your phone camera, a strap or a watch, and get a daily score. Log symptoms as they happen, and let the baseline build."
 categories:
   - app
   - recovery

@@ -6,11 +6,17 @@ summary: "Long COVID and POTS are not competing labels: one is a broad umbrella 
 description: "Long COVID or POTS? Learn the real difference: long COVID is a broad post-viral umbrella, POTS is a defined orthostatic diagnosis (30+ bpm HR rise) that often sits inside it."
 keywords: "long COVID or POTS, long COVID vs POTS, post-COVID POTS, is my POTS from COVID, POTS after COVID, difference between long COVID and POTS, dysautonomia after COVID"
 date: 2026-06-27
-updated: 2026-06-27
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1659366100463-9e29a63adcc2?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Nik / Unsplash"
 tldr: "This is usually a false choice. Long COVID is a broad label for persistent symptoms after a SARS-CoV-2 infection; POTS is a specific, measurable orthostatic diagnosis. POTS is one of the most commonly identified forms of dysautonomia in long COVID, so 'long COVID with POTS' often describes the same person. The practical difference is that a POTS diagnosis unlocks a well-established playbook, while 'long COVID' alone does not."
+question: "Do I have long COVID or POTS?"
+app:
+  feature: pots-stand-test
+  hook: "Check what standing does to your heart."
+  line: "A guided home stand test measures your heart rate rise on standing, the number that shows whether POTS may be part of your picture."
 categories:
   - postviral
   - pots
@@ -139,3 +145,10 @@ This is exactly the kind of question the app is built for. Autonomic lets you ru
   for personalized care. <em>Distinguishing long COVID from POTS, and confirming either, requires clinical evaluation; self-tracking supports that conversation but does not replace it.</em> Talk with a qualified
   clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Ely EW, Brown LM, Fineberg HV, et al. [Long Covid defined](https://doi.org/10.1056/NEJMsb2408466). *New England Journal of Medicine*, 2024.
+- Novak P, Systrom DM, Witte A, et al. [Shared autonomic phenotype of long COVID and myalgic encephalomyelitis/chronic fatigue syndrome](https://doi.org/10.1371/journal.pone.0341278). *PLoS One*, 2026.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Harvard Health Publishing. [POTS: Diagnosing and treating this dizzying syndrome](https://www.harvardhealth.org/blog/pots-diagnosing-and-treating-this-dizzying-syndrome-202110062611). Updated 2024.

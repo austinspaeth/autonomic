@@ -6,11 +6,17 @@ summary: "That sudden racing heart, tremor and wave of dread, often at 3am or af
 description: "What are adrenaline dumps in POTS? The real physiology behind catecholamine surges, why they hit at night, how they differ from panic attacks, and how to track your heart rate and HRV around them."
 keywords: "adrenaline dumps POTS, adrenaline surges POTS, hyperadrenergic POTS, POTS racing heart at night, catecholamine surge dysautonomia, waking up heart racing POTS, POTS vs panic attack, norepinephrine POTS, POTS adrenaline rush, dysautonomia adrenaline"
 date: 2026-07-22
-updated: 2026-07-22
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "/articles/adrenaline-dumps-pots/cover.webp"
 photoAttribution: "Autonomic"
 tldr: "An adrenaline dump is a surge of the stress hormones adrenaline and noradrenaline (norepinephrine) that hits fast: pounding heart, tremor, chills, nausea, a wave of dread, and often a rush to urinate afterward. In POTS the nervous system leans on these hormones to compensate for blood pooling and low blood volume, so surges are common, especially overnight and after standing or big meals. They feel identical to panic, but in POTS the racing usually comes first and the fear follows, and the trigger is physical (posture, sleep, temperature, food) rather than a frightening thought. They pass. The useful moves are to lie down and use gentle vagal and breathing tricks in the moment, defend your fluids and salt, and log the surge with your heart rate and HRV so the pattern becomes visible instead of terrifying. Discuss recurrent surges with a clinician."
+question: "Why does my heart suddenly race at 3am with POTS?"
+app:
+  feature: hrv-readings
+  hook: "Write down each surge while it is fresh."
+  line: "Log a surge in seconds with the time and what came before it, next to your morning HRV, so a pattern has a chance to show."
 categories:
   - pots
   - recovery
@@ -244,3 +250,10 @@ An adrenaline dump in POTS is a fast surge of the stress hormones your nervous s
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own experience, not to diagnose or treat any condition. A racing heart, chest pain or fainting can have causes beyond POTS, and how much salt and fluid are right for you varies with your health. Discuss recurrent surges and any treatment changes with a clinician who knows your history, and seek urgent care for severe or unusual symptoms.
 </div>
+
+## Sources
+
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Raj SR, Biaggioni I, Yamhure PC, et al. [Renin-aldosterone paradox and perturbed blood volume regulation underlying postural tachycardia syndrome](https://doi.org/10.1161/01.CIR.0000160356.97313.5D). *Circulation*, 2005.
+- Panza JA, Epstein SE, Quyyumi AA. [Circadian variation in vascular tone and its relation to alpha-sympathetic vasoconstrictor activity](https://doi.org/10.1056/NEJM199110033251402). *New England Journal of Medicine*, 1991.
+- Bourne KM, Sheldon RS, Hall J, et al. [Compression garment reduces orthostatic tachycardia and symptoms in patients with postural orthostatic tachycardia syndrome](https://doi.org/10.1016/j.jacc.2020.11.040). *Journal of the American College of Cardiology*, 2021.

@@ -6,11 +6,17 @@ summary: "An honest read on where the science stands in 2026: long COVID and ME/
 description: "A 2026 research synthesis on long COVID and dysautonomia: small-fiber neuropathy, autonomic testing, shared ME/CFS phenotype, mechanisms and early treatment directions, for patients."
 keywords: "long COVID research 2026, long COVID dysautonomia study, POTS research, small fiber neuropathy, autonomic dysfunction research, long COVID treatment research, ME/CFS, post-viral illness"
 date: 2026-07-07
-updated: 2026-07-07
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1518152006812-edab29b069ac?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Ousa Chea / Unsplash"
 tldr: "The research increasingly validates what patients have said all along: long COVID dysautonomia is real and measurable. Studies confirm small-fiber neuropathy and objective autonomic dysfunction in a subset of patients, and long COVID and ME/CFS are being recognized as related post-viral illnesses. Treatments remain early and mixed, but the mechanistic picture is getting clearer, and self-tracking maps onto exactly what researchers measure."
+question: "What does the latest research say about long COVID and dysautonomia?"
+app:
+  feature: doctor-reports
+  hook: "Bring your own data to the research conversation."
+  line: "Autonomic turns your HRV, heart rate and symptom logs into a clear summary you can share with your doctor."
 categories:
   - research
   - postviral
@@ -149,3 +155,12 @@ As of 2026, the research increasingly says: long COVID dysautonomia is real, it 
   for personalized care. <em>Research summaries like this one evolve as new studies arrive, and nothing here is treatment guidance for your specific case.</em> Talk with a qualified
   clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Novak P, Systrom DM, Witte A, et al. [Shared autonomic phenotype of long COVID and myalgic encephalomyelitis/chronic fatigue syndrome](https://doi.org/10.1371/journal.pone.0341278). *PLoS One*, 2026.
+- Davis HE, McCorkell L, Vogel JM, et al. [Long COVID: major findings, mechanisms and recommendations](https://doi.org/10.1038/s41579-022-00846-2). *Nature Reviews Microbiology*, 2023.
+- Astin R, Banerjee A, Baker MR, et al. [Long COVID: mechanisms, risk factors and recovery](https://doi.org/10.1113/EP090802). *Experimental Physiology*, 2023.
+- Oaklander AL, Mills AJ, Kelley M, et al. [Peripheral neuropathy evaluations of patients with prolonged long COVID](https://doi.org/10.1212/NXI.0000000000001146). *Neurology: Neuroimmunology & Neuroinflammation*, 2022.
+- Wang S, Salway RJ, Nicklay M, et al. [Effectiveness of dual sympathetic blocks for sympathetically mediated symptoms in post-acute sequelae of SARS-CoV-2 (PASC): an open-label, non-randomized pilot study](https://doi.org/10.7759/cureus.81530). *Cureus*, 2025.
+- Bigman G, Rusu ME, Shelawala N, et al. [A comprehensive scoping review on diet and nutrition in relation to long COVID-19 symptoms and recovery](https://doi.org/10.3390/nu17111802). *Nutrients*, 2025.

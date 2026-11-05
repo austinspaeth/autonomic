@@ -6,16 +6,22 @@ summary: "Systolic over diastolic is only the start. Two derived numbers, mean a
 description: "Mean arterial pressure (MAP) and pulse pressure explained: the formulas, what they reveal about perfusion and stroke volume, and why a low pulse pressure matters in POTS."
 keywords: "mean arterial pressure, MAP, pulse pressure, MAP formula, low pulse pressure, pulse pressure POTS, arterial stiffness, perfusion pressure, orthostatic intolerance"
 date: 2026-07-09
-updated: 2026-07-09
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1760985882646-84ff241429b8?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Rusty Watson / Unsplash"
 tldr: "Mean arterial pressure (MAP) is the average pressure perfusing your organs across the whole heartbeat, estimated as (systolic + 2 x diastolic) / 3: diastole is weighted double because it lasts about twice as long. Pulse pressure (PP) is simply systolic minus diastolic, the size of the push each beat delivers, and a rough proxy for stroke volume and arterial stiffness. A low pulse pressure (under roughly 25 mmHg) can signal poor flow and is worth watching in POTS; a high one often reflects stiff arteries. The app grades both against a recovery-optimum band and tracks their trend."
+question: "What do mean arterial pressure and pulse pressure tell me?"
+app:
+  feature: hrv-readings
+  hook: "Log your blood pressure and see it graded."
+  line: "Enter your blood pressure in Autonomic and it works out your mean arterial pressure and pulse pressure, and tracks them over time."
 categories:
   - basics
 faq:
   - q: "What is mean arterial pressure?"
-    a: "Mean arterial pressure (MAP) is the average pressure in your arteries across one full heartbeat, the pressure that actually drives blood into your organs. Because your heart spends about twice as long resting (diastole) as contracting (systole), MAP sits closer to the diastolic number than to the systolic. It is estimated as (systolic + 2 x diastolic) / 3, and a MAP of roughly 70 mmHg or more is generally needed to perfuse the organs at rest."
+    a: "Mean arterial pressure (MAP) is the average pressure in your arteries across one full heartbeat, the pressure that actually drives blood into your organs. Because your heart spends about twice as long resting (diastole) as contracting (systole), MAP sits closer to the diastolic number than to the systolic. It is estimated as (systolic + 2 x diastolic) / 3, and a MAP of about 65 mmHg is the floor clinicians commonly use for keeping the organs perfused."
   - q: "What is pulse pressure?"
     a: "Pulse pressure is systolic minus diastolic: the difference between the peak and the trough of a heartbeat. It reflects how big a push each beat delivers, which tracks loosely with stroke volume (how much blood the heart ejects per beat) and with the stiffness of your large arteries. A typical resting pulse pressure is around 40 mmHg."
   - q: "Is a low pulse pressure dangerous?"
@@ -107,7 +113,7 @@ MAP is not the simple midpoint between systolic and diastolic, because the heart
   For a reading of 116/74, that is (116 + 148) ÷ 3 ≈ <strong>93 mmHg</strong>. Notice the answer sits much closer to the diastolic 74 than to the systolic 116, because diastole dominates the timeline.
 </div>
 
-Clinicians generally treat a MAP of about **70 mmHg** as the floor for perfusing the organs at rest; below that, tissues start to be shortchanged. That is why MAP, not systolic, is the pressure watched most closely in critical-care settings. For recovery tracking, a MAP that trends downward over weeks, or dips below your usual range when you stand, is a more honest early warning than the top number alone.
+Clinicians commonly use a MAP of about **65 mmHg** as the floor for perfusing the organs; below that, tissues start to be shortchanged. That is why MAP, not systolic, is the pressure watched most closely in critical-care settings. For recovery tracking, a MAP that trends downward over weeks, or dips below your usual range when you stand, is a more honest early warning than the top number alone.
 
 ## Pulse pressure: the size of each push
 
@@ -220,7 +226,7 @@ Enter a reading and the calculator computes both derived numbers and grades each
 
 The reason MAP and pulse pressure earn a place in recovery tracking is that they catch problems the raw systolic can miss. In POTS and orthostatic intolerance, the failure mode is usually low flow: reduced blood volume, pooling in the legs on standing, and a smaller amount of blood ejected per beat. A shrinking pulse pressure is one of the cleanest fingerprints of that, and a MAP that sags toward the perfusion floor is what actually leaves your brain short when you stand and feel the room swim.
 
-This is exactly why the [orthostatic stand test](/insights/pots/the-orthostatic-stand-test-at-home/) is so revealing: watching MAP and pulse pressure *change* between lying and standing exposes the low-flow response that a single seated reading hides. And because these numbers are derived from the same cuff reading you already take, they cost nothing extra to track. <a href="https://www.dysautonomiainternational.org/page.php?ID=30" target="_blank" rel="noopener">Dysautonomia International</a> describes orthostatic intolerance as a disorder of the circulatory response to standing, and these are the numbers that describe that response most directly. For blood-pressure context and the categories these values build on, the <a href="https://www.ahajournals.org/doi/10.1161/HYP.0000000000000065" target="_blank" rel="noopener">2017 ACC/AHA guideline</a> is the reference.
+This is exactly why the [orthostatic stand test](/insights/pots/the-orthostatic-stand-test-at-home/) is so revealing: watching MAP and pulse pressure *change* between lying and standing exposes the low-flow response that a single seated reading hides. And because these numbers are derived from the same cuff reading you already take, they cost nothing extra to track. <a href="https://www.dysautonomiainternational.org/page.php?ID=30" target="_blank" rel="noopener">Dysautonomia International</a> describes POTS as an excessively fast heart rate and lightheadedness on standing, and these are the numbers that describe the circulation behind that response most directly. For blood-pressure context and the categories these values build on, the <a href="https://www.ahajournals.org/doi/10.1161/HYP.0000000000000065" target="_blank" rel="noopener">2017 ACC/AHA guideline</a> is the reference.
 
 <details class="prose-details">
   <summary><strong>Worked example: a narrowing pulse pressure on standing</strong></summary>
@@ -233,8 +239,15 @@ This is exactly why the [orthostatic stand test](/insights/pots/the-orthostatic-
 
 ## The bottom line
 
-Mean arterial pressure is the average pressure actually perfusing your organs, estimated as (systolic + 2 × diastolic) ÷ 3, weighted toward diastolic because the heart rests longer than it contracts, and a value around 70 mmHg or more is the resting floor for good perfusion. Pulse pressure is systolic minus diastolic, the size of each beat's push, and a proxy for stroke volume and arterial stiffness. A low or narrowing pulse pressure is a meaningful low-flow signal in POTS and orthostatic intolerance, while a wide one usually points to stiff arteries. Both come free from the reading you already take, both are graded on a two-sided recovery band, and both are best read as a trend beside your other numbers. For the autonomic-balance indices built from these same values, see [the autonomic blood-pressure indices](/insights/basics/autonomic-blood-pressure-indices-kerdo-robinson-kvas/).
+Mean arterial pressure is the average pressure actually perfusing your organs, estimated as (systolic + 2 × diastolic) ÷ 3, weighted toward diastolic because the heart rests longer than it contracts, and about 65 mmHg is the floor clinicians commonly use for good perfusion. Pulse pressure is systolic minus diastolic, the size of each beat's push, and a proxy for stroke volume and arterial stiffness. A low or narrowing pulse pressure is a meaningful low-flow signal in POTS and orthostatic intolerance, while a wide one usually points to stiff arteries. Both come free from the reading you already take, both are graded on a two-sided recovery band, and both are best read as a trend beside your other numbers. For the autonomic-balance indices built from these same values, see [the autonomic blood-pressure indices](/insights/basics/autonomic-blood-pressure-indices-kerdo-robinson-kvas/).
 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. If your readings concern you or your symptoms are worsening, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Evans L, Rhodes A, Alhazzani W, et al. [Surviving sepsis campaign: international guidelines for management of sepsis and septic shock 2021](https://doi.org/10.1007/s00134-021-06506-y). *Intensive Care Medicine*, 2021.
+- Dart AM, Kingwell BA. [Pulse pressure: a review of mechanisms and clinical relevance](https://doi.org/10.1016/s0735-1097(01)01108-1). *Journal of the American College of Cardiology*, 2001.
+- Whelton PK, Carey RM, Aronow WS, et al. [2017 ACC/AHA/AAPA/ABC/ACPM/AGS/APhA/ASH/ASPC/NMA/PCNA guideline for the prevention, detection, evaluation, and management of high blood pressure in adults](https://doi.org/10.1161/HYP.0000000000000065). *Hypertension*, 2018.
+- Dysautonomia International. [Postural Orthostatic Tachycardia Syndrome](https://www.dysautonomiainternational.org/page.php?ID=30).

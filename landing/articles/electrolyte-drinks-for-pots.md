@@ -6,10 +6,16 @@ summary: "Most sports drinks are far too dilute to help POTS. The number that ac
 description: "How to choose an electrolyte drink for POTS: why sodium per serving is the number that matters, a comparison of LMNT, Liquid IV, Nuun, Pedialyte and Gatorade, plus a simple DIY electrolyte recipe."
 keywords: "electrolyte drinks for POTS, best electrolyte drink POTS, sodium for POTS, DIY electrolyte drink, LMNT POTS, Liquid IV POTS, oral rehydration solution POTS, how much sodium POTS, electrolytes dysautonomia, salt drink POTS"
 date: 2026-10-09
-updated: 2026-10-09
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1744209375191-889d9fdef3f7?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 tldr: "For POTS, the useful number on an electrolyte drink is milligrams of sodium per serving, not the brand or flavor. Most sports drinks (Gatorade, Powerade) carry only 150 to 160 mg of sodium per cup, which is far below what most POTS protocols aim for. Higher-sodium options like LMNT (~1000 mg) or an oral rehydration mix get you there faster, and a pinch of salt plus a splash of juice in a liter of water does the same job for pennies. A little glucose actually helps your gut absorb the sodium and water. None of this replaces medical advice, and anyone with high blood pressure, kidney or heart conditions should set a sodium target with their clinician first."
+question: "Which electrolyte drink is best for POTS?"
+app:
+  feature: insights
+  hook: "Find out whether your electrolyte drink helps you."
+  line: "Log your drinks and water, and Autonomic shows whether the days you have them line up with better days and steadier numbers."
 categories:
   - food
   - pots
@@ -101,7 +107,7 @@ Sodium is the electrolyte that holds water inside your blood vessels. In POTS, a
 Here is the problem with most electrolyte drinks: they were designed for healthy athletes replacing modest sweat losses, not for someone trying to expand blood volume. So they are diluted for taste. A standard sports drink gives you about as much sodium as a light snack, when many POTS protocols are aiming far higher across the day. You can drink it all afternoon and barely move the needle, then conclude electrolytes "don't work for you." They do. The dose was just too small.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 320" role="img" aria-label="Horizontal bar chart comparing sodium per serving across common electrolyte drinks. LMNT is about 1000 mg, an oral rehydration mix about 500 to 700 mg, Liquid IV about 500 mg, Pedialyte about 370 mg, Nuun Sport about 300 mg, Gatorade about 160 mg, and coconut water about 40 mg. A homemade mix with a quarter teaspoon of salt sits around 575 mg.">
+  <svg viewBox="0 0 720 320" role="img" aria-label="Horizontal bar chart comparing sodium per serving across common electrolyte drinks. LMNT is about 1000 mg, an oral rehydration mix about 500 to 700 mg, Liquid IV about 500 mg, Pedialyte about 370 mg, Nuun Sport about 300 mg, Gatorade about 160 mg, and packaged coconut water about 60 mg. A homemade mix with a quarter teaspoon of salt sits around 575 mg.">
     <g font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">
       <text x="10" y="34">LMNT (1 stick)</text>
       <text x="10" y="70">Oral rehydration mix</text>
@@ -120,7 +126,7 @@ Here is the problem with most electrolyte drinks: they were designed for healthy
       <rect x="210" y="166" width="170" height="18" rx="4" fill="#eab308" opacity="0.8" />
       <rect x="210" y="202" width="138" height="18" rx="4" fill="#f97316" />
       <rect x="210" y="238" width="74" height="18" rx="4" fill="#e03127" />
-      <rect x="210" y="274" width="20" height="18" rx="4" fill="#e03127" opacity="0.7" />
+      <rect x="210" y="274" width="28" height="18" rx="4" fill="#e03127" opacity="0.7" />
     </g>
     <g font-family="Space Mono, monospace" font-size="12" fill="var(--dim-2)">
       <text x="678" y="37">~1000</text>
@@ -130,7 +136,7 @@ Here is the problem with most electrolyte drinks: they were designed for healthy
       <text x="388" y="181">~370</text>
       <text x="356" y="217">~300</text>
       <text x="292" y="253">~160</text>
-      <text x="238" y="289">~40</text>
+      <text x="246" y="289">~60</text>
     </g>
     <text x="365" y="312" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">Approximate milligrams of sodium per serving. Formulas change, so always check the current label.</text>
   </svg>
@@ -159,9 +165,9 @@ Below are rough sodium figures for popular choices. Treat them as ballpark: manu
 | Pedialyte (classic, 12 oz) | ~370 mg | ~280 mg | Designed for rehydration; widely available. |
 | Nuun Sport | ~300 mg | ~150 mg | Low sugar tablets; convenient but modest sodium. |
 | Gatorade / Powerade (12 oz) | ~150 to 160 mg | ~45 mg | Weak on sodium, higher sugar. A flavored fluid, not a salt source. |
-| Coconut water (1 cup) | ~40 mg | ~470 mg | High potassium, very low sodium. Not a POTS salt source. |
+| Coconut water (1 cup) | ~60 mg (packaged) | ~470 mg | High potassium, low sodium. Fresh coconut water can carry much more, but still far less than a POTS target. Not a POTS salt source. |
 
-A few things stand out. Coconut water gets marketed as "nature's sports drink," but for POTS it is almost backward: lots of potassium, barely any sodium. Standard Gatorade and Powerade are fine as something pleasant to sip, but you would need roughly six to seven cups to match one high-sodium stick, which is a lot of sugar and fluid for the sodium you get. And the higher-sodium products are not magic, they are just concentrated. You can reproduce any of them at home.
+A few things stand out. Coconut water gets marketed as "nature's sports drink," but for POTS it is almost backward: lots of potassium, little sodium. Standard Gatorade and Powerade are fine as something pleasant to sip, but you would need roughly six to seven cups to match one high-sodium stick, which is a lot of sugar and fluid for the sodium you get. And the higher-sodium products are not magic, they are just concentrated. You can reproduce any of them at home.
 
 ## Why a little sugar actually helps
 
@@ -248,3 +254,12 @@ The honest way to know if an electrolyte routine is working is not how you feel 
 **Can electrolyte drinks replace my medication?** No. Salt and fluids are a foundation, but many people need compression, graded exercise or medication as well. Never change a prescribed treatment based on an article.
 
 <p style="font-size:.85rem;color:var(--dim-2);margin-top:2rem">These are educational field notes, not medical advice. POTS and dysautonomia overlap with conditions where extra salt can be harmful, and individual needs vary widely. Set your sodium and fluid targets with a clinician who knows your history, and discuss any changes with them first.</p>
+
+## Sources
+
+- Raj SR, Fedorowski A, Sheldon RS. [Diagnosis and management of postural orthostatic tachycardia syndrome](https://doi.org/10.1503/cmaj.211373). *CMAJ*, 2022.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Raj SR, Biaggioni I, Yamhure PC, et al. [Renin-aldosterone paradox and perturbed blood volume regulation underlying postural tachycardia syndrome](https://doi.org/10.1161/01.CIR.0000160356.97313.5D). *Circulation*, 2005.
+- Ofei SY, Fuchs GJ. [Principles and practice of oral rehydration](https://doi.org/10.1007/s11894-019-0734-1). *Current Gastroenterology Reports*, 2019.
+- Jordan J, Shannon JR, Black BK, et al. [The pressor response to water drinking in humans: a sympathetic reflex?](https://doi.org/10.1161/01.cir.101.5.504) *Circulation*, 2000.
+- U.S. Food and Drug Administration. [Sodium in your diet](https://www.fda.gov/food/nutrition-education-resources-materials/sodium-your-diet). Updated 2024.

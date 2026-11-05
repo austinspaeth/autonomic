@@ -6,11 +6,17 @@ summary: "Magnesium is one of the most recommended supplements in POTS and long 
 description: "Does magnesium improve HRV? An honest look at magnesium for HRV, sleep and POTS: what the evidence shows, forms compared (glycinate, citrate, oxide, threonate), the blood-pressure caution, dosing, and how to track your own response. Educational, non-diagnostic."
 keywords: "magnesium and HRV, magnesium for POTS, does magnesium improve HRV, magnesium glycinate sleep, best magnesium for POTS, magnesium heart rate variability, magnesium palpitations, magnesium dosage, elemental magnesium, magnesium threonate, magnesium vagal tone, magnesium blood pressure POTS"
 date: 2026-08-07
-updated: 2026-08-07
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1693996045463-6ea86d10a2e7?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Brooke Lark / Unsplash"
 tldr: "Magnesium is an essential mineral your nerves, muscles and heart cannot run without, and it helps quiet the excitatory side of your nervous system. The direct evidence that a supplement raises HRV is modest and strongest in people who are actually deficient, but the indirect route is solid: magnesium can improve sleep quality, and better sleep reliably lifts the next morning's reading. Serum magnesium is a poor test because less than 1 percent of your body's magnesium is in the blood. Forms matter mostly for absorption and side effects, not magic: glycinate is gentle and calming, citrate is well absorbed but loosens stools, oxide is cheap and poorly absorbed. In POTS there is a real caution, because magnesium can relax blood vessels and nudge blood pressure down, so start low and watch your standing symptoms. Because the response is individual, the useful move is to hold your dose and timing steady and track your HRV, resting heart rate and stand test against your own baseline."
+question: "Does magnesium actually help HRV and POTS?"
+app:
+  feature: insights
+  hook: "See your numbers since you started magnesium."
+  line: "Log magnesium in Autonomic and it compares your HRV, sleep and symptoms before and after you started, so you can tell if it helps you."
 categories:
   - food
   - recovery
@@ -291,3 +297,11 @@ Magnesium is essential, commonly low, and genuinely useful for sleep and calm in
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Supplements can interact with medications and are not right for everyone, particularly with kidney disease. Talk with your doctor or pharmacist before starting magnesium, and if your symptoms are worsening, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Gröber U, Schmidt J, Kisters K. [Magnesium in prevention and therapy](https://doi.org/10.3390/nu7095388). *Nutrients*, 2015.
+- Institute of Medicine. [Dietary Reference Intakes for Calcium, Phosphorus, Magnesium, Vitamin D, and Fluoride: Magnesium](https://www.nationalacademies.org/read/5776/chapter/8). National Academies Press, 1997.
+- Walker AF, Marakis G, Christie S, et al. [Mg citrate found more bioavailable than other Mg preparations in a randomised, double-blind study](https://pubmed.ncbi.nlm.nih.gov/14596323/). *Magnesium Research*, 2003.
+- Abbasi B, Kimiagar M, Sadeghniiat K, et al. [The effect of magnesium supplementation on primary insomnia in elderly: a double-blind placebo-controlled clinical trial](https://pmc.ncbi.nlm.nih.gov/articles/PMC3703169/). *Journal of Research in Medical Sciences*, 2012.
+- Zhang X, Li Y, Del Gobbo LC, et al. [Effects of magnesium supplementation on blood pressure: a meta-analysis of randomized double-blind placebo-controlled trials](https://doi.org/10.1161/HYPERTENSIONAHA.116.07664). *Hypertension*, 2016.

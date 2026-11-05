@@ -6,11 +6,17 @@ summary: "Your heartbeat rhythm can be split into frequency bands, each reflecti
 description: "The HRV frequency domain explained: HF, LF and VLF power bands, total power, and the LF/HF ratio: what each measures, good target ranges, and how to read them in POTS and long COVID recovery."
 keywords: "HRV frequency domain, LF power, HF power, VLF, total power, LF/HF ratio, spectral analysis HRV, power spectrum, sympathovagal balance, POTS, long COVID"
 date: 2026-07-09
-updated: 2026-07-09
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1747633126452-dee49902fc6e?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Zach Kessinger / Unsplash"
 tldr: "Spectral analysis splits your heartbeat rhythm into frequency bands. HF (0.15–0.4 Hz) is the fast, breath-linked band and reads as almost pure vagal tone. LF (0.04–0.15 Hz) is the slower baroreflex band, a mix of both branches that leans sympathetic under stress. VLF (below 0.04 Hz) reflects slow regulatory processes and is unreliable in short readings. Total power is the sum, higher is generally better, but the mix across bands matters more than the total. The LF/HF ratio is a rough balance marker best judged on unstructured readings and on its trend."
+question: "What do LF, HF and VLF power mean in HRV?"
+app:
+  feature: hrv-readings
+  hook: "See your frequency bands after every reading."
+  line: "Autonomic works out HF, LF, VLF and total power from each paced HRV reading and grades them, so the bands mean something."
 categories:
   - basics
   - hrv
@@ -22,7 +28,7 @@ faq:
   - q: "Is high LF power bad?"
     a: "Not by itself. LF is a mix of sympathetic and parasympathetic influence, so high LF can mean stress, or it can simply mean you were breathing slowly. Slow paced breathing deliberately pumps LF up, so a large LF reading during a breathing exercise is expected and healthy, not a warning sign."
   - q: "Why is VLF unreliable in short readings?"
-    a: "VLF sits below 0.04 Hz, meaning its slowest waves take longer than 25 seconds to complete a cycle. A one-to-five-minute reading only captures a handful of those cycles, which is not enough to estimate the band reliably. The 1996 Task Force standards recommend at least five minutes, and really longer, before VLF and even LF should be trusted."
+    a: "VLF sits below 0.04 Hz, meaning its slowest waves take longer than 25 seconds to complete a cycle. A one-to-five-minute reading only captures a handful of those cycles, which is not enough to estimate the band reliably. The 1996 Task Force standards set minimum recording lengths of 1 minute for HF, 2 minutes for LF and 5 minutes for VLF, with longer recordings preferred for VLF."
 ---
 
 <script>
@@ -154,7 +160,7 @@ But here is the key idea: **the mix matters more than the total.** A healthy rea
 
 ## VLF: real, but not from a short reading
 
-VLF is where a lot of confusion starts, so it is worth being blunt. The slowest VLF waves sit below 0.04 Hz, meaning a single cycle takes **longer than 25 seconds**. A one-to-five-minute reading only contains a handful of those cycles, far too few for a stable estimate. The Task Force standards recommend **at least five minutes**, and really longer, before VLF (and even LF) can be trusted.
+VLF is where a lot of confusion starts, so it is worth being blunt. The slowest VLF waves sit below 0.04 Hz, meaning a single cycle takes **longer than 25 seconds**. A one-to-five-minute reading only contains a handful of those cycles, far too few for a stable estimate. The Task Force standards set minimum recording lengths of **1 minute for HF, 2 minutes for LF and 5 minutes for VLF**, with longer recordings preferred for VLF.
 
 For that reason, in a short at-home reading, VLF is best treated as a **lower-is-better nuisance band**: a large VLF often just means baseline drift, movement or a slow trend contaminating the reading rather than genuine slow-wave regulation.
 
@@ -222,7 +228,7 @@ Enter your LF and HF power to see the ratio and where it lands:
 
 ## Reading the frequency view in recovery
 
-In POTS, long COVID and post-viral dysautonomia the frequency picture often shows the same "stuck on" bias as the rest of your data: **suppressed HF**, a **higher LF/HF ratio**, and total power that sits below where you would like it. That is the sympathetic tilt these conditions are known for, seen through a spectral lens.
+In POTS, the frequency picture is less clear-cut than the rest of your data. A 2019 review found HF trending lower and the LF/HF ratio trending higher in POTS, but neither difference was significant: only RMSSD (lower) and heart rate (higher) clearly set POTS apart from healthy people. So treat the spectral view as a supporting lens, not the main signal.
 
 As with every HRV metric, the individual number on any given morning matters far less than the **direction over weeks**. Many people watch their HF power climb and their LF/HF ratio settle as pacing pays off, often before the symptoms ease. Pair the frequency view with the [PNS, SNS and stress-index trio](/insights/basics/pns-index-sns-index-stress-index-explained/) and the [complete HRV guide](/insights/hrv/hrv-complete-guide/) for the fullest picture, and remember that reading length and consistency (covered in [how to measure HRV accurately at home](/insights/basics/how-to-measure-hrv-accurately-at-home/)) make or break the frequency numbers especially.
 
@@ -233,3 +239,10 @@ The frequency domain splits your heartbeat rhythm into bands, each reflecting a 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. If your readings concern you or your symptoms are worsening, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Task Force of the European Society of Cardiology and the North American Society of Pacing and Electrophysiology. [Heart rate variability: standards of measurement, physiological interpretation and clinical use](https://doi.org/10.1161/01.CIR.93.5.1043). *Circulation*, 1996.
+- Shaffer F, Ginsberg JP. [An overview of heart rate variability metrics and norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.
+- Billman GE. [The LF/HF ratio does not accurately measure cardiac sympatho-vagal balance](https://doi.org/10.3389/fphys.2013.00026). *Frontiers in Physiology*, 2013.
+- Swai J, Hu Z, Zhao X, et al. [Heart rate and heart rate variability comparison between postural orthostatic tachycardia syndrome versus healthy participants; a systematic review and meta-analysis](https://doi.org/10.1186/s12872-019-01298-y). *BMC Cardiovascular Disorders*, 2019.

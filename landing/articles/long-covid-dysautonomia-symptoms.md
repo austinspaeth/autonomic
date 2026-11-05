@@ -6,11 +6,17 @@ summary: "Racing heart on standing, dizziness, brain fog, exertion crashes and t
 description: "How to tell when long COVID symptoms are autonomic: racing heart on standing, dizziness, brain fog, exercise intolerance and temperature changes, plus a simple at-home stand test and what to track."
 keywords: "long COVID dysautonomia symptoms, long COVID racing heart, long COVID dizziness, post-COVID POTS symptoms, brain fog, temperature dysregulation, orthostatic intolerance, blood pooling"
 date: 2026-05-16
-updated: 2026-05-16
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1499399814141-542cbd57935b?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Stacey Koenitz / Unsplash"
 tldr: "Many long COVID symptoms that feel scattered and unrelated actually cluster around one system: the autonomic nervous system that runs your heart rate, blood pressure and temperature on autopilot. If standing makes your heart race and your head swim, if effort triggers a crash a day later, and if your body's thermostat feels broken, that pattern is worth measuring. A simple at-home stand test plus a few weeks of standing heart rate and symptom notes gives you something real to bring to a clinician."
+question: "Are my long COVID symptoms a sign of dysautonomia?"
+app:
+  feature: pots-stand-test
+  hook: "See what standing does to your heart rate."
+  line: "Autonomic guides you through a home stand test and records how much your heart rate rises, so you have the pattern in numbers."
 categories:
   - postviral
   - pots
@@ -128,3 +134,11 @@ If your long COVID symptoms get worse when you stand and better when you lie dow
   for personalized care. <em>These same symptoms (racing heart, dizziness, fatigue and fog) can have many other causes, from anemia and thyroid disease to cardiac and inflammatory conditions, so a large heart rate rise on standing is a reason to get evaluated, not a self-diagnosis.</em> Talk with a qualified
   clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Dysautonomia International. [Postural orthostatic tachycardia syndrome](http://www.dysautonomiainternational.org/page.php?ID=30).
+- Davis HE, McCorkell L, Vogel JM, et al. [Long COVID: major findings, mechanisms and recommendations](https://doi.org/10.1038/s41579-022-00846-2). *Nature Reviews Microbiology*, 2023.
+- Novak P, Systrom DM, Witte A, et al. [Shared autonomic phenotype of long COVID and myalgic encephalomyelitis/chronic fatigue syndrome](https://doi.org/10.1371/journal.pone.0341278). *PLoS One*, 2026.
+- Astin R, Banerjee A, Baker MR, et al. [Long COVID: mechanisms, risk factors and recovery](https://doi.org/10.1113/EP090802). *Experimental Physiology*, 2023.

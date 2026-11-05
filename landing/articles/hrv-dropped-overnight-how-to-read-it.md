@@ -6,11 +6,17 @@ summary: "You checked your morning HRV and it cratered. Before you spiral, here 
 description: "Why did your HRV drop overnight? The common causes of a low HRV day, why a single number is noise, and how to read a 7-14 day rolling baseline instead of spiraling."
 keywords: "why did my HRV drop, low HRV one day, HRV overnight drop, HRV trend vs single day, HRV anxiety, reading HRV, rolling baseline, resting heart rate trend"
 date: 2026-06-04
-updated: 2026-06-04
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1654145268052-6b68f1d94519?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Ahya Agawis / Unsplash"
 tldr: "One low HRV morning is almost always noise, not a warning. Short sleep, a drink, a late heavy meal, stress, hormones, or just a different posture can swing a single reading. Watch a 7-14 day rolling baseline instead. A real signal is a sustained multi-day decline, especially when resting heart rate is climbing at the same time."
+question: "Why did my HRV drop overnight?"
+app:
+  feature: hrv-readings
+  hook: "Put one bad morning in context."
+  line: "Autonomic reads today's HRV against your recent baseline and logs your sleep and symptoms, so one low number is easier to read calmly."
 categories:
   - hrv
   - recovery
@@ -46,7 +52,7 @@ Most of the time, a low morning HRV traces back to something completely mundane 
 
 There is a particular trap that people recovering from POTS, dysautonomia, and long COVID fall into: checking HRV every morning and letting the number set the emotional tone of the day. A high reading brings relief; a low one brings dread. Over time you are not tracking your nervous system anymore, you are riding it like a stock ticker, and it is exhausting.
 
-The problem is that a single day of HRV is genuinely, mathematically noisy. Healthy people see their readings swing 20, 30, even 40 percent from one morning to the next with nothing wrong at all. Chasing that number day to day is like judging the climate by whether it rained this morning. It is the wrong timescale.
+The problem is that a single day of HRV is genuinely, mathematically noisy. In healthy people, large day-to-day swings are normal, with nothing wrong at all. Chasing that number day to day is like judging the climate by whether it rained this morning. It is the wrong timescale.
 
 This is the core idea this whole app is built around, and it is worth repeating: [track trends, not days](/insights/hrv/hrv-complete-guide/). One reading is weather. The trend is climate.
 
@@ -97,7 +103,7 @@ The signal gets much louder when a falling HRV is paired with a **rising resting
 | **3-7 days trending down**, HR flat | A soft signal. Ease off, prioritize sleep. |
 | **Sustained drop + rising resting HR** | A real signal. Back off before you crash. |
 
-Illness is the other case where a genuine, lasting dip shows up. Post-viral conditions and infections can blunt HRV for extended stretches: research on long COVID, for example, has documented [measurably reduced heart rate variability](https://www.nature.com/articles/s41598-023-50276-0) in affected patients. If your baseline drops and stays down without an obvious lifestyle cause, that is trend-level information worth taking seriously. Basics matter too: hydration and [electrolyte balance influence HRV](https://pmc.ncbi.nlm.nih.gov/articles/PMC12433138/), which is one more reason a single dehydrated morning is not a verdict.
+Illness is the other case where a genuine, lasting dip shows up. Post-viral conditions and infections can blunt HRV for extended stretches: research on long COVID, for example, has documented [measurably reduced heart rate variability](https://www.nature.com/articles/s41598-023-50276-0) in affected patients. If your baseline drops and stays down without an obvious lifestyle cause, that is trend-level information worth taking seriously. Basics matter too: hydration and [electrolyte balance influence HRV](https://doi.org/10.1038/s41598-019-52775-5), which is one more reason a single dehydrated morning is not a verdict.
 
 <div class="callout callout-warn"><strong>The two-number rule.</strong> Never read HRV in isolation. A dip alone is often nothing; a dip alongside a rising resting heart rate and worsening symptoms is your nervous system asking you to rest. Watch them together.</div>
 
@@ -118,3 +124,12 @@ One low HRV morning is almost always noise. The night before explains most of th
   for personalized care. <em>A persistent, unexplained change in your HRV or resting heart rate is worth discussing with a clinician.</em> Talk with a qualified
   clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Pietilä J, Helander E, Korhonen I, et al. [Acute effect of alcohol intake on cardiovascular autonomic regulation during the first hours of sleep in a large real-world sample of Finnish employees: observational study](https://doi.org/10.2196/mental.9519). *JMIR Mental Health*, 2018.
+- Schmalenberger KM, Eisenlohr-Moul TA, Würth L, et al. [A systematic review and meta-analysis of within-person changes in cardiac vagal activity across the menstrual cycle: implications for female health and future studies](https://doi.org/10.3390/jcm8111946). *Journal of Clinical Medicine*, 2019.
+- Mishra T, Wang M, Metwally AA, et al. [Pre-symptomatic detection of COVID-19 from smartwatch data](https://doi.org/10.1038/s41551-020-00640-6). *Nature Biomedical Engineering*, 2020.
+- Plews DJ, Laursen PB, Stanley J, et al. [Training adaptation and heart rate variability in elite endurance athletes: opening the door to effective monitoring](https://doi.org/10.1007/s40279-013-0071-8). *Sports Medicine*, 2013.
+- da Silva ALG, Vieira LDP, Dias LS, et al. [Impact of long COVID on the heart rate variability at rest and during deep breathing maneuver](https://doi.org/10.1038/s41598-023-50276-0). *Scientific Reports*, 2023.
+- Young HA, Cousins A, Johnston S, et al. [Autonomic adaptations mediate the effect of hydration on brain functioning and mood: evidence from two randomized controlled trials](https://doi.org/10.1038/s41598-019-52775-5). *Scientific Reports*, 2019.

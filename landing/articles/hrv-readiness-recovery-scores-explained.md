@@ -6,11 +6,17 @@ summary: "Oura Readiness, Whoop Recovery, Garmin Body Battery and Fitbit Daily R
 description: "What an HRV readiness or recovery score means: how Oura, Whoop, Garmin and Fitbit build the number, why it is baseline-relative, and where it misleads people with POTS and long COVID."
 keywords: "HRV readiness score, recovery score, what is a good readiness score, Oura readiness, Whoop recovery, Garmin body battery, Fitbit daily readiness, HRV recovery score meaning, readiness score POTS, recovery score long COVID, HRV baseline"
 date: 2026-09-27
-updated: 2026-09-27
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1508672019048-805c876b67e2?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Unsplash"
 tldr: "An HRV readiness or recovery score is one number, usually 0 to 100, that most wearables build mainly from your overnight heart rate variability plus resting heart rate, sleep and sometimes breathing rate. The key thing to understand is that it is baseline-relative: it compares last night to your own recent average, not to a healthy population. That makes it useful for spotting when you are below your normal, but it also means a chronically low nervous system can drift downward and still read 'green,' because the baseline quietly follows you down. Read the direction over weeks, check it against a stand test rather than trusting the supine number alone, and remember that a delayed crash can land a day or two after a green morning."
+question: "What does my HRV readiness or recovery score mean?"
+app:
+  feature: hrv-readings
+  hook: "A daily score you can look inside."
+  line: "Autonomic builds a daily score out of 100 from your morning HRV and other readings, and shows what went into it."
 categories:
   - hrv
   - recovery
@@ -22,7 +28,7 @@ faq:
   - q: "Why is my recovery score green when I still feel terrible?"
     a: "A few reasons. The score is relative to your baseline, so if your nervous system has been suppressed for months, the baseline recalibrates to those low numbers and 'green' just means 'normal for the current you.' Overnight HRV is also measured lying down, which can look recovered while you still crash on standing. And most of these algorithms were tuned on healthy people whose main stressor is exercise, so they underweight the immune and post-viral load that dominates conditions like long COVID and POTS."
   - q: "Which recovery score is most accurate: Oura, Whoop, Garmin or Fitbit?"
-    a: "There is no single winner, and accuracy depends more on wearing the device consistently than on the brand. Chest straps and finger sensors capture cleaner beat-to-beat data than wrist and ring optical sensors, so any composite is only as good as the HRV underneath it. What matters most is picking one device, wearing it the same way every night, and following your own trend rather than comparing your number to someone else's."
+    a: "There is no single winner, and accuracy depends more on wearing the device consistently than on the brand. Chest straps are generally cleaner than optical sensors, so any composite is only as good as the HRV underneath it. What matters most is picking one device, wearing it the same way every night, and following your own trend rather than comparing your number to someone else's."
   - q: "Should I skip exercise on a low recovery score?"
     a: "A low score is a reasonable prompt to be cautious, especially in post-viral illness where overexertion can trigger a delayed crash, but it is one input, not an order. Read it alongside how you actually feel, your symptoms, and a stand test if you have one. And do not treat a high score as permission to push: in conditions with delayed post-exertional malaise, you can feel and score fine the morning before a crash lands. Always discuss activity changes with your clinician."
 social:
@@ -206,7 +212,7 @@ The fix is not to throw the relative score away. It is to read it next to a fixe
 
 **Why is my recovery score green when I still feel terrible?** Usually because the baseline has recalibrated to your low numbers, because the overnight measure is taken lying down and misses your orthostatic load, or because the algorithm was tuned for exercise stress rather than post-viral illness.
 
-**Which recovery score is most accurate?** No single brand wins. Accuracy depends far more on wearing the device consistently and on the quality of the underlying HRV data. Chest straps beat wrist and ring optical sensors for clean beat-to-beat signal, and more on that is in [how accurate HRV wearables are](/insights/research/how-accurate-are-hrv-wearables/).
+**Which recovery score is most accurate?** No single brand wins. Accuracy depends far more on wearing the device consistently and on the quality of the underlying HRV data. Chest straps are generally cleaner than optical sensors, and more on that is in [how accurate HRV wearables are](/insights/research/how-accurate-are-hrv-wearables/).
 
 **Should I skip exercise on a low recovery score?** Treat it as a prompt to be cautious, not an order, and never treat a high score as permission to push if you live with delayed post-exertional malaise. Read it beside how you feel and a stand test, and discuss activity changes with your clinician.
 
@@ -217,3 +223,12 @@ An HRV readiness or recovery score is a clever compression of a whole night into
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Individual physiology varies, and if your readings concern you or your symptoms are worsening, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Task Force of the European Society of Cardiology and the North American Society of Pacing and Electrophysiology. [Heart rate variability: standards of measurement, physiological interpretation and clinical use](https://doi.org/10.1161/01.CIR.93.5.1043). *Circulation*, 1996.
+- Shaffer F, Ginsberg JP. [An overview of heart rate variability metrics and norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.
+- Miller DJ, Capodilupo JV, Lastella M, et al. [Analyzing changes in respiratory rate to predict the risk of COVID-19 infection](https://doi.org/10.1371/journal.pone.0243693). *PLoS One*, 2020.
+- Stone JD, Ulman HK, Tran K, et al. [Assessing the accuracy of popular commercial technologies that measure resting heart rate and heart rate variability](https://doi.org/10.3389/fspor.2021.585870). *Frontiers in Sports and Active Living*, 2021.
+- Stussman B, Williams A, Snow J, et al. [Characterization of post-exertional malaise in patients with myalgic encephalomyelitis/chronic fatigue syndrome](https://doi.org/10.3389/fneur.2020.01025). *Frontiers in Neurology*, 2020.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.

@@ -6,11 +6,17 @@ summary: "SDNN is the broadest single HRV number: the standard deviation of the 
 description: "What SDNN means in heart rate variability: how it's calculated, normal ranges for short readings, why it differs from 24-hour SDNN, and how to track it in POTS and long COVID recovery."
 keywords: "SDNN, what is SDNN, SDNN normal range, HRV SDNN, standard deviation NN, heart rate variability, RMSSD vs SDNN, SDNN meaning, POTS, long COVID"
 date: 2026-07-09
-updated: 2026-07-09
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1524863479829-916d8e77f114?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Eneko Uruñuela / Unsplash"
 tldr: "SDNN is the standard deviation of all the intervals between your heartbeats in a reading, the single broadest measure of heart rate variability. Higher generally means a more adaptable, better-regulated nervous system. It blends every rhythm in the recording, so it's a capacity number rather than a pure vagal one. Short at-home readings run far lower than the 24-hour SDNN values you'll see quoted, so compare yourself only to your own baseline and watch the multi-week trend."
+question: "What is SDNN in HRV, and why does mine look low?"
+app:
+  feature: hrv-readings
+  hook: "See your SDNN graded for short readings."
+  line: "Autonomic grades SDNN on a scale made for short morning readings, so your number is compared fairly and tracked over weeks."
 categories:
   - basics
   - hrv
@@ -165,7 +171,7 @@ In POTS, long COVID and post-viral illness, a suppressed SDNN is common and expe
 
 <details class="prose-details">
   <summary><strong>Worked example: two readings, same average heart rate</strong></summary>
-  <p>Say two readings both average 70 bpm (a mean interval of about 857 ms). In the first, the intervals range from roughly 780 to 940 ms, the standard deviation works out near 55 ms, a "Good" reading. In the second, they barely move, from 845 to 870 ms, a standard deviation closer to 12 ms, deep in the "Bad" band. Same heart rate, wildly different variability. That gap is exactly what SDNN exists to surface, and why average heart rate alone can hide a struggling autonomic system.</p>
+  <p>Say two readings both average 70 bpm (a mean interval of about 857 ms). In the first, the intervals range from roughly 780 to 940 ms, the standard deviation works out near 55 ms, a "Good" reading. In the second, they barely move, from 845 to 870 ms, a standard deviation closer to 6 or 7 ms, deep in the "Bad" band. Same heart rate, wildly different variability. That gap is exactly what SDNN exists to surface, and why average heart rate alone can hide a struggling autonomic system.</p>
 </details>
 
 <div class="callout callout-tip">
@@ -179,3 +185,11 @@ SDNN is the broad-strokes measure of heart rate variability: the standard deviat
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. If your readings concern you or your symptoms are worsening, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Task Force of the European Society of Cardiology and the North American Society of Pacing and Electrophysiology. [Heart rate variability: standards of measurement, physiological interpretation and clinical use](https://doi.org/10.1161/01.CIR.93.5.1043). *Circulation*, 1996.
+- Shaffer F, Ginsberg JP. [An overview of heart rate variability metrics and norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.
+- Nunan D, Sandercock GR, Brodie DA. [A quantitative systematic review of normal values for short-term heart rate variability in healthy adults](https://doi.org/10.1111/j.1540-8159.2010.02841.x). *Pacing and Clinical Electrophysiology*, 2010.
+- Kleiger RE, Miller JP, Bigger JT, et al. [Decreased heart rate variability and its association with increased mortality after acute myocardial infarction](https://doi.org/10.1016/0002-9149(87)90795-8). *American Journal of Cardiology*, 1987.
+- Swai J, Hu Z, Zhao X, et al. [Heart rate and heart rate variability comparison between postural orthostatic tachycardia syndrome versus healthy participants; a systematic review and meta-analysis](https://doi.org/10.1186/s12872-019-01298-y). *BMC Cardiovascular Disorders*, 2019.

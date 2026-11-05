@@ -11,6 +11,11 @@ author: "Austin Spaeth"
 photoLocation: "/articles/fibromyalgia-dysautonomia-pots-hrv/cover.webp"
 photoAttribution: "Autonomic"
 tldr: "Fibromyalgia is defined by widespread pain, fatigue, unrefreshing sleep and brain fog, but many people with it also get dizzy on standing, have a racing heart and run hot and cold. That is the autonomic nervous system. Studies consistently find lower heart rate variability in chronic pain conditions including fibromyalgia, POTS is common on tilt testing, and a meta-analysis found small fiber pathology in about half of people with fibromyalgia. It overlaps heavily with ME/CFS and long COVID, and in one survey nearly a third of people recovering from COVID met fibromyalgia criteria. There is no single test, but exercise is the best-supported treatment, pacing lets you build it without a crash, and tracking HRV, standing heart rate, sleep and symptoms shows what actually moves your bad days."
+question: "Is fibromyalgia linked to POTS and dysautonomia?"
+app:
+  feature: hrv-readings
+  hook: "Track your pain and nervous system together."
+  line: "Log pain, fatigue and sleep beside a morning HRV reading, so you see how your nervous system and symptoms move together."
 categories:
   - recovery
   - postviral

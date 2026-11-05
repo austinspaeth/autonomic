@@ -6,9 +6,16 @@ summary: "The lying-to-standing heart rate test is the single most useful at-hom
 description: "A step-by-step guide to the at-home orthostatic stand test for POTS and dysautonomia: how to measure your heart-rate rise on standing, the 30 and 40 bpm thresholds, and what recovery tells you."
 keywords: "orthostatic test, stand test, POTS, heart rate rise, dysautonomia, orthostatic intolerance, NASA lean test"
 date: 2026-05-21
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1615486511484-92e172cc4fe0?q=80&w=1760&auto=format&fit=crop"
 tldr: "Lie down for several minutes, record your heart rate, then stand and record it again at intervals. In POTS, the heart rate jumps sharply on standing: a sustained rise of 30 bpm or more in adults (40+ in teens) is a hallmark. Tracking both the rise and how quickly it recovers gives you a repeatable read on how your body is handling upright posture."
+question: "How do I do a POTS stand test at home?"
+app:
+  feature: pots-stand-test
+  hook: "Run a guided stand test from your couch."
+  line: "Autonomic walks you through lying down and standing, records your heart rate rise with a watch or strap, and charts it over time."
 categories:
   - pots
   - basics
@@ -38,7 +45,7 @@ Do it at roughly the same time of day, ideally before caffeine, food, or medicat
 
 The headline number is the **rise**: how far your heart rate climbs from lying to standing and *stays* climbed.
 
-- A rise of **10 to 20 bpm** is a normal physiologic response.
+- In healthy people the rise is often **20 to 30 bpm**, which is why the POTS threshold sits at 30.
 - A **sustained** rise of **30 bpm or more** in adults (without a drop in blood pressure) is the classic POTS threshold.
 - In teens (roughly 12 to 19), the threshold is higher, around **40 bpm**.
 
@@ -57,3 +64,11 @@ This is why logging the 1-minute reading is worth the extra moment: the *shape* 
 One stand test is a snapshot. A stand test logged a few times a week, over weeks, is a story. As recovery progresses, many people see the standing rise gradually shrink and the recovery quicken, long before they "feel" recovered.
 
 Autonomic scores each stand test against these thresholds automatically and charts the rise and recovery over time, so you can see the trajectory instead of guessing from scattered numbers. Pair it with how you felt, and you will start to see which days, foods, and activities move it.
+
+## Sources
+
+- Freeman R, Wieling W, Axelrod FB, et al. [Consensus statement on the definition of orthostatic hypotension, neurally mediated syncope and the postural tachycardia syndrome](https://doi.org/10.1007/s10286-011-0119-5). *Clinical Autonomic Research*, 2011.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Raj SR. [Postural tachycardia syndrome (POTS)](https://doi.org/10.1161/CIRCULATIONAHA.112.144501). *Circulation*, 2013.
+- Plash WB, Diedrich A, Biaggioni I, et al. [Diagnosing postural tachycardia syndrome: comparison of tilt testing compared with standing haemodynamics](https://doi.org/10.1042/CS20120276). *Clinical Science*, 2013.
+- Dysautonomia International. [Postural orthostatic tachycardia syndrome](https://dysautonomiainternational.org/page.php?ID=30).

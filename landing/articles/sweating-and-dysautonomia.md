@@ -6,11 +6,17 @@ summary: "Sweating is run entirely by your autonomic nervous system, so when tha
 description: "Why dysautonomia causes abnormal sweating: the sudomotor pathway, hyperhidrosis vs anhidrosis, night sweats and adrenaline surges in POTS and long COVID, sweat tests, and what tends to help."
 keywords: "sweating and dysautonomia, dysautonomia sweating, POTS night sweats, hyperhidrosis dysautonomia, anhidrosis, sudomotor dysfunction, long COVID excessive sweating, POTS sweating too much, can't sweat dysautonomia, autonomic sweating"
 date: 2026-09-22
-updated: 2026-09-22
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1601084195907-44baaa49dabd?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Delaney Van / Unsplash"
 tldr: "Your sweat glands are controlled by sympathetic nerves, so a dysregulated autonomic system frequently shows up as abnormal sweating. Dysautonomia can push it either way: too much (generalized hyperhidrosis, adrenaline-driven cold sweats, night sweats), too little (hypohidrosis or anhidrosis, often from small fiber neuropathy, which causes heat intolerance), or a patchy mix where some areas overcompensate for others. The pattern is a clue to the autonomic picture, not a diagnosis. Track it beside your other signs, replace fluids and salt when you sweat heavily, prioritize cooling if you barely sweat, and get sudden or one-sided drenching sweats checked by a clinician."
+question: "Why do I sweat too much or too little with dysautonomia?"
+app:
+  feature: insights
+  hook: "Find what lines up with your sweating days."
+  line: "Log sweating as a symptom in Autonomic, and it looks for what lines up with it, from heat and meals to sleep and weather."
 categories:
   - pots
   - postviral
@@ -193,3 +199,11 @@ Sweating is a direct readout of your autonomic nervous system, so in dysautonomi
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own body, not to diagnose or treat any condition. Sudden, drenching, or one-sided sweating, and night sweats with fever or weight loss, need proper medical evaluation. If your symptoms are new or worsening, work with a clinician who can assess you.
 </div>
+
+## Sources
+
+- Shibasaki M, Crandall CG. [Mechanisms and controllers of eccrine sweating in humans](https://doi.org/10.2741/s94). *Frontiers in Bioscience (Scholar Edition)*, 2010.
+- Illigens BM, Gibbons CH. [Sweat testing to evaluate autonomic function](https://doi.org/10.1007/s10286-008-0506-8). *Clinical Autonomic Research*, 2009.
+- Gibbons CH, Bonyhay I, Benson A, et al. [Structural and functional small fiber abnormalities in the neuropathic postural tachycardia syndrome](https://doi.org/10.1371/journal.pone.0084716). *PLoS One*, 2013.
+- Oaklander AL, Mills AJ, Kelley M, et al. [Peripheral neuropathy evaluations of patients with prolonged long COVID](https://doi.org/10.1212/NXI.0000000000001146). *Neurology: Neuroimmunology & Neuroinflammation*, 2022.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.

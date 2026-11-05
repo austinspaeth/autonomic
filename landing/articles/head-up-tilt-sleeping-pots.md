@@ -6,11 +6,17 @@ summary: "Sleeping with the head of your bed raised is a simple, low-cost habit 
 description: "Does raising the head of your bed help POTS? How head-up tilt sleeping preserves overnight blood volume, who it helps most, and how high to raise it safely."
 keywords: "head-up tilt sleeping, elevating head of bed POTS, raising head of bed orthostatic intolerance, sleeping inclined POTS, nocturnal diuresis POTS, orthostatic hypotension bed elevation, POTS morning symptoms, how to sleep with POTS"
 date: 2026-09-30
-updated: 2026-09-30
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1688384452844-8364c3e2fc28?q=80&w=1171&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Unsplash"
-tldr: "Raising the head of your whole bed a few inches keeps a gentle gravitational gradient overnight, which reduces the fluid you lose to nighttime urine production and nudges the hormones that hold on to salt and water. The result, for many people, is a bit more blood volume in the tank by morning and softer stand-up symptoms. The evidence is strongest for orthostatic hypotension and autonomic failure, and reasonable but less proven for POTS. Raise the head of the bed itself with risers, a full-length wedge, or an adjustable base, starting around 4 to 6 inches; do not just stack pillows. Give it a few weeks and track your morning stand test to see if it helps you."
+tldr: "Raising the head of your whole bed a few inches keeps a gentle gravitational gradient overnight, which reduces the fluid you lose to nighttime urine production and nudges the hormones that hold on to salt and water. The result, for many people, is a bit more blood volume in the tank by morning and softer stand-up symptoms. The evidence is strongest for orthostatic hypotension and autonomic failure, and reasonable but less proven for POTS. Raise the head of the bed itself with risers, a full-length wedge, or an adjustable base, aiming for about 6 to 9 inches; do not just stack pillows. Give it a few weeks and track your morning stand test to see if it helps you."
+question: "Does raising the head of my bed help POTS?"
+app:
+  feature: insights
+  hook: "Find out if the raised bed helps you."
+  line: "Note the night you raise your bed and keep taking morning readings. Autonomic shows how your numbers changed since you started."
 categories:
   - pots
   - recovery
@@ -18,7 +24,7 @@ faq:
   - q: "Does raising the head of the bed actually help POTS?"
     a: "It can, though the evidence is stronger for orthostatic hypotension and autonomic failure than for POTS specifically. The mechanism is sound: a gentle overnight incline reduces the nighttime fluid loss that shrinks blood volume by morning and stimulates the salt-and-water-retaining hormone system. Because low blood volume is common in POTS, many people find their morning symptoms ease. It is low-cost and low-risk, so it is a reasonable thing to trial while tracking your own numbers."
   - q: "How high should I raise the head of my bed for POTS?"
-    a: "Most home guidance starts around 4 to 6 inches (about 10 to 15 cm) of head elevation and adjusts from there, up to roughly 8 to 12 inches if it is comfortable and helping. That is a gentle incline, not sitting upright. Raise the head end of the whole bed frame with sturdy risers, slide a full-length wedge under the mattress, or use an adjustable base. Start low and give each setting a couple of weeks."
+    a: "Consensus guidance for orthostatic hypotension is about 6 to 9 inches (15 to 23 cm) of head elevation, adjusted for comfort. That is a gentle incline, not sitting upright. Raise the head end of the whole bed frame with sturdy risers, slide a full-length wedge under the mattress, or use an adjustable base. Give each setting a couple of weeks."
   - q: "Can I just use extra pillows instead?"
     a: "Not really. Stacking pillows bends your neck and upper back while your hips and legs stay flat, which does not create the head-to-toe gravitational gradient that drives the benefit, and it can leave you with neck and shoulder pain. The point is to tilt the whole body along a straight line, so raise the bed itself rather than propping your head."
   - q: "Is head-up tilt sleeping safe?"
@@ -44,7 +50,7 @@ social:
 
     The reason that made sense to me once I read about it: when you lie flat all night, your body treats the pooled central blood volume as "too much fluid" and makes more urine overnight, so you wake up a little more volume-depleted right when you have to stand up. Sleeping on a gentle incline keeps a slight head-to-toe gradient, which cuts that overnight fluid loss and helps the salt-and-water-retaining hormones do their job.
 
-    What actually worked: I raised the head end of the whole bed frame on sturdy risers (started around 5 inches). Not pillows, since that just wrecks your neck and does nothing useful. Gave it a few weeks. My morning stand-test heart rate jump got noticeably smaller and I felt less flattened waking up.
+    What actually worked: I raised the head end of the whole bed frame on sturdy risers (started around 6 inches). Not pillows, since that just wrecks your neck and does nothing useful. Gave it a few weeks. My morning stand-test heart rate jump got noticeably smaller and I felt less flattened waking up.
 
     Worth saying it is not magic and the strongest research is actually in orthostatic hypotension, not POTS specifically, so results vary. I kept my salt, fluids and compression going and ran it past my doctor before changing anything. Not medical advice, just a patient comparing notes. Longer writeup with how high to raise it and how to track it: https://autonomic.care/insights/pots/head-up-tilt-sleeping-pots/?utm_source=reddit&utm_medium=social&utm_campaign=head-up-tilt-sleeping-pots
   x: |
@@ -71,9 +77,9 @@ social:
   function band(inches) {
     if (isNaN(inches) || inches <= 0) return null;
     var deg = Math.round(Math.asin(Math.min(inches / BED, 1)) * 180 / Math.PI);
-    if (inches < 4) return ['About ' + deg + '\\u00b0', '#eab308', 'Gentle. A fine place to start, but many people go a little higher.'];
-    if (inches <= 8) return ['About ' + deg + '\\u00b0', '#54d98a', 'The common starting range for orthostatic intolerance.'];
-    if (inches <= 12) return ['About ' + deg + '\\u00b0', '#22c55e', 'A firmer tilt. Good if it is comfortable and helping.'];
+    if (inches < 6) return ['About ' + deg + '\\u00b0', '#eab308', 'Gentle. Below the 6 to 9 inch range consensus guidance suggests.'];
+    if (inches <= 9) return ['About ' + deg + '\\u00b0', '#54d98a', 'Inside the 6 to 9 inch range consensus guidance suggests.'];
+    if (inches <= 12) return ['About ' + deg + '\\u00b0', '#22c55e', 'A firmer tilt, above the usual range. Fine if it is comfortable and helping.'];
     return ['About ' + deg + '\\u00b0', '#f97316', 'Steep. Check comfort and sliding, and raise it with your clinician.'];
   }
   function update() {
@@ -143,12 +149,12 @@ The net result, for people it suits, is waking with a fuller tank: a smaller hea
 Be clear-eyed about the evidence, because it is not uniform across conditions.
 
 <div class="callout callout-note">
-  <strong>The evidence gradient in one line.</strong> Head-up tilt sleeping is best established for neurogenic orthostatic hypotension and autonomic failure, where it is a standard non-drug measure and also eases the supine hypertension those patients often have. For POTS it is a reasonable, physiology-based extrapolation with less direct trial evidence, so treat it as a personal experiment.
+  <strong>The evidence gradient in one line.</strong> Head-up tilt sleeping is best established for neurogenic orthostatic hypotension and autonomic failure, where it is a standard non-drug measure and also eases the supine hypertension those patients often have, though the trials behind it are few and small. For POTS it is a reasonable, physiology-based extrapolation with less direct trial evidence, so treat it as a personal experiment.
 </div>
 
 | Situation | How likely to help | Notes |
 | --- | --- | --- |
-| Orthostatic hypotension / autonomic failure | Well supported | A recognized first-line non-drug step; also reduces overnight supine high blood pressure |
+| Orthostatic hypotension / autonomic failure | Recommended, limited trials | A recognized first-line non-drug step; also reduces overnight supine high blood pressure |
 | POTS with low blood volume | Reasonable to try | Fits the hypovolemia picture; strongest when combined with salt, fluids and compression |
 | Hyperadrenergic POTS with supine hypertension | Case by case | Can help the night-time pressure; coordinate closely with your clinician |
 | Symptoms clearly worst in the morning | Worth a trial | This is exactly the window the tilt targets |
@@ -158,7 +164,7 @@ If you are still sorting out which pattern you have, [orthostatic hypotension vs
 
 ## How high to raise it, and how to do it right
 
-The goal is a gentle, straight-line tilt of the whole body, not sitting propped up. Most guidance starts around **4 to 6 inches** (about 10 to 15 cm) of head elevation and adjusts from there, up to roughly 8 to 12 inches (20 to 30 cm) if that is comfortable and clearly helping. That is a shallow angle; you should still feel like you are lying down.
+The goal is a gentle, straight-line tilt of the whole body, not sitting propped up. Consensus guidance for orthostatic hypotension is about **6 to 9 inches** (15 to 23 cm) of head elevation, adjusted for comfort. That is a shallow angle; you should still feel like you are lying down.
 
 Use this to sanity-check the rough incline your risers create, then let comfort and your morning numbers be the final judge:
 
@@ -231,8 +237,14 @@ Above all, this is an add-on. It works best stacked with salt and fluids, compre
 
 ## The bottom line
 
-Head-up tilt sleeping is a small, cheap change with a sensible mechanism behind it: a few inches of overnight incline reduces the fluid you lose to nighttime urine and helps your body hold on to salt and water, so you wake with a bit more blood volume for the hardest part of your day. The evidence is firmest in orthostatic hypotension and autonomic failure and more of a reasonable extrapolation in POTS, which is exactly why you should test it on yourself. Raise the whole bed with risers, a wedge, or an adjustable base rather than stacking pillows, start around 4 to 6 inches, give it a few weeks, and let your morning stand test tell you the truth.
+Head-up tilt sleeping is a small, cheap change with a sensible mechanism behind it: a few inches of overnight incline reduces the fluid you lose to nighttime urine and helps your body hold on to salt and water, so you wake with a bit more blood volume for the hardest part of your day. The evidence is firmest in orthostatic hypotension and autonomic failure and more of a reasonable extrapolation in POTS, which is exactly why you should test it on yourself. Raise the whole bed with risers, a wedge, or an adjustable base rather than stacking pillows, aim for about 6 to 9 inches, give it a few weeks, and let your morning stand test tell you the truth.
 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own patterns, not to diagnose or treat any condition. Talk with a clinician before changing how you sleep, your fluid and salt intake, or any medication, especially if you have high blood pressure lying down, heart problems, or you are pregnant.
 </div>
+
+## Sources
+
+- Gibbons CH, Schmidt P, Biaggioni I, et al. [The recommendations of a consensus panel for the screening, diagnosis, and treatment of neurogenic orthostatic hypotension and associated supine hypertension](https://doi.org/10.1007/s00415-016-8375-x). *Journal of Neurology*, 2017.
+- van der Stam AH, Shmuely S, de Vries NM, et al. [The impact of head-up tilt sleeping on orthostatic tolerance: a scoping review](https://doi.org/10.3390/biology12081108). *Biology (Basel)*, 2023.
+- Cooper VL, Hainsworth R. [Head-up sleeping improves orthostatic tolerance in patients with syncope](https://doi.org/10.1007/s10286-008-0494-8). *Clinical Autonomic Research*, 2008.

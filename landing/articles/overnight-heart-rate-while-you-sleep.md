@@ -6,11 +6,17 @@ summary: "Your overnight low is the cleanest resting heart rate you will ever ge
 description: "Overnight heart rate explained: why the sleeping low is the truest resting heart rate, when it occurs in the night, what the overnight high reflects, normal ranges, and what a rising overnight low predicts."
 keywords: "overnight heart rate, sleeping heart rate, lowest heart rate at night, overnight low heart rate, sleeping heart rate normal range, rising resting heart rate, nocturnal heart rate, heart rate during REM sleep, heart rate and illness warning"
 date: 2026-08-11
-updated: 2026-08-11
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1552858725-2758b5fb1286?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Jp Valery / Unsplash"
 tldr: "Your overnight low is the closest thing to a true resting heart rate you can measure: you are horizontal, unstimulated, unobserved and hours clear of caffeine, food and effort. It usually lands in the first half of the night, during deep sleep, and typically runs several beats below your morning seated reading. The overnight high reflects arousals, REM sleep, dreams and adrenaline surges, so it reads how disturbed the night was rather than how fit you are. A low that creeps up over several nights is one of the earliest warnings you get of infection, alcohol, overreaching, poor sleep or a coming flare, often before you feel anything. Read the trend across a week, never a single night."
+question: "What does my overnight heart rate say about me?"
+app:
+  feature: hrv-readings
+  hook: "Watch your overnight low over time."
+  line: "Autonomic brings in your sleep and overnight heart rate each morning beside your HRV, so a rising low is easy to spot."
 categories:
   - basics
   - recovery
@@ -186,3 +192,10 @@ Your overnight low is the closest thing to a true resting heart rate you can get
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. <em>Loud snoring, witnessed pauses in breathing, or an overnight heart rate that stays persistently high or drops unusually low deserve proper clinical evaluation.</em> Talk with a qualified clinician if your readings concern you.
 </div>
+
+## Sources
+
+- Somers VK, Dyken ME, Mark AL, et al. [Sympathetic-nerve activity during sleep in normal subjects](https://doi.org/10.1056/NEJM199302043280502). *New England Journal of Medicine*, 1993.
+- Trinder J, Kleiman J, Carrington M, et al. [Autonomic activity during human sleep as a function of time and sleep stage](https://doi.org/10.1046/j.1365-2869.2001.00263.x). *Journal of Sleep Research*, 2001.
+- Pietilä J, Helander E, Korhonen I, et al. [Acute effect of alcohol intake on cardiovascular autonomic regulation during the first hours of sleep in a large real-world sample of Finnish employees: observational study](https://doi.org/10.2196/mental.9519). *JMIR Mental Health*, 2018.
+- Mishra T, Wang M, Metwally AA, et al. [Pre-symptomatic detection of COVID-19 from smartwatch data](https://doi.org/10.1038/s41551-020-00640-6). *Nature Biomedical Engineering*, 2020.

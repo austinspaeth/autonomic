@@ -6,11 +6,17 @@ summary: "Heart rate variability falls with age and differs by sex, so there is 
 description: "HRV normal range by age and sex: realistic RMSSD and SDNN ballparks by decade, why the bands overlap, what a good HRV score actually means, and why your personal baseline beats any population chart."
 keywords: "HRV normal range, HRV by age, average HRV by age, good HRV score, what is a good HRV, HRV by age chart, RMSSD by age, SDNN normal range, heart rate variability normal, HRV chart, POTS HRV, long COVID HRV"
 date: 2026-07-24
-updated: 2026-07-24
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1508672019048-805c876b67e2?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Tim Swaan / Unsplash"
 tldr: "There is no universal HRV normal range: HRV declines with age, differs by sex, and depends heavily on how it was measured, so healthy people can differ by five-fold. As a rough guide for a short morning reading, RMSSD tends to run in the 40 to 70 ms range in your twenties and drift toward the teens and twenties past 60. But the spread inside any age band is wider than the gap between bands, so a single 'good HRV' target is close to meaningless. Track your own baseline and its direction over weeks instead."
+question: "What is a normal HRV for my age?"
+app:
+  feature: hrv-readings
+  hook: "Compare you to you, not a chart."
+  line: "Autonomic shows your HRV beside a healthy range for your age and sex, then grades each morning reading against your own baseline."
 categories:
   - hrv
   - basics
@@ -20,7 +26,7 @@ faq:
   - q: "What is a normal HRV for my age?"
     a: "HRV falls steadily with age. For a short at-home RMSSD reading, representative ballparks run roughly 40 to 70 ms in your twenties, 25 to 45 ms in your forties, and 15 to 30 ms past 60, with a very wide spread inside every band. Use these only as a sanity check, not a target, because measurement method and posture shift the numbers as much as age does."
   - q: "Does HRV differ between men and women?"
-    a: "Yes, modestly. Women tend to show slightly higher RMSSD and high-frequency (vagal) power, while men tend to show higher overall SDNN and total power. The differences are small compared with the age effect and the person-to-person spread, and they narrow after around age 50."
+    a: "Yes, modestly. Women tend to show higher high-frequency (vagal) power, while men tend to show higher overall SDNN and total power; RMSSD differences depend on age. The differences are small compared with the age effect and the person-to-person spread, and they narrow after around age 50."
   - q: "Why is my HRV lower than the charts say it should be?"
     a: "Population charts usually come from a different measurement window (24-hour or lab five-minute) and a different, often healthier sample than the person reading them. A short phone or wearable reading, a stressful night, or a condition like POTS or long COVID can all sit well below a generic chart while still being a perfectly readable personal baseline. Your own numbers over time are the signal; the chart is background."
   - q: "Is a higher HRV always better?"
@@ -29,7 +35,7 @@ social:
   linkedin: |
     One of the most Googled HRV questions is "what is a good HRV for my age," and the honest answer surprises people: the age bands overlap so heavily that the chart is almost useless as a personal target.
 
-    HRV does fall with age, and men and women differ a little (women a touch higher on vagal RMSSD, men a touch higher on overall SDNN). But the spread inside any single decade is wider than the gap between decades. A well-regulated 60-year-old can easily out-score an average, run-down 30-year-old. Add in the fact that a 24-hour recording, a lab five-minute strip and a phone reading produce completely different numbers, and comparing yourself to a population chart becomes mostly noise.
+    HRV does fall with age, and men and women differ a little (women a touch higher on vagal HF power, men a touch higher on overall SDNN). But the spread inside any single decade is wider than the gap between decades. A well-regulated 60-year-old can easily out-score an average, run-down 30-year-old. Add in the fact that a 24-hour recording, a lab five-minute strip and a phone reading produce completely different numbers, and comparing yourself to a population chart becomes mostly noise.
 
     What actually works: measure the same way each morning, ignore the absolute value, and watch your own baseline and its direction over 7 to 14 days. A rising personal trend is good news at any age and any starting number.
 
@@ -187,7 +193,7 @@ Notice how much the spread columns overlap. Someone at the top of the 55-to-64 b
 
 ## Does HRV differ between men and women?
 
-A little, and less than most people expect. On average, **women tend to show slightly higher RMSSD and high-frequency (vagal) power**, while **men tend to show higher overall SDNN and total power.** In plain terms, women often have a touch more of the fast, parasympathetic beat-to-beat variation, while men often have a touch more total spread across the whole recording.
+A little, and less than most people expect. On average, **women tend to show higher high-frequency (vagal) power**, while **men tend to show higher overall SDNN and total power.** RMSSD differences depend on age. In plain terms, women often have a touch more of the fast, parasympathetic beat-to-beat variation, while men often have a touch more total spread across the whole recording.
 
 Two caveats keep this in proportion. First, the sex difference is small compared with both the age effect and the raw person-to-person spread, so it will not explain a big gap between you and a chart. Second, the difference narrows with age, largely disappearing after around 50. There is also a within-cycle pattern worth knowing if you menstruate: HRV tends to run higher in the follicular phase and lower in the luteal phase, which we cover in [menstrual cycle and HRV](/insights/hrv/menstrual-cycle-hrv-pots/). The practical upshot is the same for everyone: compare like with like, and compare yourself to your own history rather than to someone else.
 
@@ -277,3 +283,13 @@ HRV does fall with age and differs slightly by sex, so a "normal range by age" c
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. HRV ranges vary by individual and by measurement method. If your readings concern you or your symptoms are worsening, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Nunan D, Sandercock GR, Brodie DA. [A quantitative systematic review of normal values for short-term heart rate variability in healthy adults](https://doi.org/10.1111/j.1540-8159.2010.02841.x). *Pacing and Clinical Electrophysiology*, 2010.
+- Shaffer F, Ginsberg JP. [An overview of heart rate variability metrics and norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.
+- Umetani K, Singer DH, McCraty R, et al. [Twenty-four hour time domain heart rate variability and heart rate: relations to age and gender over nine decades](https://doi.org/10.1016/S0735-1097(97)00554-8). *Journal of the American College of Cardiology*, 1998.
+- Voss A, Schroeder R, Heitmann A, et al. [Short-term heart rate variability: influence of gender and age in healthy subjects](https://doi.org/10.1371/journal.pone.0118308). *PLoS One*, 2015.
+- Koenig J, Thayer JF. [Sex differences in healthy human heart rate variability: a meta-analysis](https://doi.org/10.1016/j.neubiorev.2016.03.007). *Neuroscience and Biobehavioral Reviews*, 2016.
+- Kupper NH, Willemsen G, van den Berg M, et al. [Heritability of ambulatory heart rate variability](https://doi.org/10.1161/01.CIR.0000146334.96820.6E). *Circulation*, 2004.
+- Schmalenberger KM, Eisenlohr-Moul TA, Würth L, et al. [A systematic review and meta-analysis of within-person changes in cardiac vagal activity across the menstrual cycle: implications for female health and future studies](https://doi.org/10.3390/jcm8111946). *Journal of Clinical Medicine*, 2019.

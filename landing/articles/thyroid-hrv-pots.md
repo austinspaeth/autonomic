@@ -6,11 +6,17 @@ summary: "An overactive or underactive thyroid can raise your heart rate, drop y
 description: "Thyroid problems can mimic POTS and lower HRV. How hyperthyroidism and hypothyroidism change heart rate and heart rate variability, why to check thyroid labs, and how to track it at home."
 keywords: "thyroid and HRV, hyperthyroidism POTS, thyroid heart rate variability, is it thyroid or POTS, hashimoto dysautonomia, thyroid palpitations, subclinical hypothyroidism HRV, thyroid tachycardia, thyroid autonomic nervous system, TSH heart rate"
 date: 2026-09-20
-updated: 2026-09-20
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1769029174099-30d43d3e86b1?q=80&w=1740&auto=format&fit=crop"
 photoAttribution: "Unsplash"
 tldr: "Thyroid hormone is one of the strongest regulators of heart rate and autonomic balance. Too much of it (hyperthyroidism) speeds the heart, drives palpitations and lowers heart rate variability, which can look almost identical to POTS or inappropriate sinus tachycardia. Too little (hypothyroidism) tends to slow the heart but can still blunt HRV and leave you exhausted. Because thyroid problems are common, more common in women, often triggered or worsened after a viral illness, and usually treatable, a simple blood panel (TSH, free T4, free T3, and thyroid antibodies) is one of the first things worth ruling out when your resting heart rate is high or your HRV keeps reading low. Thyroid labs are a clinician's job to order and interpret; at-home tracking shows the pattern, not the diagnosis."
+question: "Could my thyroid be causing POTS-like symptoms?"
+app:
+  feature: doctor-reports
+  hook: "Bring your heart rate pattern to your thyroid workup."
+  line: "Autonomic turns your resting heart rate, HRV and symptoms into a summary your doctor can read alongside your thyroid labs."
 categories:
   - pots
   - hrv
@@ -194,3 +200,12 @@ The thyroid is a quiet but powerful hand on your heart rate and your HRV. Too mu
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational field notes to help you understand and track your own data, not a tool to diagnose or treat anything. <em>Thyroid disease is diagnosed and managed by a clinician using blood tests and, sometimes, imaging; heart rate and HRV tracking can support that conversation but cannot confirm or rule out a thyroid problem.</em> Talk with a qualified clinician before changing any medication (including thyroid medication), and seek care promptly if you have a very fast or irregular heartbeat, chest pain, fainting, or symptoms that are severe or getting worse.
 </div>
+
+## Sources
+
+- Klein I, Ojamaa K. [Thyroid hormone and the cardiovascular system](https://doi.org/10.1056/NEJM200102153440707). *New England Journal of Medicine*, 2001.
+- Brusseau V, Tauveron I, Bagheri R, et al. [Heart rate variability in hyperthyroidism: a systematic review and meta-analysis](https://doi.org/10.3390/ijerph19063606). *International Journal of Environmental Research and Public Health*, 2022.
+- Brusseau V, Tauveron I, Bagheri R, et al. [Effect of hyperthyroidism treatments on heart rate variability: a systematic review and meta-analysis](https://doi.org/10.3390/biomedicines10081982). *Biomedicines*, 2022.
+- Brusseau V, Tauveron I, Bagheri R, et al. [Heart rate variability in hypothyroid patients: a systematic review and meta-analysis](https://doi.org/10.1371/journal.pone.0269277). *PLoS One*, 2022.
+- Stasiak M, Lewiński A. [New aspects in the pathogenesis and management of subacute thyroiditis](https://doi.org/10.1007/s11154-021-09648-y). *Reviews in Endocrine and Metabolic Disorders*, 2021.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.

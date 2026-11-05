@@ -6,11 +6,17 @@ summary: "When you stand, gravity pulls a large volume of blood down into your l
 description: "Blood pooling in POTS explained: why blood collects in your legs and abdomen when you stand, how it drives the racing heart, why feet turn purple, and the compression, movement and fluid strategies that help."
 keywords: "blood pooling POTS, venous pooling POTS, why do my feet turn purple POTS, POTS legs purple, acrocyanosis POTS, blood pooling legs standing, orthostatic intolerance blood pooling, POTS compression garments, muscle pump POTS, splanchnic pooling"
 date: 2026-07-29
-updated: 2026-07-29
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1536685965216-c5f4478ec2cf?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Unsplash"
 tldr: "Every time you stand, gravity shifts roughly 300 to 800 mL of blood downward into your leg and abdominal veins. Normally your vessels clamp down within seconds to push it back up, but in POTS that reflex is weak or slow, so blood lingers in the lower body, less returns to the heart, and your heart rate climbs to keep output up. That is the pooling behind the racing heart, the heavy legs, and the dusky or purple feet many people notice after standing. It is a recognized feature of POTS, not usually dangerous, and it responds well to movement, compression, salt and fluids, leg elevation and gradual reconditioning. Track how your standing heart rate and symptoms respond, and discuss bigger changes with your clinician."
+question: "Why does blood pool in my legs when I stand?"
+app:
+  feature: pots-stand-test
+  hook: "Measure what standing does to your heart."
+  line: "A guided home stand test shows how much your heart rate climbs when you stand, the clearest sign of pooling you can see."
 categories:
   - pots
   - recovery
@@ -211,7 +217,7 @@ No single move fixes pooling, but they stack well. Here is the practical toolkit
 
 - **Engage the muscle pump.** Free, immediate, and covered above. Counter-maneuvers before and during standing, and never lock out at rigid attention.
 - **Compression, and include the abdomen.** Graduated compression physically shrinks the volume the veins can hold. Ankle-high socks are the least useful because so much blood pools higher up; **waist-high or thigh-high garments** and abdominal binders tend to help more. Common pressures are 20 to 30 mmHg, sometimes 30 to 40. See the reference below.
-- **Expand your plasma volume.** More fluid in the vessels means more to return even when some pools. Generous [salt and fluids](/insights/research/science-of-salt-and-fluids-for-pots/) are a first-line strategy, and an acute glass of cold water before standing produces a genuine, if short-lived, blood-pressure bump. Compression and fluids are the two pillars of standard [POTS management](/insights/pots/pots-treatment-salt-fluids-compression-medication/) for exactly this reason.
+- **Expand your plasma volume.** More fluid in the vessels means more to return even when some pools. Generous [salt and fluids](/insights/research/science-of-salt-and-fluids-for-pots/) are a first-line strategy, and a large glass of water before standing may help for a while: it clearly raises blood pressure in people with autonomic failure and in older adults, less so in young healthy people, and in orthostatic intolerance it has been shown to lower standing heart rate. Compression and fluids are the two pillars of standard [POTS management](/insights/pots/pots-treatment-salt-fluids-compression-medication/) for exactly this reason.
 - **Elevate and time your posture.** Legs up the wall, or feet above heart level, drains the pooled blood back centrally in minutes. Sleeping with the head of the bed slightly raised helps some people, and avoiding prolonged motionless standing and hot showers heads off pooling before it starts.
 - **Recondition, gradually.** This is the slow, foundational one. Deconditioning shrinks both leg muscle (the pump) and blood volume, tightening the loop. Structured, recumbent-first exercise like the [Levine protocol](/insights/pots/exercise-for-pots-levine-protocol/) rebuilds both over months. It feels backward to exercise a system that already struggles to stand, which is why it starts lying down. This is central to [recovery from post-viral dysautonomia](/insights/recovery/recovery-from-post-viral-dysautonomia/), where the pooling improves as capacity returns.
 
@@ -256,3 +262,16 @@ The racing heart, the leaden legs and the purple feet of POTS are not three prob
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Blood pooling and acrocyanosis are common in POTS, but new, one-sided, painful or hot leg swelling, or fainting with injury, needs prompt medical evaluation. Discuss any changes to your management with a clinician who knows your history.
 </div>
+
+## Sources
+
+- Truijen J, Bundgaard-Nielsen M, van Lieshout JJ. [A definition of normovolaemia and consequences for cardiovascular control during orthostatic and environmental stress](https://doi.org/10.1007/s00421-009-1346-5). *European Journal of Applied Physiology*, 2010.
+- Freeman R, Wieling W, Axelrod FB, et al. [Consensus statement on the definition of orthostatic hypotension, neurally mediated syncope and the postural tachycardia syndrome](https://doi.org/10.1007/s10286-011-0119-5). *Clinical Autonomic Research*, 2011.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Adler BL, Kuchinad K, Jeong SJ, et al. [Colour changes in the feet: a sign of autonomic symptoms in systemic sclerosis](https://doi.org/10.1093/rheumatology/keae516). *Rheumatology*, 2025.
+- Jacob G, Costa F, Shannon JR, et al. [The neuropathic postural tachycardia syndrome](https://doi.org/10.1056/NEJM200010053431404). *New England Journal of Medicine*, 2000.
+- Jordan J, Shannon JR, Black BK, et al. [The pressor response to water drinking in humans: a sympathetic reflex?](https://doi.org/10.1161/01.CIR.101.5.504). *Circulation*, 2000.
+- Shannon JR, Diedrich A, Biaggioni I, et al. [Water drinking as a treatment for orthostatic syndromes](https://doi.org/10.1016/S0002-9343(02)01025-2). *American Journal of Medicine*, 2002.
+- Bourne KM, Sheldon RS, Hall J, et al. [Compression garment reduces orthostatic tachycardia and symptoms in patients with postural orthostatic tachycardia syndrome](https://doi.org/10.1016/j.jacc.2020.11.040). *Journal of the American College of Cardiology*, 2021.
+- Krediet CT, van Dijk N, Linzer M, et al. [Management of vasovagal syncope: controlling or aborting faints by leg crossing and muscle tensing](https://doi.org/10.1161/01.CIR.0000030939.12646.8F). *Circulation*, 2002.
+- Fu Q, Vangundy TB, Galbreath MM, et al. [Cardiac origins of the postural orthostatic tachycardia syndrome](https://doi.org/10.1016/j.jacc.2010.02.043). *Journal of the American College of Cardiology*, 2010.

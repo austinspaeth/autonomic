@@ -6,11 +6,17 @@ summary: "Many people with POTS run on a genuinely smaller blood volume than ave
 description: "Low blood volume in POTS explained: how hypovolemia drives standing tachycardia and low HRV, why it happens, and the at-home metrics (resting HR, stand test, HRV) that track it."
 keywords: "low blood volume POTS, hypovolemic POTS, hypovolemia POTS, blood volume dysautonomia, low blood volume symptoms, POTS blood volume, plasma volume POTS, red cell volume POTS, salt and fluids POTS, standing tachycardia"
 date: 2026-08-16
-updated: 2026-08-16
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1651993737174-6890c1daef5b?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Maria Petersson / Unsplash"
 tldr: "A large share of people with POTS have a real, measurable reduction in blood volume, both the plasma and the red cell part. Less blood in the tank means less returns to the heart when you stand, so the heart speeds up to keep output steady and HRV falls. You cannot measure blood volume at home, but you can track its fingerprints: a higher morning resting heart rate, a bigger stand-test jump, and a lower HRV trend that lifts as salt, fluids and reconditioning rebuild the reserve."
+question: "Can low blood volume cause my racing heart in POTS?"
+app:
+  feature: hrv-readings
+  hook: "Track the signs of a fuller tank."
+  line: "Log water and salt in Autonomic beside your morning HRV and resting heart rate, and watch how your numbers move as you build volume back."
 categories:
   - pots
   - hrv
@@ -202,3 +208,11 @@ That is a slow, weeks-to-months arc, not an overnight fix, and it rarely moves i
 ## The honest caveats
 
 A few things worth keeping straight. Not everyone with POTS is hypovolemic: it is one important pattern that overlaps with the [other POTS subtypes](/insights/pots/pots-subtypes-explained/) rather than a separate diagnosis, and many people have a mix. Blood volume is not something a wearable measures, so everything on this page is about tracking indirect signals, not confirming a number. And these are educational field notes, not medical advice: if the pattern here sounds like you, the right next step is a clinician who can decide whether formal blood volume testing and a specific treatment plan make sense for your situation. Track the trend, bring it to your appointment, and let the reserve rebuild.
+
+## Sources
+
+- Raj SR, Biaggioni I, Yamhure PC, et al. [Renin-aldosterone paradox and perturbed blood volume regulation underlying postural tachycardia syndrome](https://doi.org/10.1161/01.CIR.0000160356.97313.5D). *Circulation*, 2005.
+- Fu Q, Vangundy TB, Galbreath MM, et al. [Cardiac origins of the postural orthostatic tachycardia syndrome](https://doi.org/10.1016/j.jacc.2010.02.043). *Journal of the American College of Cardiology*, 2010.
+- Garland EM, Gamboa A, Nwazue VC, et al. [Effect of high dietary sodium intake in patients with postural tachycardia syndrome](https://doi.org/10.1016/j.jacc.2021.03.005). *Journal of the American College of Cardiology*, 2021.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Dysautonomia International. [Postural orthostatic tachycardia syndrome](http://www.dysautonomiainternational.org/page.php?ID=30).

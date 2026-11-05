@@ -6,11 +6,17 @@ summary: "The Poincaré plot turns your heartbeat intervals into a scatter of do
 description: "Poincaré plot in HRV explained: what SD1 and SD2 mean, how they relate to RMSSD and SDNN, how to read the SD1/SD2 ellipse, and why the shape matters in POTS and long COVID recovery."
 keywords: "Poincaré plot, SD1, SD2, SD1 SD2 ratio, nonlinear HRV, Poincare plot HRV, SD1 vs RMSSD, heart rate variability scatter plot, HRV ellipse, POTS, long COVID"
 date: 2026-08-08
-updated: 2026-08-08
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1516739063901-94072f684dfc?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Max Nguyen / Unsplash"
-tldr: "A Poincaré plot draws each heartbeat interval against the next one, so a healthy, variable rhythm makes a long, comet-shaped cloud and a rigid rhythm makes a tight ball. Two numbers describe that cloud: SD1 is the width across the diagonal, which tracks fast vagal (parasympathetic) beat-to-beat change and equals RMSSD divided by the square root of two, and SD2 is the length along the diagonal, which reflects your overall variability. In POTS and long COVID the cloud usually runs small and tight, and it typically widens and lengthens over a recovery arc. Read the trend in same-time-of-day readings, not one plot."
+tldr: "A Poincaré plot draws each heartbeat interval against the next one, so a healthy, variable rhythm makes a long, comet-shaped cloud and a rigid rhythm makes a tight ball. Two numbers describe that cloud: SD1 is the width across the diagonal, which tracks fast vagal (parasympathetic) beat-to-beat change and equals RMSSD divided by the square root of two, and SD2 is the length along the diagonal, which reflects your overall variability. In POTS, including POTS that follows COVID, the cloud often runs small and tight because vagal HRV is reduced, while in long COVID more broadly the evidence is mixed. The cloud typically widens and lengthens over a recovery arc. Read the trend in same-time-of-day readings, not one plot."
+question: "What do SD1 and SD2 on a Poincare plot show?"
+app:
+  feature: hrv-readings
+  hook: "See your own beat-to-beat pattern."
+  line: "Take an HRV reading in Autonomic with your phone camera, a chest strap or a watch, and track SD1 and SD2 over time."
 categories:
   - basics
   - hrv
@@ -286,7 +292,7 @@ Notice that SD1 is fixed the moment you type your RMSSD, because it is just RMSS
 
 ## Reading the plot in POTS and long COVID
 
-In [POTS](/insights/pots/pots-subtypes-explained/), long COVID and post-viral dysautonomia, the autonomic system tends to sit biased toward "fight or flight," and the Poincaré plot shows it plainly: a **small, tight cluster** with a low SD1 (suppressed vagal change) and often a shortened SD2 (less overall variability). It is the same story RMSSD and SDNN tell, drawn as a shape. For how these conditions overlap and why the rhythm locks down, see [POTS, long COVID and MCAS](/insights/postviral/pots-long-covid-and-mcas-overlap/).
+In [POTS](/insights/pots/pots-subtypes-explained/), including POTS that follows COVID, studies find reduced vagal HRV, and the Poincaré plot shows it plainly: a **small, tight cluster** with a low SD1 (suppressed vagal change) and often a shortened SD2 (less overall variability). It is the same story RMSSD and SDNN tell, drawn as a shape. In long COVID more broadly the evidence is mixed: a pooled analysis found only a weak, uncertain trend toward lower HRV, so not everyone will see a tight cloud. For how these conditions overlap and why the rhythm locks down, see [POTS, long COVID and MCAS](/insights/postviral/pots-long-covid-and-mcas-overlap/).
 
 The encouraging part is that the cloud is not fixed. Vagal tone is trainable, and as people pace, sleep and recover, the comet usually **widens and lengthens** over months, sometimes before the symptoms ease. That mirrors the RMSSD climb we describe in [recovery from post-viral dysautonomia](/insights/recovery/recovery-from-post-viral-dysautonomia/), and it is why SD1 feeds directly into the [PNS index](/insights/basics/pns-index-sns-index-stress-index-explained/), the app's parasympathetic balance score. The Poincaré plot and the frequency-domain view are two angles on the same rhythm; the [VLF, LF and HF power guide](/insights/hrv/hrv-frequency-domain-vlf-lf-hf-power/) covers the other one.
 
@@ -308,8 +314,16 @@ The encouraging part is that the cloud is not fixed. Vagal tone is trainable, an
 
 ## The bottom line
 
-The Poincaré plot is the most intuitive HRV view you have: each dot is one pair of consecutive beats, a healthy rhythm draws a long wide comet, and a strained one collapses to a tight ball. SD1 is the width, an exact restatement of RMSSD that tracks fast vagal change, and SD2 is the length, a broad measure of overall variability close to SDNN. The SD1/SD2 ratio describes shape, not health, so read it gently. In POTS and long COVID the cloud tends to run small and tight and usually widens with recovery. Measure the same way each morning, follow the trend across weeks, and let the shape sit beside your other numbers rather than standing alone.
+The Poincaré plot is the most intuitive HRV view you have: each dot is one pair of consecutive beats, a healthy rhythm draws a long wide comet, and a strained one collapses to a tight ball. SD1 is the width, an exact restatement of RMSSD that tracks fast vagal change, and SD2 is the length, a broad measure of overall variability close to SDNN. The SD1/SD2 ratio describes shape, not health, so read it gently. In POTS the cloud tends to run small and tight and usually widens with recovery; in long COVID more broadly the picture is mixed. Measure the same way each morning, follow the trend across weeks, and let the shape sit beside your other numbers rather than standing alone.
 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> These are educational field notes to help you understand and track your own data, not a way to diagnose or treat any condition. HRV varies a lot between people and from day to day. If your readings worry you or your symptoms are worsening, discuss any changes with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Brennan M, Palaniswami M, Kamen P. [Do existing measures of Poincaré plot geometry reflect nonlinear features of heart rate variability?](https://doi.org/10.1109/10.959330) *IEEE Transactions on Biomedical Engineering*, 2001.
+- Ciccone AB, Siedlik JA, Wecht JM, et al. [Reminder: RMSSD and SD1 are identical heart rate variability metrics](https://doi.org/10.1002/mus.25573). *Muscle & Nerve*, 2017.
+- Shaffer F, Ginsberg JP. [An overview of heart rate variability metrics and norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.
+- Rigo S, Urechie V, Diedrich A, et al. [Impaired parasympathetic function in long-COVID postural orthostatic tachycardia syndrome: a case-control study](https://doi.org/10.1186/s42234-023-00121-6). *Bioelectronic Medicine*, 2023.
+- Schoene D, Deckert S, Barlinn K, et al. [Neurocardiac autonomic dysfunction in patients with post-COVID-19 condition: a systematic review and meta-analysis](https://doi.org/10.1111/ene.70561). *European Journal of Neurology*, 2026.

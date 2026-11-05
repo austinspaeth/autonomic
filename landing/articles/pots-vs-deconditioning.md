@@ -6,11 +6,17 @@ summary: "\"You're just deconditioned\" is one of the most common things people 
 description: "POTS vs deconditioning: both raise heart rate on standing, but deconditioning eases as fitness returns while POTS stays a sustained 30+ bpm rise. How to tell them apart at home with a stand test."
 keywords: "POTS vs deconditioning, is it POTS or deconditioning, deconditioning orthostatic tachycardia, POTS or out of shape, cardiac deconditioning POTS, deconditioning heart rate standing, POTS misdiagnosed deconditioning, orthostatic intolerance"
 date: 2026-08-09
-updated: 2026-08-09
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1544367567-0f2fcb009e0b?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "kike vega / Unsplash"
 tldr: "Both deconditioning and POTS can raise your heart rate when you stand, because both leave the heart working harder to fill against gravity. The difference is behaviour over time. A deconditioned heart rate rises modestly on standing and eases fairly predictably as you rebuild fitness. POTS is a sustained rise of at least 30 bpm (40 in teens) within ten minutes of standing, without a blood-pressure drop, that persists for months and does not simply resolve with a few weeks of exercise, often alongside a broader set of autonomic symptoms. The two overlap constantly (deconditioning is frequently part of POTS), so this is about direction and pattern, not a single reading, and it is worth confirming with a clinician rather than talking yourself out of care."
+question: "Is it POTS or am I just deconditioned?"
+app:
+  feature: pots-stand-test
+  hook: "Watch your stand test over time."
+  line: "Autonomic guides repeat home stand tests and keeps every result, so you can see whether your heart rate rise changes as you rebuild."
 categories:
   - pots
   - recovery
@@ -211,3 +217,11 @@ Deconditioning and POTS both raise your heart rate when you stand, which is why 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Standing heart-rate changes can have many causes. If your readings concern you or your symptoms are worsening, work with a clinician who can evaluate you properly and guide any change in activity.
 </div>
+
+## Sources
+
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Vernino S, Bourne KM, Stiles LE, et al. [Postural orthostatic tachycardia syndrome (POTS): State of the science and clinical care from a 2019 National Institutes of Health Expert Consensus Meeting, Part 1](https://doi.org/10.1016/j.autneu.2021.102828). *Autonomic Neuroscience*, 2021.
+- Fu Q, VanGundy TB, Galbreath MM, et al. [Cardiac origins of the postural orthostatic tachycardia syndrome](https://doi.org/10.1016/j.jacc.2010.02.043). *Journal of the American College of Cardiology*, 2010.
+- Fu Q, VanGundy TB, Shibata S, et al. [Exercise training versus propranolol in the treatment of the postural orthostatic tachycardia syndrome](https://doi.org/10.1161/HYPERTENSIONAHA.111.172262). *Hypertension*, 2011.
+- Centers for Disease Control and Prevention. [Strategies to Prevent Worsening of Symptoms (ME/CFS)](https://www.cdc.gov/me-cfs/hcp/clinical-care/treating-the-most-disruptive-symptoms-first-and-preventing-worsening-of-symptoms.html). 2024.

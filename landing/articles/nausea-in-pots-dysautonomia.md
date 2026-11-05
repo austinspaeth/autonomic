@@ -6,11 +6,17 @@ summary: "Nausea is one of the most common and most dismissed symptoms of POTS a
 description: "Why POTS, dysautonomia and long COVID cause nausea: vagal gut control, gastroparesis, orthostatic and postprandial patterns, MCAS, red flags, and what actually helps settle it."
 keywords: "nausea POTS, nausea dysautonomia, POTS stomach problems, why am I so nauseous POTS, gastroparesis nausea, orthostatic nausea, postprandial nausea POTS, long COVID nausea, dysautonomia queasy stomach, POTS nausea remedies"
 date: 2026-10-12
-updated: 2026-10-12
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1521868212215-fb62189f1889?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Nathan Dumlao / Unsplash"
 tldr: "Nausea in POTS, dysautonomia and long COVID is usually your autonomic nervous system misfiring in the gut: slowed stomach emptying, standing that drops blood flow to the brain and gut, adrenaline surges, blood pooling away from digestion, and in many people a mast cell or histamine component. Small frequent meals, steady salt and fluids, ginger, upright posture after eating, pacing, and treating any underlying gastroparesis or MCAS help most. Sudden severe pain, vomiting blood, weight loss or dehydration need prompt care."
+question: "Why do I feel nauseous with POTS?"
+app:
+  feature: insights
+  hook: "Find what lines up with your queasy days."
+  line: "Log nausea, meals and triggers in Autonomic and it shows what lines up with your worse days, so the pattern gets clearer."
 categories:
   - pots
   - postviral
@@ -22,7 +28,7 @@ faq:
   - q: "Why am I nauseous when I stand up with POTS?"
     a: "Standing up in POTS drops the amount of blood returning to your heart, so less reaches your brain and gut for a moment while your body compensates with a racing heart rate and an adrenaline surge. Both the reduced blood flow and the adrenaline can trigger nausea, which is why queasiness often rides along with the dizziness and lightheadedness of standing. Lying down or sitting, salt and fluids, and compression tend to ease this orthostatic nausea."
   - q: "What foods help nausea with POTS and dysautonomia?"
-    a: "Smaller, more frequent meals that are lower in fat and refined carbohydrate are easier on a slow stomach and steadier for blood sugar. Ginger, in tea, chews or capsules, has reasonable evidence for calming nausea. Staying ahead on salt and fluids supports the blood volume digestion needs. If your nausea flares after specific foods, especially aged, fermented or leftover items, a trial of a lower-histamine approach is worth exploring with your clinician."
+    a: "Smaller, more frequent meals that are lower in fat and refined carbohydrate are easier on a slow stomach and steadier for blood sugar. Ginger, in tea, chews or capsules, is worth a try: the best evidence is for nausea in pregnancy, and it has not been studied in POTS. Staying ahead on salt and fluids supports the blood volume digestion needs. If your nausea flares after specific foods, especially aged, fermented or leftover items, a trial of a lower-histamine approach is worth exploring with your clinician."
   - q: "When is nausea in dysautonomia a red flag?"
     a: "Occasional queasiness tied to standing or meals is usually part of the autonomic picture. Seek prompt care for severe or sudden abdominal pain, vomiting blood or material that looks like coffee grounds, black or bloody stools, persistent vomiting with signs of dehydration, unintentional weight loss, or nausea with a high fever or a severe new headache. Those point to problems beyond ordinary dysautonomia."
 social:
@@ -137,7 +143,7 @@ No single trick switches it off, but these stack well and most cost nothing. The
 - **Eat smaller and more often.** A slow stomach copes far better with a little at a time. Several small meals beat two or three large ones, and lower-fat, lower-refined-carbohydrate choices leave the stomach faster and keep blood sugar steadier. This is the single biggest lever for postprandial and gastroparesis-type nausea.
 - **Stay ahead on salt and fluids.** More [salt and fluid](/insights/research/science-of-salt-and-fluids-for-pots/) means more blood volume to support both standing and digestion, and it directly eases the orthostatic and morning patterns. Sip steadily through the day rather than gulping a large amount at once, which can itself feel heavy on a slow stomach.
 - **Stay upright after eating.** Lying flat right after a meal lets a slow stomach and reflux work against you. Staying gently upright for thirty to sixty minutes, without piling on exertion, helps the meal move and keeps acid down.
-- **Try ginger.** Ginger has reasonable evidence for calming nausea and is easy to trial as tea, chews or capsules. It is one of the few over-the-counter remedies worth a genuine look, and a warm ginger tea doubles as a gentle way to get fluids in.
+- **Try ginger.** The best evidence for ginger is for nausea in pregnancy, it is less certain for other kinds, and it has not been studied in POTS, but it is easy to trial as tea, chews or capsules. A warm ginger tea doubles as a gentle way to get fluids in.
 - **Pace around meals and exertion.** Digestion is work, and stacking a shower, a walk or a stressful task on top of a meal asks your circulation to be in two places at once. Spacing them out, the heart of [pacing and the energy envelope](/insights/recovery/pacing-101-energy-envelope/), heads off flare-related nausea.
 - **Address the histamine angle if it fits.** If your nausea flares after aged, fermented or leftover foods, with flushing or itching, a careful trial of a [lower-histamine approach](/insights/food/low-histamine-diet-mcas/) with your clinician can be revealing. Do not cut large food groups indefinitely on your own.
 - **Calm the surge.** Because adrenaline directly turns the stomach, slow breathing that lowers sympathetic tone can take the edge off an acute wave. It is the same lever that helps the rest of the fight-or-flight picture, and it pays off in your [HRV](/insights/hrv/hrv-complete-guide/) too.
@@ -162,7 +168,7 @@ A few things make the pattern visible. Tagging each episode as a symptom, with w
 
 **Why am I nauseous when I stand up with POTS?** Standing drops the blood returning to your heart, so less reaches your brain and gut for a moment while your body compensates with a racing heart rate and an adrenaline surge. Both the reduced flow and the adrenaline can trigger nausea, which is why it often comes with the dizziness of standing. Sitting or lying down, salt and fluids, and compression tend to ease it.
 
-**What foods help nausea with POTS and dysautonomia?** Smaller, more frequent meals that are lower in fat and refined carbohydrate are easier on a slow stomach and steadier for blood sugar. Ginger has reasonable evidence for calming nausea. Staying ahead on salt and fluids supports the volume digestion needs. If your nausea flares after specific foods, especially aged or fermented ones, a lower-histamine trial with your clinician is worth exploring.
+**What foods help nausea with POTS and dysautonomia?** Smaller, more frequent meals that are lower in fat and refined carbohydrate are easier on a slow stomach and steadier for blood sugar. Ginger is worth a try, though its best evidence is for nausea in pregnancy. Staying ahead on salt and fluids supports the volume digestion needs. If your nausea flares after specific foods, especially aged or fermented ones, a lower-histamine trial with your clinician is worth exploring.
 
 **When is nausea in dysautonomia a red flag?** Occasional queasiness tied to standing or meals is usually part of the autonomic picture. Seek prompt care for severe or sudden abdominal pain, vomiting blood or coffee-ground material, black or bloody stools, persistent vomiting with dehydration, unintentional weight loss, or nausea with a high fever or severe new headache.
 
@@ -173,3 +179,10 @@ Nausea is not a sign that you are anxious or imagining things. In POTS, dysauton
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Nausea is common in dysautonomia, but severe or sudden abdominal pain, vomiting blood, black or bloody stools, persistent vomiting with dehydration, or unintentional weight loss need prompt medical evaluation. Discuss any changes to your diet, supplements or medications with a clinician who knows your history.
 </div>
+
+## Sources
+
+- Mehr SE, Barbul A, Shibao CA. [Gastrointestinal symptoms in postural tachycardia syndrome: a systematic review](https://doi.org/10.1007/s10286-018-0519-x). *Clinical Autonomic Research*, 2018.
+- Kohno R, Cannom DS, Olshansky B, et al. [Mast cell activation disorder and postural orthostatic tachycardia syndrome: a clinical association](https://doi.org/10.1161/JAHA.121.021002). *Journal of the American Heart Association*, 2021.
+- Camilleri M, Kuo B, Nguyen L, et al. [ACG clinical guideline: gastroparesis](https://doi.org/10.14309/ajg.0000000000001874). *American Journal of Gastroenterology*, 2022.
+- National Center for Complementary and Integrative Health. [Ginger: usefulness and safety](https://www.nccih.nih.gov/health/ginger). Updated 2025.

@@ -6,11 +6,17 @@ summary: "Frequency-domain HRV isn't only about how much power sits in each band
 description: "LF peak and HF peak in HRV explained: where each peak should sit, what coherence means, and how resonance-frequency breathing near 0.1 Hz maximizes variability in POTS and long COVID."
 keywords: "LF peak, HF peak, HRV coherence, resonance frequency breathing, 0.1 Hz, paced breathing, resonance frequency, HRV biofeedback, breathing rate HRV, POTS, long COVID"
 date: 2026-07-09
-updated: 2026-07-09
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1551845792-14bd50072632?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Priscilla Du Preez / Unsplash"
 tldr: "The LF and HF peaks tell you where your heart-rate rhythm concentrates its energy, not how much there is. The HF peak sits at your breathing rate; the LF peak sits near 0.1 Hz, the baroreflex band. Breathing at your resonance frequency (roughly six breaths a minute, near 0.1 Hz) drives a big, clean, single peak that lines the two systems up. A tall, sharp peak there is high coherence, and it is the most reliable way to raise HRV on demand."
+question: "What is resonance breathing and how does it change HRV?"
+app:
+  feature: hrv-readings
+  hook: "Breathe at your pace, see the peak."
+  line: "Autonomic guides paced breathing during a reading and shows your LF and HF peaks afterward, so you can see the effect."
 categories:
   - basics
   - hrv
@@ -178,10 +184,10 @@ Autonomic offers several guided breathing patterns, each with an inhale and exha
 
 | Pattern (in / out) | Seconds per breath | Breaths / min | Target HF peak |
 | --- | --- | --- | --- |
-| 4 / 4 | 8 | 7.5 | 0.18–0.21 Hz |
-| 4 / 5 | 9 | 6.7 | 0.17–0.20 Hz |
-| 5 / 5 | 10 | 6.0 | 0.16–0.18 Hz |
-| 4 / 6 | 10 | 6.0 | 0.15–0.18 Hz |
+| 4 / 4 | 8 | 7.5 | 0.125 Hz |
+| 4 / 5 | 9 | 6.7 | 0.111 Hz |
+| 5 / 5 | 10 | 6.0 | 0.100 Hz |
+| 4 / 6 | 10 | 6.0 | 0.100 Hz |
 
 Notice how the longer patterns march the target peak downward. The **4 / 6** and **5 / 5** styles sit closest to resonance, which is why they tend to produce the tallest, sharpest peaks and the highest coherence. If you're new to slow breathing, starting at 4 / 4 and working down over a few weeks is gentler than jumping straight to the slowest pace.
 
@@ -228,3 +234,10 @@ The LF and HF peaks answer *where* your heart-rate rhythm concentrates, not how 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. If your readings concern you or your symptoms are worsening, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Task Force of the European Society of Cardiology and the North American Society of Pacing and Electrophysiology. [Heart rate variability: standards of measurement, physiological interpretation, and clinical use](https://doi.org/10.1161/01.CIR.93.5.1043). *Circulation*, 1996.
+- Lehrer PM, Gevirtz R. [Heart rate variability biofeedback: how and why does it work?](https://doi.org/10.3389/fpsyg.2014.00756). *Frontiers in Psychology*, 2014.
+- Vaschillo EG, Vaschillo B, Lehrer PM. [Characteristics of resonance in heart rate variability stimulated by biofeedback](https://doi.org/10.1007/s10484-006-9009-3). *Applied Psychophysiology and Biofeedback*, 2006.
+- Steffen PR, Austin T, DeBarros A, Brown T. [The impact of resonance frequency breathing on measures of heart rate variability, blood pressure, and mood](https://doi.org/10.3389/fpubh.2017.00222). *Frontiers in Public Health*, 2017.

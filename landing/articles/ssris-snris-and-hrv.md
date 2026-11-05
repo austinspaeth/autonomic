@@ -6,11 +6,17 @@ summary: "Starting an SSRI or SNRI can shift your HRV numbers, but the picture i
 description: "Do SSRIs and SNRIs lower HRV? How sertraline, escitalopram, venlafaxine and duloxetine change RMSSD, SDNN, resting heart rate and your stand test, and how to read your readings honestly after starting one."
 keywords: "SSRIs and HRV, do antidepressants lower HRV, SNRI heart rate variability, sertraline HRV, escitalopram HRV, venlafaxine heart rate, duloxetine HRV, antidepressants POTS, SSRI resting heart rate, medication effect on HRV, does paroxetine lower HRV"
 date: 2026-09-13
-updated: 2026-09-13
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1658279366796-e0c28623cd27?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Kelly Sikkema / Unsplash"
 tldr: "SSRIs and SNRIs have a modest and mixed effect on HRV, not the clean drop people fear. Some of the apparent lowering comes from the depression or anxiety being treated, which already lowers HRV on its own. SNRIs (venlafaxine, duloxetine) can raise your resting heart rate and blood pressure, which matters for a stand test. The practical rule: treat a start or dose change as a fresh baseline, compare readings only within your current regimen and time of day, watch the multi-week trend rather than one morning, and never stop a prescribed antidepressant to get a 'cleaner' reading. Discuss any change with your clinician."
+question: "Do antidepressants like SSRIs lower my HRV?"
+app:
+  feature: insights
+  hook: "See how your numbers look on your medication."
+  line: "Log your medication in Autonomic and it shows how your HRV and resting heart rate look since you started it, over months, not days."
 categories:
   - hrv
   - pots
@@ -188,3 +194,9 @@ If you are also sorting out whether your symptoms are anxiety, a cardiovascular 
 ## The bottom line
 
 SSRIs and SNRIs do not wreck your heart rate variability. Their direct effect is usually small, the old tricyclics are the class that clearly lowers HRV, SNRIs can raise your heart rate through noradrenaline, and the depression or anxiety being treated was lowering your HRV before any medication started. Treat a dose change as a fresh baseline, watch the multi-week trend alongside how you feel, and bring a clean before-and-after to your clinician rather than reacting to one morning's reading. This is general education and not medical advice, so discuss any change to your treatment with the person who prescribed it.
+
+## Sources
+
+- Kemp AH, Quintana DS, Gray MA, et al. [Impact of depression and antidepressant treatment on heart rate variability: a review and meta-analysis](https://doi.org/10.1016/j.biopsych.2009.12.012). *Biological Psychiatry*, 2010.
+- Alvares GA, Quintana DS, Hickie IB, et al. [Autonomic nervous system dysfunction in psychiatric disorders and the impact of psychotropic medications: a systematic review and meta-analysis](https://doi.org/10.1503/jpn.140217). *Journal of Psychiatry and Neuroscience*, 2016.
+- U.S. National Library of Medicine, DailyMed. [Venlafaxine hydrochloride extended-release tablets prescribing information](https://dailymed.nlm.nih.gov/dailymed/drugInfo.cfm?setid=5efe1336-c796-4560-8110-a64c80eefb0c).

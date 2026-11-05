@@ -6,11 +6,17 @@ summary: "Your HRV bouncing around from one morning to the next is normal, not a
 description: "Why does HRV change so much day to day? A calm guide to normal HRV fluctuation, how much daily variation is expected, telling noise from signal, and when a drop matters in POTS and long COVID."
 keywords: "HRV change day to day, HRV fluctuation, why does my HRV vary so much, normal HRV variation, HRV daily variation, how much should HRV change, HRV coefficient of variation, HRV noise vs trend, HRV drop, POTS HRV, long COVID HRV"
 date: 2026-09-19
-updated: 2026-09-19
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1713426225330-014fbfd04aa0?q=80&w=1632&auto=format&fit=crop"
 photoAttribution: "Unsplash"
 tldr: "Heart rate variability is supposed to change from day to day. It is a live readout of last night's sleep, stress, hydration, hormones, and how you measured, so a swing of 10 to 20 percent (and often more) around your own average is completely normal. A single low morning is almost always just yesterday, not a decline. The signal you actually want is the direction over one to two weeks, not any single reading, so measure the same way each morning, watch the rolling trend, and only act when several readings in a row move together."
+question: "Why does my HRV change so much from day to day?"
+app:
+  feature: hrv-readings
+  hook: "See the trend, not just today."
+  line: "Autonomic grades each morning reading against your own baseline, so you can tell an ordinary swing from a real change."
 categories:
   - hrv
   - basics
@@ -238,3 +244,13 @@ Your HRV changing day to day is not a fault, it is the metric doing its job. A s
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. If your readings concern you or your symptoms are worsening, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Fennell CRJ, Mauger AR, Hopker JG. [Inter-day reliability of heart rate complexity and variability metrics in healthy highly active younger and older adults](https://doi.org/10.1007/s00421-023-05373-3). *European Journal of Applied Physiology*, 2024.
+- Plews DJ, Laursen PB, Stanley J, et al. [Training adaptation and heart rate variability in elite endurance athletes: opening the door to effective monitoring](https://doi.org/10.1007/s40279-013-0071-8). *Sports Medicine*, 2013.
+- Plews DJ, Laursen PB, Kilding AE, et al. [Heart rate variability in elite triathletes, is variation in variability the key to effective training? A case comparison](https://doi.org/10.1007/s00421-012-2354-4). *European Journal of Applied Physiology*, 2012.
+- Pietilä J, Helander E, Korhonen I, et al. [Acute effect of alcohol intake on cardiovascular autonomic regulation during the first hours of sleep in a large real-world sample of Finnish employees: observational study](https://doi.org/10.2196/mental.9519). *JMIR Mental Health*, 2018.
+- Schmalenberger KM, Eisenlohr-Moul TA, Würth L, et al. [A systematic review and meta-analysis of within-person changes in cardiac vagal activity across the menstrual cycle: implications for female health and future studies](https://doi.org/10.3390/jcm8111946). *Journal of Clinical Medicine*, 2019.
+- Hirten RP, Danieletto M, Tomalin L, et al. [Use of physiological data from a wearable device to identify SARS-CoV-2 infection and symptoms and predict COVID-19 diagnosis: observational study](https://doi.org/10.2196/26107). *Journal of Medical Internet Research*, 2021.
+- Shaffer F, Ginsberg JP. [An overview of heart rate variability metrics and norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.

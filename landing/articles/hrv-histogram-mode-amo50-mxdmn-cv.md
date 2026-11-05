@@ -6,11 +6,17 @@ summary: "Mode, AMo50, MxDMn and CV are the geometric HRV metrics: four differen
 description: "What Mode, AMo50, MxDMn and CV mean in HRV: how these geometric histogram metrics describe the shape of your RR-interval distribution, healthy ranges, and how they feed the Baevsky stress index."
 keywords: "HRV histogram, Mode HRV, AMo50, MxDMn, coefficient of variation HRV, CV HRV, geometric HRV metrics, Baevsky stress index, heart rate variability, POTS, long COVID"
 date: 2026-07-09
-updated: 2026-07-09
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1768207750856-e1241dd2888b?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Edwin Rodriguez / Unsplash"
 tldr: "Mode, AMo50, MxDMn and CV are geometric HRV metrics: different ways of describing the shape of the histogram your heartbeat intervals form. Mode is the histogram's center (your most common interval), AMo50 is its peak height (how concentrated the rhythm is; it rises under strain), MxDMn is its full width (how much your intervals range), and CV is heart-rate-normalized variability (SDNN divided by mean interval). Mode, AMo50 and MxDMn are the raw ingredients of the Baevsky stress index. Trust the trend, since a single artifact can distort the shape."
+question: "What do Mode, AMo50, MxDMn and CV mean in HRV?"
+app:
+  feature: hrv-readings
+  hook: "Every metric, graded for you."
+  line: "Autonomic calculates these histogram metrics from your HRV reading and grades them, so you are not left decoding raw numbers."
 categories:
   - basics
   - hrv
@@ -262,3 +268,9 @@ Mode, AMo50, MxDMn and CV are the geometric HRV metrics: four rulers held agains
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. If your readings concern you or your symptoms are worsening, work with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Baevsky RM, Chernikova AG. [Heart rate variability analysis: physiological foundations and main methods](https://doi.org/10.12710/cardiometry.2017.10.6676). *Cardiometry*, 2017.
+- Huizinga JD, Chen JH, Hussain A, et al. [Determining autonomic sympathetic tone and reactivity using Baevsky's stress index](https://doi.org/10.1152/ajpregu.00243.2024). *American Journal of Physiology: Regulatory, Integrative and Comparative Physiology*, 2025.
+- Task Force of the European Society of Cardiology and the North American Society of Pacing and Electrophysiology. [Heart rate variability: standards of measurement, physiological interpretation and clinical use](https://doi.org/10.1161/01.CIR.93.5.1043). *Circulation*, 1996.

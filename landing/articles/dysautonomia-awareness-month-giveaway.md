@@ -10,6 +10,11 @@ updated: 2026-09-28
 author: "Austin Spaeth"
 photoLocation: "/articles/dysautonomia-awareness-month-giveaway/cover.jpg"
 tldr: "October is Dysautonomia Awareness Month. Starting October 1, 2026, every day you take an HRV reading in the free Autonomic app earns one giveaway entry, up to 10 entries. One iPhone user wins an Apple Watch Series 12 and one Android user wins a Polar H10 chest strap, with 4 Coospo heart-rate straps, 10 LMNT boxes and 25 free years of Autonomic Pro also up for grabs. No purchase is necessary, no health data is shared (only your email and how many readings you took), and winners are drawn November 1. Full details and rules are on the giveaway page."
+question: "How does the Dysautonomia Awareness Month giveaway work?"
+app:
+  feature: hrv-readings
+  hook: "Ten mornings of readings, ten chances to win."
+  line: "Take a morning HRV reading in Autonomic with your phone camera, a strap or a watch. Each day you take one counts as an entry."
 categories:
   - app
   - pots

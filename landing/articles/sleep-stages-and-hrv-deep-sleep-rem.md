@@ -6,11 +6,17 @@ summary: "Your morning HRV is mostly made overnight, and not evenly across the n
 description: "How sleep stages shape HRV: why deep sleep gives the highest HRV and lowest heart rate, why REM spikes and scrambles it, what a hypnogram shows, and how to read overnight HRV in POTS and long COVID."
 keywords: "sleep stages and HRV, deep sleep HRV, REM sleep heart rate, which sleep stage has highest HRV, overnight HRV, hypnogram, slow wave sleep, heart rate during REM, HRV while sleeping, POTS sleep, long COVID sleep"
 date: 2026-10-25
-updated: 2026-10-25
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1520206183501-b80df61043c2?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "bruce mars / Unsplash"
 tldr: "Your nervous system does not rest evenly through the night. Deep (slow-wave) sleep is the parasympathetic high point: heart rate falls to its lowest, blood pressure dips, and HRV (especially RMSSD and HF power) peaks. REM is the opposite, a sympathetically active state where heart rate rises and becomes irregular and HRV drops. Deep sleep is front-loaded into the first half of the night and REM lengthens toward morning, which is why a short or fragmented night costs you the most restorative part. Your morning HRV reading is largely a summary of how much undisturbed deep sleep you got."
+question: "Which sleep stage has the highest HRV?"
+app:
+  feature: hrv-readings
+  hook: "Line up your sleep stages with morning HRV."
+  line: "Autonomic shows your deep, REM and core sleep from your watch beside your overnight heart rate and next morning reading."
 categories:
   - recovery
   - hrv
@@ -225,7 +231,7 @@ Read as a set, these line up. A night with solid deep sleep usually shows a low 
 
 The interventions that reliably help are unglamorous, which is good news, because they are also free and repeatable:
 
-- **Protect the first hours.** A consistent bedtime matters more than a consistent wake time, because the front of the night is where deep sleep lives. Going to bed at the same time most nights is the single highest-leverage habit here.
+- **Protect the first hours.** The front of the night is where deep sleep lives, so avoid cutting it short with late nights. For a steady rhythm, a consistent wake time is the stronger anchor: hold it even after a bad night, and a regular bedtime tends to follow.
 - **Wind the sympathetic dial down before bed.** A few minutes of slow breathing at around six breaths per minute actively raises vagal tone and eases the transition into sleep. It is the same mechanism behind [resonant breathing](/insights/hrv/resonant-breathing-hrv-biofeedback/), and it is a genuinely calming pre-sleep ritual.
 - **Mind the obvious disruptors.** Alcohol in particular fragments the second half of the night and blunts HRV; late heavy meals, late caffeine and a hot bedroom all cost you deep sleep.
 - **Treat sleep as pacing.** A poor night narrows the next day's energy envelope, so resting after a bad night is not weakness, it is [staying inside the envelope](/insights/recovery/pacing-101-energy-envelope/) instead of trading one rough night for a multi-day crash.
@@ -252,3 +258,11 @@ Sleep stages and HRV move together in a predictable rhythm: deep sleep is the pa
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Sleep problems, a racing heart at night, or readings that worsen over time are worth discussing with a clinician who can evaluate you properly, including screening for sleep apnea.
 </div>
+
+## Sources
+
+- National Institute of Neurological Disorders and Stroke. [Brain Basics: Understanding Sleep](https://www.ninds.nih.gov/health-information/public-education/brain-basics/brain-basics-understanding-sleep). National Institutes of Health.
+- Trinder J, Kleiman J, Carrington M, et al. [Autonomic activity during human sleep as a function of time and sleep stage](https://doi.org/10.1046/j.1365-2869.2001.00263.x). *Journal of Sleep Research*, 2001.
+- Somers VK, Dyken ME, Mark AL, et al. [Sympathetic-nerve activity during sleep in normal subjects](https://doi.org/10.1056/NEJM199302043280502). *New England Journal of Medicine*, 1993.
+- Chinoy ED, Cuellar JA, Huwa KE, et al. [Performance of seven consumer sleep-tracking devices compared with polysomnography](https://doi.org/10.1093/sleep/zsaa291). *Sleep*, 2021.
+- Bagai K, Song Y, Ling JF, et al. [Sleep disturbances and diminished quality of life in postural tachycardia syndrome](https://doi.org/10.5664/jcsm.28110). *Journal of Clinical Sleep Medicine*, 2011.

@@ -11,6 +11,11 @@ author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Luke Chesser / Unsplash"
 tldr: "A single HRV or heart-rate value is meaningless without context, and population 'normal' charts often mislead people who are ill. Autonomic scores each reading into grade zones (great, good, ok, bad, crash, plus a cautionary warning band) against recovery-relevant medical thresholds, then charts it against your own rolling baseline so today is judged against your recent normal. The direction of your baseline matters more than any single number."
+question: "How does Autonomic score my HRV and heart rate readings?"
+app:
+  feature: hrv-readings
+  hook: "Every reading graded, not just a number."
+  line: "Each morning reading lands in a grade zone and feeds a daily score out of 100, judged against thresholds and your own recent baseline."
 categories:
   - app
   - hrv

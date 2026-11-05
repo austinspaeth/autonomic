@@ -6,11 +6,17 @@ summary: "Dizziness and lightheadedness are the most common symptoms of POTS and
 description: "Why dizziness and lightheadedness happen in POTS and dysautonomia: the difference between presyncope and vertigo, why standing triggers it, counter-maneuvers that help, and what to track at home."
 keywords: "dizziness POTS, lightheadedness when standing, presyncope, orthostatic intolerance, dizzy when I stand up, POTS symptoms, dysautonomia dizziness, cerebral hypoperfusion, vertigo vs lightheadedness"
 date: 2026-09-24
-updated: 2026-09-24
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1514906689926-25ba6dcb584b?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Kinga Howard / Unsplash"
 tldr: "Dizziness in POTS and dysautonomia is usually presyncope: the light, floaty, about-to-faint feeling that comes from your brain getting slightly less blood while you are upright. It is different from vertigo, the spinning sensation that comes from the inner ear. It tends to build with standing, heat, meals, and dehydration, and it eases when you sit or lie down. It is worth tracking beside a stand test so you can see the pattern rather than fear it, and worth discussing any new, severe, or spinning dizziness with your clinician."
+question: "Why do I get dizzy when I stand up?"
+app:
+  feature: pots-stand-test
+  hook: "Measure what happens when you stand and feel dizzy."
+  line: "A guided home stand test shows how much your heart rate rises on standing, so your dizziness has numbers behind it."
 categories:
   - pots
   - basics
@@ -199,3 +205,12 @@ The practical move is the same: describe it precisely and log it. Dizziness that
 The dizziness of POTS and dysautonomia is usually presyncope: your brain briefly running on a little less blood while you are upright, because gravity wins the first few seconds of standing and the vessels are slow to answer. It is real, it is measurable, and it is mostly not dangerous as long as you can get low before you fall. It is different from vertigo, which points to the inner ear and deserves its own workup. Learn which kind you have, use counterpressure and hydration in the moment, build your reserve over time with the orthostatic toolkit, and track the pattern so it stops being a mystery. Then bring that pattern to the clinician who manages your care.
 
 *These are educational field notes, not medical advice. Dizziness has many possible causes and individual experiences vary. Discuss any new, severe, spinning, or worsening dizziness, and any changes to your management, with your own clinician.*
+
+## Sources
+
+- Post RE, Dickerson LM. [Dizziness: a diagnostic approach](https://www.aafp.org/pubs/afp/issues/2010/0815/p361.html). *American Family Physician*, 2010.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Bradley JG, Davis KA. [Orthostatic hypotension](https://www.aafp.org/pubs/afp/issues/2003/1215/p2393.html). *American Family Physician*, 2003.
+- Jordan J, Shannon JR, Black BK, et al. [The pressor response to water drinking in humans: a sympathetic reflex?](https://doi.org/10.1161/01.cir.101.5.504) *Circulation*, 2000.
+- Shannon JR, Diedrich A, Biaggioni I, et al. [Water drinking as a treatment for orthostatic syndromes](https://doi.org/10.1016/s0002-9343(02)01025-2). *The American Journal of Medicine*, 2002.
+- van Dijk N, Quartieri F, Blanc JJ, et al. [Effectiveness of physical counterpressure maneuvers in preventing vasovagal syncope: the Physical Counterpressure Manoeuvres Trial (PC-Trial)](https://doi.org/10.1016/j.jacc.2006.06.059). *Journal of the American College of Cardiology*, 2006.

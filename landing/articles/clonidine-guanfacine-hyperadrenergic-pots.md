@@ -6,11 +6,17 @@ summary: "Clonidine and guanfacine work from the opposite end of a beta blocker:
 description: "How clonidine and guanfacine treat hyperadrenergic POTS: central alpha-2 agonists that lower sympathetic outflow, norepinephrine, heart rate, and blood pressure. Mechanism, differences, side effects, and what to track."
 keywords: "clonidine for POTS, guanfacine for POTS, hyperadrenergic POTS treatment, central alpha-2 agonist POTS, clonidine vs guanfacine, clonidine hyperadrenergic POTS, guanfacine dysautonomia, norepinephrine POTS, clonidine patch POTS, clonidine HRV, sympathetic overdrive POTS medication, rebound hypertension clonidine"
 date: 2026-09-09
-updated: 2026-09-09
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1674049406313-abb5511e0111?q=80&w=1470&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Sage Friedman / Unsplash"
 tldr: "Clonidine and guanfacine are central alpha-2 agonists. They act in the brainstem to reduce how much sympathetic signal leaves the brain, which lowers norepinephrine, heart rate, and blood pressure. That makes them a considered option for the hyperadrenergic form of POTS, where a high standing norepinephrine drives a racing, wired feeling, often with normal or high blood pressure. They are sedating, they can lower blood pressure too far in people who already run low, and clonidine in particular must never be stopped abruptly because of rebound hypertension. They are prescription-only and used off-label here, so every dose decision belongs with your clinician, and the most useful thing you can bring is a steady record of your resting heart rate, your stand test, and your symptoms."
+question: "Do clonidine or guanfacine help hyperadrenergic POTS?"
+app:
+  feature: pots-stand-test
+  hook: "See how your stand test looks on it."
+  line: "Run a guided home stand test now and again, and see how your heart rate rise looks on this medication. Talk any changes over with your doctor."
 categories:
   - pots
   - hrv
@@ -210,3 +216,11 @@ The second is **sedation and blood pressure**. These were designed as blood-pres
 ## The bottom line
 
 Clonidine and guanfacine treat POTS from the opposite end of a beta blocker. Instead of blocking adrenaline at the heart, they press on the brainstem's own brake and reduce how much sympathetic signal leaves the brain at all, lowering norepinephrine, heart rate, and blood pressure together. That upstream action is exactly why they are a considered option for hyperadrenergic POTS, the wired, tremulous, high-norepinephrine subtype, and exactly why they are wrong for someone whose blood pressure already runs low. The evidence is smaller than the mechanism is clean, they are sedating, and clonidine in particular must never be stopped abruptly. If one is in your picture, track your resting heart rate, your stand test, your blood pressure, and how you actually feel, read any HRV rise as partly a genuinely calmer nervous system, and keep every dose decision a conversation with the clinician who prescribes it.
+
+## Sources
+
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Patel P, Saadabadi A. [Clonidine](https://www.ncbi.nlm.nih.gov/books/NBK459124/). *StatPearls*, 2025.
+- Geyskes GG, Boer P, Dorhout Mees EJ. [Clonidine withdrawal. Mechanism and frequency of rebound hypertension](https://doi.org/10.1111/j.1365-2125.1979.tb00897.x). *British Journal of Clinical Pharmacology*, 1979.
+- Bello NT. [Clinical utility of guanfacine extended release in the treatment of ADHD in children and adolescents](https://doi.org/10.2147/PPA.S73167). *Patient Preference and Adherence*, 2015.
+- Okamoto LE, Urechie V, Rigo S, et al. [Hyperadrenergic postural tachycardia syndrome: clinical biomarkers and response to guanfacine](https://doi.org/10.1161/HYPERTENSIONAHA.124.23035). *Hypertension*, 2024.

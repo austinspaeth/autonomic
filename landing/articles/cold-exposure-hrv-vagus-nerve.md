@@ -6,11 +6,17 @@ summary: "Cold water can calm your heart through the vagus nerve, but only in a 
 description: "Does cold exposure boost your vagus nerve and HRV? How the diving reflex slows your heart, why an ice plunge spikes it first, what happens to HRV, and cold-water cautions for POTS and dysautonomia."
 keywords: "cold exposure HRV, cold water vagus nerve, does cold water stimulate the vagus nerve, diving reflex, cold plunge HRV, cold shower heart rate variability, cold face immersion, cold water POTS, parasympathetic, vagal tone"
 date: 2026-08-17
-updated: 2026-08-17
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: https://images.unsplash.com/photo-1707303674302-1a99bbd6b0c1?q=80&w=1364&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D
 photoAttribution: "Priscilla Du Preez / Unsplash"
 tldr: "Cold water can raise vagal (parasympathetic) activity, but where the cold lands decides what happens. Cold on the face triggers the diving reflex, a real vagal slowdown of the heart, and this is the most reliable cold effect. A whole-body cold plunge does the opposite first: a sympathetic cold-shock surge that speeds the heart and raises blood pressure, sometimes followed by a vagal rebound minutes later. Acute effects are well documented; a durable rise in baseline HRV from regular cold exposure is not. With POTS or dysautonomia, treat the cold plunge as a stressor and start small."
+question: "Does cold water really boost my vagus nerve?"
+app:
+  feature: hrv-readings
+  hook: "See what cold water does to your HRV."
+  line: "Take an HRV reading before and after you try cold on your face, and log it, so you see your own response instead of the hype."
 categories:
   - hrv
   - pots
@@ -186,3 +192,14 @@ Cold water can raise vagal activity and show up in your HRV, but the useful trut
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Cold exposure carries real cardiovascular and drowning risks, especially with a heart rhythm condition, POTS or dysautonomia. Discuss any change with a clinician who knows your history, and never do cold water immersion alone.
 </div>
+
+## Sources
+
+- Godek D, Freeman AM. [Physiology, diving reflex](https://www.ncbi.nlm.nih.gov/books/NBK538245/). *StatPearls*, 2022.
+- Niehues LJ, Klovenski V. [Vagal maneuver](https://www.ncbi.nlm.nih.gov/books/NBK551575/). *StatPearls*, 2023.
+- Berk WA, Shea MJ, Crevey BJ. [Bradycardic responses to vagally mediated bedside maneuvers in healthy volunteers](https://doi.org/10.1016/S0002-9343(05)80062-2). *American Journal of Medicine*, 1991.
+- Hayashi N, Ishihara M, Tanaka A, et al. [Face immersion increases vagal activity as assessed by heart rate variability](https://doi.org/10.1007/s004210050267). *European Journal of Applied Physiology*, 1997.
+- Schagatay E, Holm B. [Effects of water and ambient air temperatures on human diving bradycardia](https://doi.org/10.1007/BF00262802). *European Journal of Applied Physiology*, 1996.
+- Tipton MJ, Mekjavic IB, Eglin CM. [Permanence of the habituation of the initial responses to cold-water immersion in humans](https://doi.org/10.1007/s004210000255). *European Journal of Applied Physiology*, 2000.
+- Buchheit M, Peiffer JJ, Abbiss CR, et al. [Effect of cold water immersion on postexercise parasympathetic reactivation](https://doi.org/10.1152/ajpheart.01017.2008). *American Journal of Physiology: Heart and Circulatory Physiology*, 2009.
+- Esperland D, de Weerd L, Mercer JB. [Health effects of voluntary exposure to cold water: a continuing subject of debate](https://doi.org/10.1080/22423982.2022.2111789). *International Journal of Circumpolar Health*, 2022.

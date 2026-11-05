@@ -6,11 +6,17 @@ summary: "Pacing is the single most important recovery skill for POTS, long COVI
 description: "Learn to pace with chronic illness: find your energy envelope, break the boom-and-bust cycle, use heart rate and HRV as guardrails, and expand capacity slowly to protect against post-exertional malaise."
 keywords: "pacing, energy envelope, pacing chronic illness, how to pace POTS, pacing long COVID, boom and bust cycle, activity pacing, heart rate pacing, post-exertional malaise"
 date: 2026-06-06
-updated: 2026-06-06
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1495556281896-46ef1eed55f6?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Jordan Bauer / Unsplash"
 tldr: "Pacing means staying inside your energy envelope, the amount of physical, cognitive and emotional activity you can do without triggering a crash. Break big tasks into chunks with rest, rest before you feel you need to, and use heart rate or HRV as guardrails. Only expand the envelope once you are reliably stable, and expand it slowly."
+question: "How do I find my energy envelope with pacing?"
+app:
+  feature: pacing-budget
+  hook: "Turn your energy envelope into daily minutes."
+  line: "Autonomic learns from what your body has handled and gives you a daily budget in minutes, with alerts when it is nearly spent."
 categories:
   - recovery
   - pots
@@ -46,7 +52,7 @@ The envelope is a moving target, not a fixed budget. It shrinks after poor sleep
 
 Here is the cycle that keeps people stuck. You feel decent, so you seize the good day and do everything you have been putting off. That afternoon or, more often, one to two days later, you crash, and the crash is worse than the baseline you started from. You rest for days to claw back, feel decent again, and repeat.
 
-Each swing overshoots in both directions. The "boom" pushes you well past your envelope; the "bust" drops you *below* your previous baseline. Over weeks, the pattern can drag your average capacity down rather than up. In conditions that share an autonomic phenotype and [post-exertional malaise](/insights/postviral/post-exertional-malaise-explained/), the hallmark delayed crash after overexertion, this overshoot is not just uncomfortable, it can [set recovery back](https://www.ncbi.nlm.nih.gov/pmc/articles/PMC12829881/).
+Each swing overshoots in both directions. The "boom" pushes you well past your envelope; the "bust" drops you *below* your previous baseline. Over weeks, the pattern can drag your average capacity down rather than up. In conditions that share an autonomic phenotype and [post-exertional malaise](/insights/postviral/post-exertional-malaise-explained/), the hallmark delayed crash after overexertion, this overshoot is not just uncomfortable, it can [set recovery back](https://www.nice.org.uk/guidance/ng206).
 
 <figure class="prose-figure">
   <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="Two line charts contrasting a boom-and-bust pattern that crashes below baseline with a steady pacing pattern of small sustainable waves trending gently upward.">
@@ -139,3 +145,12 @@ Pacing is not giving up: it is the strategy most likely to get your capacity bac
   for personalized care. <em>Pacing strategies here are general; heart-rate caps and any activity progression should be personalized with a clinician, especially if you have ME/CFS or established post-exertional malaise.</em> Talk with a qualified
   clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Jason LA, Brown M, Brown A, et al. [Energy conservation/envelope theory interventions to help patients with myalgic encephalomyelitis/chronic fatigue syndrome](https://doi.org/10.1080/21641846.2012.733602). *Fatigue: Biomedicine, Health & Behavior*, 2013.
+- Chu L, Valencia IJ, Garvert DW, et al. [Deconstructing post-exertional malaise in myalgic encephalomyelitis/chronic fatigue syndrome: a patient-centered, cross-sectional survey](https://doi.org/10.1371/journal.pone.0197811). *PLoS One*, 2018.
+- Vøllestad NK, Mengshoel AM. [Post-exertional malaise in daily life and experimental exercise models in patients with myalgic encephalomyelitis/chronic fatigue syndrome](https://doi.org/10.3389/fphys.2023.1257557). *Frontiers in Physiology*, 2023.
+- Clague-Baker N, Davenport TE, Madi M, et al. [An international survey of experiences and attitudes towards pacing using a heart rate monitor for people with myalgic encephalomyelitis/chronic fatigue syndrome](https://doi.org/10.3233/WOR-220512). *Work*, 2023.
+- National Institute for Health and Care Excellence. [Myalgic encephalomyelitis (or encephalopathy)/chronic fatigue syndrome: diagnosis and management (NG206)](https://www.nice.org.uk/guidance/ng206). Published 2021.
+- Centers for Disease Control and Prevention. [Symptoms of ME/CFS](https://www.cdc.gov/me-cfs/signs-symptoms/index.html). Updated 2024.

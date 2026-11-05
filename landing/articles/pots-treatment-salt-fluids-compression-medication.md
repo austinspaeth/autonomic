@@ -6,11 +6,17 @@ summary: "POTS treatment usually starts with volume, compression and a careful e
 description: "How POTS is treated: fluids, salt loading, compression garments and exercise first, then medications like fludrocortisone, midodrine, beta-blockers, ivabradine and pyridostigmine, grouped by what each one targets."
 keywords: "POTS treatment, salt for POTS, fluids POTS, compression garments POTS, POTS medication, fludrocortisone, midodrine, beta blocker POTS, ivabradine, pyridostigmine, POTS management"
 date: 2026-06-11
-updated: 2026-06-11
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1651993737174-6890c1daef5b?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Rajasekhar R / Unsplash"
 tldr: "POTS treatment is built in layers. The foundation is non-drug: 2 to 3 liters of fluid a day, gradually higher sodium to expand blood volume, waist-high compression, and a recumbent-first exercise ramp. When that isn't enough, clinicians add medication chosen by goal, expanding volume, reducing pooling, or slowing the heart rate. It's almost always a personalized combination, and salt and volume changes need a clinician's sign-off."
+question: "How is POTS treated with salt, fluids, compression and medication?"
+app:
+  feature: insights
+  hook: "See what your treatment changes in your numbers."
+  line: "Log salt, fluids, compression and meds in Autonomic and it shows what lines up with your better days and how things look since you started."
 categories:
   - pots
   - recovery
@@ -137,3 +143,13 @@ POTS treatment is a layered, individual thing. Start with the foundation, fluids
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and not a substitute for personalized care. <em>Medication choices and any decision to load salt or fluids must be individualized with a clinician who knows your blood pressure, kidney and heart history.</em> Talk with a qualified clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Vernino S, Bourne KM, Stiles LE, et al. [Postural orthostatic tachycardia syndrome (POTS): State of the science and clinical care from a 2019 National Institutes of Health Expert Consensus Meeting - Part 1](https://doi.org/10.1016/j.autneu.2021.102828). *Autonomic Neuroscience*, 2021.
+- Bourne KM, Sheldon RS, Hall J, et al. [Compression garment reduces orthostatic tachycardia and symptoms in patients with postural orthostatic tachycardia syndrome](https://doi.org/10.1016/j.jacc.2020.11.040). *Journal of the American College of Cardiology*, 2021.
+- George SA, Bivens TB, Howden EJ, et al. [The international POTS registry: evaluating the efficacy of an exercise training intervention in a community setting](https://doi.org/10.1016/j.hrthm.2015.12.012). *Heart Rhythm*, 2016.
+- Raj SR, Black BK, Biaggioni I, et al. [Propranolol decreases tachycardia and improves symptoms in the postural tachycardia syndrome: less is more](https://doi.org/10.1161/CIRCULATIONAHA.108.846501). *Circulation*, 2009.
+- Taub PR, Zadourian A, Lo HC, et al. [Randomized trial of ivabradine in patients with hyperadrenergic postural orthostatic tachycardia syndrome](https://doi.org/10.1016/j.jacc.2020.12.029). *Journal of the American College of Cardiology*, 2021.
+- Raj SR, Black BK, Biaggioni I, et al. [Acetylcholinesterase inhibition improves tachycardia in postural tachycardia syndrome](https://doi.org/10.1161/CIRCULATIONAHA.104.497594). *Circulation*, 2005.

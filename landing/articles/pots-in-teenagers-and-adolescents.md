@@ -6,11 +6,17 @@ summary: "POTS most often begins in the teen years, frequently after a virus, a 
 description: "Teenage POTS explained: the 40 bpm adolescent stand-test threshold, common triggers like viral illness and growth spurts, school accommodations, and why many teens improve substantially over time."
 keywords: "POTS in teenagers, adolescent POTS, teenage POTS, POTS in teens, pediatric POTS, POTS 40 bpm teens, POTS in adolescents symptoms, does teenage POTS go away, POTS school accommodations, orthostatic intolerance teenager, dysautonomia teenager"
 date: 2026-09-15
-updated: 2026-09-15
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1524601500432-1e1a4c71d692?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Unsplash"
 tldr: "POTS commonly starts in adolescence, often after a viral illness, a fast growth spurt, or a concussion. For ages 12 to 19, the stand-test threshold is a sustained heart-rate rise of at least 40 bpm within ten minutes of standing (higher than the adult 30 bpm), without a big blood-pressure drop, with chronic symptoms. The outlook for teenagers is generally more hopeful than for adults: many improve substantially over months to a few years, especially post-viral cases, and the daily work is salt, fluids, recumbent-first exercise, sleep, and school accommodations. Track the standing rise at home and bring the trend to a pediatric clinician."
+question: "What does POTS look like in teenagers?"
+app:
+  feature: pots-stand-test
+  hook: "Track a teen's stand test at home."
+  line: "Autonomic guides a home stand test and keeps each result, so you can watch the heart rate rise change as the months go by."
 categories:
   - pots
   - recovery
@@ -246,3 +252,11 @@ POTS most often begins in adolescence, frequently after a virus, a growth spurt,
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help families understand and track a young person's data, not to diagnose or treat any condition. Adolescent heart-rate changes can have many causes, and salt, fluids, and exercise plans should be set with a clinician who knows the teen's full history. If symptoms are worsening, if there is fainting, or if you are worried, seek proper medical evaluation.
 </div>
+
+## Sources
+
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Singer W, Sletten DM, Opfer-Gehrking TL, et al. [Postural tachycardia in children and adolescents: what is abnormal?](https://doi.org/10.1016/j.jpeds.2011.08.054) *Journal of Pediatrics*, 2012.
+- Kizilbash SJ, Ahrens SP, Bruce BK, et al. [Adolescent fatigue, POTS, and recovery: a guide for clinicians](https://doi.org/10.1016/j.cppeds.2013.12.014). *Current Problems in Pediatric and Adolescent Health Care*, 2014.
+- Bhatia R, Kizilbash SJ, Ahrens SP, et al. [Outcomes of adolescent-onset postural orthostatic tachycardia syndrome](https://doi.org/10.1016/j.jpeds.2016.02.035). *Journal of Pediatrics*, 2016.
+- George SA, Bivens TB, Howden EJ, et al. [The international POTS registry: evaluating the efficacy of an exercise training intervention in a community setting](https://doi.org/10.1016/j.hrthm.2015.12.012). *Heart Rhythm*, 2016.

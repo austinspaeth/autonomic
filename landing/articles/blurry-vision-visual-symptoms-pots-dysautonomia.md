@@ -6,11 +6,17 @@ summary: "Blurry vision, graying out, tunnel vision, light sensitivity and dry e
 description: "Why blurry vision and visual symptoms happen in POTS and dysautonomia: graying out and tunnel vision from retinal hypoperfusion, light sensitivity, dry eyes, what to track, and the red flags worth an eye exam."
 keywords: "blurry vision POTS, visual symptoms dysautonomia, graying out when standing, tunnel vision POTS, light sensitivity POTS, photophobia long covid, dry eyes dysautonomia, vision goes dark when I stand up, orthostatic visual symptoms"
 date: 2026-10-14
-updated: 2026-10-14
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: https://images.unsplash.com/photo-1551184451-76b762941ad6?q=80&w=1760&auto=format&fit=crop
 photoAttribution: "Kamila Maciejewska / Unsplash"
 tldr: "Visual symptoms in POTS and dysautonomia are usually orthostatic: your eyes briefly getting less blood when you are upright. Because the eye sits above the heart and the retina burns oxygen faster than almost any tissue, vision often fades before you actually feel faint, showing up as blurring, graying, or tunneling that clears when you sit or lie down. Light sensitivity and dry eyes are also common. Track visual symptoms beside a stand test so you can read the pattern, and get sudden, one-eyed, or persistent vision changes checked by a clinician."
+question: "Why does my vision go blurry when I stand up?"
+app:
+  feature: pots-stand-test
+  hook: "See what your heart does when vision fades."
+  line: "A guided stand test measures your heart rate rise as you stand, so you can see what is happening when your vision grays out."
 categories:
   - pots
   - basics
@@ -233,3 +239,13 @@ For the fuller picture of why standing sets all of this off, the companion piece
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Visual symptoms are common in dysautonomia, but sudden, one-sided, or persistent vision changes, new double vision, flashes with floaters, or vision loss with a severe headache or weakness need prompt medical evaluation. Discuss any changes to your routine, supplements, or medications with a clinician who knows your history.
 </div>
+
+## Sources
+
+- Shaw BH, Stiles LE, Bourne K, et al. [The face of postural tachycardia syndrome: insights from a large cross-sectional online community-based survey](https://doi.org/10.1111/joim.12895). *Journal of Internal Medicine*, 2019.
+- Rodriguez B, Pantano L, Nef T, et al. [Visual symptoms in postural tachycardia syndrome: an investigation of position-dependent visual exploration](https://doi.org/10.1111/ene.16507). *European Journal of Neurology*, 2025.
+- Metzler M, Duerr S, Granata R, et al. [Neurogenic orthostatic hypotension: pathophysiology, evaluation, and management](https://doi.org/10.1007/s00415-012-6736-7). *Journal of Neurology*, 2013.
+- Ramsey DJ, Arden GB. [Hypoxia and dark adaptation in diabetic retinopathy: interactions, consequences, and therapy](https://doi.org/10.1007/s11892-015-0686-2). *Current Diabetes Reports*, 2015.
+- van Dijk N, Quartieri F, Blanc JJ, et al. [Effectiveness of physical counterpressure maneuvers in preventing vasovagal syncope: the Physical Counterpressure Manoeuvres Trial (PC-Trial)](https://doi.org/10.1016/j.jacc.2006.06.059). *Journal of the American College of Cardiology*, 2006.
+- Jordan J. [Effect of water drinking on sympathetic nervous activity and blood pressure](https://doi.org/10.1007/s11906-005-0050-z). *Current Hypertension Reports*, 2005.
+- Puledda F, Schankin C, Goadsby PJ. [Visual snow syndrome: a clinical and phenotypical description of 1,100 cases](https://doi.org/10.1212/WNL.0000000000008909). *Neurology*, 2020.

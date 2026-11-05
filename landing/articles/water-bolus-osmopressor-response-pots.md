@@ -6,11 +6,17 @@ summary: "Drinking about 500 ml of plain water quickly can raise blood pressure 
 description: "The water bolus for POTS: how drinking ~500 ml of water fast triggers the osmopressor response, raises blood pressure, lowers standing heart rate, when to use it, and how to test it at home."
 keywords: "water bolus POTS, osmopressor response, does drinking water raise blood pressure, water bolus orthostatic intolerance, rapid water drinking POTS, water for POTS heart rate, acute volume loading, standing heart rate water"
 date: 2026-08-28
-updated: 2026-08-28
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1523362628745-0c100150b504?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Ethan Sykes / Unsplash"
 tldr: "Drinking roughly 500 ml (about two cups) of plain, cool water quickly triggers the osmopressor response: within 5 to 15 minutes it raises blood pressure and can lower standing heart rate by 10 or more beats per minute in people with POTS and orthostatic intolerance. The effect peaks around 20 to 40 minutes and fades within an hour, so it is a fast, free tool to reach for before standing, showering, or getting up in the morning, not a replacement for daily salt, fluids, and the rest of your plan. Test it with a simple before-and-after stand test to see how much it does for you."
+question: "Does drinking water fast raise blood pressure in POTS?"
+app:
+  feature: pots-stand-test
+  hook: "Test the water bolus with a stand test."
+  line: "Run Autonomic's guided stand test on a day with a water bolus and a day without, then compare your standing heart rate rise."
 categories:
   - pots
   - research
@@ -223,3 +229,11 @@ No. Salt and fluid loading is a sustained, daily strategy to expand blood volume
 "Drink more water" is worn out advice, but hidden inside it is a specific, fast, free tool. Drink about 500 ml of plain water quickly, aim it 10 to 20 minutes before you have to be upright, and in POTS and orthostatic intolerance the osmopressor response can steady your standing heart rate for the next hour. Then test it, because the real value is not the average from a study but the before-and-after from your own body. Keep it as one part of a plan built with your clinician, and let the numbers, not the anxiety, tell you what is working.
 
 *Educational field notes, not medical advice. Autonomic is a tracking tool, not a medical device; it does not diagnose or treat. Discuss changes to fluids, salt, or medication with your clinician.*
+
+## Sources
+
+- Jordan J, Shannon JR, Black BK, et al. [The pressor response to water drinking in humans: a sympathetic reflex?](https://doi.org/10.1161/01.cir.101.5.504) *Circulation*, 2000.
+- Shannon JR, Diedrich A, Biaggioni I, et al. [Water drinking as a treatment for orthostatic syndromes](https://doi.org/10.1016/s0002-9343(02)01025-2). *American Journal of Medicine*, 2002.
+- May M, Jordan J. [The osmopressor response to water drinking](https://doi.org/10.1152/ajpregu.00544.2010). *American Journal of Physiology: Regulatory, Integrative and Comparative Physiology*, 2011.
+- McHugh J, Keller NR, Appalsamy M, et al. [Portal osmopressor mechanism linked to transient receptor potential vanilloid 4 and blood pressure control](https://doi.org/10.1161/HYPERTENSIONAHA.110.151860). *Hypertension*, 2010.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.

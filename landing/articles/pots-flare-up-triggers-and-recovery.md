@@ -6,10 +6,16 @@ summary: "A POTS flare is a temporary spell of amplified symptoms above your usu
 description: "What a POTS flare is, what triggers it (heat, illness, hormones, overexertion, dehydration), how long it lasts, and a step-by-step recovery plan you can track with resting heart rate and HRV."
 keywords: "POTS flare, POTS flare up, how to recover from a POTS flare, POTS flare symptoms, what triggers a POTS flare, dysautonomia flare, POTS crash, how long does a POTS flare last, orthostatic intolerance"
 date: 2026-09-14
-updated: 2026-09-14
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1495197359483-d092478c170a?q=80&w=1065&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 tldr: "A POTS flare is a temporary period, usually hours to days, where orthostatic symptoms climb well above your normal. It is not a new permanent worsening. Common triggers stack: heat, dehydration, illness, hormonal shifts, poor sleep and overexertion. Recovery is mostly about catching it early, resting before you are forced to, loading fluids and salt, staying cooler and more horizontal, and re-expanding activity only as your resting heart rate and HRV drift back toward baseline. Discuss recurring or severe flares with a clinician."
+question: "What triggers a POTS flare and how do I recover?"
+app:
+  feature: insights
+  hook: "Find the triggers behind your flares."
+  line: "Autonomic shows what lines up with your worse days, from sleep and food to heat and barometric pressure, so your triggers get clearer."
 categories:
   - pots
   - recovery
@@ -285,3 +291,11 @@ A POTS flare is a temporary surge, not a life sentence. Triggers stack, so flare
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own nervous system, not to diagnose or treat POTS, dysautonomia or any other condition. Fluid, salt, compression and medication strategies should be individualized and interact with blood pressure, heart and kidney health. Discuss recurring or severe flares with a clinician who knows your history, and seek prompt care for fainting, chest pain, or new, severe or unusual symptoms rather than treating them as just another flare.
 </div>
+
+## Sources
+
+- Raj SR. [Postural tachycardia syndrome (POTS)](https://doi.org/10.1161/CIRCULATIONAHA.112.144501). *Circulation*, 2013.
+- Vernino S, Bourne KM, Stiles LE, et al. [Postural orthostatic tachycardia syndrome (POTS): State of the science and clinical care from a 2019 National Institutes of Health Expert Consensus Meeting - Part 1](https://doi.org/10.1016/j.autneu.2021.102828). *Autonomic Neuroscience*, 2021.
+- Peggs KJ, Nguyen H, Enayat D, et al. [Gynecologic disorders and menstrual cycle lightheadedness in postural tachycardia syndrome](https://doi.org/10.1016/j.ijgo.2012.04.014). *International Journal of Gynecology & Obstetrics*, 2012.
+- Z'Graggen WJ, Hess CW, Humm AM. [Acute fluid ingestion in the treatment of orthostatic intolerance: important implications for daily practice](https://doi.org/10.1111/j.1468-1331.2010.03030.x). *European Journal of Neurology*, 2010.
+- Vøllestad NK, Mengshoel AM. [Post-exertional malaise in daily life and experimental exercise models in patients with myalgic encephalomyelitis/chronic fatigue syndrome](https://doi.org/10.3389/fphys.2023.1257557). *Frontiers in Physiology*, 2023.

@@ -6,11 +6,17 @@ summary: "A patient-founder's honest account of four years with long COVID and d
 description: "One long hauler's real recovery story, with the data behind it. Crashing HRV, labile blood pressure, and how tracking HRV, blood pressure and orthostatic patterns helped me see what was actually helping. Not a cure, a way to see. Personal experience, not medical advice."
 keywords: "long covid recovery story, dysautonomia recovery, POTS recovery, tracking HRV long covid, labile blood pressure long covid, low HRV recovery, quercetin long covid, antihistamines POTS histamine, MCAS long covid, patient founder, see what is helping"
 date: 2026-08-07
-updated: 2026-08-07
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "/articles/from-daily-crashes-to-living-again/austin-and-daughter-carousel.jpg"
 photoAttribution: "Austin Spaeth"
 tldr: "Four years into long COVID I was crashing daily, with labile blood pressure and HRV in the teens, and no doctor could tell me whether anything I tried was working. So I started measuring: HRV, blood pressure, orthostatic response, sleep, food, and the supplements and medications I was trying. Slowly the patterns surfaced. Over two years I built a routine and watched the numbers after every change (antihistamines, and later quercetin, were the big ones for me), and I went from daily crashes to occasional ones. I am not healed, but I can see and manage it now. The app did not fix me. It let me see, and seeing was what I needed. This is my own experience, not medical advice."
+question: "How can I tell if anything I'm trying for long COVID is working?"
+app:
+  feature: insights
+  hook: "See what is actually helping, in your own data."
+  line: "Log your supplements, meds, sleep and food next to a morning HRV reading. Autonomic shows what lines up with your better and worse days."
 categories:
   - postviral
   - pots
@@ -117,3 +123,10 @@ If you're where I was, please work with a doctor who takes long COVID and dysaut
 ---
 
 *Autonomic is a personal journal and education tool, not a medical device. It does not diagnose, treat, or prevent any disease. This article describes my own experience only and is not medical advice. Always talk to your doctor before starting or stopping any medication, supplement, or treatment.*
+
+## Sources
+
+- Nunan D, Sandercock GR, Brodie DA. [A quantitative systematic review of normal values for short-term heart rate variability in healthy adults](https://doi.org/10.1111/j.1540-8159.2010.02841.x). *Pacing and Clinical Electrophysiology*, 2010.
+- Glynne P, Tahmasebi N, Gant V, et al. [Long COVID following mild SARS-CoV-2 infection: characteristic T cell alterations and response to antihistamines](https://doi.org/10.1136/jim-2021-002051). *Journal of Investigative Medicine*, 2022.
+- Weinstock LB, Brook JB, Walters AS, et al. [Mast cell activation symptoms are prevalent in Long-COVID](https://doi.org/10.1016/j.ijid.2021.09.043). *International Journal of Infectious Diseases*, 2021.
+- Weng Z, Zhang B, Asadi S, et al. [Quercetin is more effective than cromolyn in blocking human mast cell cytokine release and inhibits contact dermatitis and photosensitivity in humans](https://doi.org/10.1371/journal.pone.0033805). *PLoS One*, 2012.

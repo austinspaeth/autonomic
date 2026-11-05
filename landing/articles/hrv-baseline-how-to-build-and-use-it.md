@@ -6,11 +6,17 @@ summary: "A single HRV number means almost nothing on its own. Your baseline, yo
 description: "How to build an HRV baseline and read each reading against it: how long it takes, how to set your personal normal range, and why your own rolling average beats any population norm in POTS and long COVID."
 keywords: "HRV baseline, heart rate variability baseline, personal HRV baseline, how long to establish HRV baseline, HRV normal range, rolling HRV average, RMSSD baseline, HRV trend, POTS, long COVID"
 date: 2026-08-04
-updated: 2026-08-04
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1545205597-3d9d02c29597?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Emma Simpson / Unsplash"
 tldr: "Your HRV baseline is your own rolling average plus the normal spread around it, usually built from RMSSD taken the same way each morning. Expect a rough baseline after about two weeks and a stable one after four to eight, held on a rolling window (often 60 days) so it moves with you. Read each reading against your personal band, not a population norm: a single low morning is usually noise, and a sustained shift away from baseline is the real signal."
+question: "How do I build an HRV baseline?"
+app:
+  feature: hrv-readings
+  hook: "Read every morning against your own normal."
+  line: "Take a short reading each morning and Autonomic builds your baseline, then grades each new reading against it in a daily score."
 categories:
   - hrv
   - basics
@@ -281,3 +287,11 @@ A single HRV reading is a data point with almost no meaning until it has somethi
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> These are educational field notes to help you understand and track your own data, not a way to diagnose or treat any condition. HRV varies widely between people and day to day. If your readings concern you or your symptoms are changing, discuss it with a clinician who can evaluate you properly.
 </div>
+
+## Sources
+
+- Shaffer F, Ginsberg JP. [An overview of heart rate variability metrics and norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.
+- Task Force of the European Society of Cardiology and the North American Society of Pacing and Electrophysiology. [Heart rate variability: standards of measurement, physiological interpretation, and clinical use](https://doi.org/10.1161/01.CIR.93.5.1043). *Circulation*, 1996.
+- Plews DJ, Laursen PB, Stanley J, et al. [Training adaptation and heart rate variability in elite endurance athletes: opening the door to effective monitoring](https://doi.org/10.1007/s40279-013-0071-8). *Sports Medicine*, 2013.
+- Plews DJ, Laursen PB, Kilding AE, et al. [Heart rate variability in elite triathletes, is variation in variability the key to effective training? A case comparison](https://doi.org/10.1007/s00421-012-2354-4). *European Journal of Applied Physiology*, 2012.
+- Umetani K, Singer DH, McCraty R, et al. [Twenty-four hour time domain heart rate variability and heart rate: relations to age and gender over nine decades](https://doi.org/10.1016/S0735-1097%2897%2900554-8). *Journal of the American College of Cardiology*, 1998.

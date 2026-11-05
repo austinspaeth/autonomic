@@ -6,11 +6,17 @@ summary: "How long to measure HRV depends on which metric you care about and how
 description: "How long should an HRV reading be? Why 1-minute ultra-short readings differ from the 5-minute standard, which metrics scale with duration, and how to pick a length for POTS and long COVID recovery."
 keywords: "how long to measure HRV, HRV reading length, ultra-short HRV, 1 minute HRV, 5 minute HRV reading, HRV measurement duration, RMSSD reading length, SDNN reading length, HRV normal range, POTS, long COVID"
 date: 2026-08-14
-updated: 2026-08-14
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1522075782449-e45a34f1ddfb?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Sage Friedman / Unsplash"
 tldr: "For a same-time-of-day morning trend, a 1-minute reading is enough to track RMSSD, the fast vagal signal, and roughly 5 minutes is the reference standard that also gives you a stable SDNN and frequency-domain numbers. The one rule that matters more than the exact length: pick a single duration and never change it, because most HRV metrics grow with reading length and comparing a 2-minute reading to a 5-minute one invents a difference that isn't real."
+question: "How long should I measure HRV for?"
+app:
+  feature: hrv-readings
+  hook: "One steady reading, the same way daily."
+  line: "Autonomic guides a timed morning HRV reading with your phone camera, a strap or a watch, so every reading is taken the same way."
 categories:
   - hrv
   - basics
@@ -201,3 +207,10 @@ That last point is worth repeating because it's the one people violate by accide
 **Should I use morning spot readings or overnight HRV?** Both work if you stay consistent. A morning spot reading is a controlled snapshot you can standardize; an overnight average is less effortful but blends sleep stages and isn't comparable to a seated daytime number. Pick one and track it against itself.
 
 <p style="color:var(--dim-2);font-size:0.9rem;margin-top:2rem">These are educational field notes on HRV measurement, not medical advice. HRV is highly individual, and reading length, posture, and timing all shape the number. Discuss any changes in your health or your tracking with a qualified clinician.</p>
+
+## Sources
+
+- Shaffer F, Ginsberg JP. [An overview of heart rate variability metrics and norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.
+- Shaffer F, Meehan ZM, Zerr CL. [A critical review of ultra-short-term heart rate variability norms research](https://doi.org/10.3389/fnins.2020.594880). *Frontiers in Neuroscience*, 2020.
+- Munoz ML, van Roon A, Riese H, et al. [Validity of (ultra-)short recordings for heart rate variability measurements](https://doi.org/10.1371/journal.pone.0138921). *PLoS One*, 2015.
+- Esco MR, Flatt AA. [Ultra-short-term heart rate variability indexes at rest and post-exercise in athletes: evaluating the agreement with accepted recommendations](https://pmc.ncbi.nlm.nih.gov/articles/PMC4126289/). *Journal of Sports Science and Medicine*, 2014.

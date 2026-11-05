@@ -11,6 +11,11 @@ author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1434494878577-86c23bcb06b9?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Luke Chesser / Unsplash"
 tldr: "Fitness trackers are excellent sensors built for healthy people chasing performance. They compare you to athlete norms, gamify activity, and separate the numbers from how you feel. A recovery-first tool scores against medically relevant thresholds, centers your own baseline, keeps symptoms next to the data, and never nudges you to push harder. You can even feed your wearable's data in; the difference is interpretation, not hardware."
+question: "Is a fitness tracker useful if I have POTS or long COVID?"
+app:
+  feature: pacing-budget
+  hook: "Pace for recovery instead of chasing step goals."
+  line: "Autonomic gives you a daily energy budget in minutes, learned from what your body handled, and warns you when you are close to spending it."
 categories:
   - app
   - hrv

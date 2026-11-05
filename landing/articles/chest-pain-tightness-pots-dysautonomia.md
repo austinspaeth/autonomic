@@ -6,11 +6,17 @@ summary: "Chest pain and tightness are common and frightening in POTS, long COVI
 description: "Chest pain in POTS and dysautonomia explained: why it happens, the non-cardiac causes, how to tell it apart from heart pain, the emergency red flags, and what calms it."
 keywords: "chest pain POTS, chest tightness POTS, dysautonomia chest pain, non-cardiac chest pain, long covid chest pain, POTS chest pressure, chest pain when standing, costochondritis POTS, is chest pain in POTS dangerous, chest pain anxiety vs heart"
 date: 2026-09-25
-updated: 2026-09-25
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1769029270011-8be0623cd87b?q=80&w=1740&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Unsplash"
 tldr: "Chest pain and tightness are common in POTS, long COVID and dysautonomia, and in a young person with a normal heart they are usually non-cardiac: musculoskeletal chest-wall pain, esophageal and reflux irritation, upper-chest breathing and hyperventilation, and the strain of a racing, adrenaline-primed heart working harder than it should. That does not mean you skip a check. New or unexplained chest pain deserves at least one proper cardiac evaluation, and a specific set of red flags (crushing pressure, pain spreading to the arm, jaw or back, cold sweat, breathlessness, fainting, or pain brought on by exertion) means stop and call emergency services now. Once serious causes are ruled out, the same fundamentals that steady the rest of dysautonomia, volume, pacing, slow breathing and treating reflux, tend to quiet the chest too."
+question: "Why does my chest hurt or feel tight with POTS?"
+app:
+  feature: doctor-reports
+  hook: "Give your doctor a clear record of chest pain."
+  line: "Log each episode with when it happened, then turn your data into a doctor summary you can bring to your next appointment."
 categories:
   - pots
   - postviral
@@ -227,3 +233,12 @@ Chest pain and tightness are common in POTS, long COVID and dysautonomia, and in
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and not a substitute for personalized care. <em>New, severe or unexplained chest pain, and any chest pain with the red flags above, should be evaluated urgently by a clinician or emergency service.</em> Talk with a qualified clinician before making changes to medication, diet or exercise.
 </div>
+
+## Sources
+
+- Shaw BH, Stiles LE, Bourne K, et al. [The face of postural tachycardia syndrome: insights from a large cross-sectional online community-based survey](https://doi.org/10.1111/joim.12895). *Journal of Internal Medicine*, 2019.
+- Gulati M, Levy PD, Mukherjee D, et al. [2021 AHA/ACC/ASE/CHEST/SAEM/SCCT/SCMR guideline for the evaluation and diagnosis of chest pain](https://doi.org/10.1161/CIR.0000000000001029). *Circulation*, 2021.
+- Fass R, Achem SR. [Noncardiac chest pain: epidemiology, natural course and pathogenesis](https://doi.org/10.5056/jnm.2011.17.2.110). *Journal of Neurogastroenterology and Motility*, 2011.
+- Proulx AM, Zryd TW. [Costochondritis: diagnosis and treatment](https://pubmed.ncbi.nlm.nih.gov/19817327/). *American Family Physician*, 2009.
+- Jones M, Harvey A, Marston L, et al. [Breathing exercises for dysfunctional breathing/hyperventilation syndrome in adults](https://doi.org/10.1002/14651858.CD009041.pub2). *Cochrane Database of Systematic Reviews*, 2013.
+- Centers for Disease Control and Prevention. [About heart attack symptoms, risk, and recovery](https://www.cdc.gov/heart-disease/about/heart-attack.html). Updated 2024.

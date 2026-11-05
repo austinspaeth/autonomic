@@ -6,11 +6,17 @@ summary: "Heat is one of the most reliable triggers in POTS and dysautonomia. He
 description: "Why does heat make POTS worse? The real physiology behind heat intolerance in POTS and dysautonomia, how hot weather moves your HRV, resting heart rate and stand test, and how to stay ahead of it."
 keywords: "heat intolerance POTS, does heat make POTS worse, POTS hot weather, heat and dysautonomia, POTS summer symptoms, heat intolerance dysautonomia, POTS heat exhaustion, heat and HRV, POTS cooling strategies, orthostatic intolerance heat"
 date: 2026-07-21
-updated: 2026-07-21
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1526801505392-f7e63693233d?q=80&w=774&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
 photoAttribution: "Giorgio Trovato / Unsplash"
 tldr: "Heat is a top trigger in POTS and dysautonomia because thermoregulation is an autonomic job. To shed heat your skin vessels widen and you sweat, which pools blood in the periphery and drains fluid and salt from an already low blood volume. Less blood returns to the heart, so heart rate climbs, HRV falls, and standing gets harder. On a hot day your resting heart rate runs higher, your morning HRV runs lower, and your stand test looks worse, none of which means you are backsliding. The useful moves are to cool actively (cold drinks, cooling vest, shade, cool showers), lift fluids and salt with your clinician's guidance, wear compression, avoid midday heat, and log heat as a trigger so you can see the pattern instead of guessing."
+question: "Why does hot weather make my POTS worse?"
+app:
+  feature: insights
+  hook: "See what a hot day does to you."
+  line: "Log heat as a trigger next to your morning readings. Autonomic shows what lines up with your harder days, so you can plan around the weather."
 categories:
   - pots
   - recovery
@@ -24,7 +30,7 @@ faq:
   - q: "How can I exercise with POTS in the heat?"
     a: "Favor the cool parts of the day, and lean on recumbent and water-based options. Swimming, water walking and a recumbent bike keep you horizontal or supported and let the water carry away heat, which is why water exercise is a staple of graded POTS programs. Pre-cool with a cold drink, keep fluids and electrolytes close, and stop early if your heart rate spikes or you feel unwell. Building tolerance is about consistency, not pushing through a hot afternoon."
   - q: "When is heat a medical emergency in POTS?"
-    a: "Ordinary heat intolerance is miserable but not dangerous. Heat exhaustion and heat stroke are. Warning signs include a body temperature that keeps climbing, confusion or altered behavior, skin that stops sweating and turns hot and dry, repeated vomiting, or fainting that does not recover quickly once you lie down and cool off. People with dysautonomia can be more vulnerable to overheating, so treat those signs as an emergency and seek urgent care."
+    a: "Ordinary heat intolerance is miserable but not dangerous. Heat exhaustion and heat stroke are. Warning signs include a body temperature that keeps climbing, confusion or altered behavior, heavy sweating with weakness or nausea, skin that turns hot and dry (heat stroke can also come with heavy sweating, so still sweating does not mean you are safe), repeated vomiting, or fainting that does not recover quickly once you lie down and cool off. People with dysautonomia can be more vulnerable to overheating, so treat those signs as an emergency and seek urgent care."
 social:
   linkedin: |
     A seasonal reminder for anyone who tracks autonomic data: heat is one of the most reliable triggers in POTS and dysautonomia, and the reason is mechanical, not mysterious.
@@ -46,7 +52,7 @@ social:
 
     What helped me: pre-cooling with a cold drink before I have to be upright, a cheap cooling towel or vest on hot days, compression, keeping salt and fluids up (check with your doctor on amounts, especially if you are on meds), and just not scheduling anything that needs me standing outside at 2pm. Water walking was the one form of summer exercise that did not wreck me because the water carries the heat away.
 
-    Not medical advice, and please know the difference between normal heat misery and actual heat exhaustion (confusion, no sweating, fainting that does not recover) which is an emergency. I wrote the mechanisms and a cooling checklist up here if it is useful: https://autonomic.care/insights/pots/heat-intolerance-and-pots/?utm_source=reddit&utm_medium=social&utm_campaign=heat-intolerance-and-pots
+    Not medical advice, and please know the difference between normal heat misery and actual heat exhaustion or heat stroke (confusion, heavy sweating with weakness or nausea, hot dry skin, fainting that does not recover) which is an emergency. I wrote the mechanisms and a cooling checklist up here if it is useful: https://autonomic.care/insights/pots/heat-intolerance-and-pots/?utm_source=reddit&utm_medium=social&utm_campaign=heat-intolerance-and-pots
   x: |
     Heat is a top POTS trigger, and it's mechanical: cooling pools blood and drains volume, so HR climbs and HRV drops. Physiology + fixes: https://autonomic.care/insights/pots/heat-intolerance-and-pots/?utm_source=x&utm_medium=social&utm_campaign=heat-intolerance-and-pots #POTS
   facebook: |
@@ -216,7 +222,7 @@ Everyday heat intolerance is exhausting but not dangerous. Heat exhaustion and h
 | --- | --- |
 | Higher heart rate, lightheadedness, fatigue | Body temperature that keeps climbing |
 | Symptoms ease when you cool and lie down | Confusion, slurred speech, altered behavior |
-| You are still sweating | Skin hot and dry, sweating has stopped |
+| Still sweating is not a sign you are safe | Heavy sweating with weakness, nausea or dizziness (heat exhaustion); hot dry skin or heavy sweating with a very high temperature (heat stroke) |
 | A rough afternoon, back to baseline after cooling | Repeated vomiting, fainting that does not recover |
 
 If you see the signs in the right-hand column, treat it as an emergency: get to a cool place, cool the body actively, and seek urgent care. Do not try to ride it out.
@@ -232,3 +238,14 @@ Heat intolerance in POTS and dysautonomia is real, mechanical and predictable. T
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Heat can be genuinely dangerous, and individual needs (including how much salt and fluid are right for you) vary. Discuss changes with a clinician who knows your history, and treat signs of heat illness as an emergency.
 </div>
+
+## Sources
+
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Crandall CG, Wilson TE. [Human cardiovascular responses to passive heat stress](https://doi.org/10.1002/cphy.c140015). *Comprehensive Physiology*, 2015.
+- Crandall CG, González-Alonso J. [Cardiovascular function in the heat-stressed human](https://doi.org/10.1111/j.1748-1716.2010.02119.x). *Acta Physiologica*, 2010.
+- Crandall CG, Zhang R, Levine BD. [Effects of whole body heating on dynamic baroreflex regulation of heart rate in humans](https://doi.org/10.1152/ajpheart.2000.279.5.H2486). *American Journal of Physiology: Heart and Circulatory Physiology*, 2000.
+- Raj SR, Biaggioni I, Yamhure PC, et al. [Renin-aldosterone paradox and perturbed blood volume regulation underlying postural tachycardia syndrome](https://doi.org/10.1161/01.CIR.0000160356.97313.5D). *Circulation*, 2005.
+- Fu Q, Levine BD. [Exercise and non-pharmacological treatment of POTS](https://doi.org/10.1016/j.autneu.2018.07.001). *Autonomic Neuroscience*, 2018.
+- Okamoto-Mizuno K, Mizuno K. [Effects of thermal environment on sleep and circadian rhythm](https://doi.org/10.1186/1880-6805-31-14). *Journal of Physiological Anthropology*, 2012.
+- Centers for Disease Control and Prevention. [Heat-related illnesses](https://www.cdc.gov/niosh/heat-stress/about/illnesses.html). Updated 2026.

@@ -6,11 +6,17 @@ summary: "When your heart rate spikes standing up with POTS, a few fast, drug-fr
 description: "How to lower a high heart rate from POTS in the moment: position changes, counterpressure, slow breathing, fluids and salt, plus a standing HR-rise calculator and when to call a clinician."
 keywords: "how to lower high heart rate POTS, calm racing heart POTS, how to slow heart rate POTS, POTS heart rate spike standing, tachycardia POTS what to do, lower heart rate dysautonomia, standing heart rate rise, POTS heart rate 150"
 date: 2026-11-02
-updated: 2026-11-02
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: https://images.unsplash.com/photo-1552081844-512cf156e161?q=80&w=1760&auto=format&fit=crop
 photoAttribution: "Jonathan Borba / Unsplash"
 tldr: "To lower a high heart rate from POTS in the moment, get horizontal or at least sit with your legs up, use counterpressure (cross and tense your legs, clench your buttocks), slow your breathing to about six breaths a minute, and drink cold fluids with salt. These push pooled blood back toward your heart and nudge your nervous system toward rest. The spike itself is usually your body compensating for standing, not a dangerous rhythm, but new chest pain, fainting, or a racing heart that will not settle at rest deserves a clinician's attention."
+question: "How do I lower my heart rate fast when POTS spikes it?"
+app:
+  feature: pots-stand-test
+  hook: "Measure how big your standing rise is."
+  line: "A guided home stand test measures how much your heart rate climbs when you stand, so you can see if your spikes get smaller over time."
 categories:
   - pots
   - recovery
@@ -22,14 +28,14 @@ faq:
   - q: "What is the best breathing to slow your heart rate in POTS?"
     a: "Slow, even breathing at about five to seven breaths a minute, with the exhale a little longer than the inhale, gives you the biggest parasympathetic (vagal) pull on your heart rate. A simple version is to breathe in for about four seconds and out for about six. The long exhale is the active ingredient, because heart rate naturally slows as you breathe out. This is the same mechanism behind resonant breathing and HRV biofeedback."
   - q: "Why does my heart rate spike to 150 when I stand up with POTS?"
-    a: "When you stand, up to a third of a liter of blood pools in your legs and abdomen. In POTS the reflexes that should clamp those vessels down are incomplete, so less blood returns to your heart, and the only way your body keeps blood pressure up is to raise your heart rate sharply. A sustained rise of 30 beats per minute or more within ten minutes of standing (40 or more in teenagers) is the defining feature of POTS, so a jump to 150 is the pattern working as described, not a separate heart problem."
+    a: "When you stand, roughly half a liter to a liter of blood shifts into your legs and abdomen. In POTS the reflexes that should clamp those vessels down are incomplete, so less blood returns to your heart, and the only way your body keeps blood pressure up is to raise your heart rate sharply. A sustained rise of 30 beats per minute or more within ten minutes of standing (40 or more in teenagers) is the defining feature of POTS, so a jump to 150 is the pattern working as described, not a separate heart problem."
   - q: "Do beta-blockers or medication fix the POTS heart rate spike?"
     a: "Low-dose beta-blockers and ivabradine can blunt the standing heart-rate rise for some people, and they are prescribed for exactly this. But medication is a clinician's decision and works best on top of the basics: fluids, salt, compression, and gradual reconditioning. The in-the-moment moves in this article are things you can do today without a prescription, and they are worth having whether or not you also take something."
 social:
   linkedin: |
     One of the most common questions in POTS support spaces is simple and urgent: my heart rate just jumped to 150 standing up, what do I do right now?
 
-    The physiology points straight to the answer. On standing, up to a third of a liter of blood pools in the legs and abdomen; in POTS the vessels do not clamp down well, so less blood returns to the heart and the only way to defend blood pressure is a sharp rise in heart rate. So the fixes are the moves that reverse that: get horizontal or raise your legs, use counterpressure (cross and tense the legs, clench the buttocks), slow the breath to about six per minute with a longer exhale, and get cold fluid and salt on board.
+    The physiology points straight to the answer. On standing, roughly half a liter to a liter of blood shifts into the legs and abdomen; in POTS the vessels do not clamp down well, so less blood returns to the heart and the only way to defend blood pressure is a sharp rise in heart rate. So the fixes are the moves that reverse that: get horizontal or raise your legs, use counterpressure (cross and tense the legs, clench the buttocks), slow the breath to about six per minute with a longer exhale, and get cold fluid and salt on board.
 
     The part worth emphasizing for anyone tracking this: judge the moves by data, not by one anxious day. Compare your standing heart-rate rise with and without them over a week, not in the middle of a spike. The spike is usually compensation, not a dangerous rhythm, but new chest pain, true fainting, or a racing heart that will not settle at rest belongs with a clinician.
 
@@ -73,7 +79,7 @@ The good news is that the physiology points to a short, reliable list of things 
 
 ## Why your heart races when you stand
 
-To stand is to fight gravity. The instant you are upright, somewhere between 300 and 800 ml of blood wants to settle into the veins of your legs and, especially, your abdomen. In a healthy system, reflexes squeeze those vessels down and blood keeps circulating. In POTS, that clamp-down is incomplete, so blood pools, less returns to your heart, and the amount pumped per beat drops.
+To stand is to fight gravity. The instant you are upright, somewhere between half a liter and a liter of blood wants to settle into the veins of your legs and, especially, your abdomen. In a healthy system, reflexes squeeze those vessels down and blood keeps circulating. In POTS, that clamp-down is incomplete, so blood pools, less returns to your heart, and the amount pumped per beat drops.
 
 Your body will not let blood pressure fall if it can help it, so it does the one thing it can do fast: it raises your heart rate, hard. That is the standing spike. A sustained rise of **30 beats per minute or more** within ten minutes of standing (**40 or more** in teenagers) is the defining feature of POTS. So a jump to 150 is not a second, separate heart problem layered on top. It is the same mechanism doing exactly what it does. We go deeper into the pooling itself in [blood pooling in POTS legs](/insights/pots/blood-pooling-in-pots-legs/), and into how to measure the rise in [the orthostatic stand test at home](/insights/pots/the-orthostatic-stand-test-at-home/).
 
@@ -119,7 +125,7 @@ Your heart rate naturally rises a little as you breathe in and falls as you brea
 
 ### 4. Cold and fluid
 
-Cold is a quick parasympathetic nudge: sip ice water, hold something cold to your face or the back of your neck, or splash cool water on your face. At the same time, drink. A fast glass or two of water, ideally with salt or an electrolyte mix, pulls fluid into your bloodstream and raises the volume your heart has to work with. Many people with POTS use a rapid "water bolus" of roughly 300 to 500 ml for exactly this acute effect. More on why this works in [the science of salt and fluids for POTS](/insights/research/science-of-salt-and-fluids-for-pots/).
+Cold is a quick parasympathetic nudge: sip ice water, hold something cold to your face or the back of your neck, or splash cool water on your face. At the same time, drink. A fast glass or two of water, ideally with salt or an electrolyte mix, can set off a quick reflex that raises blood pressure. Many people with POTS use a rapid "water bolus" of roughly 300 to 500 ml for this, though the evidence in POTS is mixed: a 2023 review found no clear change in heart rate or blood pressure when sitting or lying down, and standing was not tested. More on why this works in [the science of salt and fluids for POTS](/insights/research/science-of-salt-and-fluids-for-pots/).
 
 ### 5. Remove the trigger
 
@@ -197,7 +203,7 @@ The number that matters in POTS is not your standing heart rate on its own, it i
 | Counterpressure (tense legs, clench) | Seconds | Muscle pump pushes pooled blood centrally, raises blood pressure | Do it early, before symptoms peak |
 | Cold water or cold to the face | Seconds | A quick parasympathetic (vagal) nudge | Very intense cold can feel jarring |
 | Slow breathing, long exhale | 30 to 60 seconds | Lengthened exhale pulls the vagal brake on heart rate | Do not force or hold the breath |
-| Rapid fluid, with salt | 2 to 20 minutes | Expands blood volume so the heart has more to pump | Discuss daily salt load with your clinician |
+| Rapid fluid, with salt | 2 to 20 minutes | A fast reflex can raise blood pressure; evidence in POTS is mixed | Discuss daily salt load with your clinician |
 | Leave the heat or sit after eating | Minutes | Removes a trigger stacked on top of standing | Plan ahead for known triggers |
 
 ## Is a high heart rate from POTS dangerous?
@@ -235,6 +241,15 @@ The piece people most often miss is feedback. It is genuinely hard to tell wheth
 **Do beta-blockers or medication fix the spike?** Low-dose beta-blockers and ivabradine can blunt the rise for some people and are prescribed for it, but that is a clinician's decision and works best alongside fluids, salt, compression and reconditioning.
 
 <p style="color:var(--dim-2); font-size:0.9rem; margin-top:2rem;"><em>Educational field notes, not medical advice. POTS and dysautonomia vary widely from person to person. Use this to understand your pattern and to have a better conversation with your clinician, and discuss any changes to your routine or medication with them first.</em></p>
+
+## Sources
+
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Smit AAJ, Halliwill JR, Low PA, et al. [Pathophysiological basis of orthostatic hypotension in autonomic failure](https://doi.org/10.1111/j.1469-7793.1999.0001o.x). *The Journal of Physiology*, 1999.
+- van Dijk N, Quartieri F, Blanc JJ, et al. [Effectiveness of physical counterpressure maneuvers in preventing vasovagal syncope: the Physical Counterpressure Manoeuvres Trial (PC-Trial)](https://doi.org/10.1016/j.jacc.2006.06.059). *Journal of the American College of Cardiology*, 2006.
+- Lehrer PM, Gevirtz R. [Heart rate variability biofeedback: how and why does it work?](https://doi.org/10.3389/fpsyg.2014.00756). *Frontiers in Psychology*, 2014.
+- Oyewunmi OA, Lei LY, Laurin JKH, et al. [Hemodynamic effects of the osmopressor response: a systematic review and meta-analysis](https://doi.org/10.1161/JAHA.122.029645). *Journal of the American Heart Association*, 2023.
+- Raj SR, Black BK, Biaggioni I, et al. [Propranolol decreases tachycardia and improves symptoms in the postural tachycardia syndrome: less is more](https://doi.org/10.1161/CIRCULATIONAHA.108.846501). *Circulation*, 2009.
 
 <script>
   // Injected verbatim into the prerendered HTML via {@html} below. With csr off,

@@ -6,11 +6,17 @@ summary: "Joint hypermobility, hypermobile Ehlers-Danlos syndrome (hEDS) and POT
 description: "Why hypermobility and hEDS overlap with POTS: the connective-tissue and blood-pooling link, the Beighton score explained, the POTS-hEDS-MCAS trifecta, and how to track and manage it at home."
 keywords: "hypermobility and POTS, hEDS POTS, Ehlers-Danlos POTS, Beighton score, hypermobile POTS, POTS hEDS MCAS trifecta, joint hypermobility dysautonomia, connective tissue POTS, bendy joints racing heart"
 date: 2026-08-15
-updated: 2026-08-15
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1552196527-bffef41ef674?ixlib=rb-4.1.0&q=85&fm=jpg&crop=entropy&cs=srgb&dl=dane-wetton-AkSJQnem75Y-unsplash.jpg"
 photoAttribution: "Dane Wetton / Unsplash"
 tldr: "Joint hypermobility and hypermobile Ehlers-Danlos syndrome (hEDS) show up in POTS far more often than chance. The leading explanation is connective tissue: more stretchy vein and vessel walls let extra blood pool in the legs and abdomen when you stand, so the heart speeds up to compensate. The Beighton score screens for hypermobility but does not diagnose hEDS, and hypermobility does not by itself prove you have a syndrome. The management is the same POTS toolkit, weighted toward abdominal compression, gentle recumbent reconditioning and joint protection. Tracking your own standing numbers is how you tell what is actually helping."
+question: "Why do hypermobility and POTS often happen together?"
+app:
+  feature: pots-stand-test
+  hook: "Measure what standing does to you."
+  line: "A guided home stand test records your heart rate rise on standing, so you can see your own pattern and track it over time."
 categories:
   - pots
   - basics
@@ -219,3 +225,13 @@ If you are bendy and your heart races when you stand, those two facts are probab
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Hypermobility, hEDS and POTS all vary widely between people, and diagnosis and treatment belong with a qualified clinician. If your symptoms are worsening, work with a doctor who can evaluate you properly.
 </div>
+
+## Sources
+
+- Malfait F, Francomano C, Byers P, et al. [The 2017 international classification of the Ehlers-Danlos syndromes](https://doi.org/10.1002/ajmg.c.31552). *American Journal of Medical Genetics Part C: Seminars in Medical Genetics*, 2017.
+- Miller AJ, Stiles LE, Sheehan T, et al. [Prevalence of hypermobile Ehlers-Danlos syndrome in postural orthostatic tachycardia syndrome](https://doi.org/10.1016/j.autneu.2020.102637). *Autonomic Neuroscience*, 2020.
+- Roma M, Marden CL, De Wandele I, et al. [Postural tachycardia syndrome and other forms of orthostatic intolerance in Ehlers-Danlos syndrome](https://doi.org/10.1016/j.autneu.2018.02.006). *Autonomic Neuroscience*, 2018.
+- Kucharik AH, Chang C. [The relationship between hypermobile Ehlers-Danlos syndrome (hEDS), postural orthostatic tachycardia syndrome (POTS), and mast cell activation syndrome (MCAS)](https://doi.org/10.1007/s12016-019-08755-8). *Clinical Reviews in Allergy and Immunology*, 2020.
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Freeman R, Wieling W, Axelrod FB, et al. [Consensus statement on the definition of orthostatic hypotension, neurally mediated syncope and the postural tachycardia syndrome](https://doi.org/10.1007/s10286-011-0119-5). *Clinical Autonomic Research*, 2011.
+- Smit AA, Halliwill JR, Low PA, et al. [Pathophysiological basis of orthostatic hypotension in autonomic failure](https://doi.org/10.1111/j.1469-7793.1999.0001o.x). *Journal of Physiology*, 1999.

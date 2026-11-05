@@ -6,17 +6,23 @@ summary: "A hot shower stacks three POTS triggers at once: heat that dilates you
 description: "Why do hot showers make POTS worse? How heat, blood pooling, and standing combine to cause dizziness, plus a practical safe-showering checklist for POTS."
 keywords: "hot showers POTS, showering with POTS, POTS dizzy in shower, why do I feel faint in the shower, heat intolerance POTS, shower chair POTS, dysautonomia shower, orthostatic intolerance bathing, POTS fainting shower"
 date: 2026-10-01
-updated: 2026-10-01
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "/articles/hot-showers-pots/cover.webp"
 photoAttribution: "Autonomic"
-tldr: "Hot showers make POTS worse because they combine three triggers at once: heat opens up the blood vessels in your skin and belly so blood pools away from your heart and brain, you are standing still with no muscle pump to push it back, and sweating slowly drops your blood volume. The riskiest moment is stepping out, when those dilated vessels have not yet tightened back up. You do not have to give up showering. Use cooler water, sit on a shower chair, keep the room ventilated, pre-hydrate with salt and fluids, keep it short, and move slowly when you get out."
+tldr: "Hot showers make POTS worse because they combine three triggers at once: heat opens up the blood vessels in your skin so blood pools away from your heart and brain, you are standing still with no muscle pump to push it back, and sweating slowly drops your blood volume. The riskiest moment is stepping out, when those dilated vessels have not yet tightened back up. You do not have to give up showering. Use cooler water, sit on a shower chair, keep the room ventilated, pre-hydrate with salt and fluids, keep it short, and move slowly when you get out."
+question: "Why do hot showers make me dizzy with POTS?"
+app:
+  feature: insights
+  hook: "See what a hot shower does to your numbers."
+  line: "Log showers and symptoms as triggers next to your readings. Autonomic shows what lines up with your dizzier days, so you can see what helps."
 categories:
   - pots
   - recovery
 faq:
   - q: "Why do I feel dizzy or faint in a hot shower with POTS?"
-    a: "A hot shower stacks three POTS triggers at once. Heat makes the blood vessels in your skin and gut dilate to shed warmth, which pools blood away from your heart and brain. You are standing still, so your leg muscles are not pumping that blood back up. And you lose a little fluid to sweat, which lowers your blood volume. Your heart speeds up to compensate, and if it cannot keep enough blood reaching your head you feel lightheaded. The worst moment is often stepping out, when those vessels are still wide open."
+    a: "A hot shower stacks three POTS triggers at once. Heat makes the blood vessels in your skin dilate to shed warmth, which pools blood away from your heart and brain. You are standing still, so your leg muscles are not pumping that blood back up. And you lose a little fluid to sweat, which lowers your blood volume. Your heart speeds up to compensate, and if it cannot keep enough blood reaching your head you feel lightheaded. The worst moment is often stepping out, when those vessels are still wide open."
   - q: "Is it the heat or the standing that causes shower symptoms?"
     a: "Both, and they feed each other. Heat is the trigger that dilates your vessels and drops the pressure pushing blood upward; standing is what adds gravity to an already low-margin system; and holding your arms overhead to wash your hair reduces return from your upper body too. That is why a cool shower while seated is far easier than a hot shower while standing, even though it is the same task."
   - q: "Does a shower chair really help with POTS?"
@@ -31,7 +37,7 @@ social:
   linkedin: |
     One of the most common questions in POTS and dysautonomia care is deceptively simple: why does a shower leave me dizzy?
 
-    A hot shower is not one trigger, it is three stacked together. Heat dilates the blood vessels in your skin and splanchnic bed to dump warmth, which pools blood away from the heart and brain. You are standing still, so the calf-muscle pump that normally returns that blood is idle. And you lose a little plasma volume to sweat. Your heart compensates with tachycardia, and when it cannot keep cerebral perfusion up, you feel lightheaded. The most overlooked part: the riskiest moment is stepping out, when those vessels have not yet reconstricted and your volume is lowest.
+    A hot shower is not one trigger, it is three stacked together. Heat dilates the blood vessels in your skin to dump warmth, which pools blood away from the heart and brain. You are standing still, so the calf-muscle pump that normally returns that blood is idle. And you lose a little plasma volume to sweat. Your heart compensates with tachycardia, and when it cannot keep cerebral perfusion up, you feel lightheaded. The most overlooked part: the riskiest moment is stepping out, when those vessels have not yet reconstricted and your volume is lowest.
 
     The practical upshot is reassuring. You rarely need to give up showering; you need to unstack the triggers. Cooler water, a shower chair so you are not fighting gravity, good ventilation, salt and fluids beforehand, a shorter shower, and a slow, seated transition out cover most of it.
 
@@ -44,7 +50,7 @@ social:
 
     For the longest time a shower was one of the hardest parts of my day and I could not figure out why something so ordinary left me gray, sweaty and about to drop. Sharing what finally made sense, in case it helps someone.
 
-    A hot shower is basically three POTS triggers at once. The heat opens up all the blood vessels in your skin (and your gut) to get rid of warmth, so blood pools away from your heart and brain. You are standing dead still, so your leg muscles are not pumping any of it back up. And you sweat, which slowly drops your blood volume. Your heart rate shoots up to compensate and eventually it cannot keep enough blood getting to your head. The part I never realized: the worst moment is usually stepping OUT, because your vessels are still wide open and your volume is lowest right then.
+    A hot shower is basically three POTS triggers at once. The heat opens up all the blood vessels in your skin to get rid of warmth, so blood pools away from your heart and brain. You are standing dead still, so your leg muscles are not pumping any of it back up. And you sweat, which slowly drops your blood volume. Your heart rate shoots up to compensate and eventually it cannot keep enough blood getting to your head. The part I never realized: the worst moment is usually stepping OUT, because your vessels are still wide open and your volume is lowest right then.
 
     What actually helped me: turned the temp way down (warm, not hot), got a cheap shower stool so I am sitting the whole time, cracked the door for ventilation, chugged salt and water beforehand, kept it short, and I sit down to dry off and dress instead of standing there reaching. Grab bar and a non-slip mat too.
 
@@ -69,22 +75,22 @@ The reassuring part, and the point of this article, is that you almost never hav
 
 To see why showers are so hard, it helps to picture what your circulation is trying to do under normal conditions. When you stand, gravity pulls roughly a pint of blood down into your legs and belly. A healthy autonomic system instantly tightens those vessels and nudges your heart rate up a little to keep blood pressure steady. In POTS, that tightening is weak or delayed, so your heart compensates with a big jump in rate instead. A hot shower attacks exactly that fragile compensation from three directions.
 
-**Hit one: heat dilates your vessels.** The whole job of your skin's circulation in the heat is to carry warmth to the surface and dump it. To do that, the blood vessels in your skin open up wide, and so do the large vessels in your gut (the splanchnic bed). Wide-open vessels hold more blood and offer less resistance, so blood pools in your skin and abdomen instead of returning to your heart. Less blood comes back, so less goes out to your brain. We go deeper into this in [heat intolerance and POTS](/insights/pots/heat-intolerance-and-pots/) and the mechanics of pooling in [blood pooling in POTS](/insights/pots/blood-pooling-in-pots-legs/).
+**Hit one: heat dilates your vessels.** The whole job of your skin's circulation in the heat is to carry warmth to the surface and dump it. To do that, the blood vessels in your skin open up wide. Wide-open vessels hold more blood and offer less resistance, so blood pools in your skin instead of returning to your heart. Less blood comes back, so less goes out to your brain. We go deeper into this in [heat intolerance and POTS](/insights/pots/heat-intolerance-and-pots/) and the mechanics of pooling in [blood pooling in POTS](/insights/pots/blood-pooling-in-pots-legs/).
 
 **Hit two: you are standing still.** Normally your calf muscles act as a second pump, squeezing leg veins every time you take a step and pushing blood back up toward your heart. In a shower you stand almost motionless, so that muscle pump is switched off right when you need it most. Worse, washing your hair means holding your arms overhead, which reduces blood return from your upper body too.
 
 **Hit three: you lose fluid to sweat.** A warm, steamy, enclosed bathroom makes you sweat, and sweat is fluid leaving your bloodstream. Since many people with POTS already run on a low [blood volume](/insights/pots/low-blood-volume-pots-hypovolemia/), even a small loss narrows an already thin margin. By the end of a long hot shower you have less blood in the tank than when you started.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 300" role="img" aria-label="A cascade diagram. Hot water leads to three branches, skin and gut vessels dilate, no leg muscle pump while standing, and fluid lost to sweat. All three arrows converge on less blood returning to the heart, which leads to heart rate rises to compensate, which leads to if it cannot keep up, lightheadedness.">
+  <svg viewBox="0 0 720 300" role="img" aria-label="A cascade diagram. Hot water leads to three branches, skin vessels dilate, no leg muscle pump while standing, and fluid lost to sweat. All three arrows converge on less blood returning to the heart, which leads to heart rate rises to compensate, which leads to if it cannot keep up, lightheadedness.">
     <rect x="280" y="18" width="160" height="40" rx="10" fill="none" stroke="#e03127" stroke-width="2.5"/>
     <text x="360" y="43" fill="#e03127" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="15">Hot shower</text>
     <line x1="360" y1="58" x2="120" y2="96" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="360" y1="58" x2="360" y2="96" stroke="var(--line)" stroke-width="1.5"/>
     <line x1="360" y1="58" x2="600" y2="96" stroke="var(--line)" stroke-width="1.5"/>
     <rect x="30" y="96" width="180" height="56" rx="8" fill="none" stroke="var(--line)" stroke-width="1.5"/>
-    <text x="120" y="120" fill="var(--dim-2)" text-anchor="middle" font-family="Space Mono, monospace" font-size="11">heat dilates skin</text>
-    <text x="120" y="138" fill="var(--dim-2)" text-anchor="middle" font-family="Space Mono, monospace" font-size="11">and gut vessels</text>
+    <text x="120" y="120" fill="var(--dim-2)" text-anchor="middle" font-family="Space Mono, monospace" font-size="11">heat dilates</text>
+    <text x="120" y="138" fill="var(--dim-2)" text-anchor="middle" font-family="Space Mono, monospace" font-size="11">skin vessels</text>
     <rect x="270" y="96" width="180" height="56" rx="8" fill="none" stroke="var(--line)" stroke-width="1.5"/>
     <text x="360" y="120" fill="var(--dim-2)" text-anchor="middle" font-family="Space Mono, monospace" font-size="11">standing still,</text>
     <text x="360" y="138" fill="var(--dim-2)" text-anchor="middle" font-family="Space Mono, monospace" font-size="11">no muscle pump</text>
@@ -195,7 +201,7 @@ The trap with triggers like showers is that symptoms are easy to misremember. On
 ## Frequently asked questions
 
 **Why do I feel dizzy or faint in a hot shower with POTS?**
-A hot shower stacks three POTS triggers at once. Heat makes the blood vessels in your skin and gut dilate to shed warmth, which pools blood away from your heart and brain. You are standing still, so your leg muscles are not pumping that blood back up. And you lose a little fluid to sweat, which lowers your blood volume. Your heart speeds up to compensate, and if it cannot keep enough blood reaching your head you feel lightheaded. The worst moment is often stepping out, when those vessels are still wide open.
+A hot shower stacks three POTS triggers at once. Heat makes the blood vessels in your skin dilate to shed warmth, which pools blood away from your heart and brain. You are standing still, so your leg muscles are not pumping that blood back up. And you lose a little fluid to sweat, which lowers your blood volume. Your heart speeds up to compensate, and if it cannot keep enough blood reaching your head you feel lightheaded. The worst moment is often stepping out, when those vessels are still wide open.
 
 **Is it the heat or the standing that causes shower symptoms?**
 Both, and they feed each other. Heat is the trigger that dilates your vessels and drops the pressure pushing blood upward; standing adds gravity to an already low-margin system; and holding your arms overhead to wash your hair reduces return from your upper body too. That is why a cool shower while seated is far easier than a hot shower while standing, even though it is the same task.
@@ -219,3 +225,12 @@ Hot showers are hard on POTS because they are not one trigger, they are three: h
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own patterns, not to diagnose or treat any condition. Talk with a clinician before changing your salt and fluid intake, any medication, or your routine, especially if you faint, have injured yourself fainting, or notice chest pain or a new, sudden change in your symptoms.
 </div>
+
+## Sources
+
+- Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
+- Cleveland Clinic. [Postural orthostatic tachycardia syndrome (POTS)](https://my.clevelandclinic.org/health/diseases/16560-postural-orthostatic-tachycardia-syndrome-pots). Updated 2026.
+- Crandall CG, Wilson TE. [Human cardiovascular responses to passive heat stress](https://doi.org/10.1002/cphy.c140015). *Comprehensive Physiology*, 2015.
+- Crandall CG, González-Alonso J. [Cardiovascular function in the heat-stressed human](https://doi.org/10.1111/j.1748-1716.2010.02119.x). *Acta Physiologica*, 2010.
+- Raj SR, Biaggioni I, Yamhure PC, et al. [Renin-aldosterone paradox and perturbed blood volume regulation underlying postural tachycardia syndrome](https://doi.org/10.1161/01.CIR.0000160356.97313.5D). *Circulation*, 2005.
+- van Dijk N, Quartieri F, Blanc JJ, et al. [Effectiveness of physical counterpressure maneuvers in preventing vasovagal syncope: the Physical Counterpressure Manoeuvres Trial (PC-Trial)](https://doi.org/10.1016/j.jacc.2006.06.059). *Journal of the American College of Cardiology*, 2006.

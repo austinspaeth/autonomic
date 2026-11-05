@@ -6,11 +6,17 @@ summary: "Healthy blood pressure follows a daily rhythm and drops 10 to 20 perce
 description: "Non-dipping blood pressure explained: why your BP should fall 10-20% at night, the four dipping patterns, what a flat or reverse nocturnal dip means in dysautonomia, and how to track it."
 keywords: "non-dipping blood pressure, nocturnal blood pressure dip, blood pressure at night, reverse dipping, non-dipper, blood pressure higher at night, nocturnal hypertension, ambulatory blood pressure monitoring, dysautonomia, autonomic failure, POTS blood pressure"
 date: 2026-10-07
-updated: 2026-10-07
+updated: 2026-11-04
+reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1585577529540-a8095ea25427?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Shane / Unsplash"
 tldr: "Blood pressure is not a single number: it follows a daily rhythm and normally falls 10 to 20 percent while you sleep, because your nervous system shifts toward 'rest and digest' overnight. A night-time fall under 10 percent is called non-dipping, and a pressure that actually rises at night is reverse dipping. Both are linked in the research to higher cardiovascular risk, and in autonomic disorders the classic pattern is low pressure on standing by day paired with high pressure lying down at night. You cannot measure the dip with a single home cuff reading; a 24-hour ambulatory monitor is the proper test. This is educational, not a diagnosis, so bring any abnormal pattern to your clinician."
+question: "Why should my blood pressure drop at night?"
+app:
+  feature: hrv-readings
+  hook: "Keep your day and night readings together."
+  line: "Log blood pressure readings in Autonomic alongside sleep and overnight heart rate, so you can see your own rhythm over time."
 categories:
   - basics
   - pots
@@ -24,7 +30,7 @@ faq:
   - q: "How do I know if I am a non-dipper?"
     a: "The proper test is 24-hour ambulatory blood pressure monitoring, where a wearable cuff takes readings through the day and night and a clinician compares your daytime average with your sleeping average. A single home cuff reading cannot tell you, because the dip is a comparison across the whole day. A rough home proxy is to compare your typical morning and bedtime readings over a couple of weeks, but treat that as a prompt to ask for a proper monitor rather than an answer."
   - q: "Does POTS or dysautonomia affect the nocturnal dip?"
-    a: "It can. In autonomic failure the hallmark is low pressure on standing during the day paired with high pressure lying down at night, which flattens or reverses the normal dip. In POTS the picture is more variable: some people show blunted dipping and a higher night-time heart rate, particularly in hyperadrenergic presentations, while many have low or normal daytime pressure. Because it is so individual, the pattern is something to measure and discuss rather than assume."
+    a: "It can. In autonomic failure the hallmark is low pressure on standing during the day paired with high pressure lying down at night, which flattens or reverses the normal dip. In POTS the picture is more variable: studies find blunted or reversed dipping more often in POTS than in people without it, while many have low or normal daytime pressure. Because it is so individual, the pattern is something to measure and discuss rather than assume."
 social:
   linkedin: |
     Most people think of blood pressure as one number. It is actually a rhythm. In healthy adults it falls 10 to 20 percent during sleep, because the autonomic nervous system shifts toward parasympathetic "rest and digest" overnight and gives the cardiovascular system a scheduled break.
@@ -234,7 +240,7 @@ So a pressure that stays flat all night is telling you the "rest" signal is not 
 
 This is where the pattern gets especially relevant. In the autonomic failure disorders, the textbook presentation is a striking mismatch: **low pressure on standing during the day, high pressure lying down at night**. The baroreflex, the fast feedback loop that normally holds pressure steady as you change position, is impaired, so pressure sags when gravity pulls blood into the legs and pools high when you lie flat. The nocturnal dip flattens or reverses outright. If you also live with daytime [orthostatic hypotension](/insights/pots/orthostatic-hypotension-vs-pots/), a reverse-dipping night is part of the same single problem, not a separate one.
 
-POTS is more variable, and it is worth being careful here. Many people with POTS have low or normal daytime blood pressure, so they do not fit the autonomic-failure mold at all. But some studies describe blunted nocturnal dipping and a raised night-time heart rate in POTS, more often in hyperadrenergic presentations where sympathetic drive runs high around the clock. Long COVID and post-viral dysautonomia can disturb the same circadian rhythm. The honest summary is that the nocturnal pattern in these conditions is individual: it is something to measure and talk through, not to assume from a label.
+POTS is more variable, and it is worth being careful here. Many people with POTS have low or normal daytime blood pressure, so they do not fit the autonomic-failure mold at all. But some studies describe blunted nocturnal dipping and higher night-time blood pressure in POTS, in children and in adults whose POTS began after COVID. Long COVID and post-viral dysautonomia can disturb the same circadian rhythm. The honest summary is that the nocturnal pattern in these conditions is individual: it is something to measure and talk through, not to assume from a label.
 
 <div class="callout callout-warn">
   <strong>Nocturnal and supine hypertension needs a clinician, not a home experiment.</strong> If your pressure runs high lying down at night but low on standing by day, the usual daytime blood-pressure advice can make the opposite problem worse. Managing that balance (fluid timing, how you sleep, any medication) is genuinely specialist territory. Bring the pattern to a doctor who treats autonomic disorders rather than adjusting anything yourself.
@@ -254,7 +260,7 @@ The point of the list is reassurance as much as caution: a flat dip is usually p
 
 ## How to actually find out
 
-A single home cuff cannot measure your dip, because the dip only exists as a day-versus-night comparison. The proper test is <a href="https://en.wikipedia.org/wiki/Ambulatory_blood_pressure" target="_blank" rel="noopener">24-hour ambulatory blood pressure monitoring</a>: a small cuff worn for a full day and night that takes readings automatically, including while you sleep, so a clinician can calculate your awake and asleep averages. If your pattern matters (resistant hypertension, suspected sleep apnea, autonomic symptoms, or unexplained orthostatic trouble), it is a reasonable thing to ask for.
+A single home cuff cannot measure your dip, because the dip only exists as a day-versus-night comparison. The proper test is <a href="https://doi.org/10.1097/HJH.0000000000004053" target="_blank" rel="noopener">24-hour ambulatory blood pressure monitoring</a>: a small cuff worn for a full day and night that takes readings automatically, including while you sleep, so a clinician can calculate your awake and asleep averages. If your pattern matters (resistant hypertension, suspected sleep apnea, autonomic symptoms, or unexplained orthostatic trouble), it is a reasonable thing to ask for.
 
 Short of that, there are rougher home proxies. Comparing your typical morning and bedtime cuff readings over a couple of weeks can hint at whether your evenings run unusually high. Overnight heart rate from a watch or strap tells a parallel story, because the same vagal shift that should lower your pressure also lowers your heart rate: a [sleeping heart rate that refuses to dip](/insights/basics/overnight-heart-rate-while-you-sleep/) is a clue worth taking to the same appointment. None of these replaces a monitor, but they can be the reason you ask for one.
 
@@ -276,7 +282,7 @@ If you have ever seen "non-dipper" on a report and felt your stomach drop, here 
 
 **How do I know if I am a non-dipper?** The proper test is 24-hour ambulatory blood pressure monitoring, where a clinician compares your daytime average with your sleeping average. A single home reading cannot tell you, because the dip is a comparison across the whole day. Comparing your morning and bedtime readings over a couple of weeks is a rough proxy, best used as a reason to ask for a monitor.
 
-**Does POTS or dysautonomia affect the nocturnal dip?** It can. In autonomic failure the hallmark is low pressure on standing by day paired with high pressure lying down at night, which flattens or reverses the dip. In POTS the picture is more variable: some people show blunted dipping and a higher night-time heart rate, particularly in hyperadrenergic presentations, while many have low or normal daytime pressure. Because it is so individual, it is something to measure and discuss rather than assume.
+**Does POTS or dysautonomia affect the nocturnal dip?** It can. In autonomic failure the hallmark is low pressure on standing by day paired with high pressure lying down at night, which flattens or reverses the dip. In POTS the picture is more variable: studies find blunted or reversed dipping more often in POTS than in people without it, while many have low or normal daytime pressure. Because it is so individual, it is something to measure and discuss rather than assume.
 
 ### Related reading
 
@@ -284,3 +290,11 @@ If you have ever seen "non-dipper" on a report and felt your stomach drop, here 
 - [Overnight heart rate: what your sleeping low and high reveal](/insights/basics/overnight-heart-rate-while-you-sleep/)
 - [Orthostatic hypotension vs POTS](/insights/pots/orthostatic-hypotension-vs-pots/)
 - [Sleep apnea and HRV in dysautonomia](/insights/hrv/sleep-apnea-and-hrv-dysautonomia/)
+
+## Sources
+
+- Parati G, Pengo MF, Avolio A, et al. [Nocturnal blood pressure: pathophysiology, measurement and clinical implications. Position paper of the European Society of Hypertension](https://doi.org/10.1097/HJH.0000000000004053). *Journal of Hypertension*, 2025.
+- Salles GF, Reboldi G, Fagard RH, et al. [Prognostic effect of the nocturnal blood pressure fall in hypertensive patients: the Ambulatory Blood Pressure Collaboration in Patients With Hypertension (ABC-H) meta-analysis](https://doi.org/10.1161/HYPERTENSIONAHA.115.06981). *Hypertension*, 2016.
+- Fanciulli A, Jordan J, Biaggioni I, et al. [Consensus statement on the definition of neurogenic supine hypertension in cardiovascular autonomic failure by the American Autonomic Society (AAS) and the European Federation of Autonomic Societies (EFAS)](https://doi.org/10.1007/s10286-018-0529-8). *Clinical Autonomic Research*, 2018.
+- Johansson M, Ståhlberg M, Ricci F, et al. [Blood pressure regulation in post-COVID POTS: beyond sinus tachycardia](https://doi.org/10.1161/HYPERTENSIONAHA.124.23670). *Hypertension*, 2024.
+- Cai H, Wang S, Zou R, et al. [Circadian rhythms of blood pressure and rate pressure product in children with postural tachycardia syndrome](https://doi.org/10.1016/j.autneu.2020.102715). *Autonomic Neuroscience*, 2020.
