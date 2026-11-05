@@ -63,6 +63,42 @@ describe('iOS permission sets', () => {
   });
 });
 
+describe('the medication permission', () => {
+  /**
+   * 1.39.0 (92) crashed every phone that turned "Symptoms and medications" on.
+   * A medication is a PER-OBJECT authorization, and naming one in
+   * `requestAuthorization(toShare:read:)` does not fail — HealthKit RAISES
+   * (`_throwIfAuthorizationDisallowedForSharing:types:`), which no Swift catch
+   * can reach, so the process aborts. Nothing in JS can test a Swift call, so
+   * the shape of the call is pinned from the source the way the latch keys are.
+   */
+  const SWIFT = readFileSync(
+    join(__dirname, '..', '..', '..', '..', 'modules', 'ecg-health', 'ios', 'EcgHealthModule.swift'),
+    'utf8',
+  );
+
+  it('asks through the per-object API, for the medication list', () => {
+    expect(SWIFT).toContain('requestPerObjectReadAuthorization(');
+    expect(SWIFT).toContain('for: HKObjectType.userAnnotatedMedicationType()');
+  });
+
+  it('never reaches the batch API from the medication request', () => {
+    // The body of the exported function, up to the next one. The crash was a
+    // `requestAuthorization(toShare:read:)` HERE, over a type set assigned a
+    // few lines above it — so the batch call and the medication types have to
+    // be checked in the same scope, not as two greps over the whole file.
+    const i = SWIFT.indexOf('AsyncFunction("requestMedicationAuth")');
+    expect(i).toBeGreaterThan(-1);
+    const next = SWIFT.indexOf('AsyncFunction(', i + 20);
+    const body = SWIFT.slice(i, next > -1 ? next : SWIFT.length);
+    expect(body).toContain('requestPerObjectReadAuthorization(');
+    expect(body).not.toContain('requestAuthorization(toShare:');
+    // And the dose type is not asked for anywhere: authorizing a medication
+    // grants its doses, and the type is read-only to third parties.
+    expect(body).not.toContain('medicationDoseEventType');
+  });
+});
+
 describe('Android permission sets', () => {
   /**
    * The consent-loop trap: a record type requested with no
