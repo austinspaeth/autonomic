@@ -5,6 +5,7 @@
   import JournalScreen from '$lib/v2/screens/JournalScreen.svelte';
   import PacingSheetScreen from '$lib/v2/screens/PacingSheetScreen.svelte';
   import InsightsTabScreen from '$lib/v2/screens/InsightsTabScreen.svelte';
+  import ProgressScreen from '$lib/v2/screens/ProgressScreen.svelte';
   import StandResultScreen from '$lib/v2/screens/StandResultScreen.svelte';
   import CycleImpactScreen from '$lib/v2/screens/CycleImpactScreen.svelte';
   import AiReportsSheetScreen from '$lib/v2/screens/AiReportsSheetScreen.svelte';
@@ -43,6 +44,8 @@
         {:else}
           <Phone w={320}><div class="v2-ph-full">
             {#if data.slug === 'pacing-budget'}<PacingSheetScreen time="8:48" battery={0.9} />
+            {:else if data.slug === 'download'}<ProgressScreen />
+            {:else if data.slug === 'pricing'}<InsightsTabScreen />
             {:else if data.slug === 'insights'}<InsightsTabScreen />
             {:else if data.slug === 'pots-stand-test'}<StandResultScreen time="9:12" />
             {:else if data.slug === 'cycle-tracking'}<CycleImpactScreen time="7:18" battery={0.85} />

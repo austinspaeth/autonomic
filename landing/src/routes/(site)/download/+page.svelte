@@ -124,11 +124,11 @@
   <meta property="og:url" content={`${site.url}/download/`} />
   <meta property="og:title" content={title} />
   <meta property="og:description" content={description} />
-  <meta property="og:image" content={site.ogImage} />
+  <meta property="og:image" content={`${site.url}/og/features/download.jpg`} />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content={title} />
   <meta name="twitter:description" content={description} />
-  <meta name="twitter:image" content={site.ogImage} />
+  <meta name="twitter:image" content={`${site.url}/og/features/download.jpg`} />
   <!-- A redirect is not a page of the site: keep it out of the index and out of
        the sitemap (which is hand-listed in routes/sitemap.xml). -->
   <meta name="robots" content="noindex, nofollow" />

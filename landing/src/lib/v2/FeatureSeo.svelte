@@ -17,7 +17,8 @@
    *  scripts/gen-feature-og.mjs) for a feature page, the site card otherwise. */
   export let image = '';
   $: seg = path.split('/')[2] || '';
-  $: cardSlug = path.startsWith('/features/') ? seg || 'features' : path.startsWith('/conditions/') && seg ? `condition-${seg}` : path.startsWith('/compare/') ? (seg ? `compare-${seg}` : 'compare') : '';
+  $: flat = { '/pricing/': 'pricing', '/story/': 'story', '/press/': 'press' }[path] || '';
+  $: cardSlug = flat ? flat : path.startsWith('/features/') ? seg || 'features' : path.startsWith('/conditions/') && seg ? `condition-${seg}` : path.startsWith('/compare/') ? (seg ? `compare-${seg}` : 'compare') : '';
   $: img = image || (cardSlug ? `https://autonomic.care/og/features/${cardSlug}.jpg` : 'https://autonomic.care/og.png');
   /** A feature page's own entity data: what the feature does, the conditions it
    *  is for and the research it cites. Given `features`, the page is described

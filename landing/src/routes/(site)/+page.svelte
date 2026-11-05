@@ -103,15 +103,15 @@
   <meta property="og:url" content="https://autonomic.care/" />
   <meta property="og:title" content="Autonomic: POTS App &amp; HRV Tracker for Long COVID and ME/CFS" />
   <meta property="og:description" content="A private app for POTS, long COVID and ME/CFS: a five-minute HRV reading, a stand test and a pacing budget against your own normal. Free on iPhone and Android." />
-  <meta property="og:image" content="https://autonomic.care/og.png" />
+  <meta property="og:image" content="https://autonomic.care/og/features/home.jpg" />
   <meta property="og:image:width" content="1200" />
   <meta property="og:image:height" content="630" />
-  <meta property="og:image:type" content="image/png" />
+  <meta property="og:image:type" content="image/jpeg" />
   <meta property="og:image:alt" content="Autonomic: see your nervous system recover. A private journal that scores your daily HRV, blood pressure, sleep and orthostatic readings." />
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:title" content="Autonomic: POTS App &amp; HRV Tracker for Long COVID and ME/CFS" />
   <meta name="twitter:description" content="A private app for POTS, long COVID and ME/CFS: a five-minute HRV reading, a stand test and a pacing budget against your own normal. Free on iPhone and Android." />
-  <meta name="twitter:image" content="https://autonomic.care/og.png" />
+  <meta name="twitter:image" content="https://autonomic.care/og/features/home.jpg" />
   <meta name="twitter:image:alt" content="Autonomic: private, offline autonomic recovery journal for POTS, dysautonomia and long COVID." />
 
   {@html `<script type="application/ld+json">${JSON.stringify(softwareLd)}<\/script>`}
