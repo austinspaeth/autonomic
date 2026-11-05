@@ -33,6 +33,7 @@ reports as an anonymous section. Rules:
 | `app_pitch_click` | A named link into a feature, condition or comparison page | `cta`, `target`, `feature` |
 | `download_modal_open` | A download CTA on desktop opens the QR modal | `placement`, `cta` |
 | `cta_view` | A named CTA is half on screen (once per page load). Click-through = `cta_click` / `cta_view` | `cta`, `feature` |
+| `download_redirect` | Every pass through `/download` or a campaign link (QR codes land here); also fires `app_store_redirect` / `play_store_redirect` / `site_redirect` | `platform`, `destination` (`app_store` / `play_store` / `site`), `campaign` |
 | `blog_to_site` | A reader on a blog page clicks through to a non-blog page of the site (feature, condition, comparison, pricing, home). Downloads are not counted here; they are `download_click` | `target` (the page they went to), `cta` (what they clicked), `from_type` (`blog_article` / `blog_hub`) |
 
 A store badge **inside the download modal** has `placement: download_modal`
@@ -83,9 +84,9 @@ GA4 only shows a custom parameter in reports once it is registered. In
 
 `cta`, `cta_type`, `feature`, `placement`, `via`, `plan`, `platform`,
 `target`, `article`, `article_target`, `page_type`, `from_type`, `percent`,
-`network`, `query`, `symptom`, `section`, `link_type`.
+`network`, `query`, `symptom`, `section`, `link_type`, `destination`, `campaign`.
 
-**Key events:** `cta_click`, `download_click` and `blog_to_site`.
+**Key events:** `cta_click`, `download_click`, `blog_to_site` and `download_redirect`.
 `download_click` is the one to optimise; `cta_click` counts every CTA
 (downloads included) and `blog_to_site` counts readers the blog sent into
 the rest of the site.

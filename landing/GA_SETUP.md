@@ -32,8 +32,10 @@ For each row: **Dimension name** and **Event parameter** are the same word,
 - [ ] `section`
 - [ ] `network`
 - [ ] `percent`
+- [ ] `destination` (the download redirect: `app_store`, `play_store` or `site`)
+- [ ] `campaign` (which QR code or campaign link a redirect came from)
 
-(18 of GA's 50 allowed.)
+(20 of GA's 50 allowed.)
 
 ---
 
@@ -45,8 +47,9 @@ exactly; this works before any data has arrived.
 - [ ] `download_click`: the real conversion, a tap on a store badge or link
 - [ ] `cta_click`: any CTA tap
 - [ ] `blog_to_site`: a blog reader moving on to the rest of the site
+- [ ] `download_redirect`: someone came through `/download` or a campaign link / QR code. It also counts desktop visitors sent to the site (`destination: site`); if you want store sends only, mark `app_store_redirect` and `play_store_redirect` instead
 
-`cta_click` includes downloads, so do not add the three together. Treat
+`cta_click` includes downloads and `download_redirect` overlaps them, so do not add these together. Treat
 `download_click` as the headline number.
 
 ---
