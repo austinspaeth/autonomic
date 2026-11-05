@@ -48,7 +48,7 @@ ${(a.categories ?? []).map((c) => `      <category>${esc(c)}</category>`).join('
   const body = `<?xml version="1.0" encoding="UTF-8"?>
 <rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom" xmlns:dc="http://purl.org/dc/elements/1.1/">
   <channel>
-    <title>The Autonomic Blog</title>
+    <title>Questions People Ask, from Autonomic</title>
     <link>${BASE}/insights/</link>
     <atom:link href="${BASE}/rss.xml" rel="self" type="application/rss+xml" />
     <description>HRV, POTS, dysautonomia and post-viral recovery, explained for the people living it.</description>
@@ -57,7 +57,7 @@ ${(a.categories ?? []).map((c) => `      <category>${esc(c)}</category>`).join('
     <generator>Autonomic</generator>${lastBuild ? `\n    <lastBuildDate>${lastBuild}</lastBuildDate>` : ''}
     <image>
       <url>${BASE}/web-app-manifest-512x512.png</url>
-      <title>The Autonomic Blog</title>
+      <title>Questions People Ask, from Autonomic</title>
       <link>${BASE}/insights/</link>
     </image>
 ${items}

@@ -1,5 +1,6 @@
 <!-- The plum header every blog page opens on: a crumb or eyebrow, a big title,
-     a lead, and a slot under it (topic chips, an author line). Pass `latest` and
+     a lead, and a slot under it (topic chips, an author line). Pass `photo` for
+     a picture behind it (the topic pages). Pass `latest` and
      the hero wears that article's cover under the article page's tint, with the
      question and its short answer set under a divider. -->
 <script lang="ts">
@@ -14,10 +15,16 @@
   export let crumbs: { href?: string; label: string }[] = [];
   export let size: 'xl' | 'lg' = 'lg';
   export let latest: Article | undefined = undefined;
+  /** A photo behind the hero (a topic page's), under the same tint as a cover. */
+  export let photo = '';
+  export let photoPos = '60% 30%';
+  export let photoFlip = false;
 </script>
 
-<section class="bl-hero" class:photo={latest}>
-  {#if latest}
+<section class="bl-hero" class:photo={latest || photo} class:topic={photo && !latest}>
+  {#if photo && !latest}
+    <figure class="bl-hero-bg" aria-hidden="true"><img class="bl-hero-photo" src={photo} alt="" width="1600" height="900" fetchpriority="high" style="object-position: {photoPos}{photoFlip ? '; transform: scaleX(-1)' : ''}" /></figure>
+  {:else if latest}
     <figure class="bl-hero-bg" aria-hidden="true">
       <ArticleCover photoLocation={latest.photoLocation} photoAttribution={latest.photoAttribution} title={latest.title} slug={latest.slug} category={latest.categories?.[0]} showTag={false} eager />
     </figure>

@@ -18,7 +18,7 @@
 
 {#if bare}
   <div class="v2-wrap">
-    <div class="v2-midcta">
+    <div class="v2-midcta" data-cta="mid_cta">
       <span class="v2-appicon"><svg viewBox="0 0 651.59 348.34" aria-hidden="true"><path d={APP_MARK_PATH} fill="#e03127" stroke="#e03127" stroke-width="9" /></svg></span>
       <div class="v2-midcta-copy"><b>{title}</b><span>{sub}</span></div>
       <Stores />
@@ -28,7 +28,7 @@
 {:else}
   <section class="v2-sec tight v2-midcta-sec">
     <div class="v2-wrap">
-      <div class="v2-midcta">
+      <div class="v2-midcta" data-cta="mid_cta">
         <span class="v2-appicon"><svg viewBox="0 0 651.59 348.34" aria-hidden="true"><path d={APP_MARK_PATH} fill="#e03127" stroke="#e03127" stroke-width="9" /></svg></span>
         <div class="v2-midcta-copy"><b>{title}</b><span>{sub}</span></div>
         <Stores />

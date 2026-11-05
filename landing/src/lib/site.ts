@@ -73,8 +73,8 @@ export const videoAppStoreLink = storeUrl('ios', VIDEO_CAMPAIGN);
 export const videoPlayStoreLink = `${playStoreUrl}&referrer=${encodeURIComponent(VIDEO_UTM)}`;
 export const videoSiteLink = `${site.url}/?${VIDEO_UTM}`;
 
-/** Every redirect page's title (and share title): "Autonomic App - <campaign>". */
-export const redirectTitle = (campaign: string): string => `Autonomic App - ${campaign}`;
+/** Every redirect page's title (and share title): "Download Autonomic | <link name>". */
+export const redirectTitle = (campaign: string): string => `Download Autonomic | ${campaign}`;
 
 /** The campaign slug `/download` reports itself under, matching its utm_campaign. */
 export const VIDEO_CAMPAIGN_SLUG = 'videos';

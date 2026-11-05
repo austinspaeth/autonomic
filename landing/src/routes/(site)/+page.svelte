@@ -204,7 +204,7 @@
         {/each}
       </div>
       <button type="button" class="v2-btn ghost v2-match-more" id="fmMore" hidden>Show other features</button>
-      <div class="v2-match-dl"><span>Free to download, with {pricing.trialDays} days of Pro.</span><Stores /></div>
+      <div class="v2-match-dl" data-cta="home_match"><span>Free to download, with {pricing.trialDays} days of Pro.</span><Stores /></div>
     </div>
   </div>
 </section>
@@ -233,7 +233,7 @@
         <button type="button" data-answer-dot="3" aria-label="Answer 4 of 4: What is actually helping?"><i></i></button>
       </div>
     </div>
-    <div class="v2-inlinecta"><b>Free on iPhone and Android.</b><Stores tone="glass" /></div>
+    <div class="v2-inlinecta" data-cta="home_inline"><b>Free on iPhone and Android.</b><Stores tone="glass" /></div>
   </div>
 </section>
 
@@ -326,13 +326,13 @@
         <b class="n">Free</b>
         <div class="amt"><b>$0</b><span>forever</span></div>
         <ul>{#each FREE_ROWS as r}<li>{@html CHECK}{r}</li>{/each}</ul>
-        <a class="v2-btn ghost" data-dl-cta data-dl-plan="free" href="/#download"><span class="btn-dl-ic" aria-hidden="true"></span>Download free</a>
+        <a class="v2-btn ghost" data-cta="home_plans_free" data-dl-cta data-dl-plan="free" href="/#download"><span class="btn-dl-ic" aria-hidden="true"></span>Download free</a>
       </div>
       <div class="v2-price pro">
         <div class="n-row"><b class="n">Pro</b><i>{pricing.trialDays} days free</i></div>
         <div class="amt"><b>{monthly}</b><span>a month, or {yearly} a year</span></div>
         <ul>{#each PRO_ROWS as r}<li>{@html CHECK}{r}</li>{/each}</ul>
-        <a class="v2-btn" data-dl-cta data-dl-plan="pro" href="/#download"><span class="btn-dl-ic" aria-hidden="true"></span>Start {pricing.trialDays} days free</a>
+        <a class="v2-btn" data-cta="home_plans_pro" data-dl-cta data-dl-plan="pro" href="/#download"><span class="btn-dl-ic" aria-hidden="true"></span>Start {pricing.trialDays} days free</a>
       </div>
     </div>
     <a class="v2-savebar" href="/pricing/#compare">
@@ -375,7 +375,7 @@
 </section>
 
 
-<section class="v2-sec soft" id="download">
+<section class="v2-sec soft" id="download" data-cta="home_end_cta">
   <div class="v2-wrap">
     <div class="v2-cta big">
       <div class="v2-cta-copy">

@@ -18,23 +18,37 @@
     ['Where your data lives', 'On your phone, no account', 'Their cloud servers; location and contact info used to track you', 'Their database, linked to you', 'Its servers with an account; contact info and identifiers used to track you'],
     ['Use your own AI', 'Claude, Gemini or ChatGPT', 'Their AI coach, $99.99 a year extra', 'Not offered', 'Not offered']
   ];
+  // A competitor cell that is an absence reads quieter than one that answers.
+  const NIL = new Set(['Not offered', 'Not listed']);
+  const apps = [
+    { name: 'Autonomic', icon: '/apple-touch-icon.png' },
+    { name: competitor.name, icon: '/welltory.png' },
+    { name: visibleApp.name, icon: '/visible.png' },
+    { name: 'Bearable', icon: '/bearable.png' }
+  ];
 </script>
 
 <div class="v2-cmp-scroll">
-  <table class="v2-cmp card stack">
+  <table class="v2-cmp card stack multi">
     <caption class="v2-sr">{caption}</caption>
+    <colgroup><col class="feat" />{#each apps as _}<col />{/each}</colgroup>
     <thead>
       <tr>
         <th><span class="v2-sr">Feature</span></th>
-        <th class="us"><span class="v2-cmp-logo"><img src="/apple-touch-icon.png" width="28" height="28" alt="" /></span>Autonomic</th>
-        <th><span class="v2-cmp-logo"><img src="/welltory.png" width="28" height="28" alt="" /></span>{competitor.name}</th>
-        <th><span class="v2-cmp-logo"><img src="/visible.png" width="28" height="28" alt="" /></span>{visibleApp.name}</th>
-        <th><span class="v2-cmp-logo"><img src="/bearable.png" width="28" height="28" alt="" /></span>Bearable</th>
+        {#each apps as a, i}
+          <th scope="col" class:us={i === 0}><span class="v2-cmp-logo"><img src={a.icon} width="36" height="36" alt="" /></span><span class="v2-cmp-name">{a.name}</span></th>
+        {/each}
       </tr>
     </thead>
     <tbody>
-      {#each rows as r}
-        <tr><th scope="row">{r[0]}</th><td class="us" data-label="Autonomic">{@html CHECK}{r[1]}</td><td data-label={competitor.name}>{r[2]}</td><td data-label={visibleApp.name}>{r[3]}</td><td data-label="Bearable">{r[4]}</td></tr>
+      {#each rows as r, ri}
+        <tr class:price={ri === 0}>
+          <th scope="row">{r[0]}</th>
+          <td class="us" data-label="Autonomic">{@html CHECK}{r[1]}</td>
+          {#each r.slice(2) as c, ci}
+            <td data-label={apps[ci + 1].name} class:nil={NIL.has(c)}>{c}</td>
+          {/each}
+        </tr>
       {/each}
     </tbody>
   </table>

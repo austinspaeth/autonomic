@@ -1,5 +1,6 @@
 <script lang="ts">
   import { BRAND_POLYLINE, categoryLabel } from './site';
+  import { COVER_SIZES, unsplashAt, unsplashSrcset, type CoverSize } from './img';
 
   export let photoLocation: string | undefined = undefined;
   export let photoAttribution: string | undefined = undefined;
@@ -10,6 +11,8 @@
   export let eager = false;
   /** Overlay the category pill on the image. Off for the featured card, which shows the topic in its meta row. */
   export let showTag = true;
+  /** Where the cover is drawn: Unsplash photos are requested at that size. */
+  export let size: CoverSize = 'hero';
 
   // Deterministic per-article variation for the branded fallback cover, so each
   // article reads differently without any external image. No randomness - keeps
@@ -24,11 +27,13 @@
   $: glowX = [22, 50, 78][seed % 3];
   $: tint = ['var(--accent)', 'var(--orange)', 'var(--sky)'][(seed >> 2) % 3];
   $: label = categoryLabel(category);
+  $: spec = COVER_SIZES[size];
+  $: srcset = photoLocation ? unsplashSrcset(photoLocation, [...spec.widths]) : undefined;
 </script>
 
 {#if photoLocation}
   <div class="cover">
-    <img class="cover-img" src={photoLocation} alt={photoAttribution || title} loading={eager ? 'eager' : 'lazy'} />
+    <img class="cover-img" src={unsplashAt(photoLocation, spec.fallback)} srcset={srcset} sizes={srcset ? spec.sizes : undefined} alt={photoAttribution || title} loading={eager ? 'eager' : 'lazy'} decoding="async" fetchpriority={eager ? 'high' : undefined} />
     {#if label && showTag}<span class="cover-tag">{label}</span>{/if}
   </div>
 {:else}

@@ -34,17 +34,17 @@
 </script>
 
 <svelte:head>
-  <title>{name} | The Autonomic Blog</title>
+  <title>{name} | Autonomic</title>
   <meta name="description" content={writer?.about ?? `Articles by ${name}.`} />
   <link rel="canonical" href={canonical} />
   {#if !writer}<meta name="robots" content="noindex, follow" />{/if}
   <meta property="og:type" content="profile" />
   <meta property="og:url" content={canonical} />
-  <meta property="og:title" content={`${name} | The Autonomic Blog`} />
+  <meta property="og:title" content={`${name} | Questions People Ask`} />
   <meta property="og:description" content={writer?.about ?? `Articles by ${name}.`} />
   <meta property="og:image" content="https://autonomic.care/og.png" />
   <meta name="twitter:card" content="summary_large_image" />
-  <meta name="twitter:title" content={`${name} | The Autonomic Blog`} />
+  <meta name="twitter:title" content={`${name} | Questions People Ask`} />
   <meta name="twitter:description" content={writer?.about ?? `Articles by ${name}.`} />
   <meta name="twitter:image" content="https://autonomic.care/og.png" />
   {@html `<script type="application/ld+json">${JSON.stringify(profileLd)}<\/script>`}

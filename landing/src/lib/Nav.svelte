@@ -29,7 +29,7 @@
               </a>
             {/each}
           </div>
-          <a class="nv-promo" href="/features/pacing-budget/">
+          <a class="nv-promo" href="/features/pacing-budget/" data-cta="nav_promo_pacing">
             <i>NEW</i>
             <b>The pacing budget</b>
             <span>See the ceiling coming.</span>
@@ -64,7 +64,7 @@
       <!-- Platform-aware download CTA. No JS: falls back to the /#download
            section. With JS, the site-wide script in app.html either deep-links a
            phone straight to its store or opens the dual-download modal below. -->
-      <a class="btn-v2-app btn-download" id="navDownload" data-dl-cta data-dl-plan="free" href="/#download" aria-label="Download Autonomic">
+      <a class="btn-v2-app btn-download" id="navDownload" data-cta="nav_get_app" data-dl-cta data-dl-plan="free" href="/#download" aria-label="Download Autonomic">
         <span class="btn-dl-ic" aria-hidden="true"></span>
         <span class="btn-dl-label">Get the app</span>
       </a>

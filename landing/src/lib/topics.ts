@@ -45,7 +45,7 @@ export const topics: Record<string, Topic> = {
     shortName: 'Food',
     icon: '❖',
     description:
-      'What to eat when your gut and nervous system are dysregulated: the POTS diet, low-histamine and MCAS eating, the SIBO gut connection, the Mediterranean pattern, and simple meal ideas for hard days.',
+      'What to eat when your gut and nervous system are struggling: the POTS diet, low-histamine eating for MCAS, the gut connection and easy meals for hard days.',
     title: 'Food & Diet for POTS, MCAS & Long COVID',
     keywords:
       'POTS diet, low histamine diet, MCAS food list, SIBO diet, Mediterranean diet long covid, histamine intolerance, gut health, dysautonomia nutrition, meal ideas',
@@ -156,8 +156,8 @@ export const topics: Record<string, Topic> = {
     shortName: 'Recovery',
     icon: '↗',
     description:
-      'The long view, pacing, trends, milestones and turning months of data into decisions that bend your recovery the right way.',
-    title: 'Autonomic Recovery | Trends & Pacing',
+      'How recovery from POTS, long COVID and ME/CFS really goes: pacing, slow trends, setbacks, and turning months of data into better decisions.',
+    title: 'Recovering from POTS, Long COVID & ME/CFS',
     keywords: 'autonomic recovery, pacing, long covid recovery, post-viral fatigue, trends, milestones',
     sticky: 7
   },
@@ -191,8 +191,8 @@ export const topics: Record<string, Topic> = {
     shortName: 'Basics',
     icon: '○',
     description:
-      'Start-here explainers, the core concepts and vocabulary behind reading your nervous system as a recovery instrument.',
-    title: 'Autonomic Recovery Basics',
+      'Start here. Plain explainers on the nervous system, HRV and the words your doctor uses, for anyone new to POTS, long COVID or ME/CFS.',
+    title: 'Nervous System Basics for POTS & Long COVID',
     keywords: 'HRV basics, POTS basics, autonomic nervous system, getting started, explainers',
     sticky: 9
   }

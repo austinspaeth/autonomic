@@ -51,7 +51,7 @@
     <link rel="shortcut icon" href="/favicon.ico" />
     <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <link rel="manifest" href="/site.webmanifest" />
-    <link rel="alternate" type="application/rss+xml" title="The Autonomic Blog" href="/rss.xml" />
+    <link rel="alternate" type="application/rss+xml" title="Questions People Ask, from Autonomic" href="/rss.xml" />
 
     <!-- Site-wide Organization + WebSite structured data (constant across every
          page) so search engines can build a brand entity and understand the site
@@ -151,7 +151,7 @@
              link (hidden from assistive tech so the bar reads as one CTA).
              The gauge is the app's own 270° dial, same geometry as the
              homepage mock's. -->
-        <a class="aj-scta-badge" data-dl-cta href="/#download" aria-hidden="true" tabindex="-1">
+        <a class="aj-scta-badge" data-cta="sticky_cta_score" data-dl-cta href="/#download" aria-hidden="true" tabindex="-1">
           <span class="aj-scta-gauge">
             <svg viewBox="0 0 176 176" aria-hidden="true">
               <path d="M35.67 140.33 A74 74 0 1 1 140.33 140.33" fill="none" stroke="#2b3a2c" stroke-width="15" stroke-linecap="round" />
@@ -163,7 +163,7 @@
         </a>
         <!-- No store glyph here: the gauge does the selling, and the button
              just answers the question it plants ("92 out of 100... mine?"). -->
-        <a class="aj-scta-btn" data-dl-cta href="/#download" aria-label="Get your Autonomic score, free">Get your score</a>
+        <a class="aj-scta-btn" data-cta="sticky_cta_button" data-dl-cta href="/#download" aria-label="Get your Autonomic score, free">Get your score</a>
       </div>
     </div>
     <script>
@@ -236,11 +236,34 @@
             if (articleSlug) p.article = articleSlug;
             gtag('event', name, p);
           }
+          // Page scripts (the blog search) report through the same helper.
+          window.ajEvent = ajEvent;
+
+          // Every CTA names itself with data-cta ("article_mid_card",
+          // "page_cta", "nav_get_app"…). A name used twice on one page (two
+          // mid-page download bars) is numbered in page order, mid_cta then
+          // mid_cta_2, so each one is still its own row in GA.
+          (function () {
+            var seen = {};
+            document.querySelectorAll('[data-cta]').forEach(function (el) {
+              var n = el.getAttribute('data-cta');
+              seen[n] = (seen[n] || 0) + 1;
+              if (seen[n] > 1) el.setAttribute('data-cta', n + '_' + seen[n]);
+            });
+          })();
+          function ctaOf(el) {
+            var c = el && el.closest ? el.closest('[data-cta]') : null;
+            return c ? c.getAttribute('data-cta') : '';
+          }
 
           // Where on the page an element sits, for the `placement` param.
-          // Ordered most-specific first; falls back to the enclosing section.
+          // A named CTA is its own placement; otherwise most-specific first,
+          // falling back to the enclosing section.
           function placementOf(el) {
             if (!el || !el.closest) return 'unknown';
+            if (el.closest('#dlModal')) return 'download_modal';
+            var named = ctaOf(el);
+            if (named) return named;
             // Dysautonomia Awareness Month surfaces. Before #nav and the blog
             // sidebar, which contain two of them.
             if (el.closest('.awareness')) return 'nav_awareness';
@@ -371,11 +394,23 @@
             // `plan` splits free-framed CTAs from Pro-framed ones — without it
             // every button on the site reads as the same undifferentiated
             // "download" and paid intent can't be measured at all.
+            // Every CTA click also fires ONE generic `cta_click` naming the CTA
+            // (`cta`) and what kind it is (`cta_type`: download | store |
+            // pitch), so "which CTA works" is one report. A store badge inside
+            // the download modal is credited to the CTA that OPENED the modal
+            // (`cta`), while its placement stays `download_modal`.
+            var modalOpener = '', modalFeature = '';
             function trackDownload(platform, el, placement) {
               var place = placement || placementOf(el);
+              var inModal = !!(el && el.closest && el.closest('#dlModal'));
+              var cta = inModal ? (modalOpener || 'download_modal') : place;
               var plan = (el && el.getAttribute && el.getAttribute('data-dl-plan')) || 'unspecified';
-              ajEvent(platform === 'android' ? 'play_store_click' : 'app_store_click', { placement: place, plan: plan });
-              ajEvent('download_click', { platform: platform, placement: place, plan: plan });
+              // The app feature the CTA was selling, on an article (data-feature).
+              var fEl = inModal ? null : el && el.closest && el.closest('[data-feature]');
+              var feature = fEl ? fEl.getAttribute('data-feature') : modalFeature;
+              ajEvent(platform === 'android' ? 'play_store_click' : 'app_store_click', { placement: place, plan: plan, cta: cta, feature: feature });
+              ajEvent('download_click', { platform: platform, placement: place, plan: plan, cta: cta, feature: feature });
+              ajEvent('cta_click', { cta: cta, cta_type: inModal ? 'store' : 'download', platform: platform, plan: plan, feature: feature, via: inModal ? 'download_modal' : 'direct' });
             }
             window.ajTrackDownload = trackDownload;
 
@@ -386,7 +421,11 @@
             var lastFocus = null;
             function openModal(trigger) {
               if (!modal) return;
-              ajEvent('download_modal_open', { placement: placementOf(trigger) });
+              modalOpener = placementOf(trigger);
+              var tf = trigger && trigger.closest && trigger.closest('[data-feature]');
+              modalFeature = tf ? tf.getAttribute('data-feature') : '';
+              ajEvent('download_modal_open', { placement: modalOpener, cta: modalOpener });
+              ajEvent('cta_click', { cta: modalOpener, cta_type: 'download', platform: 'desktop', plan: (trigger && trigger.getAttribute && trigger.getAttribute('data-dl-plan')) || 'unspecified', feature: modalFeature, via: 'download_modal' });
               lastFocus = document.activeElement;
               modal.hidden = false;
               document.body.style.overflow = 'hidden';
@@ -870,6 +909,18 @@
             // Store CTAs/badges are wired individually above (they resolve the
             // platform first); skip them here so nothing double-counts.
             if (t.closest('[data-dl-cta],[data-dl-store]')) return;
+            // Leaving the blog for the rest of the site (a feature, condition,
+            // comparison or pricing page, home): `blog_to_site`, a key event.
+            // It fires ALONGSIDE whatever the link reports below. Downloads are
+            // excluded above; they are download_click.
+            var bl = t.closest('a[href]');
+            if (bl && (pageType === 'blog_article' || pageType === 'blog_hub')) {
+              var bu = null;
+              try { bu = new URL(bl.getAttribute('href'), window.location.href); } catch (e) { /* bad href */ }
+              if (bu && bu.origin === window.location.origin && !/^\/(insights|blog)(\/|$)/.test(bu.pathname) && bu.pathname !== pagePath) {
+                ajEvent('blog_to_site', { target: bu.pathname, cta: ctaOf(bl) || placementOf(bl), from_type: pageType });
+              }
+            }
             var el;
             // Giveaway page store badges are wired in the giveaway block below.
             if (t.closest('.gvp-badge')) return;
@@ -913,6 +964,19 @@
               // AI interactive: prompt copied (which report was showing).
               var sel = document.querySelector('.ai-chip.selected[data-report]');
               ajEvent('ai_prompt_copy', { report: sel ? sel.getAttribute('data-report') : '' });
+            } else if ((el = t.closest('a[data-cta]'))) {
+              // A named link that is not a download: a pitch into a feature,
+              // condition or comparison page. Fired twice, like a download: the
+              // specific event and the generic cta_click.
+              var cn = el.getAttribute('data-cta') || '';
+              var ch = el.getAttribute('href') || '';
+              var feat = (el.closest('[data-feature]') || el).getAttribute('data-feature') || '';
+              ajEvent('app_pitch_click', { cta: cn, target: ch, feature: feat });
+              ajEvent('cta_click', { cta: cn, cta_type: 'pitch', target: ch, feature: feat });
+            } else if ((el = t.closest('.bl-toc a'))) {
+              ajEvent('toc_click', { section: (el.textContent || '').replace(/^\d+/, '').trim().slice(0, 80) });
+            } else if ((el = t.closest('.bl-sym[data-sym]'))) {
+              ajEvent('symptom_open', { symptom: el.getAttribute('data-sym') || '' });
             } else if ((el = t.closest('.article-prose a'))) {
               // Any link inside the article body: cross-links between articles,
               // citations out to studies, in-page jumps.
@@ -923,32 +987,38 @@
                   : ph.charAt(0) === '#' ? 'anchor' : 'internal',
                 text: (el.textContent || '').trim().slice(0, 100)
               });
-            } else if ((el = t.closest('.ash-btn'))) {
-              ajEvent('article_share', { network: (el.textContent || '').trim() });
-            } else if ((el = t.closest('.blog-card, .recent-card, .article-line, .side-recent-link, .side-pillars a'))) {
-              // Every route into an article, tagged with the surface it came
-              // from: related block, a hub/list page, or the blog sidebar.
+            } else if ((el = t.closest('.bl-rail-share a'))) {
+              ajEvent('article_share', { network: el.getAttribute('data-share') || '' });
+            } else if ((el = t.closest('.bl-card, .bl-row, .bl-pillars a, .bl-topic-a, .bl-latest, .bl-feat'))) {
+              // Every route into an article, tagged with the list it came from
+              // (data-list on the section: blog_new, blog_start_here,
+              // blog_topics, blog_symptom, topic_group, topic_newest, related,
+              // condition_latest…), or the hero's latest question.
+              var list = el.closest('[data-list]');
               ajEvent('article_click', {
                 article_target: slugOf(el.getAttribute('href')),
-                placement: el.closest('.side-pillars') ? 'sidebar_start_here'
-                  : el.closest('.insights-side') ? 'sidebar_recent'
-                  : el.closest('.article-related') ? 'related'
-                  : 'list'
+                placement: el.classList.contains('bl-latest') ? 'blog_latest' : list ? list.getAttribute('data-list') : 'list'
               });
-            } else if ((el = t.closest('.ac-author, .author-name a, .writer-link'))) {
+            } else if ((el = t.closest('.bl-byline-n, .bl-author h2 a'))) {
               ajEvent('author_click', { author: (el.textContent || '').trim().slice(0, 60) });
-            } else if ((el = t.closest('.ac-tag, .article-chips a, .side-all, .topic-card'))) {
+            } else if ((el = t.closest('.bl-chip, .bl-atags a, .bl-topic-h, .insights-pill, .bl-crumb a, .bl-headlink'))) {
               ajEvent('topic_click', { target: el.getAttribute('href') || '', text: (el.textContent || '').trim().slice(0, 60) });
             } else if (t.closest('#burger')) {
               ajEvent('nav_click', { target: 'menu' });
             } else if ((el = t.closest('#nav a'))) {
               if (el.hasAttribute('data-dl-cta') || el.hasAttribute('data-dl-store')) return;
               ajEvent('nav_click', { target: el.getAttribute('href') || '' });
-            } else if ((el = t.closest('a[href^="#"], a[href^="/#"]'))) {
-              // Any other in-page link (trustbar "Read my story", pricing
-              // cross-links, footer section links, …).
+            } else if ((el = t.closest('a[href]'))) {
+              // Any other link: in-page jumps, question-grid and feature cards,
+              // footer links, outbound. Tagged with where it sits.
               if (el.hasAttribute('data-dl-cta') || el.hasAttribute('data-dl-store')) return;
-              ajEvent('link_click', { target: el.getAttribute('href') || '' });
+              var lh = el.getAttribute('href') || '';
+              ajEvent('link_click', {
+                target: lh,
+                placement: placementOf(el),
+                link_type: /^https?:/i.test(lh) && lh.indexOf('autonomic.care') < 0 ? 'external' : lh.charAt(0) === '#' || lh.indexOf('/#') === 0 ? 'anchor' : 'internal',
+                text: (el.textContent || '').trim().slice(0, 80)
+              });
             }
           });
 
@@ -1018,6 +1088,29 @@
             });
           }
           // --------------------------------------------------------------
+
+          // CTA impressions: `cta_view` once per named CTA per page load when
+          // half of it is on screen, so every cta_click has a denominator
+          // (click-through = cta_click / cta_view, split by `cta`). The nav
+          // button and the sticky bar are always on screen and report
+          // themselves elsewhere, so they are left out.
+          if (window.IntersectionObserver) {
+            var ctaObs = new IntersectionObserver(function (entries) {
+              entries.forEach(function (en) {
+                if (!en.isIntersecting) return;
+                ctaObs.unobserve(en.target);
+                var fe = en.target.closest('[data-feature]');
+                var f = fe ? fe.getAttribute('data-feature') : '';
+                ajEvent('cta_view', { cta: en.target.getAttribute('data-cta'), feature: f });
+              });
+            }, { threshold: 0.5 });
+            document.querySelectorAll('[data-cta]').forEach(function (el) {
+              if (el.closest('#nav') || el.closest('#aj-sticky-cta') || el.closest('footer')) return;
+              // A named link inside a named block is counted by its block.
+              if (el.parentElement && el.parentElement.closest('[data-cta]')) return;
+              ctaObs.observe(el);
+            });
+          }
 
           // Section views: fire once per page load when a section crosses the
           // middle band of the viewport (works for sections taller than the

@@ -8,7 +8,7 @@
 </script>
 
 <a class="bl-card" href={articleHref(article)}>
-  <span class="bl-card-art"><ArticleCover photoLocation={article.photoLocation} photoAttribution={article.photoAttribution} title={article.title} slug={article.slug} category={article.categories?.[0]} showTag={false} /></span>
+  <span class="bl-card-art"><ArticleCover photoLocation={article.photoLocation} photoAttribution={article.photoAttribution} title={article.title} slug={article.slug} category={article.categories?.[0]} showTag={false} size="card" /></span>
   <span class="bl-card-body">
     <span class="bl-card-meta">{cardMeta(article)}</span>
     <span class="bl-card-t">{article.title}</span>

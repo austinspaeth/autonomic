@@ -174,7 +174,7 @@
         </a>
       {/each}
     </div>
-    <div class="v2-match-dl"><span>Free on iPhone and Android, with {pricing.trialDays} days of Pro.</span><Stores /></div>
+    <div class="v2-match-dl" data-cta="features_match"><span>Free on iPhone and Android, with {pricing.trialDays} days of Pro.</span><Stores /></div>
   </div>
 </section>
 

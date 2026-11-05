@@ -9,7 +9,7 @@
   export let app = false;
 </script>
 
-<section class="v2-sec tight">
+<section class="v2-sec tight" data-cta="review_strip">
   <div class="v2-wrap">
     <div class="v2-revcard" class:app>
       <div class="v2-revstrip">

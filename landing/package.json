@@ -5,7 +5,8 @@
   "type": "module",
   "scripts": {
     "dev": "vite dev",
-    "prebuild": "node scripts/gen-og.mjs --soft",
+    "prebuild": "node scripts/gen-og.mjs --soft && node tests/articles.test.mjs",
+    "test:articles": "node tests/articles.test.mjs",
     "build": "vite build",
     "preview": "vite preview",
     "prepare": "svelte-kit sync || echo ''",

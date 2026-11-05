@@ -56,7 +56,7 @@
         <span><b>Austin</b><small>Founder of Autonomic · long hauler · dad of six, South Carolina</small></span>
       </div>
       <div class="v2-story-act">
-        <a class="v2-btn" data-dl-cta data-dl-plan="pro" href="/#download"><span class="btn-dl-ic" aria-hidden="true"></span>Start with {pricing.trialDays} days of Pro</a>
+        <a class="v2-btn" data-cta="story_start_trial" data-dl-cta data-dl-plan="pro" href="/#download"><span class="btn-dl-ic" aria-hidden="true"></span>Start with {pricing.trialDays} days of Pro</a>
         <span class="v2-fine">Free to download · No card · Your data never leaves your phone</span>
       </div>
     </div>

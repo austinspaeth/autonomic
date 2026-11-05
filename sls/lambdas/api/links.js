@@ -191,7 +191,7 @@ const redirectPlan = (link) => {
 const renderLinkPage = (link) => {
   const d = destinations(link);
   const plan = redirectPlan(link);
-  const title = link.label ? `${link.label} — Autonomic` : 'Download Autonomic';
+  const title = link.label ? `Download Autonomic | ${link.label}` : 'Download Autonomic';
   return `<!doctype html>
 <html lang="en">
 <head>

@@ -16,13 +16,13 @@
 </script>
 
 <svelte:head>
-  <title>All {longName} articles | The Autonomic Blog</title>
+  <title>All {longName} answers | Questions People Ask</title>
   <meta name="description" content={`Every ${longName} article from the Autonomic blog.`} />
   <link rel="canonical" href={canonical} />
   {#if !topic || !articles.length}<meta name="robots" content="noindex, follow" />{/if}
   <meta property="og:type" content="website" />
   <meta property="og:url" content={canonical} />
-  <meta property="og:title" content={`All ${longName} articles | The Autonomic Blog`} />
+  <meta property="og:title" content={`All ${longName} answers | Questions People Ask`} />
   <meta property="og:description" content={`Every ${longName} article from the Autonomic blog.`} />
   <meta property="og:image" content="https://autonomic.care/og.png" />
   <meta name="twitter:card" content="summary_large_image" />

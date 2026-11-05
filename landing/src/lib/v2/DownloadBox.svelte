@@ -7,7 +7,7 @@
   import Qr from './Qr.svelte';
 </script>
 
-<div class="v2-dlbox">
+<div class="v2-dlbox" data-cta="hero_download">
   <Stores stack />
   <span class="v2-dlbox-div"></span>
   <div class="v2-dlbox-qr"><Qr /><span><b>Scan to get the app</b></span></div>

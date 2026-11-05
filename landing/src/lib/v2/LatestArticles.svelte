@@ -19,7 +19,7 @@
 </script>
 
 {#if latest.length}
-  <section class="v2-sec" class:white>
+  <section class="v2-sec" data-list="condition_latest" class:white>
     <div class="v2-wrap">
       <div class="v2-headrow end">
         <div><h2 class="v2-h2 sm">{title}</h2></div>

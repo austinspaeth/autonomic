@@ -3,7 +3,7 @@
      page under /conditions/ passes its own `section`; `ld` carries anything
      else the page describes (a MedicalWebPage, the app's offers). -->
 <script lang="ts">
-  import { appStoreUrl, playStoreUrl, pricing, rating } from '$lib/site';
+  import { appLd } from './appLd';
   import { SOURCES_REVIEWED, type Source } from './sources';
   export let title: string;
   export let description: string;
@@ -43,22 +43,7 @@
         mainEntity: faq.map((f) => ({ '@type': 'Question', name: f.q, acceptedAnswer: { '@type': 'Answer', text: f.a } }))
       }
     : null;
-  const app = {
-    '@type': 'SoftwareApplication',
-    '@id': 'https://autonomic.care/#app',
-    name: 'Autonomic',
-    applicationCategory: 'HealthApplication',
-    operatingSystem: 'iOS, Android',
-    downloadUrl: [appStoreUrl, playStoreUrl],
-    offers: [
-      { '@type': 'Offer', name: 'Free', price: '0', priceCurrency: pricing.currency },
-      { '@type': 'Offer', name: 'Autonomic Pro, monthly', price: pricing.monthly.toFixed(2), priceCurrency: pricing.currency },
-      { '@type': 'Offer', name: 'Autonomic Pro, yearly', price: pricing.yearly.toFixed(2), priceCurrency: pricing.currency, description: `Every install starts with ${pricing.trialDays} days of Pro, with no card.` }
-    ],
-    publisher: { '@id': 'https://autonomic.care/#organization' },
-    // Only with a real count from App Store Connect; Google rejects a rating without one.
-    ...(rating.reviews ? { aggregateRating: { '@type': 'AggregateRating', ratingValue: rating.stars, bestRating: 5, ratingCount: rating.reviews } } : {})
-  };
+  const app = appLd();
   $: pageLd = features.length
     ? {
         '@context': 'https://schema.org',

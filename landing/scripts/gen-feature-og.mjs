@@ -5,6 +5,7 @@
 //
 //   npm run dev            (in another terminal)
 //   node scripts/gen-feature-og.mjs [http://localhost:5173]
+//   ONLY=topic- node scripts/gen-feature-og.mjs    (just the topic cards)
 import { execFileSync } from 'node:child_process';
 import { mkdirSync, readFileSync, rmSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -19,7 +20,9 @@ const chrome = process.env.CHROME || '/Applications/Google Chrome.app/Contents/M
 
 // The slugs are the keys of CARDS, read from the source so the two never drift.
 const cards = readFileSync(join(root, 'src/routes/(card)/og-card/[slug]/cards.ts'), 'utf8');
-const slugs = [...cards.matchAll(/^\s+'?([a-z-]+)'?: \{ icon:/gm)].map((m) => m[1]);
+// ONLY=topic- renders just the cards whose slug starts with it, leaving the rest as committed.
+const only = process.env.ONLY || '';
+const slugs = [...cards.matchAll(/^\s+'?([a-z-]+)'?: \{ icon:/gm)].map((m) => m[1]).filter((s) => s.startsWith(only));
 if (!slugs.length) throw new Error('No cards found in cards.ts');
 
 const out = join(root, 'static/og/features');

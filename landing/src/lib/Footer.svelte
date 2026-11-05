@@ -5,7 +5,7 @@
   import Stores from './v2/Stores.svelte';
 </script>
 
-<footer class="v2-footer">
+<footer class="v2-footer" data-cta="footer">
   <div class="v2-wrap v2-footer-grid">
     <div>
       <a class="brand" href="/">

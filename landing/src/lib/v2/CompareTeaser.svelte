@@ -19,13 +19,13 @@
       <span class="ct-logos" aria-hidden="true"><img src="/apple-touch-icon.png" width="44" height="44" alt="" /><i>vs</i><img src={r.icon} width="44" height="44" alt="" /></span>
       <h2 class="v2-h2">{title}</h2>
       <p class="v2-sub">{sub}</p>
-      <a class="v2-link" href="/compare/{r.slug}/">Read the full comparison with {r.name} →</a>
+      <a class="v2-link" href="/compare/{r.slug}/" data-cta="compare_teaser_link">Read the full comparison with {r.name} →</a>
     </div>
     <div class="ct-rows">
       {#each rows as row}
         <div class="ct-row"><b>{row.k}</b><span class="us">{row.us}</span><span class="them"><img src={r.icon} width="18" height="18" alt="" />{txt(row.them)}</span></div>
       {/each}
-      <a class="ct-go" href="/compare/{r.slug}/">Autonomic vs {r.name}, with sources<b aria-hidden="true">→</b></a>
+      <a class="ct-go" href="/compare/{r.slug}/" data-cta="compare_teaser_card">Autonomic vs {r.name}, with sources<b aria-hidden="true">→</b></a>
     </div>
   </div>
 </section>

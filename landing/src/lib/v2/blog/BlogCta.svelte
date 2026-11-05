@@ -8,7 +8,7 @@
   export let sub = 'Take a quick heart reading each morning and Autonomic gives you a score out of 100, plus a plain note on how much your body can handle today. So you can plan around a bad day instead of finding out halfway through it.';
 </script>
 
-<section class="v2-sec bl-cta-sec" id="download">
+<section class="v2-sec bl-cta-sec" id="download" data-cta="blog_end_cta">
   <div class="v2-wrap">
     <div class="v2-cta big bl-cta">
       <div class="v2-cta-copy">

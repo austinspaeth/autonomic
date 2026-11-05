@@ -9,10 +9,12 @@
     VIDEO_CAMPAIGN_SLUG,
     redirectTitle,
     site,
+    pricing,
     videoAppStoreLink,
     videoPlayStoreLink,
     videoSiteLink
   } from '$lib/site';
+  import Stores from '$lib/v2/Stores.svelte';
 
   const title = redirectTitle(VIDEO_CAMPAIGN);
   const description = 'Get Autonomic for iPhone or Android.';
@@ -132,94 +134,36 @@
   <meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
-<main>
-  <!-- The app's own mark, not the decorative ECG waveform: this is the last
-       thing a visitor sees before the store, so it has to be the same object
-       they are about to install. It is wide (651.59 x 348.34), so it sizes by
-       width and is filled rather than stroked — same treatment as the footer. -->
-  <svg class="mark" viewBox="0 0 651.59 348.34" aria-hidden="true">
-    <path d={APP_MARK_PATH} />
-  </svg>
-  <h1>Opening your app store…</h1>
-  <p>If nothing happens, pick your phone:</p>
-  <div class="links">
-    <a href={videoAppStoreLink}>Download for iPhone</a>
-    <a href={videoPlayStoreLink}>Download for Android</a>
+<!-- Rendered inside the site's own nav and footer: on a phone it is on screen
+     for a beat before the store opens, and on a desktop (or with JS off) it is
+     the page the visitor is left holding, so it has to read as the site. -->
+<section class="v2-phead dlr">
+  <div class="v2-wrap">
+    <!-- The app's own mark, not the decorative ECG waveform: this is the last
+         thing a visitor sees before the store, so it has to be the same object
+         they are about to install. -->
+    <span class="v2-appicon dlr-icon"><svg viewBox="0 0 651.59 348.34" aria-hidden="true"><path d={APP_MARK_PATH} fill="#e03127" stroke="#e03127" stroke-width="9" /></svg></span>
+    <h1>Opening your app store<span class="dlr-dots" aria-hidden="true"><i>.</i><i>.</i><i>.</i></span></h1>
+    <p class="v2-lead">If nothing happens, pick your phone below. Free to download, with {pricing.trialDays} days of Pro and no card.</p>
+    <div class="dlr-stores"><Stores ios={videoAppStoreLink} android={videoPlayStoreLink} /></div>
+    <a class="dlr-quiet" href={videoSiteLink}>Or explore autonomic.care →</a>
   </div>
-  <a class="quiet" href={videoSiteLink}>Or visit autonomic.care</a>
-</main>
+</section>
 
 {@html redirect}
 
 <style>
-  :global(body) {
-    margin: 0;
-    background: #050506;
-    color: #f4f4f5;
-    font-family:
-      -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Helvetica, Arial, sans-serif;
-  }
-
-  main {
-    min-height: 100vh;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    justify-content: center;
-    gap: 14px;
-    padding: 32px 24px;
-    box-sizing: border-box;
-    text-align: center;
-  }
-
-  /* Sized by WIDTH: the mark is 1.87:1, so a square box would letterbox it into
-     something much smaller than the old squiggle occupied. */
-  .mark {
-    width: 160px;
-    height: 86px;
-    fill: #e03127;
-  }
-
-  h1 {
-    margin: 0;
-    font-size: 22px;
-    font-weight: 650;
-    letter-spacing: -0.01em;
-  }
-
-  p {
-    margin: 0;
-    font-size: 15px;
-    color: #a1a1aa;
-  }
-
-  .links {
-    display: flex;
-    flex-wrap: wrap;
-    justify-content: center;
-    gap: 10px;
-    margin-top: 6px;
-  }
-
-  .links a {
-    display: inline-block;
-    padding: 12px 20px;
-    border-radius: 999px;
-    background: #e03127;
-    color: #fff;
-    font-size: 15px;
-    font-weight: 600;
-    text-decoration: none;
-  }
-
-  .links a:last-child {
-    background: rgba(255, 255, 255, 0.1);
-  }
-
-  .quiet {
-    margin-top: 4px;
-    font-size: 14px;
-    color: #71717a;
-    text-decoration: none;
-  }
+  .dlr { min-height: min(78vh, 760px); display: flex; align-items: center; padding-bottom: 96px; }
+  .dlr .v2-wrap { display: flex; flex-direction: column; align-items: center; }
+  .dlr-icon { width: 92px; height: 92px; border-radius: 24px; margin-bottom: 30px; box-shadow: 0 24px 40px -16px rgba(20,14,26,.55); }
+  .dlr h1 { font-size: clamp(36px, 5vw, 60px); }
+  .dlr-dots i { font-style: normal; animation: dlr-blink 1.4s infinite both; }
+  .dlr-dots i:nth-child(2) { animation-delay: .2s; }
+  .dlr-dots i:nth-child(3) { animation-delay: .4s; }
+  @keyframes dlr-blink { 0%, 80%, 100% { opacity: .2; } 40% { opacity: 1; } }
+  .dlr-stores { margin-top: 32px; }
+  .dlr-stores :global(.v2-stores) { justify-content: center; }
+  .dlr-quiet { margin-top: 26px; font-size: 15px; font-weight: 700; color: var(--red); text-decoration: none; }
+  .dlr-quiet:hover { text-decoration: underline; }
+  @media (prefers-reduced-motion: reduce) { .dlr-dots i { animation: none; opacity: 1; } }
 </style>

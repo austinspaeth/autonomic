@@ -29,6 +29,7 @@
   const CHECK = '<svg class="v2-check" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M20 6 9 17l-5-5" /></svg>';
   const txt = (c: Cell) => (typeof c === 'string' ? c : c.t);
   const cites = (c: Cell) => (typeof c === 'string' ? [] : c.c);
+  const NIL = new Set(['Not offered', 'Not listed']);
   const money = (n: number) => `$${n.toFixed(2)}`;
   $: path = `/compare/${r.slug}/`;
   $: features = r.diffs.map((d) => d.t.replace(/\.$/, ''));
@@ -77,16 +78,17 @@
   <div class="v2-wrap">
     <div class="v2-center"><h2 class="v2-h2">Autonomic and {r.name}, side by side.</h2><p class="v2-sub">From each company’s own listing and help pages, checked {checked}. The numbers link to their sources.</p></div>
     <div class="v2-cmp-scroll">
-      <table class="v2-cmp card stack duo cp-table">
+      <table class="v2-cmp card stack multi two cp-table">
         <caption class="v2-sr">Autonomic compared with {r.name}</caption>
+        <colgroup><col class="feat" /><col /><col /></colgroup>
         <thead><tr>
           <th><span class="v2-sr">Feature</span></th>
-          <th class="us"><span class="v2-cmp-logo"><img src="/apple-touch-icon.png" width="28" height="28" alt="" /></span>Autonomic</th>
-          <th><span class="v2-cmp-logo"><img src={r.icon} width="28" height="28" alt="" /></span>{r.name}</th>
+          <th scope="col" class="us"><span class="v2-cmp-logo"><img src="/apple-touch-icon.png" width="36" height="36" alt="" /></span><span class="v2-cmp-name">Autonomic</span></th>
+          <th scope="col"><span class="v2-cmp-logo"><img src={r.icon} width="36" height="36" alt="" /></span><span class="v2-cmp-name">{r.name}</span></th>
         </tr></thead>
         <tbody>
           {#each r.rows as row}
-            <tr><th scope="row">{row.k}</th><td class="us" data-label="Autonomic">{@html CHECK}{row.us}</td><td data-label={r.name}><span>{txt(row.them)}{#if cites(row.them).length}<Cite n={cites(row.them)} />{/if}</span></td></tr>
+            <tr class:price={row.k === 'Price'}><th scope="row">{row.k}</th><td class="us" data-label="Autonomic">{@html CHECK}{row.us}</td><td data-label={r.name} class:nil={NIL.has(txt(row.them))}><span>{txt(row.them)}{#if cites(row.them).length}<Cite n={cites(row.them)} />{/if}</span></td></tr>
           {/each}
         </tbody>
       </table>
@@ -100,16 +102,17 @@
     <div class="v2-wrap">
       <div class="v2-center"><h2 class="v2-h2">What you get for $0.</h2><p class="v2-sub">Before anyone pays a cent: the free version of each app, side by side.</p></div>
       <div class="v2-cmp-scroll">
-        <table class="v2-cmp card stack duo cp-table">
+        <table class="v2-cmp card stack multi two cp-table">
           <caption class="v2-sr">The free versions of Autonomic and {r.name} compared</caption>
+          <colgroup><col class="feat" /><col /><col /></colgroup>
           <thead><tr>
             <th><span class="v2-sr">Feature</span></th>
-            <th class="us"><span class="v2-cmp-logo"><img src="/apple-touch-icon.png" width="28" height="28" alt="" /></span>Autonomic Free</th>
-            <th><span class="v2-cmp-logo"><img src={r.icon} width="28" height="28" alt="" /></span>{r.name} Free</th>
+            <th scope="col" class="us"><span class="v2-cmp-logo"><img src="/apple-touch-icon.png" width="36" height="36" alt="" /></span><span class="v2-cmp-name">Autonomic Free</span></th>
+            <th scope="col"><span class="v2-cmp-logo"><img src={r.icon} width="36" height="36" alt="" /></span><span class="v2-cmp-name">{r.name} Free</span></th>
           </tr></thead>
           <tbody>
             {#each r.free as row}
-              <tr><th scope="row">{row.k}</th><td class="us" data-label="Autonomic Free">{@html CHECK}{row.us}</td><td data-label="{r.name} Free"><span>{txt(row.them)}{#if cites(row.them).length}<Cite n={cites(row.them)} />{/if}</span></td></tr>
+              <tr><th scope="row">{row.k}</th><td class="us" data-label="Autonomic Free">{@html CHECK}{row.us}</td><td data-label="{r.name} Free" class:nil={NIL.has(txt(row.them))}><span>{txt(row.them)}{#if cites(row.them).length}<Cite n={cites(row.them)} />{/if}</span></td></tr>
             {/each}
           </tbody>
         </table>

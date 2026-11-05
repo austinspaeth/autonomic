@@ -83,7 +83,7 @@ test('the page redirects, and still works with no scripting at all', () => {
   assert.ok(html.includes('href="https://autonomic.care/?utm_source=facebook"'));
   // A campaign page is a signpost, not a page of the site.
   assert.match(html, /noindex, nofollow/);
-  assert.match(html, /<title>Facebook — August — Autonomic<\/title>/);
+  assert.match(html, /<title>Download Autonomic \| Facebook — August<\/title>/);
 });
 
 test('a label cannot break out of the page it is written into', () => {
