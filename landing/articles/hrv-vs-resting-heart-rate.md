@@ -128,7 +128,7 @@ The short answer is that this is the wrong fight to pick. HRV and resting heart 
 
 **HRV (heart rate variability)** answers: *how flexible is my autonomic nervous system right now?* It measures the tiny differences in timing between consecutive beats, usually in milliseconds, and it's far more sensitive and far noisier.
 
-Both are powered largely by the same nerve, which is why they tend to move together (in opposite directions), and why the moments they split are so informative. If you only ever look at one, you're reading half the page. For the full picture of what variability itself means, the [complete guide to HRV](/insights/hrv/hrv-complete-guide/) is the companion to this piece, and [resting heart rate and mean RR](/insights/hrv/resting-heart-rate-and-mean-rr/) goes deeper on the rate side.
+Both are powered largely by the same nerve, which is why they tend to move together (in opposite directions), and why the moments they split are so informative. If you only ever look at one, you're reading half the page. For the full picture of what variability itself means, the [complete guide to HRV](/insights/hrv/hrv-complete-guide/) is the companion to this piece, and [resting heart rate and mean RR](/insights/basics/resting-heart-rate-and-mean-rr/) goes deeper on the rate side.
 
 ## What resting heart rate actually measures
 
@@ -136,13 +136,13 @@ Your heart has its own pacemaker, the sinoatrial node, which left alone would fi
 
 A lower resting heart rate generally reflects more of that vagal braking and often better cardiovascular fitness. A higher one reflects more sympathetic "fight or flight" drive, which can come from stress, dehydration, poor sleep, illness, caffeine, deconditioning, or simply standing up (which is the whole basis of the [orthostatic stand test](/insights/pots/the-orthostatic-stand-test-at-home/)).
 
-Resting heart rate's great virtue is stability. It doesn't bounce around much from a single rough night, and it's easy to measure reliably even on a basic wrist device. Its limitation is that it's a blunt instrument: it tells you the *average* braking, not how nimble the system is, and it can look perfectly normal while something underneath is off. The most reliable version is your [overnight heart rate while you sleep](/insights/hrv/overnight-heart-rate-while-you-sleep/), because it's taken when nothing else is interfering.
+Resting heart rate's great virtue is stability. It doesn't bounce around much from a single rough night, and it's easy to measure reliably even on a basic wrist device. Its limitation is that it's a blunt instrument: it tells you the *average* braking, not how nimble the system is, and it can look perfectly normal while something underneath is off. The most reliable version is your [overnight heart rate while you sleep](/insights/basics/overnight-heart-rate-while-you-sleep/), because it's taken when nothing else is interfering.
 
 ## What HRV actually measures
 
 HRV looks one level deeper. Your heart never beats like a metronome: the gap between beats constantly flexes, speeding up slightly as you breathe in and slowing as you breathe out. That beat-to-beat flex is produced by the vagus nerve acting fast, and the amount of it is your HRV.
 
-A higher HRV usually means an active, responsive vagus nerve and a nervous system that can shift gears easily: the signature of a rested, adaptable state. A lower HRV means a stiffer, more sympathetically-biased rhythm, which shows up with stress, fatigue, illness, overtraining and poor recovery. The specific vagal metrics, [RMSSD and pNN50](/insights/hrv/rmssd-and-pnn50-vagal-tone-metrics/), are the ones most people watch each morning.
+A higher HRV usually means an active, responsive vagus nerve and a nervous system that can shift gears easily: the signature of a rested, adaptable state. A lower HRV means a stiffer, more sympathetically-biased rhythm, which shows up with stress, fatigue, illness, overtraining and poor recovery. The specific vagal metrics, [RMSSD and pNN50](/insights/basics/rmssd-and-pnn50-vagal-tone-metrics/), are the ones most people watch each morning.
 
 HRV's strength is sensitivity. It reacts to small changes, and it can change on a different timeline from your resting heart rate. Its weakness is the flip side of that: it's genuinely noisy. Sleep, hydration, hormones, alcohol, measurement posture and reading length all push it around, so a single morning tells you very little. We dig into that in [HRV day-to-day fluctuation](/insights/hrv/hrv-day-to-day-fluctuation-normal-variation/).
 
@@ -253,7 +253,7 @@ Here is the single most useful habit: stop asking "is my HRV good today?" and st
 
 A practical routine:
 
-- **Measure both the same way, every day.** Same time (first thing in the morning is ideal), same posture, same length. Switching conditions resets the comparison, exactly as covered in [how to measure HRV accurately at home](/insights/hrv/how-to-measure-hrv-accurately-at-home/).
+- **Measure both the same way, every day.** Same time (first thing in the morning is ideal), same posture, same length. Switching conditions resets the comparison, exactly as covered in [how to measure HRV accurately at home](/insights/basics/how-to-measure-hrv-accurately-at-home/).
 - **Compare to yourself, not a chart.** Your personal baseline is the only fair reference. A resting rate of 68 and an RMSSD of 28 might be great for one person and a warning for another.
 - **Weigh agreement heavily, disagreement lightly.** When both point the same way, believe it. When they split, lean on the steadier resting rate and give HRV a day to confirm.
 - **Look at the slope, not the dot.** A two-week drift matters; one odd morning almost never does.
@@ -304,7 +304,7 @@ So for this audience the full recovery picture is really three readings working 
 
 ## The bottom line
 
-HRV vs resting heart rate is not a contest. Resting heart rate tells you how hard your heart is working at rest; HRV tells you how flexible your nervous system is beat to beat. Both are driven largely by the vagus nerve, so they usually move in opposite directions, and good recovery looks like a resting rate drifting down while HRV drifts up. The moments they diverge carry their own meaning: HRV dipping while resting heart rate holds is an early warning, a normal resting rate over a low HRV is a POTS-typical mismatch, and both turning the wrong way together is the clearest signal to rest. Measure both the same way every day, compare to your own baseline, and read the two-week trend rather than the morning. Do that, and two confusing numbers become one dependable read on where your recovery is heading. For the next step, see [HRV readiness and recovery scores explained](/insights/hrv/hrv-readiness-recovery-scores-explained/) and [how Autonomic scores your readings](/insights/basics/how-autonomic-scores-your-readings/).
+HRV vs resting heart rate is not a contest. Resting heart rate tells you how hard your heart is working at rest; HRV tells you how flexible your nervous system is beat to beat. Both are driven largely by the vagus nerve, so they usually move in opposite directions, and good recovery looks like a resting rate drifting down while HRV drifts up. The moments they diverge carry their own meaning: HRV dipping while resting heart rate holds is an early warning, a normal resting rate over a low HRV is a POTS-typical mismatch, and both turning the wrong way together is the clearest signal to rest. Measure both the same way every day, compare to your own baseline, and read the two-week trend rather than the morning. Do that, and two confusing numbers become one dependable read on where your recovery is heading. For the next step, see [HRV readiness and recovery scores explained](/insights/hrv/hrv-readiness-recovery-scores-explained/) and [how Autonomic scores your readings](/insights/app/how-autonomic-scores-your-readings/).
 
 <div class="callout callout-warn">
   <strong>Not medical advice.</strong> This article is educational and meant to help you understand and track your own data, not to diagnose or treat any condition. Resting heart rate and HRV vary widely between healthy people, and individual numbers mean little out of context. If your readings concern you or your symptoms are worsening, discuss any changes with a clinician who can evaluate you properly.

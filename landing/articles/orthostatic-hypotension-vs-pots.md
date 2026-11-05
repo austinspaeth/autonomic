@@ -216,7 +216,7 @@ Because the two conditions live in two different numbers, the at-home version of
 4. Record blood pressure and heart rate again at **1, 3, 5 and 10 minutes** of standing.
 5. Note any symptoms and when they hit.
 
-Read the two traces together. A systolic drop of 20 or more (or diastolic of 10 or more) by the three-minute mark is the OH signature. A heart-rate rise of 30 or more that stays up, with the pressure roughly held, is the POTS signature. Do it across a few calm mornings, because a single reading, taken rushed or dehydrated or right after coffee, can mislead in either direction. For a refresher on what the pressure numbers mean, the [blood-pressure basics guide](/insights/pots/blood-pressure-basics-systolic-diastolic-pulse/) is a good companion, and [baroreflex sensitivity](/insights/pots/baroreflex-sensitivity-orthostatic-intolerance/) explains the reflex that both conditions strain.
+Read the two traces together. A systolic drop of 20 or more (or diastolic of 10 or more) by the three-minute mark is the OH signature. A heart-rate rise of 30 or more that stays up, with the pressure roughly held, is the POTS signature. Do it across a few calm mornings, because a single reading, taken rushed or dehydrated or right after coffee, can mislead in either direction. For a refresher on what the pressure numbers mean, the [blood-pressure basics guide](/insights/basics/blood-pressure-basics-systolic-diastolic-pulse/) is a good companion, and [baroreflex sensitivity](/insights/basics/baroreflex-sensitivity-orthostatic-intolerance/) explains the reflex that both conditions strain.
 
 Try the blood-pressure arithmetic here. Enter your lying and standing readings to see the drop the way a clinician reads it:
 
@@ -264,7 +264,7 @@ What genuinely exists, and confuses things, is **neurogenic OH with a compensato
 
 The reassuring news is that the first-line, everyday tools overlap heavily, because both conditions come down to keeping enough blood circulating to your brain when you are upright:
 
-- **Fluids and salt.** Expanding blood volume helps both. The [science of salt and fluids](/insights/pots/science-of-salt-and-fluids-for-pots/) applies across orthostatic intolerance, though salt loading is not right for everyone and should be cleared with a clinician, especially if you have high blood pressure or heart or kidney concerns.
+- **Fluids and salt.** Expanding blood volume helps both. The [science of salt and fluids](/insights/research/science-of-salt-and-fluids-for-pots/) applies across orthostatic intolerance, though salt loading is not right for everyone and should be cleared with a clinician, especially if you have high blood pressure or heart or kidney concerns.
 - **Compression.** Waist-high compression garments reduce the pooling that starts the whole cascade.
 - **Rising slowly and counter-maneuvers.** Standing in stages, crossing your legs, or clenching your calves buys the reflex time in both conditions.
 - **Gradual reconditioning.** Recumbent-first exercise, built up patiently, helps the deconditioning that feeds both, as in the [Levine-style protocol](/insights/pots/exercise-for-pots-levine-protocol/).

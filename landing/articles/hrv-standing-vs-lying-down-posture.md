@@ -123,7 +123,7 @@ Your body cannot allow that dip to continue, or blood would not reach your brain
 - **Vagal withdrawal.** The vagus nerve, which normally applies a gentle brake to your heart, eases off. This is the fast lever, and it is the main reason your heart rate jumps in the first few seconds of standing.
 - **Sympathetic activation.** The "accelerator" side ramps up, tightening blood vessels and giving the heart an extra push.
 
-Here is the key link to HRV. The rapid beat-to-beat variation that metrics like [RMSSD and pNN50](/insights/basics/rmssd-and-pnn50-vagal-tone-metrics/) measure is produced mostly by the vagus nerve. When vagal tone withdraws on standing, that fast flicker shrinks, so RMSSD and the high-frequency (HF) band of your [frequency-domain HRV](/insights/hrv/hrv-frequency-domain-vlf-lf-hf-power/) both fall. At the same time, the slower, pressure-regulating rhythm in the low-frequency (LF) band becomes relatively more prominent, so the LF/HF ratio usually rises. Your heart rate climbs and your HRV compresses, together, as one coordinated response.
+Here is the key link to HRV. The rapid beat-to-beat variation that metrics like [RMSSD and pNN50](/insights/basics/rmssd-and-pnn50-vagal-tone-metrics/) measure is produced mostly by the vagus nerve. When vagal tone withdraws on standing, that fast flicker shrinks, so RMSSD and the high-frequency (HF) band of your [frequency-domain HRV](/insights/basics/hrv-frequency-domain-vlf-lf-hf-power/) both fall. At the same time, the slower, pressure-regulating rhythm in the low-frequency (LF) band becomes relatively more prominent, so the LF/HF ratio usually rises. Your heart rate climbs and your HRV compresses, together, as one coordinated response.
 
 <figure class="prose-figure">
   <svg viewBox="0 0 720 250" role="img" aria-label="Two heartbeat interval traces compared. Lying down shows large beat-to-beat swings and widely spaced beats. Standing shows small beat-to-beat swings and beats packed closer together.">
@@ -214,7 +214,7 @@ There is a simple way to sanity-check your own posture effect. Take a calm five-
 
 ## Should you track standing HRV on purpose?
 
-Researchers do use the supine-to-standing shift, sometimes called orthostatic HRV, to study how briskly and completely the autonomic nervous system responds to a postural challenge. It is a legitimate window on baroreflex function and it overlaps with the ideas behind [baroreflex sensitivity](/insights/pots/baroreflex-sensitivity-orthostatic-intolerance/).
+Researchers do use the supine-to-standing shift, sometimes called orthostatic HRV, to study how briskly and completely the autonomic nervous system responds to a postural challenge. It is a legitimate window on baroreflex function and it overlaps with the ideas behind [baroreflex sensitivity](/insights/basics/baroreflex-sensitivity-orthostatic-intolerance/).
 
 For day-to-day self-tracking, though, standing HRV is usually not the number to chase. It is noisier, it is uncomfortable to hold still for when you are symptomatic, and it is easy to contaminate with movement. For most people the better setup is a consistent resting reading to follow their recovery trend, plus an occasional structured stand test when they specifically want to see the orthostatic response, heart rate rise and all. The [complete HRV guide](/insights/hrv/hrv-complete-guide/) walks through how these pieces fit together, and [resting heart rate](/insights/basics/resting-heart-rate-and-mean-rr/) is a useful companion signal that tends to fall as you recover.
 

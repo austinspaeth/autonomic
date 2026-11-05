@@ -149,7 +149,7 @@ The single most useful idea is to front-load. Do not wait for symptoms in the te
 
 ### The day or two before
 
-- **Lift fluids and salt within your clinician's range.** Extra volume going in gives you a buffer against the dry cabin. This is the one item to be careful with: increased salt and fluid should be set with your clinician, especially if you have any heart or kidney condition. [The science of salt and fluids for POTS](/insights/pots/science-of-salt-and-fluids-for-pots/) explains how volume loading actually works.
+- **Lift fluids and salt within your clinician's range.** Extra volume going in gives you a buffer against the dry cabin. This is the one item to be careful with: increased salt and fluid should be set with your clinician, especially if you have any heart or kidney condition. [The science of salt and fluids for POTS](/insights/research/science-of-salt-and-fluids-for-pots/) explains how volume loading actually works.
 - **Protect your sleep.** You cannot always control an early flight, but the nights before it are yours. A rested nervous system absorbs a travel day far better than a depleted one.
 - **Pack the carry-on, not the checked bag.** Compression garments, an empty refillable water bottle, electrolyte powder or tablets, salty snacks, and every medication belong in the bag that stays with you. Bags get delayed; your tools should not.
 

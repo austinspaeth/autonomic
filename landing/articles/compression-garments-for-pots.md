@@ -164,7 +164,7 @@ The timing is not a detail; it is half the effect.
 2. **Keep it on through your upright hours.** The days you are on your feet, shopping, cooking, working at a standing desk, are exactly when it earns its keep. You can take it off when you are lying down for the evening.
 3. **Layer if you need to.** Socks plus an abdominal binder is a completely legitimate combination and often more comfortable than one heavy waist-high garment.
 4. **Get the fit measured.** Too loose does nothing; too tight in the wrong place can pool blood. Measure your calf, thigh and waist per the manufacturer's chart, and re-check the fit if your weight changes.
-5. **Pair it with the basics.** Compression works better on a well-hydrated, salt-replete system. It is a partner to [salt and fluids](/insights/pots/science-of-salt-and-fluids-for-pots/), not a substitute.
+5. **Pair it with the basics.** Compression works better on a well-hydrated, salt-replete system. It is a partner to [salt and fluids](/insights/research/science-of-salt-and-fluids-for-pots/), not a substitute.
 
 This also stacks well with heat management. Compression in a hot room can feel worse, and heat itself dilates your veins and worsens pooling, so on bad-weather days the two problems compound. The [heat intolerance guide](/insights/pots/heat-intolerance-and-pots/) covers that overlap.
 

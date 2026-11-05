@@ -141,7 +141,7 @@ Why they travel together is still being worked out, and honesty matters here: th
   <figcaption>The "trifecta": POTS, hypermobility or hEDS, and MCAS co-occur more than chance. Overlap does not mean everyone has all three, and each is diagnosed on its own terms.</figcaption>
 </figure>
 
-If the mast cell side sounds familiar, it is worth reading our deeper look at the [POTS, long COVID and MCAS overlap](/insights/pots/pots-long-covid-and-mcas-overlap/), which walks through the immune piece in more detail.
+If the mast cell side sounds familiar, it is worth reading our deeper look at the [POTS, long COVID and MCAS overlap](/insights/postviral/pots-long-covid-and-mcas-overlap/), which walks through the immune piece in more detail.
 
 ## The Beighton score: what it does and does not tell you
 
@@ -190,7 +190,7 @@ Two other signals are worth watching over weeks:
 The good news is that hypermobile POTS responds to the **same core toolkit as any POTS**, so nothing here is exotic. The emphasis just shifts to match the mechanism.
 
 - **Compression, with the waist and abdomen in mind.** Because a lot of the pooling is splanchnic (in the abdomen), waist-high or abdominal compression often outperforms calf socks alone. Our guide to [compression garments for POTS](/insights/pots/compression-garments-for-pots/) covers strengths and how to build up tolerance.
-- **Salt and fluids to expand blood volume.** More circulating volume gives stretchy veins less room to hide it. See the [science of salt and fluids](/insights/pots/science-of-salt-and-fluids-for-pots/) for how and how much, and clear it with your clinician if you have blood-pressure or kidney concerns.
+- **Salt and fluids to expand blood volume.** More circulating volume gives stretchy veins less room to hide it. See the [science of salt and fluids](/insights/research/science-of-salt-and-fluids-for-pots/) for how and how much, and clear it with your clinician if you have blood-pressure or kidney concerns.
 - **Reconditioning that protects the joints.** Graded exercise still helps, but hypermobile joints do better starting **recumbent or seated** (rowing, recumbent cycling, swimming) before moving upright, exactly the shape of the [Levine protocol](/insights/pots/exercise-for-pots-levine-protocol/). Strength work for the core and legs also acts as a second muscle pump to push blood upward.
 - **Physical therapy for joint stability.** A physio experienced with hypermobility can teach you to hold joints in a safer range and build the surrounding muscle, which reduces the injuries and pain that otherwise derail reconditioning.
 - **Pacing.** Fatigue is real in this population, and overdoing it triggers setbacks. If post-exertional symptoms are part of your picture, the [energy-envelope approach to pacing](/insights/recovery/pacing-101-energy-envelope/) helps you push without crashing.

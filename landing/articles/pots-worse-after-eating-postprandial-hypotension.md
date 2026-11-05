@@ -235,7 +235,7 @@ Not all meals are equal. Three features of a meal decide how much blood your gut
   <figcaption>Meal size and fast-carb content drive how much blood your gut pulls at once. A smaller plate weighted toward protein, fat, and fiber flattens the response.</figcaption>
 </figure>
 
-Alcohol deserves its own mention: it dilates blood vessels and adds to the pooling, so a drink with a meal often compounds a post-meal crash. Our deeper dive on [alcohol and HRV in POTS](/insights/pots/alcohol-and-hrv-pots/) covers that pathway.
+Alcohol deserves its own mention: it dilates blood vessels and adds to the pooling, so a drink with a meal often compounds a post-meal crash. Our deeper dive on [alcohol and HRV in POTS](/insights/hrv/alcohol-and-hrv-pots/) covers that pathway.
 
 ## How to eat around it
 

@@ -183,7 +183,7 @@ export const RIVALS: Rival[] = [
       { q: 'Does Autonomic measure HRV with the phone camera like Welltory?', a: 'Yes. Rest a fingertip lightly on the rear camera for a five-minute reading. An Apple Watch, a Garmin or a Bluetooth chest strap work too, and a strap gives the cleanest signal.' },
       { q: 'Is Welltory good for POTS?', a: 'Welltory now mentions POTS, long COVID and ME/CFS, and its HRV and energy tracking can help. It does not list a guided stand test, which is the measurement POTS is defined by. Autonomic has one, on a watch, a strap or by hand.' },
       { q: 'How much does Welltory cost compared with Autonomic?', a: `On the US App Store, Welltory Premium is listed at $99.99 to $119.99 a year or $299.99 for life, with its AI coach as a separate $99.99 a year (checked 2026). Autonomic Pro is ${us.monthly} a month or ${us.yearly} a year, the journal and every HRV reading are free forever, and every install starts with ${pricing.trialDays} days of Pro.` },
-      { q: 'Can I move my data from Welltory?', a: 'Autonomic reads HRV, sleep, heart rate and workouts from Apple Health or Health Connect, so anything Welltory wrote there arrives on its own. An imported HRV reading only counts when it carries at least four minutes of real beat-to-beat data.' }
+      { q: 'Can I move my data from Welltory?', a: 'Autonomic reads sleep, heart rate and workouts from Apple Health or Health Connect, so anything Welltory wrote there arrives on its own. HRV comes in from Apple Health when the reading carries at least four minutes of real beat-to-beat data. Health Connect on Android has no beat-to-beat data, so on Android your HRV readings start fresh in Autonomic.' }
     ],
     sources: WELLTORY_SOURCES
   },

@@ -191,7 +191,7 @@ HRV often drops a day or two *before* you feel sick, as your immune system ramps
 
 ### Dehydration and timing
 
-Low fluid volume nudges your heart rate up and your HRV down, since the sympathetic side works a little harder to maintain blood pressure. This matters especially in POTS, where fluid and salt are part of the baseline strategy ([science of salt and fluids](/insights/pots/science-of-salt-and-fluids-for-pots/)). Simple measurement timing counts too: reading later in the day, after coffee, or right after getting up will all read lower than a settled first-thing measurement.
+Low fluid volume nudges your heart rate up and your HRV down, since the sympathetic side works a little harder to maintain blood pressure. This matters especially in POTS, where fluid and salt are part of the baseline strategy ([science of salt and fluids](/insights/research/science-of-salt-and-fluids-for-pots/)). Simple measurement timing counts too: reading later in the day, after coffee, or right after getting up will all read lower than a settled first-thing measurement.
 
 ### Hard exercise the day before
 
@@ -320,8 +320,8 @@ If your baseline is genuinely suppressed, the levers that work are unglamorous a
 
 - **Consistent, sufficient sleep**, more than any other single factor.
 - **Less alcohol**, especially close to bed.
-- **Stress management and a real wind-down**, including slow [resonant breathing](/insights/recovery/resonant-breathing-hrv-biofeedback/), which is one of the few things that reliably nudges vagal tone.
-- **Gentle, paced exercise within your limits.** In POTS and long COVID, [careful pacing to avoid post-exertional crashes](/insights/postviral/pacing-101-energy-envelope/) usually does more for the HRV baseline over time than any single intervention.
+- **Stress management and a real wind-down**, including slow [resonant breathing](/insights/hrv/resonant-breathing-hrv-biofeedback/), which is one of the few things that reliably nudges vagal tone.
+- **Gentle, paced exercise within your limits.** In POTS and long COVID, [careful pacing to avoid post-exertional crashes](/insights/recovery/pacing-101-energy-envelope/) usually does more for the HRV baseline over time than any single intervention.
 - **Hydration and salt** if you have POTS or orthostatic intolerance.
 
 The full menu, with what the evidence actually supports, is in [how to improve HRV](/insights/hrv/how-to-improve-hrv-what-works/). The honest headline: trend up over weeks, do not chase any single day.

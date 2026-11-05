@@ -75,7 +75,7 @@ A **tilt table test** measures one specific thing: how your heart rate and blood
 
 It sounds dramatic, and the first time is genuinely a little unnerving, but the design is simple and the reasoning behind it is worth understanding. When you stand up on your own, your calves and thighs squeeze the veins in your legs and help pump blood back toward your heart. That muscle pump is helpful in daily life, and it also hides things. It can prop up a blood pressure that would otherwise sag, or blunt a heart rate rise that would otherwise show. The tilt table takes the muscle pump out of the equation. You are passive, held at a fixed angle, so the test reads your **autonomic** response to standing more cleanly than ordinary standing does.
 
-That is why the tilt table test, often written **HUTT** for head-up tilt table test, is a standard tool for sorting out fainting, [POTS](/insights/pots/how-pots-is-diagnosed/) and other forms of [orthostatic intolerance](/insights/pots/baroreflex-sensitivity-orthostatic-intolerance/). It is not the only test, and as you will see below it is not the whole story, but it is one of the clearest windows into how your nervous system handles being upright.
+That is why the tilt table test, often written **HUTT** for head-up tilt table test, is a standard tool for sorting out fainting, [POTS](/insights/pots/how-pots-is-diagnosed/) and other forms of [orthostatic intolerance](/insights/basics/baroreflex-sensitivity-orthostatic-intolerance/). It is not the only test, and as you will see below it is not the whole story, but it is one of the clearest windows into how your nervous system handles being upright.
 
 ## What happens during the test, step by step
 
@@ -137,7 +137,7 @@ The tilt table test does not produce a single number. It produces a **pattern** 
 
 **An orthostatic hypotension response.** Your blood pressure drops, defined as a fall of **20 mmHg systolic or 10 mmHg diastolic within three minutes** of tilting. This points toward [orthostatic hypotension](/insights/pots/orthostatic-hypotension-vs-pots/) rather than POTS, and the heart rate response helps separate the underlying cause. A delayed version, where the drop appears only after many minutes upright, is also something the longer tilt can catch.
 
-**A vasovagal (neurally mediated) response.** After a period upright, your blood pressure suddenly crashes, often with your heart rate slowing at the same time, and you feel faint or briefly pass out. This is [vasovagal syncope](/insights/pots/vasovagal-syncope-fainting/), the most common cause of fainting, and the tilt table test is one of the main tools used to bring it out and classify it as cardioinhibitory (heart-rate driven), vasodepressor (pressure driven) or mixed.
+**A vasovagal (neurally mediated) response.** After a period upright, your blood pressure suddenly crashes, often with your heart rate slowing at the same time, and you feel faint or briefly pass out. This is [vasovagal syncope](/insights/basics/vasovagal-syncope-fainting/), the most common cause of fainting, and the tilt table test is one of the main tools used to bring it out and classify it as cardioinhibitory (heart-rate driven), vasodepressor (pressure driven) or mixed.
 
 Here is how those patterns line up at a glance.
 

@@ -261,7 +261,7 @@ Try the arithmetic here. Enter a resting (lying) heart rate and a standing heart
 
 Because Autonomic is built around [heart rate variability](/insights/hrv/hrv-complete-guide/), it is worth being honest about what HRV can and cannot tell you here. Low HRV reflects a nervous system tilted toward sympathetic "fight or flight." Chronic anxiety does that. So does POTS. So a suppressed HRV number, on its own, does **not** tell you which one you are dealing with. Anyone claiming a single HRV reading distinguishes POTS from anxiety is overselling it.
 
-What HRV is good for is the *trend* once you know what you are tracking. Watched over weeks, alongside your resting heart rate and your standing response, it becomes a recovery signal: is the system settling down over time, or staying stuck in overdrive? Slow, paced breathing is one of the few things that reliably nudges it upward in the moment, which is part of why [resonant breathing](/insights/recovery/resonant-breathing-hrv-biofeedback/) helps with both anxiety and the adrenaline side of POTS. It calms the shared mechanism without needing to know which label is bigger.
+What HRV is good for is the *trend* once you know what you are tracking. Watched over weeks, alongside your resting heart rate and your standing response, it becomes a recovery signal: is the system settling down over time, or staying stuck in overdrive? Slow, paced breathing is one of the few things that reliably nudges it upward in the moment, which is part of why [resonant breathing](/insights/hrv/resonant-breathing-hrv-biofeedback/) helps with both anxiety and the adrenaline side of POTS. It calms the shared mechanism without needing to know which label is bigger.
 
 ## Why it's often "and," not "or"
 

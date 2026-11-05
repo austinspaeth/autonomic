@@ -98,7 +98,7 @@ Your autonomic nervous system runs the background machinery that keeps you uprig
 
 The first is **thermoregulation**. Holding your core temperature steady is entirely an autonomic task, carried out mainly by opening or closing the vessels in your skin and by sweating. The second is **blood pressure control** through the baroreflex, the fast loop that tightens your vessels and adjusts your heart rate the instant you stand. Weather leans on both. That is why the same conditions a healthy body shrugs off can knock a POTS body sideways: there is simply less spare capacity to absorb the swing.
 
-For the deeper picture of the reflex doing that upright work, see [baroreflex sensitivity and orthostatic intolerance](/insights/pots/baroreflex-sensitivity-orthostatic-intolerance/).
+For the deeper picture of the reflex doing that upright work, see [baroreflex sensitivity and orthostatic intolerance](/insights/basics/baroreflex-sensitivity-orthostatic-intolerance/).
 
 ## Heat and humidity: the clearest triggers
 
@@ -124,7 +124,7 @@ Humidity is the part people underestimate. Sweat only cools you when it **evapor
   <figcaption>An illustrative pattern: on a hot, humid day standing heart rate tends to drift upward through the afternoon as fluid is lost and blood pools, then eases as things cool. A higher reading on a day like this is the weather, not a relapse.</figcaption>
 </figure>
 
-Heat has its own full write-up, including the cooling strategies that actually move the needle: see [heat intolerance and POTS](/insights/pots/heat-intolerance-and-pots/). The salt-and-fluids side, which matters most on hot and humid days, is covered in [the science of salt and fluids for POTS](/insights/pots/science-of-salt-and-fluids-for-pots/), and the pooling mechanism itself in [blood pooling in POTS legs](/insights/pots/blood-pooling-in-pots-legs/).
+Heat has its own full write-up, including the cooling strategies that actually move the needle: see [heat intolerance and POTS](/insights/pots/heat-intolerance-and-pots/). The salt-and-fluids side, which matters most on hot and humid days, is covered in [the science of salt and fluids for POTS](/insights/research/science-of-salt-and-fluids-for-pots/), and the pooling mechanism itself in [blood pooling in POTS legs](/insights/pots/blood-pooling-in-pots-legs/).
 
 ## Barometric pressure: real for many, but more complicated
 

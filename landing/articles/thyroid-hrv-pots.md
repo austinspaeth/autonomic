@@ -85,7 +85,7 @@ Every cell in your body reads thyroid hormone, but the heart and the autonomic n
 
 - **It multiplies your beta-adrenergic receptors.** These are the docking sites that adrenaline and the sympathetic nervous system use to speed the heart. More receptors, and more sensitive ones, mean the same amount of sympathetic signal produces a bigger effect. Your heart becomes easier to rev.
 - **It increases the intrinsic rate of the sinus node**, the heart's own pacemaker, so the resting rate drifts up even without extra nerve traffic.
-- **It shifts autonomic balance toward the sympathetic side.** The net effect of hyperthyroidism is a nervous system leaning into fight-or-flight, with the [parasympathetic, vagal brake](/insights/hrv/rmssd-and-pnn50-vagal-tone-metrics/) relatively suppressed.
+- **It shifts autonomic balance toward the sympathetic side.** The net effect of hyperthyroidism is a nervous system leaning into fight-or-flight, with the [parasympathetic, vagal brake](/insights/basics/rmssd-and-pnn50-vagal-tone-metrics/) relatively suppressed.
 
 That last point is the one that matters for HRV. Heart rate variability is largely a readout of vagal tone, the moment-to-moment braking your parasympathetic system applies between beats. When thyroid hormone tips the balance toward sympathetic drive, that braking weakens, the beats become more metronomic, and your HRV falls.
 

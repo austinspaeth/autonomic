@@ -242,7 +242,7 @@ The single most useful thing you can learn about a headache is whether lying dow
 
 Because these headaches come from more than one source, the fix is to treat the right one. The posture question above is how you decide where to start, and almost everything below is worth planning with the clinician who manages your condition.
 
-- **Shore up your volume.** Steady fluids and, if your clinician agrees, [salt](/insights/pots/science-of-salt-and-fluids-for-pots/) keep more blood in circulation so your head is better supplied when you stand. This is first-line for the orthostatic type.
+- **Shore up your volume.** Steady fluids and, if your clinician agrees, [salt](/insights/research/science-of-salt-and-fluids-for-pots/) keep more blood in circulation so your head is better supplied when you stand. This is first-line for the orthostatic type.
 - **Use compression and pacing.** Compression garments blunt the pooling, and pacing your upright time, so you are not standing still for long stretches, keeps the orthostatic headache from building. Lying down early, before it peaks, works better than pushing through.
 - **Be consistent with caffeine and meals.** Pick a steady caffeine routine rather than swinging, and avoid long gaps without food. Consistency matters more than the exact amount.
 - **Protect sleep.** A regular sleep window and the usual POTS sleep measures lower your threshold for both headache types.

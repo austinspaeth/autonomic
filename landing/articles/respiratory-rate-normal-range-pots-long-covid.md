@@ -149,7 +149,7 @@ Enter a resting, awake reading to see where it lands. This is a general educatio
 
 Part of the reason breathing rate gets skipped is practical: it is tedious to measure well, and the moment people know you are counting their breaths, they change how they breathe. But there is a better reason to pay attention to it. Of the standard vital signs, respiratory rate is often the **earliest to shift** when something is changing, whether that is a brewing infection or a nervous system sliding out of balance.
 
-Wearable makers noticed this during the pandemic: an overnight respiratory rate creeping above your own usual was, for many people, one of the first measurable hints of an illness a day or two before symptoms. The absolute number a ring or watch reports is only an estimate, but the *direction* relative to your baseline is genuinely informative. That is the whole theme of this article, and of [tracking recovery in general](/insights/basics/hrv-vs-resting-heart-rate/): your own stable baseline beats any textbook range.
+Wearable makers noticed this during the pandemic: an overnight respiratory rate creeping above your own usual was, for many people, one of the first measurable hints of an illness a day or two before symptoms. The absolute number a ring or watch reports is only an estimate, but the *direction* relative to your baseline is genuinely informative. That is the whole theme of this article, and of [tracking recovery in general](/insights/hrv/hrv-vs-resting-heart-rate/): your own stable baseline beats any textbook range.
 
 ## How breathing rate and HRV are linked
 

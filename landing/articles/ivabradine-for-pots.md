@@ -212,7 +212,7 @@ Try your own lying-to-standing numbers below. This is an educational check on th
 
 ## How ivabradine changes your HRV numbers
 
-If you track heart rate variability, expect your numbers to drift up a little on ivabradine, and read that drift carefully. HRV is measured in milliseconds between beats. When your heart rate slows, those intervals get longer, so the same relative variability reads as bigger millisecond values. Some of the rise in [RMSSD](/insights/hrv/rmssd-and-pnn50-vagal-tone-metrics/) or [SDNN](/insights/basics/what-is-sdnn-in-hrv/) you see is that arithmetic, not a nervous system that has suddenly healed.
+If you track heart rate variability, expect your numbers to drift up a little on ivabradine, and read that drift carefully. HRV is measured in milliseconds between beats. When your heart rate slows, those intervals get longer, so the same relative variability reads as bigger millisecond values. Some of the rise in [RMSSD](/insights/basics/rmssd-and-pnn50-vagal-tone-metrics/) or [SDNN](/insights/basics/what-is-sdnn-in-hrv/) you see is that arithmetic, not a nervous system that has suddenly healed.
 
 Ivabradine is actually a clean illustration of the effect. A beta blocker raises HRV for two reasons at once: it slows the heart (arithmetic) and it shifts autonomic balance toward the parasympathetic side (a real change). Ivabradine mostly does only the first. It works at the pacemaker and does not directly turn your sympathetic or parasympathetic tone up or down, so the HRV change it produces is largely the rate effect. That makes it a good reminder of a rule that applies to any rate-changing medication: the metric and the heart rate are coupled, so a lower heart rate flatters the numbers a bit for free.
 

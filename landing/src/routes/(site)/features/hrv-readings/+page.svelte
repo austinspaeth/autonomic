@@ -65,7 +65,7 @@
     { q: 'What is a good HRV?', a: 'There is no single good number. HRV falls with age, differs between people several-fold, and depends on how it was measured. Autonomic grades each reading against medical thresholds and against your own recent normal, and the trend over weeks says more than any one morning.' },
     { q: 'What is the difference between a baseline and a training reading?', a: 'A baseline is five minutes breathing normally, first thing, and it is the heaviest single input to your daily score. A training reading is five minutes of paced breathing. It can lift your day by at most one grade above its baseline, and never hides a bad morning.' },
     { q: 'What happens if a reading comes out noisy?', a: 'The app grades its own signal. A reading with too much noise is never silently saved. If it is usable but rough, you are asked once, with the artifact rate in view. If it cannot be used, the app says why and what to try next, starting with the most likely cause.' },
-    { q: 'Does Autonomic import HRV from Apple Health or Health Connect?', a: 'Yes, when the reading carries at least four minutes of real beat-to-beat data. Short background samples from a watch are kept out of your averages, because they are not comparable with a still five-minute reading.' }
+    { q: 'Does Autonomic import HRV from Apple Health or Health Connect?', a: 'From Apple Health, yes, when the reading carries at least four minutes of real beat-to-beat data. Short background samples from a watch are kept out of your averages, because they are not comparable with a still five-minute reading. Health Connect on Android stores no beat-to-beat data, so on Android HRV is not imported: take your readings in the app instead.' }
   ];
 </script>
 
@@ -117,7 +117,7 @@
   <div class="v2-wrap">
     <div class="v2-center"><h2 class="v2-h2">Four ways to take the same HRV reading.</h2><p class="v2-sub">No new gadget required. If you own better hardware, the app will use it, and every reading lands in the same journal.</p></div>
     <DeviceCards {devices} />
-    <p class="v2-fine hrv-center">Already measuring somewhere else? HRV from Apple Health or Health Connect comes in too, when it carries at least four minutes of real beat-to-beat data. <a class="v2-inl" href="/insights/hrv/best-hrv-chest-strap-polar-h10-coospo-h808s/">Which chest strap to buy</a></p>
+    <p class="v2-fine hrv-center">Already measuring somewhere else? On iPhone, HRV from Apple Health comes in too, when it carries at least four minutes of real beat-to-beat data. Health Connect has no beat-to-beat data, so on Android readings are taken in the app. <a class="v2-inl" href="/insights/hrv/best-hrv-chest-strap-polar-h10-coospo-h808s/">Which chest strap to buy</a></p>
   </div>
 </section>
 

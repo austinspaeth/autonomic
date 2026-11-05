@@ -1,4 +1,4 @@
-import { error } from '@sveltejs/kit';
+import { error, redirect } from '@sveltejs/kit';
 
 // The raw markdown, read at prerender only, for what the structured data says
 // about the article that its frontmatter does not: how long it is and which
@@ -7,6 +7,18 @@ import { error } from '@sveltejs/kit';
 const raws = import.meta.glob('../../../../../../articles/*.md', { query: '?raw', import: 'default' }) as Record<string, () => Promise<string>>;
 
 export type Citation = { name: string; url: string };
+
+// Every address an article has ever been reachable at: its first category,
+// where the page lives, and each of its other categories, which prerender as
+// permanent redirects to it. Listing them all (rather than only the ones some
+// link happens to reach) keeps an old or external link working after the
+// deploy's --delete sync, instead of turning it into a 404.
+const metas = import.meta.glob('../../../../../../articles/*.md', { eager: true, import: 'metadata' }) as Record<string, { categories?: string[]; published?: boolean }>;
+export const entries = () =>
+  Object.entries(metas).flatMap(([path, m]) => {
+    const slug = path.split('/').pop()!.replace(/\.md$/, '');
+    return m?.published === false ? [] : [...new Set(m?.categories ?? [])].map((topic) => ({ topic, slug }));
+  });
 
 // Research and clinical hosts: when an article has no Sources section, links to
 // these anywhere in its body are what it cites.
@@ -42,19 +54,25 @@ function wordsIn(raw: string): number {
 }
 
 export async function load({ params }) {
+  let post;
   try {
-    const post = await import(`../../../../../../articles/${params.slug}.md`);
-    const readRaw = raws[`../../../../../../articles/${params.slug}.md`];
-    const raw = readRaw ? await readRaw() : '';
-    return {
-      content: post.default,
-      meta: post.metadata,
-      citations: citationsIn(raw),
-      wordCount: wordsIn(raw)
-    };
+    post = await import(`../../../../../../articles/${params.slug}.md`);
   } catch (e) {
     throw error(404, `Could not find ${params.slug}`);
   }
+  // An article lives at ONE address: its first category. A link that files it
+  // under one of its other topics would otherwise prerender a full duplicate
+  // page (and a duplicate of its structured data), so it redirects instead.
+  const primary = post.metadata?.categories?.[0];
+  if (primary && params.topic !== primary) throw redirect(308, `/insights/${primary}/${params.slug}/`);
+  const readRaw = raws[`../../../../../../articles/${params.slug}.md`];
+  const raw = readRaw ? await readRaw() : '';
+  return {
+    content: post.default,
+    meta: post.metadata,
+    citations: citationsIn(raw),
+    wordCount: wordsIn(raw)
+  };
 }
 
 export const prerender = true;

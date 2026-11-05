@@ -155,9 +155,9 @@ Because the mechanism is shared with the rest of orthostatic intolerance, coat h
 Because coat hanger pain is an orthostatic symptom, the things that help it are the things that help orthostatic intolerance in general. It usually responds poorly to the painkillers and muscle rubs people reach for first, which is itself a clue that the neck is not the real problem.
 
 - **Change position before it builds.** Sitting or lying down when the ache starts lets the muscles reperfuse. Catching it early is easier than waiting it out.
-- **Stay well hydrated**, and if your clinician agrees, keep your **salt** intake adequate. More circulating volume supports upright blood flow. See [the science of salt and fluids for POTS](/insights/pots/science-of-salt-and-fluids-for-pots/).
+- **Stay well hydrated**, and if your clinician agrees, keep your **salt** intake adequate. More circulating volume supports upright blood flow. See [the science of salt and fluids for POTS](/insights/research/science-of-salt-and-fluids-for-pots/).
 - **Try compression.** [Compression garments](/insights/pots/compression-garments-for-pots/), especially waist-high, reduce pooling and support the pressures that keep blood moving upward.
-- **Pace your upright time.** Long stretches of standing still are the hardest thing for an orthostatically intolerant system. Breaking them up, shifting your weight, or using a footrest to engage the calf muscle pump can blunt the buildup. Our [pacing guide](/insights/pots/pacing-101-energy-envelope/) covers the wider principle.
+- **Pace your upright time.** Long stretches of standing still are the hardest thing for an orthostatically intolerant system. Breaking them up, shifting your weight, or using a footrest to engage the calf muscle pump can blunt the buildup. Our [pacing guide](/insights/recovery/pacing-101-energy-envelope/) covers the wider principle.
 - **Support the head and arms** when you can, so the postural muscles are not working as hard against gravity.
 
 None of this is a cure, and coat hanger pain that is frequent, severe, or new deserves a proper workup rather than home management alone. But framed correctly, as a blood flow problem rather than a muscle problem, it becomes something you can actually influence.

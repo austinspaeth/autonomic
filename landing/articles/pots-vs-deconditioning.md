@@ -204,7 +204,7 @@ The point is not to slap a label on yourself. It is to replace "you're just deco
 1. **Measure the orthostatic response** across several calm mornings with a stand test, heart rate and, ideally, blood pressure.
 2. **Note the symptom breadth**, not just the heart rate. A wide autonomic set points beyond simple deconditioning.
 3. **Watch the slope over weeks** of gentle, paced activity. Bending down is reassuring; stubbornly high is a reason to be evaluated.
-4. **Bring the record to a clinician.** A written trend beats "I feel awful when I stand," and it is what turns a dismissive conversation into a useful one. See [turning your data into a doctor conversation](/insights/app/turn-your-data-into-a-doctor-conversation/).
+4. **Bring the record to a clinician.** A written trend beats "I feel awful when I stand," and it is what turns a dismissive conversation into a useful one. See [turning your data into a doctor conversation](/insights/recovery/turn-your-data-into-a-doctor-conversation/).
 
 <div class="callout callout-tip">
   <strong>Let Autonomic track the pattern for you.</strong> Log your morning stand test, heart rate and HRV, and the app scores each reading against clinical thresholds <em>and</em> your own rolling baseline, then charts the slope over weeks: the exact "is this bending down or staying stubborn?" picture this article is about. It is private and offline, with no account, and it brings your cuff, strap or ring into one timeline. <strong><a href="/">See how it works →</a></strong>

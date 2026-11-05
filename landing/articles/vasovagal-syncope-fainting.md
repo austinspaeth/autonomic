@@ -216,10 +216,10 @@ Hold the squeeze until the wave clearly passes, then release slowly and keep sti
 
 Aborting a faint in the moment is one half. Raising the threshold so the reflex fires less often is the other. Most of the everyday tools work by expanding blood volume and reducing pooling, so there is less "give" in the system when a trigger arrives.
 
-- **Fluids and salt.** Being well hydrated, and, where a clinician agrees it is appropriate, increasing salt, raises blood volume and lifts the fainting threshold. The [science of salt and fluids](/insights/pots/science-of-salt-and-fluids-for-pots/) applies here too, with the same caution: salt loading is not right for everyone, especially with high blood pressure or heart or kidney concerns.
+- **Fluids and salt.** Being well hydrated, and, where a clinician agrees it is appropriate, increasing salt, raises blood volume and lifts the fainting threshold. The [science of salt and fluids](/insights/research/science-of-salt-and-fluids-for-pots/) applies here too, with the same caution: salt loading is not right for everyone, especially with high blood pressure or heart or kidney concerns.
 - **Compression.** Waist-high compression garments reduce the leg pooling that starts the cascade.
 - **Rise in stages.** Sit on the edge of the bed, then stand, rather than launching straight up. Pump your calves a few times first.
-- **Know and defuse your triggers.** Hot showers, long queues, blood draws, skipped meals and alcohol are classic. If needles set you off, tell the phlebotomist so you can lie down for the draw. A [symptom and trigger journal](/insights/pots/find-your-triggers-symptom-journal/) is how patterns become visible.
+- **Know and defuse your triggers.** Hot showers, long queues, blood draws, skipped meals and alcohol are classic. If needles set you off, tell the phlebotomist so you can lie down for the draw. A [symptom and trigger journal](/insights/recovery/find-your-triggers-symptom-journal/) is how patterns become visible.
 - **Counter-move early and often.** Fidget, shift weight, cross and tense your legs during any forced standing rather than locking your knees.
 - **Reconditioning, gently.** For frequent faints tied to deconditioning or orthostatic intolerance, a gradual, recumbent-first exercise plan can retrain the reflex over months, similar to the [Levine-style protocol](/insights/pots/exercise-for-pots-levine-protocol/).
 

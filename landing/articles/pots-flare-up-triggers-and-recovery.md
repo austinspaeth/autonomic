@@ -116,7 +116,7 @@ None of this is medical advice. These are educational field notes to help you un
 
 - A **flare** spikes above your baseline and returns toward it over days to a few weeks. It is reversible.
 - A **baseline shift** means your normal has genuinely moved and stays moved for many weeks, with no clear trigger and no recovery. This is much less common than it feels mid-flare.
-- **Post-exertional malaise (PEM)** is a specific, delayed crash after physical, cognitive or emotional effort, often arriving 12 to 48 hours later. It is a hallmark of ME/CFS and long COVID and is covered in depth in [post-exertional malaise explained](/insights/recovery/post-exertional-malaise-explained/). Overexertion is one of the most common flare triggers, so PEM and POTS flares frequently travel together, but they are not the same thing.
+- **Post-exertional malaise (PEM)** is a specific, delayed crash after physical, cognitive or emotional effort, often arriving 12 to 48 hours later. It is a hallmark of ME/CFS and long COVID and is covered in depth in [post-exertional malaise explained](/insights/postviral/post-exertional-malaise-explained/). Overexertion is one of the most common flare triggers, so PEM and POTS flares frequently travel together, but they are not the same thing.
 
 Because a flare and a baseline shift look identical in the first days, the practical rule is simple: **treat any surge as a flare first.** Rest it, support it, and only conclude your baseline has changed if the worse level holds for a long stretch despite good management.
 
@@ -140,7 +140,7 @@ Here are the usual suspects, grouped by how they hit your system.
 | Overexertion | Exceeds your energy envelope, can trigger PEM | Pace under your limit, not up to it |
 | Barometric pressure and travel | Weather swings and long transit days stack multiple loads | Plan recovery buffers around them |
 
-If you want to find your own personal stack rather than the generic list, a [symptom and trigger journal](/insights/app/find-your-triggers-symptom-journal/) is the tool that surfaces it, because the pattern is usually specific to you and only visible over weeks. Heat, alcohol and the [menstrual cycle](/insights/pots/menstrual-cycle-hrv-pots/) each have their own deeper write-ups if one of those is your main driver.
+If you want to find your own personal stack rather than the generic list, a [symptom and trigger journal](/insights/recovery/find-your-triggers-symptom-journal/) is the tool that surfaces it, because the pattern is usually specific to you and only visible over weeks. Heat, alcohol and the [menstrual cycle](/insights/hrv/menstrual-cycle-hrv-pots/) each have their own deeper write-ups if one of those is your main driver.
 
 ## What a flare looks like from the inside, and in the data
 

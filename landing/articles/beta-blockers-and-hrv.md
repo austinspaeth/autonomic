@@ -87,7 +87,7 @@ That third effect is why beta blockers tend to raise HRV. But it is not the whol
 
 ## Do beta blockers raise or lower HRV?
 
-For most people, beta blockers **raise** the standard HRV numbers. Time-domain metrics like [RMSSD and SDNN](/insights/basics/rmssd-and-pnn50-vagal-tone-metrics/) go up, and in a [frequency-domain analysis](/insights/hrv/hrv-frequency-domain-vlf-lf-hf-power/) the high-frequency (HF) power, which tracks vagal activity, tends to rise as well. This is one of the more reproducible findings in the whole field, seen across decades of cardiology research.
+For most people, beta blockers **raise** the standard HRV numbers. Time-domain metrics like [RMSSD and SDNN](/insights/basics/rmssd-and-pnn50-vagal-tone-metrics/) go up, and in a [frequency-domain analysis](/insights/basics/hrv-frequency-domain-vlf-lf-hf-power/) the high-frequency (HF) power, which tracks vagal activity, tends to rise as well. This is one of the more reproducible findings in the whole field, seen across decades of cardiology research.
 
 Two separate mechanisms push the numbers in the same direction, and it is worth pulling them apart:
 

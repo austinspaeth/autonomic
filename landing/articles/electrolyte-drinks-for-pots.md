@@ -102,7 +102,7 @@ social:
 
 If you have POTS, you have been told to drink electrolytes roughly a thousand times. What almost nobody tells you is which number on the label to look at. It is not the flavor, the brand, the "advanced hydration" badge, or the long list of trace minerals. It is a single figure: **milligrams of sodium per serving.**
 
-Sodium is the electrolyte that holds water inside your blood vessels. In POTS, a large share of people run with low blood volume, so when you stand up there is simply less fluid for your heart to work with, your heart rate spikes to compensate, and you feel it. Pulling more sodium (and the water it carries) into circulation is the whole rationale behind the "salt and fluids" advice, and it is covered in more depth in our pieces on [the science of salt and fluids](/insights/pots/science-of-salt-and-fluids-for-pots/) and [low blood volume in POTS](/insights/pots/low-blood-volume-pots-hypovolemia/).
+Sodium is the electrolyte that holds water inside your blood vessels. In POTS, a large share of people run with low blood volume, so when you stand up there is simply less fluid for your heart to work with, your heart rate spikes to compensate, and you feel it. Pulling more sodium (and the water it carries) into circulation is the whole rationale behind the "salt and fluids" advice, and it is covered in more depth in our pieces on [the science of salt and fluids](/insights/research/science-of-salt-and-fluids-for-pots/) and [low blood volume in POTS](/insights/pots/low-blood-volume-pots-hypovolemia/).
 
 Here is the problem with most electrolyte drinks: they were designed for healthy athletes replacing modest sweat losses, not for someone trying to expand blood volume. So they are diluted for taste. A standard sports drink gives you about as much sodium as a light snack, when many POTS protocols are aiming far higher across the day. You can drink it all afternoon and barely move the needle, then conclude electrolytes "don't work for you." They do. The dose was just too small.
 
@@ -196,7 +196,7 @@ It seems like plain salt water should hydrate you best, but it does not. Your sm
   <figcaption>Sodium and glucose ride the same transporter into the bloodstream, and water trails along. A pinch of sugar makes salt water absorb faster, not slower.</figcaption>
 </figure>
 
-You do not need much. The classic rehydration ratio is modest, and a very sugary drink is not better. For POTS, a small splash of fruit juice or a half teaspoon of sugar in a liter is plenty to get the benefit without a sugar spike, which matters if you also deal with [reactive blood-sugar swings](/insights/pots/reactive-hypoglycemia-blood-sugar-pots/).
+You do not need much. The classic rehydration ratio is modest, and a very sugary drink is not better. For POTS, a small splash of fruit juice or a half teaspoon of sugar in a liter is plenty to get the benefit without a sugar spike, which matters if you also deal with [reactive blood-sugar swings](/insights/food/reactive-hypoglycemia-blood-sugar-pots/).
 
 ## The DIY recipe
 
