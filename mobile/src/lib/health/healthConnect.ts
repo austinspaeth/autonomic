@@ -587,7 +587,13 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
 
     // Health Connect's medication record type is still experimental and not
     // exposed by react-native-health-connect — wire it here when it ships.
+    // Apple Health's medication log (iOS 26) has no Android counterpart yet,
+    // so the import's Medications group simply never appears here.
     async readMedications() { return []; },
+
+    // Health Connect has no symptom record types at all — the same reason
+    // writeCycleSymptoms below writes nothing. There is nothing to read.
+    async readSymptoms() { return []; },
 
     async readWorkouts(dk) {
       const { from, to } = dayBounds(dk);

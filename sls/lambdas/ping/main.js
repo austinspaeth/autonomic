@@ -218,7 +218,7 @@ const KINDS = {
   pay: 'PAY', not: 'NOT', pot: 'POT', see: 'SEE', err: 'ERR',
   osh: 'OSH', odm: 'ODM', oac: 'OAC', ofl: 'OFL',
   log: 'LOG', use: 'USE', fnd: 'FND', rpt: 'RPT',
-  rdg: 'RDG', mbp: 'MBP', stp: 'STP', rvw: 'RVW',
+  rdg: 'RDG', mbp: 'MBP', stp: 'STP', rvw: 'RVW', rvc: 'RVC',
 };
 
 /** The routes whose slot letter is a capture SENSOR. */
@@ -380,6 +380,18 @@ const MORNING_PROMPT = { S: 'shown', T: 'take-reading', X: 'closed' };
 const STRAP_CARD = { C: 'shown-camera', G: 'shown-garmin', T: 'amazon-tapped' };
 
 /**
+ * The review request card. One card's outcomes on one route, the MORNING_PROMPT
+ * shape: `S` raised, then whichever answered it. Each letter is capped on its
+ * own on the client, so each is a headcount and `R / S`, `N / S`, `X / S` are
+ * the split of what people did with it.
+ *
+ * Kept apart from RVW, which counts the OS review prompt being requested: the
+ * two asks are mutually exclusive on any one install, so RVW + RVC's `S` is
+ * everyone who was asked at all, and the split between them is which ask.
+ */
+const REVIEW_CARD = { S: 'shown', R: 'review-tapped', N: 'note-tapped', X: 'dismissed' };
+
+/**
  * The alphabet each route speaks, or null for the routes that carry no letter.
  *
  * Validated per route rather than globally, because the same slot means
@@ -394,7 +406,7 @@ const ALPHABET = {
   PAY: SURFACES, NOT: NOTIFY, POT: POTS, SEE: VIEWS,
   OSH: OFFERS, ODM: OFFERS, OAC: OFFERS, OFL: OFFER_FAILS,
   LOG: LOGS, USE: FEATURES, FND: FINDINGS, RPT: REPORTS,
-  RDG: READING_TYPES, MBP: MORNING_PROMPT, STP: STRAP_CARD,
+  RDG: READING_TYPES, MBP: MORNING_PROMPT, STP: STRAP_CARD, RVC: REVIEW_CARD,
   SUB: PLANS, RST: PLANS, LAP: PLANS,
 };
 

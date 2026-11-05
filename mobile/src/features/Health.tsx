@@ -1,17 +1,20 @@
 /** Health settings (Apple Health on iOS, Health Connect on Android):
  *  permission and a bedtime-confirmation flow that reads last night's sleep +
  *  overnight HR and lets you review/edit it before it lands in the journal. */
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { ActivityIndicator, Alert, Platform, Text, View } from 'react-native';
 import { Button, DaySaveButton } from '../components/ui';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { TimeField } from '../components/Field';
 import { useToast } from '../components/Toast';
 import { usePalette } from '../theme';
-import { health, healthAppName, healthPermissionPath, revokeHealthAuth, SleepImport } from '../lib/health';
+import {
+  health, healthAppName, healthPermissionPath, medicationsSupported, revokeHealthAuth, SleepImport,
+} from '../lib/health';
 import { ensureDay, getState, save, storeSleepSeries, useStore } from '../store/store';
 import { fmtTime12, todayKey } from '../lib/dates';
 import { ImportedList, runHealthUpdateCheck } from './HealthUpdates';
+import { NotifRow } from './Reminders';
 
 export function HealthScreen() {
   const p = usePalette();
@@ -93,6 +96,7 @@ export function HealthScreen() {
       <Text style={{ color: p.textDim, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Troubleshooting</Text>
       <Button title={`Check ${healthAppName()} for updates`} onPress={checkForUpdates} disabled={busy} />
       {busy ? <View style={{ alignItems: 'center', marginTop: 14 }}><ActivityIndicator color={p.accent} /></View> : null}
+      {connected ? <LogsImportRow /> : null}
       {connected ? (
         <>
           {/* The same list the import pill opens, so anything it filed can be
@@ -104,6 +108,76 @@ export function HealthScreen() {
       ) : null}
       <View style={{ height: 24 }} />
     </View>
+  );
+}
+
+/**
+ * "Also import what I log in Health itself" — symptoms, and on iOS 26 the
+ * medication doses from the Health app's own medication list.
+ *
+ * OPT-IN, and off by default, for three reasons that all point the same way.
+ * It needs a read permission the core set deliberately does not ask for (a
+ * sheet nobody tapped anything to get is the nag lib/health/askedAuth exists to
+ * prevent); the symptom read is one query per mapped type and the periodic
+ * check runs on every foreground, so off has to mean NOT READ rather than read
+ * and discarded; and somebody who logs symptoms in both places may genuinely
+ * not want them merged. `settings.healthLogs` is the source of truth and the
+ * permission is derived — the same arrangement the morning reminder uses.
+ *
+ * Android does not render it at all: Health Connect has no symptom record and
+ * no medication record, so the row would be a promise the platform cannot keep.
+ */
+function LogsImportRow() {
+  const toast = useToast();
+  const p = usePalette();
+  const on = useStore((s) => !!s.state.settings.healthLogs);
+  const [meds, setMeds] = useState(false);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { void medicationsSupported().then(setMeds); }, []);
+
+  if (Platform.OS !== 'ios') return null;
+
+  const toggle = async () => {
+    if (busy) return;
+    if (on) {
+      // Off is ours alone to do: HealthKit cannot hand a read grant back, so
+      // the honest thing is to stop reading, and say where to revoke.
+      getState().settings.healthLogs = false; save();
+      toast('Will stop importing symptoms');
+      return;
+    }
+    setBusy(true);
+    // The whole 'logs' set in one tap: the symptom types through the normal
+    // bridge, then (iOS 26) the medication log's own sheet.
+    const ok = await health().requestAuth({ force: true, scope: 'logs' });
+    setBusy(false);
+    if (!ok) { toast('Permission denied'); return; }
+    getState().settings.healthLogs = true; save();
+    toast('Importing from Apple Health');
+  };
+
+  return (
+    <>
+      <View style={{ height: 20 }} />
+      <Text style={{ color: p.textDim, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>
+        What you log in Health
+      </Text>
+      <NotifRow
+        icon="alert"
+        title={meds ? 'Symptoms and medications' : 'Symptoms'}
+        sub={meds
+          ? 'Bring in what you log in the Health app itself'
+          : 'Bring in the symptoms you log in the Health app'}
+        on={on}
+        onToggle={() => { void toggle(); }}
+      />
+      <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 18, marginTop: 8 }}>
+        {meds
+          ? 'Doses you mark as taken in Health are filed under your own medication types, and a medication you have no type for yet offers to create one. Skipped doses are never imported.'
+          : 'Medication doses need iOS 26, which added the Health app\u2019s medication log. Symptoms import on any version.'}
+      </Text>
+      {busy ? <View style={{ alignItems: 'center', marginTop: 12 }}><ActivityIndicator color={p.accent} /></View> : null}
+    </>
   );
 }
 

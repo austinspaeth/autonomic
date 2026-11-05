@@ -50,6 +50,7 @@ import { ACCENT, radius, usePalette } from '../theme';
 import { health, healthAppName, type HistoryProgress } from '../lib/health';
 import { workoutCandidateOf } from '../lib/health/workoutCandidate';
 import { dayAlreadyHas } from '../lib/health/updateSet';
+import { matchMedType } from '../lib/health/medications';
 import { typesFor } from '../lib/typeCatalog';
 import { computeScores, profileCtx } from '../lib/scoring';
 import { rrCoverageSec } from '../lib/hrvQuality';
@@ -125,7 +126,7 @@ async function importHealthHistory(onProgress?: (p: HistoryProgress) => void): P
   // Doses come back under the health app's own name; only those matching a med
   // type we know how to file get imported (same rule as the daily check).
   const medTypes = typesFor(st, 'meds');
-  const medKeyByLabel = new Map(Object.keys(medTypes).map((k) => [medTypes[k].label.toLowerCase(), k]));
+  const medLabels = Object.fromEntries(Object.keys(medTypes).map((k) => [k, medTypes[k].label]));
   let added = 0;
   mutate((s) => {
     if (s.meta.healthHistoryImported) return;          // already ran — no-op
@@ -179,11 +180,16 @@ async function importHealthHistory(onProgress?: (p: HistoryProgress) => void): P
 
     for (const m of bundle.meds) {
       if (m.ownApp) continue;
-      const type = medKeyByLabel.get(m.name.trim().toLowerCase());
+      // The same canonical-name rules the daily check uses (lib/health/medications),
+      // so the two paths agree about which medication a dose is. The backfill
+      // never CREATES a type the way the daily check offers to: a one-shot
+      // sweep of a year would mint them in bulk with nobody looking.
+      const type = matchMedType(m.name, medLabels);
       if (!type) continue;                              // nothing sane to file it under
       if (dayAlreadyHas(s.days[m.dayKey], 'med', type, m.time)) continue;
-      const amount = m.amount ? (m.amount.match(/[\d.]+/)?.[0] ?? '') : '';
-      day(m.dayKey).meds.push({ id: uid(), type, time: m.time, note, amount } as never);
+      // The dose, whole, unit included — the field is free text everywhere
+      // else in the app ("400mg", "1 scoop").
+      day(m.dayKey).meds.push({ id: uid(), type, time: m.time, note, amount: m.amount ?? '' } as never);
       added++;
     }
 
@@ -705,7 +711,7 @@ function Onboarding({ onDone }: { onDone: () => void }) {
         <View>
           <Text style={st.h2}>Take your first HRV reading</Text>
           <Text style={st.para}>
-            This is the first point on your trend. Five minutes sitting still, and the picture builds from there.
+            This is the first point on your trend. Five minutes lying still, and the picture builds from there.
           </Text>
         </View>
 

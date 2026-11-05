@@ -34,7 +34,7 @@ const STEPS = [
     sub: 'The watch runs the reading itself and counts down five minutes.',
   },
   {
-    title: 'Tell us below, then sit still',
+    title: 'Tell us below, then lie still',
     sub: 'When the watch finishes, the reading appears here on its own. Nothing to sync.',
   },
 ];

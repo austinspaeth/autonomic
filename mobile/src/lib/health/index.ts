@@ -29,6 +29,8 @@ import {
 import { requestEcgAuth } from './ecg';
 import { ecgNative } from '../../../modules/ecg-health';
 import { groupNights, summarizeSleep, type StageSpan } from './sleepSummary';
+import { SYMPTOM_IMPORT, SYMPTOM_READ_IDS, symptomSeverity } from './symptomMap';
+import { medAmountText } from './medications';
 import { thinSeries, type HrPoint, type RespPoint } from '../sleep/night';
 import { activityTypeFromHk, workoutHrSeries } from './workoutMap';
 
@@ -36,7 +38,7 @@ import { activityTypeFromHk, workoutHrSeries } from './workoutMap';
 const OWN_BUNDLE = 'com.autonomic.journal';
 
 /** Which slice of the read set a permission question is about. */
-export type HealthScope = 'all' | 'workouts' | 'steps' | 'cycle';
+export type HealthScope = 'all' | 'workouts' | 'steps' | 'cycle' | 'logs';
 /**
  * What we can honestly say about read access.
  *  - `shouldRequest` — the OS still has questions to ask; requesting shows UI.
@@ -121,14 +123,28 @@ export interface HealthApi {
    */
   readHrvSessions(opts: { fromMs: number; toMs: number }): Promise<WatchHrvSample[]>;
   /**
-   * The day's medication doses logged in the platform health app. Neither
-   * bridge library exposes medication reads yet (HealthKit gained a meds API
-   * in iOS 26 but @kingstinct/react-native-healthkit doesn't surface it, and
-   * Health Connect's medication record is still experimental), so both
-   * implementations currently return [] — this seam exists so the periodic
-   * import check grows a Medications group the moment a library ships it.
+   * The day's medication doses logged in the platform health app.
+   *
+   * iOS 26+ only, and through the local `ecg-health` native module rather than
+   * the kingstinct bridge, which speaks in type-identifier strings and a dose
+   * event is neither a quantity nor a category sample. Everything else answers
+   * `[]`: iOS 25 and earlier have no medication log at all, and Health
+   * Connect's dose record is still experimental and unexposed. Only doses
+   * logged as TAKEN come back — a skipped or untouched reminder is a dose that
+   * did not happen (./medications).
+   *
+   * Needs its own read permission (`scope: 'logs'`), so a phone that has never
+   * been asked reads empty rather than failing.
    */
   readMedications(dk: string): Promise<ImportedMed[]>;
+  /**
+   * The day's symptoms logged in the platform health app, mapped to the
+   * journal's own symptom types (./symptomMap). Apple Health only: Health
+   * Connect has no symptom records, which is also why the write side is
+   * iOS-only. Under the same `scope: 'logs'` permission as medications, asked
+   * from a tap, so an install that never opted in reads empty.
+   */
+  readSymptoms(dk: string): Promise<ImportedSymptom[]>;
   /** iOS writes SDNN (HealthKit's HRV type); Android writes RMSSD (Health
    *  Connect's). Callers pass both when they have them. */
   writeHrvSession(opts: { sdnnMs?: number; rmssdMs?: number; avgHr?: number; startISO: string; durationSec: number }): Promise<void>;
@@ -311,6 +327,23 @@ export interface ImportedMed {
   startMs: number;           // epoch ms of the dose, for dedup windows
   amount: string | null;     // display amount, e.g. "400 mg", when recorded
   ownApp: boolean;           // authored by this app — skip on import
+  /** The person's own name for it in the Health app, when they set one: what a
+   *  type created for this dose should be called (./medications). */
+  nickname?: string | null;
+}
+
+/** A symptom logged in the platform health app (see readSymptoms). */
+export interface ImportedSymptom {
+  /** The journal's symptom type key, already resolved through SYMPTOM_IMPORT —
+   *  an unmapped HealthKit type never becomes one of these. */
+  type: string;
+  time: string;              // HH:MM local
+  startMs: number;           // epoch ms, for dedup windows and the item key
+  /** 'Mild' | 'Moderate' | 'Severe', or '' when it was logged without a grade.
+   *  The journal's built-in symptoms have no severity field, so this rides the
+   *  entry's note rather than inventing one (./updates). */
+  severity: string;
+  ownApp: boolean;           // authored by this app (our own cycle-symptom writes)
 }
 
 /** A watch heartbeat-series reading pulled for the live-capture sync flow. */
@@ -376,6 +409,7 @@ const stub: HealthApi = {
   async readHistory() { return emptyHistory(); },
   async readHrvSessions() { return []; },
   async readMedications() { return []; },
+  async readSymptoms() { return []; },
   async readWorkouts() { return []; },
   async readSleep() { return null; },
   async writeHrvSession() { /* no-op */ },
@@ -649,6 +683,19 @@ const STEPS_READ_IDS = [QID.steps, QID.standTime];
 const CYCLE_READ_IDS = [CID.menstrualFlow, CID.spotting, QID.wristTemp, QID.basalTemp];
 const CYCLE_WRITE_IDS = [CID.menstrualFlow, CID.spotting, ...Object.values(SYMPTOM_HK)];
 
+/**
+ * Symptoms and medications: the "things you already log in Health" set, with
+ * its own latch for the same reason the two sets above have theirs — it is
+ * asked from a tap (Settings → Apple Health) and never from a launch path.
+ *
+ * The symptom ids come from the import map itself (./symptomMap), so the
+ * permission can never drift from what the import can actually file. The
+ * MEDICATION half is not here: a dose event is not a category type and the
+ * kingstinct bridge cannot name it, so it is asked for separately through the
+ * local native module, in the same tap.
+ */
+const LOGS_READ_IDS = SYMPTOM_READ_IDS;
+
 const READ_IDS = CORE_READ_IDS;
 const WRITE_IDS = [
   QID.hrvSdnn, QID.restingHr, QID.heartRate,
@@ -669,6 +716,8 @@ const HK_SET_KEY = `hk1:${CORE_READ_IDS.join(',')}|${WRITE_IDS.join(',')}`;
 const HK_STEPS_SET_KEY = `hk1steps:${[...CORE_READ_IDS, ...STEPS_READ_IDS].join(',')}|${WRITE_IDS.join(',')}`;
 /** The cycle set, with its own latch for the same reason. */
 const HK_CYCLE_SET_KEY = `hk1cycle:${[...CORE_READ_IDS, ...CYCLE_READ_IDS].join(',')}|${[...WRITE_IDS, ...CYCLE_WRITE_IDS].join(',')}`;
+/** The symptoms/medications set, with its own latch for the same reason. */
+const HK_LOGS_SET_KEY = `hk1logs:${[...CORE_READ_IDS, ...LOGS_READ_IDS].join(',')}|${WRITE_IDS.join(',')}`;
 
 /**
  * Has HealthKit been asked about this set yet? The only honest question iOS
@@ -718,6 +767,30 @@ async function ecgAuth(force: boolean): Promise<void> {
   if (!force && ecgAsked) return;
   ecgAsked = true;
   try { await step('ecg', () => requestEcgAuth()); } catch { /* ECG is optional */ }
+}
+
+/**
+ * Does this phone have a medication log at all? iOS 26 introduced it, and a
+ * binary built before 1.39 has no native function to ask with — both answer
+ * false, which the UI reads as "this phone cannot do it" rather than as a
+ * failure. Cached: it cannot change inside one launch.
+ */
+let medsSupported: boolean | null = null;
+export async function medicationsSupported(): Promise<boolean> {
+  if (medsSupported != null) return medsSupported;
+  if (Platform.OS !== 'ios') { medsSupported = false; return false; }
+  const ask = ecgNative()?.medicationsAvailable;
+  if (!ask) { medsSupported = false; return false; }
+  try { medsSupported = await ask(); } catch { medsSupported = false; }
+  return !!medsSupported;
+}
+
+/** The medication log's own read sheet (dose events + the medication list).
+ *  Only ever called from the 'logs' tap — see requestAuth. */
+async function requestMedicationAuth(): Promise<boolean> {
+  const ask = ecgNative()?.requestMedicationAuth;
+  if (!ask) return false;
+  try { return (await step('meds', () => ask())) ?? false; } catch { return false; }
 }
 
 /**
@@ -820,12 +893,15 @@ function makeReal(mod: HkModule): HealthApi {
       // The pacing budget asks for a WIDER set under its own latch, so the
       // core set's key — and therefore every background path's once-only ask —
       // is untouched by this feature existing.
-      const wide = opts?.scope === 'steps' || opts?.scope === 'cycle';
       const cycle = opts?.scope === 'cycle';
+      const logs = opts?.scope === 'logs';
+      const wide = opts?.scope === 'steps' || cycle || logs;
       const readIds = cycle ? [...CORE_READ_IDS, ...CYCLE_READ_IDS]
+        : logs ? [...CORE_READ_IDS, ...LOGS_READ_IDS]
         : wide ? [...CORE_READ_IDS, ...STEPS_READ_IDS] : CORE_READ_IDS;
       const writeIds = cycle ? [...WRITE_IDS, ...CYCLE_WRITE_IDS] : WRITE_IDS;
-      const setKey = cycle ? HK_CYCLE_SET_KEY : wide ? HK_STEPS_SET_KEY : HK_SET_KEY;
+      const setKey = cycle ? HK_CYCLE_SET_KEY : logs ? HK_LOGS_SET_KEY
+        : wide ? HK_STEPS_SET_KEY : HK_SET_KEY;
       return shareAuthRequest(async () => {
         try {
           if (mod.isHealthDataAvailable && !(await step('available', () => mod.isHealthDataAvailable!()))) return false;
@@ -848,6 +924,10 @@ function makeReal(mod: HkModule): HealthApi {
           // ECG sits outside the kingstinct set (local native module) — same
           // step, sequential so the two sheets can't race.
           await ecgAuth(force);
+          // The medication log is outside it too, and is asked ONLY in the
+          // 'logs' tap: it is a second sheet, and nothing on a launch path may
+          // raise one. A phone under iOS 26 resolves false and asks nothing.
+          if (logs) await requestMedicationAuth();
           return ok;
         } catch { return false; }
       });
@@ -861,7 +941,8 @@ function makeReal(mod: HkModule): HealthApi {
       // `shouldRequest` means the sheet has never been shown for them.
       try {
         const read = scope === 'workouts' ? [WORKOUT_TYPE, QID.heartRate]
-          : scope === 'steps' ? STEPS_READ_IDS : scope === 'cycle' ? CYCLE_READ_IDS : READ_IDS;
+          : scope === 'steps' ? STEPS_READ_IDS : scope === 'cycle' ? CYCLE_READ_IDS
+          : scope === 'logs' ? LOGS_READ_IDS : READ_IDS;
         const write = scope === 'all' ? WRITE_IDS : scope === 'cycle' ? CYCLE_WRITE_IDS : [];
         const st = await mod.getRequestStatusForAuthorization?.(read, write);
         return st === 1 ? 'shouldRequest' : 'unknown';
@@ -1154,10 +1235,77 @@ function makeReal(mod: HkModule): HealthApi {
       } catch { return []; }
     },
 
-    async readMedications() {
-      // @kingstinct/react-native-healthkit has no medication-dose query yet
-      // (the HKMedication APIs are iOS 26+); wire it here when it lands.
-      return [];
+    /**
+     * Doses from the Health app's own medication log (iOS 26+).
+     *
+     * The native module already filters to TAKEN and already joins each dose to
+     * its medication's name; everything left to do here is shape it the way the
+     * rest of the import pipeline expects. Two rules worth stating:
+     *
+     *  - the window is the DAY, and a dose is placed by when it was taken
+     *    (`start`), never by its scheduled time: a 9pm pill logged at 11:40pm
+     *    belongs to the day it was swallowed on.
+     *  - a dose with no recorded amount gets `amount: null`, not "0".
+     */
+    async readMedications(dk) {
+      const query = ecgNative()?.queryMedications;
+      if (!query) return [];
+      const { from, to } = dayBounds(dk);
+      try {
+        const rows = await query(from.getTime(), to.getTime() + 60_000, 400);
+        const out: ImportedMed[] = [];
+        for (const r of rows || []) {
+          const startMs = Number(r.start);
+          if (!Number.isFinite(startMs)) continue;
+          const name = String(r.name || '').trim();
+          if (!name) continue;          // nothing to match a type on
+          const when = new Date(startMs);
+          out.push({
+            name,
+            nickname: (r.nickname || '').trim() || null,
+            time: hhmm(when),
+            startMs,
+            amount: medAmountText({ dose: r.dose, unit: r.unit, form: r.form }),
+            // The Health app writes the user's own log; our own medication
+            // writes do not exist (nothing in the app publishes doses), but the
+            // check costs nothing and keeps the rule uniform across readers.
+            ownApp: r.bundleId === OWN_BUNDLE,
+          });
+        }
+        return out.sort((a, b) => a.startMs - b.startMs);
+      } catch { return []; }
+    },
+
+    /**
+     * Symptoms logged in the Health app, as journal symptom types.
+     *
+     * Only the types ./symptomMap knows are read at all — they are the same
+     * list the 'logs' permission asks for — so an unmapped HealthKit symptom
+     * cannot arrive here looking for a home. A sample recording that a symptom
+     * was NOT present is dropped (`symptomSeverity` returns null), which is the
+     * one case that would otherwise put a symptom in the journal on a day the
+     * person said they did not have it.
+     */
+    async readSymptoms(dk) {
+      const { from, to } = dayBounds(dk);
+      const out: ImportedSymptom[] = [];
+      for (const [hkId, type] of Object.entries(SYMPTOM_IMPORT)) {
+        let rows: readonly CSample[] = [];
+        try { rows = (await mod.queryCategorySamples?.(hkId, { from, to, limit: 200 })) || []; }
+        catch { continue; }            // one refused type must not lose the rest
+        for (const r of rows) {
+          const severity = symptomSeverity(Number(r.value));
+          if (severity == null) continue;
+          out.push({
+            type,
+            time: hhmm(r.startDate),
+            startMs: r.startDate.getTime(),
+            severity,
+            ownApp: isOwnSample(r.sourceRevision),
+          });
+        }
+      }
+      return out.sort((a, b) => a.startMs - b.startMs);
     },
 
     async readWorkouts(dk) {

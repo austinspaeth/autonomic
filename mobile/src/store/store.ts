@@ -570,7 +570,8 @@ export function upsertEntry(dk: string, arrKey: 'readings' | 'activities' | 'med
  *  Settings → Apple Health's manual check still shows it. */
 function noteDeclinedImport(dk: string, arrKey: 'readings' | 'activities' | 'meds' | 'symptoms', entry: Entry | undefined) {
   if (!entry?.imported) return;
-  const kind = arrKey === 'readings' ? 'reading' : arrKey === 'activities' ? 'workout' : arrKey === 'meds' ? 'med' : null;
+  const kind = arrKey === 'readings' ? 'reading' : arrKey === 'activities' ? 'workout'
+    : arrKey === 'meds' ? 'med' : arrKey === 'symptoms' ? 'symptom' : null;
   if (!kind) return;
   const keys = [importFingerprint(dk, kind, entry.type, String(entry.time || ''))];
   if (typeof entry.healthKey === 'string') keys.push(entry.healthKey);

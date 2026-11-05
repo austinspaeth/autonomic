@@ -32,7 +32,7 @@ import { reviewMemory } from '../review';
 import { liveOffer } from '../upsell/annual';
 import { annualMemory } from '../upsell/annualMemory';
 import { getDeclinedKeys } from '../health/declined';
-import { health, healthAppName } from '../health';
+import { health, healthAppName, medicationsSupported } from '../health';
 import { bleIfStarted } from '../ble/manager';
 import { garminLinkIntact } from '../garmin/receiver';
 import { isSideloadedAndroidBuild, isTestFlightBuild } from '../../../modules/app-env';
@@ -408,11 +408,17 @@ async function bluetoothRows(s: AppState): Promise<Rows> {
   };
 }
 
-function healthRows(s: AppState): Rows {
+async function healthRows(s: AppState): Promise<Rows> {
   return {
     app: healthAppName(),
     available: health().available,
     'connected in settings': !!s.settings.healthEnabled,
+    // Three gates sit between "I log symptoms in Health" and an import, and
+    // all three fail silently: the switch, the OS permission (which HealthKit
+    // will never report) and, for doses, the OS version. "Nothing imports" is
+    // otherwise unanswerable.
+    'symptom/med import': !!s.settings.healthLogs,
+    'medication log supported': await safe(() => medicationsSupported(), false),
     'history imported': s.meta?.healthHistoryImported ? daysAgo(s.meta.healthHistoryImported) : 'never',
     'declined samples': getDeclinedKeys().size,
   };

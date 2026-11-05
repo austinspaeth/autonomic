@@ -369,6 +369,15 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
     opacity: 1 - Math.min(1, Math.max(0, translateY.value / SCREEN_H)),
   }));
 
+  // How far a fitContent card can ride up on the keyboard: the slack above it,
+  // never more than the keyboard itself. Shared by the card and its footer, so
+  // the two can never disagree about how much of the keyboard is still to cover.
+  const cardLift = (kbH: number) => {
+    'worklet';
+    const slack = Math.max(0, SCREEN_H - cardH.value - insets.top - 8);
+    return Math.min(kbH, slack);
+  };
+
   const sheetStyle = useAnimatedStyle(() => {
     const scale = 1 - 0.08 * recede.value; // shrink to 0.92 when fully receded
     // Scaling is centered, so it drops the top edge by (1-scale)*sheetH/2. Lift by
@@ -379,8 +388,7 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
     // A fitContent card has no scroll view to scroll a focused field clear of the
     // keyboard, so the whole card rides up on it instead. Capped at the slack
     // above the card so its top (and title) can never leave the screen.
-    const slack = Math.max(0, SCREEN_H - cardH.value - insets.top - 8);
-    const kbShift = fit ? Math.min(kb.value, slack) : 0;
+    const kbShift = fit ? cardLift(kb.value) : 0;
     return {
       transform: [
         { translateY: translateY.value - lift - kbShift },
@@ -391,9 +399,16 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
 
   // Lift the footer by the keyboard height and shed the home-indicator inset as it
   // rises (the keyboard already covers that safe area).
-  // (A fitContent card lifts bodily in sheetStyle, so its footer must not lift again.)
+  //
+  // A fitContent card lifts BODILY in sheetStyle, so the footer only takes what
+  // the card could not: a tall card has little slack above it, the lift is
+  // capped there, and the remainder of the keyboard was left sitting over the
+  // Save button. Three symptoms plus a note is exactly that card — the only way
+  // out was to dismiss the keyboard first, with nothing on screen to say so.
+  // The footer is opaque and the strip it covers is the card's own bottom edge,
+  // which the keyboard was covering anyway.
   const footerStyle = useAnimatedStyle(() => ({
-    transform: [{ translateY: fit ? 0 : -kb.value }],
+    transform: [{ translateY: fit ? -Math.max(0, kb.value - cardLift(kb.value)) : -kb.value }],
     paddingBottom: 14 + insets.bottom * (1 - Math.min(1, kb.value / 24)),
   }));
   // Spacer at the tail of the scroll content so a focused field can scroll clear

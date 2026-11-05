@@ -50,6 +50,14 @@ export function fmtReleaseDate(iso: string): string {
 
 export const RELEASES: Release[] = [
   {
+    version: '1.39',
+    date: '2026-11-05',
+    notes: [
+      'NEW: Import what you already log in Apple Health. The symptoms you log there now come into your journal, and on iOS 26 so do the doses from the Health app\u2019s own medication list. Turn it on under Settings, Apple Health. No more logging the same thing twice.',
+      'Bug fixes and improvements suggested by people reaching out. Thank you!',
+    ],
+  },
+  {
     version: '1.38',
     date: '2026-10-26',
     notes: [

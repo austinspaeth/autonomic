@@ -229,7 +229,9 @@ export function CustomRangeSheet({ controls, initial, initialGroup, onApply }: {
   );
 }
 
-function DateField({ label, value, onPress }: { label: string; value: string; onPress: () => void }) {
+/** A tappable date, labelled. Exported because the data export reuses the
+ *  same pair of fields over the same `Calendar` picker. */
+export function DateField({ label, value, onPress }: { label: string; value: string; onPress: () => void }) {
   const p = usePalette();
   return (
     <View style={{ flex: 1 }}>

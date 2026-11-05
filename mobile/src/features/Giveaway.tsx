@@ -28,7 +28,7 @@ import { useStore } from '../store/store';
 import { todayKey } from '../lib/dates';
 import { isGiveawaySignedUp, submitGiveaway } from '../store/giveaway';
 import {
-  GIVEAWAY_INFO_URL, GIVEAWAY_MAX_ENTRIES, giveawayEntries, giveawayPhase, isPlausibleEmail,
+  GIVEAWAY_INFO_URL, GIVEAWAY_MAX_ENTRIES, giveawayEntries, giveawayOpen, isPlausibleEmail,
 } from '../lib/giveaway';
 
 const TEAL = '#2dd4bf';
@@ -100,40 +100,13 @@ const RIB_ASPECT = 100 / 140;
 const RIB_MAX_H = 74;
 const GLOW = 190;
 
-/** Today's Journal only: the live card through the window, then the ended row
- *  for its few days, then nothing. */
+/** Today's Journal only, and only while the window is open. There is no
+ *  "has ended" row: it stood for ten days after the window closed, said
+ *  "Winners will be emailed", and then there was nothing left for it to tell
+ *  anybody. */
 export function GiveawayCard({ dk }: { dk: string }) {
-  if (dk !== todayKey()) return null;
-  const phase = giveawayPhase(dk);
-  if (phase === 'open') return <LiveGiveawayCard />;
-  return phase === 'ended' ? <GiveawayEndedCard /> : null;
-}
-
-/**
- * Claude Design "Giveaway Ended Widget": the collapsed row with nothing left to
- * open. Same tile, ribbon and type as that row, so the card the user has been
- * looking at all month simply stops counting; no chevron and no press, since
- * there is nowhere for it to go.
- */
-function GiveawayEndedCard() {
-  const p = usePalette();
-  return (
-    <View style={{
-      flexDirection: 'row', alignItems: 'center', gap: 13, padding: 15, marginBottom: 12,
-      backgroundColor: p.surface, borderWidth: 1, borderColor: p.border, borderRadius: radius.card,
-    }}>
-      <View style={{
-        width: ICON_TILE, height: ICON_TILE, borderRadius: 9, alignItems: 'center', justifyContent: 'center',
-        backgroundColor: TEAL_TILE, borderWidth: 1, borderColor: hexA(TEAL, 0.14),
-      }}>
-        <View style={{ width: RIB_ROW.w, height: RIB_ROW.h }}><Ribbon /></View>
-      </View>
-      <View style={{ flex: 1, minWidth: 0 }}>
-        <Text style={{ fontSize: 15, color: p.text, fontWeight: '700' }}>Giveaway has ended</Text>
-        <Text style={{ fontSize: 13, color: p.textDim, marginTop: 2 }}>Winners will be emailed</Text>
-      </View>
-    </View>
-  );
+  if (dk !== todayKey() || !giveawayOpen(dk)) return null;
+  return <LiveGiveawayCard />;
 }
 
 function LiveGiveawayCard() {

@@ -388,6 +388,7 @@ export function migrate(s: unknown): AppState {
   if (settings.lastBleDeviceId !== undefined && typeof settings.lastBleDeviceId !== 'string') delete settings.lastBleDeviceId;
   if (settings.lastBleDeviceName !== undefined && typeof settings.lastBleDeviceName !== 'string') delete settings.lastBleDeviceName;
   if (settings.healthEnabled !== undefined) settings.healthEnabled = !!settings.healthEnabled;
+  if (settings.healthLogs !== undefined) settings.healthLogs = !!settings.healthLogs;
   if (settings.units !== undefined && settings.units !== 'imperial' && settings.units !== 'metric') delete settings.units;
   if (settings.lastHrvSource !== undefined && !['polar', 'watch', 'garmin', 'camera'].includes(settings.lastHrvSource as string)) delete settings.lastHrvSource;
   // A reminder only ever schedules from a real HH:MM; anything else is dropped

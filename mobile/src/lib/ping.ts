@@ -103,6 +103,7 @@ export type PingKind =
   | 'rdg'                           // an HRV reading completed, by KIND
   | 'mbp'                           // the morning baseline prompt card
   | 'stp'                           // the strap suggestion card: shown (by sensor) · Amazon tapped
+  | 'rvc'                           // the review request card: shown · reviewed · noted · dismissed
   | 'rvw'                           // the store review prompt was REQUESTED
   | 'gvw'                           // the giveaway sign-up (POST, carries an email; NOT a counter)
   | 'cde';                          // an access code redeemed (POST, answers with its days; NOT a counter)
@@ -453,6 +454,34 @@ export function strapCardCode(action: string | undefined): StrapCardCode | undef
 }
 
 /**
+ * The review request card (`features/ReviewRequestCard.tsx`): `S` shown, `R`
+ * "Leave a review" tapped, `N` "Send me a note" tapped, `X` dismissed with the
+ * ✕. One route for one card's outcomes, the `mbp` shape, each letter capped on
+ * its own so each is a headcount.
+ *
+ * Deliberately NOT the three offer routes (`osh`/`odm`/`oac`). Those are read
+ * as a conversion funnel against revenue, where the denominator has to be
+ * unambiguous. This card has no revenue behind it and three different ways to
+ * be answered, so what is wanted is the SPLIT: `R / S` is how many reviewed,
+ * `N / S` how many wrote instead, `X / S` how many waved it away, and the gap
+ * is the people who were shown it and did neither.
+ *
+ * It is also not `rvw`, which counts the OS prompt being requested. The two are
+ * mutually exclusive on any one install (see `lib/review/card.ts`), and keeping
+ * them apart is the whole point: `rvw + rvc S` is everyone asked, and the split
+ * between them is which ask they met.
+ */
+export type ReviewCardCode = 'S' | 'R' | 'N' | 'X';
+
+export function reviewCardCode(action: string | undefined): ReviewCardCode | undefined {
+  if (action === 'shown') return 'S';
+  if (action === 'review') return 'R';
+  if (action === 'note') return 'N';
+  if (action === 'dismissed') return 'X';
+  return undefined;
+}
+
+/**
  * Which subscription product: `Y` yearly, `M` monthly, `P` the promo year the
  * annual card sells, `F` the founder year. Carried by all three subscriber
  * routes (`sub`, `rst`, `lap`), so new, restored and lapsed read against each
@@ -486,7 +515,7 @@ export function planCode(sku: string | undefined): PlanCode | undefined {
 export type SlotCode =
   | MethodCode | SurfaceCode | NotifyCode | PotsCode | ViewCode | OfferCode
   | LogCode | FeatureCode | FindingCode | ReportCode | PlanCode
-  | ReadingKindCode | MorningPromptCode | StrapCardCode;
+  | ReadingKindCode | MorningPromptCode | StrapCardCode | ReviewCardCode;
 
 /**
  * What this install could do at the moment it pinged: `F` free, `T` trial (the

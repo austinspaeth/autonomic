@@ -319,7 +319,7 @@ export function connectSteps(brand: WatchBrand, hub: string, direct = false): Wa
     },
     {
       title: 'Come back here and take a reading',
-      sub: 'Sit still, the same as you would with a chest strap. The watch does the measuring.',
+      sub: 'Lie still, the same as you would with a chest strap. The watch does the measuring.',
     },
   ];
 }

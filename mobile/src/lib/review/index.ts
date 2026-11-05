@@ -29,6 +29,7 @@ import { getState } from '../../store/store';
 import { pingReviewAsked } from '../../store/ping';
 import { getInstalledAtMs, getTier } from '../../store/tier';
 import { shouldAskForReview, type ReviewMemory, type ReviewVerdict } from './eligibility';
+import { reviewCardAnswered, reviewCardStanding } from './cardMemory';
 import { profileCtx } from '../scoring';
 
 export {
@@ -78,6 +79,9 @@ export function reviewMemory(): ReviewMemory {
  *  for a favour in the same sitting. Reset by app relaunch, which is the point. */
 let paywallSeen = false;
 export function notePaywallSeen(): void { paywallSeen = true; }
+/** Read by the review request card (../review/card), which carries the same
+ *  suppression for the same reason. */
+export function paywallSeenThisSession(): boolean { return paywallSeen; }
 
 /** The eligibility verdict for right now — exported so a dev build can log why
  *  the prompt is (not) showing without duplicating the wiring. */
@@ -107,6 +111,13 @@ export function reviewVerdict(): ReviewVerdict {
  */
 export async function maybeAskForReview(): Promise<boolean> {
   try {
+    // The request card (./card) is the other way this install can be asked,
+    // and one ask is the whole budget: a user who has already answered that
+    // card is not asked again by the OS, and neither is one still LOOKING at
+    // it — a standing card is a question in progress, and the OS sheet would
+    // land on top of it. The card reads this memory in the other direction, so
+    // whichever happens first wins.
+    if (!FORCE_REVIEW_PROMPT && (reviewCardAnswered() || reviewCardStanding())) return false;
     if (!FORCE_REVIEW_PROMPT && !reviewVerdict().ok) return false;
     // hasAction() covers the platform cases where a prompt can't lead anywhere
     // (no store client, unsupported OS version).

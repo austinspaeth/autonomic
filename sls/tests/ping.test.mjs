@@ -122,6 +122,12 @@ test('each route validates the slot against ITS OWN alphabet', () => {
   assert.ok(['C', 'G', 'T'].every((l) => speaks('STP', l)));
   assert.ok(!speaks('STP', 'F'));
 
+  // The review card: shown, then whichever of the three answered it. It must
+  // not be handed RVW's silence or another card's letters.
+  assert.ok(['S', 'R', 'N', 'X'].every((l) => speaks('RVC', l)));
+  assert.ok(!speaks('RVC', 'C'));
+  assert.ok(!speaks('RVC', 'T'));
+
   // The three subscriber routes share ONE plan alphabet, so new, restored and
   // lapsed can be read against each other per plan.
   ['Y', 'M', 'P', 'F'].forEach((l) => assert.ok(speaks('SUB', l) && speaks('RST', l) && speaks('LAP', l)));
@@ -138,7 +144,7 @@ test('every route name the client can send has a storage kind', () => {
   // The handler resolves a route by name, so a route added to serverless.yml
   // but not here answers 204 and counts nothing — silently.
   ['open', 'sub', 'rst', 'lap', 'act', 'cap', 'hrv', 'sav', 'pay', 'not', 'pot', 'see', 'err', 'osh', 'odm', 'oac', 'ofl',
-    'log', 'use', 'fnd', 'rpt', 'rdg', 'mbp', 'stp', 'rvw']
+    'log', 'use', 'fnd', 'rpt', 'rdg', 'mbp', 'stp', 'rvw', 'rvc']
     .forEach((k) => assert.ok(KINDS[k], `no storage kind for /ping/${k}`));
 });
 

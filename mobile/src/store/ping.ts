@@ -83,7 +83,7 @@
 import { AppState as RNAppState, Platform } from 'react-native';
 import { MMKV } from 'react-native-mmkv';
 import {
-  doorCode, easternDay, featureCode, findingCode, logCode, methodCode, morningPromptCode, notifyCode, strapCardCode, offerCode,
+  doorCode, easternDay, featureCode, findingCode, logCode, methodCode, morningPromptCode, notifyCode, strapCardCode, reviewCardCode, offerCode,
   offerFailureBody, pingUrl, planCode, platformCode, readingKindCode, reportCode, resolveCohort, shouldPingDaily,
   surfaceCode, tierCode, type PlanCode,
   type LogKind, type OfferFailureBody, type PingKind, type PotsCode, type PurchaseOutcome,
@@ -130,6 +130,7 @@ const KEY_LAST_RPT = 'pingLastRpt';     // + the report letter
 const KEY_LAST_RDG = 'pingLastRdg';     // + the reading-kind letter
 const KEY_LAST_MBP = 'pingLastMbp';     // + the morning-prompt letter
 const KEY_LAST_STP = 'pingLastStp';     // + the strap-card letter
+const KEY_LAST_RVC = 'pingLastRvc';     // + the review-card letter
 const KEY_LAST_RVW = 'pingLastRvw';     // ISO date (Eastern) of the last review-ask ping
 /** Written by ./tier.ts on first launch: this install's birthday. */
 const KEY_TRIAL_STARTED = 'trialStartedAt';
@@ -709,7 +710,7 @@ export function pingViewOpened(view: 'insights' | 'progress' | 'pacing'): void {
  * route exists for — and `logCode` returns undefined on purpose for most
  * reading types.
  */
-function pingPerLetter(kind: 'log' | 'use' | 'fnd' | 'rpt' | 'rdg' | 'mbp' | 'stp', base: string, slot: SlotCode | undefined): void {
+function pingPerLetter(kind: 'log' | 'use' | 'fnd' | 'rpt' | 'rdg' | 'mbp' | 'stp' | 'rvc', base: string, slot: SlotCode | undefined): void {
   if (!slot) return;
   pingDaily(kind, slotKey(base, slot), slot);
 }
@@ -763,6 +764,20 @@ export function pingReadingKind(kind: 'hrv' | 'breathHrv', firstBaselineToday: b
  *  today", or closed with the ✕. */
 export function pingMorningPrompt(action: 'shown' | 'take' | 'closed'): void {
   pingPerLetter('mbp', KEY_LAST_MBP, morningPromptCode(action));
+}
+
+/**
+ * The review request card: `'shown'` when it is raised, then whichever of
+ * `'review'` / `'note'` / `'dismissed'` answered it.
+ *
+ * The card is raised at most once per install ever and answered at most once,
+ * so the daily cap is doing almost nothing here — it is kept because the rule
+ * is per-letter for every route of this shape, and because a card that STANDS
+ * across days (see `lib/review/card.ts`) would otherwise re-report itself as
+ * shown on every launch until it is answered.
+ */
+export function pingReviewCard(action: 'shown' | 'review' | 'note' | 'dismissed'): void {
+  pingPerLetter('rvc', KEY_LAST_RVC, reviewCardCode(action));
 }
 
 /** The strap suggestion card: shown after failed `'camera'` or `'garmin'`

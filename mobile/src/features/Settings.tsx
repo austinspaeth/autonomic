@@ -6,7 +6,6 @@ import React, { useState } from 'react';
 import { Alert, Linking, Pressable, Text, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
 import * as FileSystem from 'expo-file-system';
-import * as Sharing from 'expo-sharing';
 import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
 import { SheetControls, useSheets } from '../components/Sheet';
@@ -15,9 +14,9 @@ import { CheckField, DateField, HeightField, TextField, onlyNumeric } from '../c
 import { BrandMark, Icon, IconName } from '../components/Icon';
 import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
-import { clearAllData, getState, replaceState, save, serializeState, useAppState, useStore } from '../store/store';
+import { clearAllData, getState, replaceState, save, useAppState, useStore } from '../store/store';
 import { deleteAllBackups } from '../lib/backup';
-import { ageFromBirthday, keyOf } from '../lib/dates';
+import { ageFromBirthday } from '../lib/dates';
 import { cmToInches, getUnits, heightCmText, weightText, weightToLb, weightUnit, type UnitSystem } from '../lib/units';
 import { DATE_KEY_RE, assertImportVersion, isPlainObject } from '../lib/migrate';
 import { useIap, paywallBypassed, manageSubscription, restore, priceOf, storeName, MONTHLY_SKU, YEARLY_SKU } from '../store/iap';
@@ -31,6 +30,7 @@ import { HealthScreen } from './Health';
 import { CycleSettingsSheet } from './cycle/CycleSettings';
 import { disableCycle } from '../store/cycle';
 import { NotificationsRow } from './Reminders';
+import { exportJson, openExportSheet } from './ExportSheet';
 import { showWelcomeAgain } from './Onboarding';
 import { PromptSheet } from './PromptSheet';
 import { openWhatsNew } from './WhatsNew';
@@ -51,6 +51,10 @@ const TERMS_URL = 'https://autonomic.care/terms-of-service/';
  *  duration as the Bluetooth and camera dumps: far past any accidental press,
  *  because it is a support tool rather than a feature. */
 const DIAGNOSTICS_HOLD_MS = 8000;
+/** The export sheet's own hold. Much shorter than the support dumps' 8s
+ *  because it is not a support dump: it hides a feature testers are meant to
+ *  REACH, not a diagnostic reached once by being told where it is. */
+const EXPORT_HOLD_MS = 3000;
 
 /** Collect and present the support dump. Collection touches native modules
  *  (camera, Bluetooth, health, watch) and takes a moment, so the haptic and
@@ -107,14 +111,21 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
   const pressure = usePressureStatus();
   // Row badge: `true` keeps the green "Connected" pill; a {text, color} pair
   // renders the same pill in any tint (e.g. the accent "Trial" state).
-  const item = (icon: IconName, title: string, sub: string, onPress: () => void, badge?: boolean | { text: string; color: string }) => {
+  // `onLongPress` is how a row hides a second, unlabelled destination behind
+  // the same 8-second hold the brand card and the capture reports use.
+  const item = (icon: IconName, title: string, sub: string, onPress: () => void, badge?: boolean | { text: string; color: string }, onLongPress?: () => void, holdMs: number = DIAGNOSTICS_HOLD_MS) => {
     const b = badge === true ? { text: 'Connected', color: '#22c55e' } : badge || null;
     const soft = (hex: string) => {
       const n = parseInt(hex.slice(1), 16);
       return `rgba(${(n >> 16) & 255}, ${(n >> 8) & 255}, ${n & 255}, 0.15)`;
     };
     return (
-      <Pressable onPress={onPress} style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderTopWidth: 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}>
+      <Pressable
+        onPress={onPress}
+        onLongPress={onLongPress}
+        delayLongPress={onLongPress ? holdMs : undefined}
+        style={({ pressed }) => [{ flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 15, borderTopWidth: 1, borderTopColor: p.border }, pressed && { opacity: 0.5 }]}
+      >
         <Icon name={icon} size={22} color={p.textDim} />
         <View style={{ flex: 1 }}><Text style={{ color: p.text, fontSize: 17 }}>{title}</Text><Text style={{ color: p.textDim, fontSize: 13 }}>{sub}</Text></View>
         {b ? (
@@ -158,7 +169,10 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
         : null}
       {item('star', 'Subscription', 'Manage plan or restore', () => openSheet((c) => <SubscriptionSheet controls={c} />),
         tier === 'pro' || proByCode ? { text: 'Pro', color: '#22c55e' } : tier === 'trial' ? { text: 'Trial', color: p.accent } : undefined)}
-      {item('download', 'Export data', 'Download everything as JSON', () => exportData())}
+      {/* Tap is the full JSON export it always was. Holding it for 3s opens the
+          format + range sheet, which is in beta for testers, and
+          `openExportSheet` is all a plain tap would need once it ships. */}
+      {item('download', 'Export data', 'Download everything as JSON', () => exportJson(), undefined, () => openExportSheet(openSheet), EXPORT_HOLD_MS)}
       {item('upload', 'Import data', 'Replace everything from a JSON file', () => importData(controls, toast))}
       {item('trash', 'Clear all data', 'Erase everything on this device', () => openSheet((c) => <ClearDataSheet controls={c} />, { fitContent: true }))}
       {item('sparkles', 'Show welcome screen', 'Replay the first-run guide', () => { controls.closeAll(); showWelcomeAgain(); })}
@@ -471,7 +485,7 @@ function ClearDataSheet({ controls }: { controls: SheetControls }) {
         {/* Both neutral: the accent IS red in this theme, so a primary Export
             button would read as destructive next to the real one. */}
         <Button title="Cancel" variant="default" onPress={controls.close} />
-        <Button title="Export data first" variant="default" onPress={() => exportData()} />
+        <Button title="Export data first" variant="default" onPress={() => exportJson()} />
       </View>
       <Button title={busy ? 'Clearing…' : 'Delete everything'} variant="danger" disabled={busy} onPress={onDelete} />
       <Text style={{ fontSize: 13, textAlign: 'center', marginTop: 10, color: taps ? '#d63b3b' : p.textDim }}>
@@ -492,34 +506,6 @@ function ClearDataSheet({ controls }: { controls: SheetControls }) {
  * from a dead button (see CLAUDE.md). They use Alert, which is a native
  * dialog and paints above the Modal, and which this file already uses for the
  * import confirm. */
-/** The export is the whole journal in plain text. When it holds cycle data,
- *  the most sensitive thing in it, say so before the share sheet opens. */
-function exportData() {
-  const days = getState().days;
-  const hasCycle = Object.keys(days).some((k) => !!days[k]?.cycle);
-  if (!hasCycle) { void writeExport(); return; }
-  Alert.alert(
-    'This file includes your cycle data',
-    'The export is your whole journal as plain text, period days included. Anyone you share it with can read it.',
-    [{ text: 'Cancel', style: 'cancel' }, { text: 'Export', onPress: () => { void writeExport(); } }],
-  );
-}
-
-async function writeExport() {
-  const uri = `${FileSystem.cacheDirectory}autonomic-journal-${keyOf(new Date())}.json`;
-  try {
-    const json = serializeState(true);
-    await FileSystem.writeAsStringAsync(uri, json);
-    if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(uri, { mimeType: 'application/json', dialogTitle: 'Export Autonomic data' });
-    else Alert.alert('Sharing unavailable', 'This device has no way to share the exported file.');
-  } catch (e) {
-    Alert.alert('Export failed', (e as Error).message || 'The file could not be written.');
-  } finally {
-    // The exported file is the user's full plaintext journal; don't leave it in cache.
-    await FileSystem.deleteAsync(uri, { idempotent: true }).catch(() => {});
-  }
-}
-
 async function importData(controls: SheetControls, toast: (m: string) => void) {
   try {
     const res = await DocumentPicker.getDocumentAsync({ type: 'application/json', copyToCacheDirectory: true });

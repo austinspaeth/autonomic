@@ -143,6 +143,7 @@ export function LogPickerSheet({ kind, dk, controls }: { kind: LogKind; dk: stri
   const copy = COPY[kind];
   const [mode, setMode] = useState<'log' | 'edit'>('log');
   const [query, setQuery] = useState('');
+  const searchRef = React.useRef<TextInput>(null);
   const [sel, setSel] = useState<Record<string, boolean>>({});
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
 
@@ -215,16 +216,25 @@ export function LogPickerSheet({ kind, dk, controls }: { kind: LogKind; dk: stri
           entering={FadeIn.duration(160)}
           exiting={FadeOut.duration(120)}
           layout={SPRING}
-          style={{ height: BAR_H, flexDirection: 'row', alignItems: 'center', gap: 10, backgroundColor: p.surface2, borderColor: q ? p.accent : p.border, borderWidth: 1, borderRadius: radius.control, paddingHorizontal: 12, marginBottom: 10 }}
+          style={{ height: BAR_H, backgroundColor: p.surface2, borderColor: q ? p.accent : p.border, borderWidth: 1, borderRadius: radius.control, marginBottom: 10 }}
         >
-          <Icon name="search" size={17} color={p.textDim} />
-          <TextInput
-            value={query}
-            onChangeText={setQuery}
-            placeholder="Search or add a new one"
-            placeholderTextColor={p.textDim}
-            style={{ flex: 1, paddingVertical: 0, fontSize: 16, color: p.text }}
-          />
+          {/* The whole bar focuses the field: the input is one line tall inside
+           *  a 46pt box, so the icon and the space around the text used to be
+           *  dead. The input stretches, and this catches what is left. */}
+          <Pressable
+            onPress={() => searchRef.current?.focus()}
+            style={{ flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10, paddingHorizontal: 12 }}
+          >
+            <Icon name="search" size={17} color={p.textDim} />
+            <TextInput
+              ref={searchRef}
+              value={query}
+              onChangeText={setQuery}
+              placeholder="Search or add a new one"
+              placeholderTextColor={p.textDim}
+              style={{ flex: 1, alignSelf: 'stretch', paddingVertical: 0, fontSize: 16, color: p.text }}
+            />
+          </Pressable>
         </Animated.View>
       )}
 

@@ -44,6 +44,23 @@ describe('iOS permission sets', () => {
     expect(block('STEPS_READ_IDS', SRC)).toContain('QID.standTime');
     expect(SRC).toContain('HK_STEPS_SET_KEY');
   });
+
+  it('keeps the symptom/medication reads out of the core set, under their own key', () => {
+    // 1.39's "import what you log in Health" set. Same rule as steps and the
+    // cycle: its own latch, asked from a tap. The core set must not name a
+    // single symptom type, or every existing install meets a new sheet.
+    expect(SRC).toContain('const LOGS_READ_IDS = SYMPTOM_READ_IDS;');
+    expect(SRC).toContain('HK_LOGS_SET_KEY');
+    expect(block('CORE_READ_IDS', SRC)).not.toContain('SYMPTOM');
+    expect(block('CORE_READ_IDS', SRC)).not.toContain('LOGS');
+  });
+
+  it('asks for the medication log separately, and only in the logs tap', () => {
+    // A dose event is not a category type, so it cannot ride the bridge's
+    // set; it is a second native sheet and must never be raised from a launch
+    // path (requestAuth's ECG leg runs on every call, this one does not).
+    expect(SRC).toContain('if (logs) await requestMedicationAuth();');
+  });
 });
 
 describe('Android permission sets', () => {

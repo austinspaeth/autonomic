@@ -151,8 +151,7 @@ old web app so old `export.json` files import directly.
   tested: entries with `imported`, plus a night with `sleep.imported`), never a
   per-check list. Settings → Apple Health shows the same `ImportedList` under
   "Imported today", which is what let the pill stop standing until tapped. A
-  tick there removes and declines; the night is listed but not removable (meds
-  read is a stub, see `HealthApi.readMedications`).
+  tick there removes and declines; the night is listed but not removable.
   Viewing the card or dismissing the pill marks those item keys "seen" (plaintext
   `autonomic.flags` MMKV, 48h TTL) so the pill never re-offers them. Deleting an
   imported entry is stronger: `deleteEntry` records its `healthKey` (stamped at
@@ -166,12 +165,66 @@ old web app so old `export.json` files import directly.
   Apple Health → "Check for updates" ignores that memory and sweeps the last 24h
   (`checkHealthUpdatesLast24h`). Imports write through the normal store paths
   (scores + waveform sidecar).
+- **What the user logs in Health ITSELF — symptoms and medication doses — is
+  imported too, and it is OPT-IN** (1.39, iOS only: Health Connect has no record
+  for either, which is why the write side has none). `settings.healthLogs` is
+  the source of truth and the permission is derived, the morning reminder's
+  arrangement; undefined is OFF, and while it is off `checkHealthUpdates` does
+  not RUN the two reads — the symptom read is one query per mapped type on every
+  foreground, so off has to mean absent rather than discarded. The tap is
+  Settings → Apple Health (`LogsImportRow`), and it asks the whole thing at once
+  under its OWN latch (`scope: 'logs'`, `LOGS_READ_IDS` = the import map's own
+  keys so the permission can never drift from what can be filed,
+  `HK_LOGS_SET_KEY`); `CORE_READ_IDS` is byte-identical, pinned by
+  `health/__tests__/authSets.test.ts`, or every existing install would meet a
+  sheet it tapped nothing to get. **Symptoms** are a curated join
+  (`src/lib/health/symptomMap.ts`, pure + tested): a HealthKit type is mapped
+  only where the journal means the SAME thing, every omission is a decision
+  (diarrhea and constipation are BOWEL MOVEMENTS here, with a Bristol form, so
+  importing them as symptoms would count one event twice), two HK types may map
+  to one journal type, and **value 1 is never imported** — it is `notPresent` in
+  both `HKCategoryValueSeverity` and `HKCategoryValuePresence`, so one rule
+  reads either enum and the one case that must never become an entry is the one
+  the two enums agree on. Severity rides the entry's NOTE ("Moderate · From
+  Apple Health"), since the built-in symptoms carry no severity field and
+  inventing one would put a field on an entry the log form cannot edit.
+  **Medication doses need iOS 26** and ride `modules/ecg-health`, not the
+  kingstinct bridge: a dose event is neither a quantity nor a category type, and
+  its name is not even on it — `HKMedicationDoseEvent` carries the dose, unit
+  and log status plus a `medicationConceptIdentifier`, and the NAME lives on
+  `HKUserAnnotatedMedication`, so the module runs the medication-list query
+  first and joins on that identifier (a dose it cannot name is DROPPED rather
+  than filed as an unnamed medication). Only `logStatus == .taken` is read, as a
+  predicate AND re-checked in JS: a skipped, snoozed or untouched reminder is a
+  dose that did not happen. `src/lib/health/medications.ts` (pure + tested) is
+  the matching and the dose text. A name is reduced to a CANONICAL form —
+  strength and dose form stripped, a small synonym table applied — and BOTH
+  sides go through it, so brand↔generic matches either way ("Fexofenadine
+  Hydrochloride 180 mg tablet" → Allegra) and a custom type the user created is
+  matched exactly like a built-in. **There is deliberately no fuzzy match**:
+  a prefix rule pairs Magnesium Citrate with Magnesium Glycinate, and the
+  Insights sweep would then publish findings about the wrong product. A dose
+  that matches nothing is still OFFERED, with the type it would CREATE
+  (`UpdateMed.create`), because a strict label match imported almost nothing and
+  that is the failure mode that looks like the feature working. **Creating a
+  type is held for review** (`splitForReview` now returns `ReviewItem`s, a
+  reading OR a dose): a silent foreground check may file an entry, which the
+  receipt can undo, but it may not reach into the type catalog on its own. The
+  amount is filed WHOLE, unit included ("400 mg", "2 capsules" — `medAmountText`
+  says what a `count` is counting from the medication's form), because the dose
+  field is free text that holds its unit everywhere else in the app; the import
+  used to strip everything but the digits. A dose with no recorded amount gets
+  NO amount, never "0". The support dump carries the switch, the OS support and
+  the declined count, since all three gates fail silently. Native build (new
+  read types + the module's two new functions).
 - **One-time historical backfill.** Connecting Health in the welcome wizard offers
   a one-shot import of the last year (`HealthApi.readHistory`, `HISTORY_DAYS` in
   `src/features/Onboarding.tsx`): readings (HRV only with real RR ≥ 4 min; Android
   imports no historical HRV at all — Health Connect has no beat-to-beat series),
   nights of sleep with overnight HR + stages, workouts with their HR trace, and
-  meds (same platform stub). Guarded by `meta.healthHistoryImported` and written
+  meds (which read empty unless the user has already opted into the symptom/med
+  set below, and which NEVER create a type — a year-long sweep would mint them
+  in bulk with nobody looking). Guarded by `meta.healthHistoryImported` and written
   in a single `mutate()`. Sleep uses one range query bucketed by `groupNights`
   (`src/lib/health/sleepSummary.ts`, pure + tested) instead of 365 per-day reads;
   per-night HR and per-workout HR are the only per-item queries, pooled a few at
@@ -421,6 +474,40 @@ old web app so old `export.json` files import directly.
   the whole journal plus every referenced waveform (RR traces, workout HR traces,
   overnight sleep series), and none of the flags store, which is why an export/import
   round trip carries all the health data and no device bookkeeping.
+- **A spreadsheet export sits beside the JSON one, and JSON is ALWAYS the whole
+  journal.** Import REPLACES everything on the device, so a partial JSON is a
+  data-loss trap wearing a backup's name: the date range belongs to the two CSV
+  shapes alone and the JSON row says so. Reached by a 3-second hold on
+  Settings → Export data (`EXPORT_HOLD_MS`, deliberately shorter than the
+  support dumps' 8s `DIAGNOSTICS_HOLD_MS`: this one hides a feature testers are
+  meant to REACH, not a diagnostic reached once by being told where it is; a
+  tap is still the immediate full JSON export it always was) — `features/ExportSheet.tsx`, beta, and `openExportSheet` is all a
+  plain tap would need later. `src/lib/export/csv.ts` is pure + tested and must
+  go through the app's OWN logic rather than a second copy of it, because the
+  numbers people read are computed and stored nowhere: `dayScore` for the score,
+  `sleepGradeParts` for the duration and grade, `stagesForWindow` for the stage
+  split (so a hand-corrected night shows none rather than one describing a
+  window that no longer exists), `typesFor` so a custom type's own spelling is
+  the header, `isTrustedReading` so a watch's one-minute background sample is
+  absent exactly as it is from the Journal, `budgetSeries` for the published
+  pacing figures, `lib/digestion` for the worst stool form, and `lib/units` in
+  the user's CURRENT setting with the unit NAMED IN EVERY HEADER. It never reads
+  the waveform sidecar or the flags MMKV. Two shapes: a DAILY summary, one row
+  per logged day with any column that is empty across the whole range dropped
+  (nobody tracks forty symptom types), and EVERY ENTRY, long format, one row per
+  field, which is what a PivotTable rebuilds any view from. **A column a
+  spreadsheet has to sum may never hold "1h 29m"** — durations are decimal hours
+  or whole minutes, never the `hm()` copy form. CSV hygiene is load-bearing and
+  tested: RFC 4180 quoting, CRLF, a UTF-8 BOM (Excel on Windows reads a BOM-less
+  file as the system codepage and turns every accent in a custom type's name to
+  mojibake), and a leading `'` on any TEXT cell opening with `= + - @` or tab,
+  since a note someone typed starting "=" is otherwise a formula in their
+  doctor's spreadsheet — a NUMBER stays bare, negatives included. The range's
+  own cycle data raises the same confirm the JSON path does
+  (`rangeHasCycle`, the exported window rather than the whole journal), the file
+  is deleted from the cache after the share, and a failure is reported INSIDE
+  the sheet (`StoreError`), never with `toast()`. Free on every tier: no gate,
+  no paywall, no ping. JS only.
 - **A finished reading is SAVED, not offered.** The HRV and POTS results cards
   (`features/hrv/Results.tsx`, `features/pots/common.tsx`) write the entry the
   moment they open — journal + waveform sidecar, plus the health store on the
@@ -661,6 +748,55 @@ old web app so old `export.json` files import directly.
   appeared. Each ask is counted on the anonymous `rvw` ping, as an ask and not a
   showing. `<ReviewPrompt/>` (root layout) owns the "calm moment" half: sheet
   stack empty, app foreground, 25s after launch, 4s after a journal change.
+- **The review REQUEST CARD is the other way that ask can happen, and only one
+  of the two ever fires.** `src/lib/review/card.ts` (pure + tested) +
+  `cardMemory.ts` (flags MMKV) behind `features/ReviewRequestCard.tsx`, rendered
+  in the Journal directly ABOVE Milestones, on today only. It is Austin's own
+  note in the first person over two doors — the store's review composer
+  (`?action=write-review` on iOS, the Play listing elsewhere) and a `mailto:` to
+  `SUPPORT_EMAIL` — and the ✕ and both buttons are the SAME answer: asked once,
+  never again. `reviewCardAnswered()` silences `maybeAskForReview`, and an
+  install the OS prompt already spent never meets the card, so one install is
+  asked once by one of them. The bar is a week of the user's OWN entries
+  (`engagedDayCount`, the OS prompt's own `ENGAGED_DOOR_DAYS`) **and a clean
+  capture record**, and the two are different kinds of claim: the first is read
+  off the journal, the second CANNOT be — a refused or abandoned reading leaves
+  nothing in it — so `noteReadingFailure()` counts forward from the three places
+  a reading fails (`Results`'s refusal on any sensor, a session the app stopped
+  or the user gave up on, a Garmin `diag` from the wrist; `'early'` is an
+  abandon, not a failure), and the card will not open until the install has been
+  WATCHED for `WATCH_DAYS`. A phone that updated into this yesterday has a clean
+  record because nobody was looking, and "no failures" has to mean we were there
+  to see. ONE failure retires it for good. It is never shown to an **iOS** user
+  whose `lastHrvSource` is the camera or a Garmin (`weakSensorFor`): those are
+  the two weak sensors, their readings are the ones the app refuses, and asking
+  for five stars while the measurement keeps failing is the ask that earns one
+  back; an UNSET source is unknown, never read as the camera. Every suppression
+  the OS prompt carries applies (crash-alert day, downturn, strain, a session
+  that met the paywall), plus the two offer cards — the Journal has one slot for
+  something the app raised on its own initiative. The tile is the design's SOLID
+  gold star on dark translucent gold (`STAR_GOLD`, a warmer amber than
+  `CAUTION_GOLD`, and the ONE place in the app gold is not a grade); Milestones
+  sits directly below with an outlined star in RED, so the two are told apart by
+  colour and weight rather than by shape. `Icon` gained a `filled` option for
+  it, opt-in per call site because an open path thickens into a blob.
+  **Once RAISED it STANDS** (`standing` in the memory, `reviewCardLive`): every
+  rule in `reviewCardDue` is about whether to START asking, so a card already on
+  screen renders from its own memory alone and nothing below may take it
+  down — not a downturn beginning, not an offer appearing, not a reading failing
+  overnight. The annual card's rule, for the annual card's reason: a question
+  withdrawn while the reader was still deciding reads as a bug. It is stamped
+  and pinged BEFORE it renders, since nothing reports back that it was seen.
+  **It is counted on its own `rvc` route** (`pingReviewCard`, per-letter capped
+  like `mbp`): `S` shown, `R` review tapped, `N` note tapped, `X` dismissed, so
+  `R/S`, `N/S` and `X/S` are the split and the gap is the people who did
+  neither. Deliberately not the three offer routes (no revenue behind it, three
+  ways to answer) and deliberately not `rvw`, which counts the OS prompt — the
+  two asks are mutually exclusive per install, so `rvw + rvc S` is everyone
+  asked and the split between them is which ask they met. **The lambda must be
+  deployed before a build sending it ships**: an unknown ROUTE is refused
+  outright (an unknown letter is merely dropped), so it would land as nothing at
+  all. Drawn by both dashboards' event lists.
 - **Capture is never metered; Pro is what the app makes of the readings.**
   The freemium line runs between *taking* a measurement and *analysing* it.
   Free forever, with no cap: journaling, manual readings, the daily score and

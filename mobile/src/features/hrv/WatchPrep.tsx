@@ -31,7 +31,7 @@ const stepsFor = (kind: SessionConfig['kind']): { title: string; sub: string }[]
     title: 'Tap Breathe on the watch',
     sub: kind === 'unstructured'
       ? 'Then tell us below. Ignore the breathing animation, breathe normally and stay still through the whole reading.'
-      : 'Then tell us below, follow its breathing, and sit still through the whole reading.',
+      : 'Then tell us below, follow its breathing, and lie still through the whole reading.',
   },
 ];
 

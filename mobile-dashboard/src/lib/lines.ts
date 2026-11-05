@@ -15,6 +15,10 @@ export const DO_LINES: Line[] = [
   { kind: 'not', L: 'C', label: 'Turned on crash warning' },
   { kind: 'not', L: 'P', label: 'Turned on pacing alerts' },
   { kind: 'rvw', label: 'Store review asked' },
+  { kind: 'rvc', L: 'S', label: 'Review card shown' },
+  { kind: 'rvc', L: 'R', label: 'Review card: left a review' },
+  { kind: 'rvc', L: 'N', label: 'Review card: sent a note' },
+  { kind: 'rvc', L: 'X', label: 'Review card dismissed' },
 ];
 export const LOG_LINES: Line[] = [
   { kind: 'log', L: 'S', label: 'Sleep' },

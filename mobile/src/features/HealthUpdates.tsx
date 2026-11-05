@@ -59,7 +59,7 @@ import {
   allItemKeys, checkHealthUpdates, checkHealthUpdatesLast24h, emptyUpdateSet,
   filterDeclined, filterSeen, getDeclinedKeys, getSeenKeys, importUpdates,
   markSeenKeys, splitForReview, undoImports, updateCount,
-  type HealthUpdateSet, type UpdateReading,
+  type HealthUpdateSet, type ReviewItem,
 } from '../lib/health/updates';
 import type { AppState as JournalState, Entry } from '../lib/types';
 import { importQualityNote, isPoorImport } from '../lib/hrvQuality';
@@ -77,6 +77,9 @@ import { fmtTime12, todayKey } from '../lib/dates';
 const SLEEP_BLUE = '#4aa3f0';
 const EXERCISE_GREEN = '#3ec46d';
 const MED_GOLD = '#e0a030';
+/** Symptoms wear the journal's own symptom colour (the alert mark's gold-red),
+ *  one step off the readings red so the two groups are told apart at a glance. */
+const SYMPTOM_ORANGE = '#e0672f';
 
 /** A 6-digit hex tint → the faded chip fill behind its solid icon. */
 function softTint(hex: string): string {
@@ -126,7 +129,7 @@ type PillPhase = 'hidden' | 'checking' | 'found';
  * hides the first check's items, and an entry deleted from the Journal is
  * never listed as imported.
  */
-interface Receipt { dk: string; lead: ImportRow | null; more: number; review: UpdateReading[] }
+interface Receipt { dk: string; lead: ImportRow | null; more: number; review: ReviewItem[] }
 
 /** How long a receipt with nothing left to decide stays up. The card is always
  *  reachable from Settings → Apple Health, so the pill no longer has to wait
@@ -139,6 +142,7 @@ const KIND_LOOK: Record<ImportKind, { icon: IconName; tint: string }> = {
   reading: { icon: 'heartPulse', tint: '#e03127' },
   workout: { icon: 'activity', tint: EXERCISE_GREEN },
   med: { icon: 'pill', tint: MED_GOLD },
+  symptom: { icon: 'alert', tint: SYMPTOM_ORANGE },
   cycle: { icon: 'droplet', tint: '#e03127' },
 };
 
@@ -307,7 +311,8 @@ export function HealthUpdatePill() {
         markSeenKeys(allItemKeys(fresh));
         if (added > 0 || review.length) {
           const keys = new Set<string>([
-            ...auto.readings.map((r) => r.key), ...auto.workouts.map((w) => w.key), ...auto.meds.map((m) => m.key),
+            ...auto.readings.map((r) => r.key), ...auto.workouts.map((w) => w.key),
+            ...auto.meds.map((m) => m.key), ...auto.symptoms.map((y) => y.key),
             ...(auto.sleep ? ['sleep'] : []),
             ...(cycleToday && fresh.dk === todayKey() ? ['cycle'] : []),
           ]);
@@ -410,7 +415,7 @@ export function HealthUpdatePill() {
         <>
           <Icon name="alert" size={16} color={CAUTION_GOLD} />
           <Text numberOfLines={1} style={[styles.label, { color: CAUTION_GOLD }]}>
-            {reviewCount === 1 ? '1 reading needs a look' : `${reviewCount} readings need a look`}
+            {reviewCount === 1 ? '1 item needs a look' : `${reviewCount} items need a look`}
           </Text>
         </>
       )}
@@ -538,6 +543,7 @@ function groupsOf(sets: HealthUpdateSet[]): SheetGroup[] {
   const readings: SheetItem[] = [];
   const workouts: SheetItem[] = [];
   const meds: SheetItem[] = [];
+  const symptoms: SheetItem[] = [];
   for (const set of sets) {
     if (set.sleep) {
       const h = Math.floor(set.sleep.minutesAsleep / 60);
@@ -560,7 +566,17 @@ function groupsOf(sets: HealthUpdateSet[]): SheetGroup[] {
       };
     }));
     workouts.push(...set.workouts.map((w) => ({ key: w.key, title: w.label, sub: tag(set, w.sub) })));
-    meds.push(...set.meds.map((m) => ({ key: m.key, title: m.title, sub: tag(set, m.sub) })));
+    // A dose whose medication the journal has no type for yet carries the chip:
+    // importing it CREATES that type, which is a bigger thing than filing an
+    // entry and has to be visible before the tick, not after.
+    meds.push(...set.meds.map((m) => ({
+      key: m.key, title: m.title, sub: tag(set, m.sub),
+      // Sentence case, like the 'Poor quality' chip beside it in this sheet.
+      // The receipt card's own chips are the shouty pair (NEW TYPE / POOR
+      // QUALITY) because that surface sets them that way.
+      ...(m.create ? { tag: 'New type' } : {}),
+    })));
+    symptoms.push(...set.symptoms.map((y) => ({ key: y.key, title: y.title, sub: tag(set, y.sub) })));
   }
 
   const groups: SheetGroup[] = [];
@@ -568,6 +584,7 @@ function groupsOf(sets: HealthUpdateSet[]): SheetGroup[] {
   if (readings.length) groups.push({ key: 'readings', label: 'Readings', tint: '#e03127', icon: 'heartPulse', items: readings });
   if (workouts.length) groups.push({ key: 'workouts', label: 'Exercise', tint: EXERCISE_GREEN, icon: 'activity', items: workouts });
   if (meds.length) groups.push({ key: 'meds', label: 'Medications', tint: MED_GOLD, icon: 'pill', items: meds });
+  if (symptoms.length) groups.push({ key: 'symptoms', label: 'Symptoms', tint: SYMPTOM_ORANGE, icon: 'alert', items: symptoms });
   return groups;
 }
 
@@ -701,21 +718,25 @@ export function HealthUpdatesSheet({ sets, controls, onImported }: {
  * be seen from inside a sheet anyway.
  */
 export function HealthImportsSheet({ dk, review: initialReview, controls }: {
-  dk: string; review: UpdateReading[]; controls: SheetControls;
+  dk: string; review: ReviewItem[]; controls: SheetControls;
 }) {
   const p = usePalette();
-  const [review, setReview] = useState<UpdateReading[]>(initialReview);
+  const [review, setReview] = useState<ReviewItem[]>(initialReview);
 
   useEffect(() => {
     importSheetOpen = true;
     return () => { importSheetOpen = false; };
   }, []);
 
-  // A reviewed reading is written the moment the user says so, and then simply
-  // appears in the list below, which is read from the journal.
-  const importOne = (r: UpdateReading) => {
-    const { added } = importUpdates({ ...emptyUpdateSet(dk), readings: [r] }, null);
-    if (added) setReview((prev) => prev.filter((x) => x.key !== r.key));
+  // A reviewed item is written the moment the user says so, and then simply
+  // appears in the list below, which is read from the journal. For a dose, that
+  // write is also what creates the med type (lib/health/updates).
+  const importOne = (item: ReviewItem) => {
+    const set = item.kind === 'reading'
+      ? { ...emptyUpdateSet(dk), readings: [item.reading] }
+      : { ...emptyUpdateSet(dk), meds: [item.med] };
+    const { added } = importUpdates(set, null);
+    if (added) setReview((prev) => prev.filter((x) => x.key !== item.key));
   };
 
   return (
@@ -737,32 +758,46 @@ export function HealthImportsSheet({ dk, review: initialReview, controls }: {
             }}>Needs review</Text>
           </View>
           <View style={{ backgroundColor: p.surface2, borderRadius: radius.card, overflow: 'hidden' }}>
-            {review.map((r, i) => (
-              <View
-                key={r.key}
-                style={{
-                  flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13,
-                  backgroundColor: CAUTION_GOLD_SOFT,
-                  borderTopWidth: i === 0 ? 0 : 1, borderTopColor: p.border,
-                }}
-              >
-                <View style={{ flex: 1 }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-                    <Text style={{ color: p.text, fontSize: 15.5, fontWeight: '600' }}>{r.title}</Text>
-                    <View style={styles.tag}>
-                      <Icon name="alert" size={11} color={CAUTION_GOLD} />
-                      <Text style={styles.tagText}>POOR QUALITY</Text>
+            {review.map((item, i) => {
+              // Each kind says in its own words what the decision is: a
+              // reading's quality, or the medication type this would add.
+              const row = item.kind === 'reading'
+                ? {
+                  title: item.reading.title,
+                  chip: 'POOR QUALITY',
+                  sub: [item.reading.sub, importQualityNote(item.reading.quality)].filter(Boolean).join(' · '),
+                }
+                : {
+                  title: item.med.title,
+                  chip: 'NEW TYPE',
+                  sub: [item.med.amount, `Adds “${item.med.create?.label ?? item.med.title}” to your medications`]
+                    .filter(Boolean).join(' · '),
+                };
+              return (
+                <View
+                  key={item.key}
+                  style={{
+                    flexDirection: 'row', alignItems: 'center', gap: 12, padding: 13,
+                    backgroundColor: CAUTION_GOLD_SOFT,
+                    borderTopWidth: i === 0 ? 0 : 1, borderTopColor: p.border,
+                  }}
+                >
+                  <View style={{ flex: 1 }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                      <Text style={{ color: p.text, fontSize: 15.5, fontWeight: '600' }}>{row.title}</Text>
+                      <View style={styles.tag}>
+                        <Icon name="alert" size={11} color={CAUTION_GOLD} />
+                        <Text style={styles.tagText}>{row.chip}</Text>
+                      </View>
                     </View>
+                    <Text style={{ color: p.textDim, fontSize: 12.5, marginTop: 1 }}>{row.sub}</Text>
                   </View>
-                  <Text style={{ color: p.textDim, fontSize: 12.5, marginTop: 1 }}>
-                    {[r.sub, importQualityNote(r.quality)].filter(Boolean).join(' · ')}
-                  </Text>
+                  <Pressable onPress={() => importOne(item)} hitSlop={8} accessibilityRole="button">
+                    <Text style={{ fontSize: 13.5, fontWeight: '700', color: p.accent }}>Import</Text>
+                  </Pressable>
                 </View>
-                <Pressable onPress={() => importOne(r)} hitSlop={8} accessibilityRole="button">
-                  <Text style={{ fontSize: 13.5, fontWeight: '700', color: p.accent }}>Import</Text>
-                </Pressable>
-              </View>
-            ))}
+              );
+            })}
           </View>
         </View>
       ) : null}

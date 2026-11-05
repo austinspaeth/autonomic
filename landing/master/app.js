@@ -4517,7 +4517,13 @@
     { kind: 'mbp', slot: 'X', name: 'Morning card: closed', color: COLOR.red },
     { kind: 'stp', slot: 'C', name: 'Strap card: shown (camera)', color: COLOR.muted },
     { kind: 'stp', slot: 'G', name: 'Strap card: shown (Garmin)', color: COLOR.s4 },
-    { kind: 'stp', slot: 'T', name: 'Strap card: Amazon tapped', color: COLOR.green }
+    { kind: 'stp', slot: 'T', name: 'Strap card: Amazon tapped', color: COLOR.green },
+    /* The review request card. `S` is the denominator the other three are read
+       against, and the people who are shown it and do NOTHING are the gap. */
+    { kind: 'rvc', slot: 'S', name: 'Review card: shown', color: COLOR.muted },
+    { kind: 'rvc', slot: 'R', name: 'Review card: left a review', color: COLOR.green },
+    { kind: 'rvc', slot: 'N', name: 'Review card: sent a note', color: COLOR.s3 },
+    { kind: 'rvc', slot: 'X', name: 'Review card: dismissed', color: COLOR.red }
   ];
 
   function renderSlotLines(ix, days, lines, chartId, noteId, emptyText) {
@@ -10291,7 +10297,8 @@
     { key: 'rdg', label: 'Reading kind', color: PC.reading, note: 'morning baseline, later baseline or training' },
     { key: 'mbp', label: 'Morning card', color: COLOR.s5, note: 'shown, took it, closed' },
     { key: 'stp', label: 'Strap card', color: COLOR.s6, note: 'shown after failed readings, Amazon tapped' },
-    { key: 'rvw', label: 'Review asked', color: COLOR.green, note: 'store review prompt requested (not necessarily shown)' }
+    { key: 'rvw', label: 'Review asked', color: COLOR.green, note: 'store review prompt requested (not necessarily shown)' },
+    { key: 'rvc', label: 'Review card', color: COLOR.s2, note: 'shown, reviewed, note sent, dismissed' }
   ];
 
   /**

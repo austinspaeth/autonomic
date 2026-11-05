@@ -709,7 +709,7 @@ function HrvKindPrompt({ onPick }: { onPick: (k: HrvKind) => void }) {
     <View style={{ borderWidth: 1, borderColor: p.border, borderRadius: radius.card, backgroundColor: p.surface, marginBottom: 14, padding: 15 }}>
       <Text style={{ fontSize: 15, fontWeight: '700', color: p.text }}>Was this a baseline or a training reading?</Text>
       <Text style={{ fontSize: 13, color: p.textDim, marginTop: 3, lineHeight: 17 }}>
-        Baseline is sitting still and breathing normally. Training is paced breathing.
+        Baseline is lying still and breathing normally. Training is paced breathing.
       </Text>
       <View style={{ flexDirection: 'row', gap: 10, marginTop: 12 }}>
         <Button title="Baseline" icon="heartPulse" onPress={() => onPick('baseline')} style={{ flex: 1 }} />

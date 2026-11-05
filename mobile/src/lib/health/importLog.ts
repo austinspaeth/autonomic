@@ -19,7 +19,7 @@ import { hm } from '../budget/format';
 import { isPoorImport } from '../hrvQuality';
 import { fmtDist } from '../units';
 
-export type ImportKind = 'sleep' | 'reading' | 'workout' | 'med' | 'cycle';
+export type ImportKind = 'sleep' | 'reading' | 'workout' | 'med' | 'symptom' | 'cycle';
 
 export interface ImportRow {
   /** The entry's `healthKey`, or 'sleep' for the night. Unique within a day. */
@@ -41,7 +41,7 @@ export interface ImportRow {
 
 /** A label for a type key, from the catalog the caller resolved
  *  (`typesFor(state, kind)`), so custom types keep their own names. */
-export type LabelOf = (kind: 'readings' | 'activities' | 'meds', type: string) => string;
+export type LabelOf = (kind: 'readings' | 'activities' | 'meds' | 'symptoms', type: string) => string;
 
 const time12 = (t: string | undefined) => (t ? fmtTime12(t) : '');
 const join = (...parts: (string | null | undefined | false)[]) => parts.filter(Boolean).join(' · ');
@@ -88,6 +88,20 @@ function medRow(e: Entry, labelOf: LabelOf): Omit<ImportRow, 'key' | 'removable'
   return { kind: 'med', time: t, noun: 'medication', title: labelOf('meds', e.type), sub: join(e.amount ? String(e.amount) : null, time12(t)), poor: false };
 }
 
+/** A symptom brought in from the Health app. Its severity (when Health
+ *  recorded one) was written into the note, since the journal's built-in
+ *  symptoms have no severity field — so the row reads it back off the note
+ *  rather than storing the same fact twice. */
+function symptomRow(e: Entry, labelOf: LabelOf): Omit<ImportRow, 'key' | 'removable'> {
+  const t = e.time || '';
+  const grade = /^(Mild|Moderate|Severe)\b/.exec(String(e.note || ''))?.[1] || null;
+  return {
+    kind: 'symptom', time: t, noun: 'symptom',
+    title: labelOf('symptoms', e.type),
+    sub: join(grade, time12(t)), poor: false,
+  };
+}
+
 /** Minutes between two HH:MM clock times, across midnight when wake < bed. */
 function spanMin(bed: string, wake: string): number | null {
   const m = (s: string) => { const [h, mm] = s.split(':').map(Number); return h * 60 + mm; };
@@ -108,6 +122,7 @@ export function importedRows(day: DayRecord | undefined, labelOf: LabelOf): Impo
   (day.readings || []).forEach((e) => add(e, readingRow));
   (day.activities || []).forEach((e) => add(e, workoutRow));
   (day.meds || []).forEach((e) => add(e, medRow));
+  (day.symptoms || []).forEach((e) => add(e, symptomRow));
 
   const s = day.sleep;
   if (s?.imported && s.bed && s.wake) {

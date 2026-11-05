@@ -369,6 +369,12 @@ export interface AppState {
     lastBleDeviceId?: string;
     lastBleDeviceName?: string;
     healthEnabled?: boolean;
+    /** Import the symptoms and medication doses the user logs in the Health app
+     *  itself (iOS only — Health Connect has no record for either). OPT-IN and
+     *  undefined = off: it needs its own read permission, and the periodic
+     *  check skips both reads entirely while it is off, so an install that
+     *  never asked for it is byte-identical to one from before it existed. */
+    healthLogs?: boolean;
     /** Signal source of the last live HRV capture — seeds the setup sheet's
      *  default so a deliberate choice (camera / watch) sticks across sessions. */
     lastHrvSource?: 'polar' | 'watch' | 'garmin' | 'camera';

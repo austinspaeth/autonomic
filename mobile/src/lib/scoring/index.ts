@@ -422,7 +422,7 @@ export const HRV_HELP: Record<string, HelpContent> = {
     learnMore: '/insights/basics/rmssd-and-pnn50-vagal-tone-metrics/',
   },
   hr: {
-    what: 'Mean heart rate across the capture, in beats per minute. Taken seated or lying still it approximates your resting rate, which is one of the simplest autonomic signals you can track.',
+    what: 'Mean heart rate across the capture, in beats per minute. Taken lying still it approximates your resting rate, which is one of the simplest autonomic signals you can track.',
     why: 'A falling trend usually accompanies improving recovery. An unexplained sustained rise of five beats or more above your own baseline often turns up alongside poor sleep, infection, dehydration or overreaching, and is worth noting next to symptoms.',
     learnMore: '/insights/basics/resting-heart-rate-and-mean-rr/',
   },

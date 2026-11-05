@@ -254,7 +254,7 @@ window.Analytics = (function () {
      two subscription events that are NOT purchases (a subscription arriving
      on a new install, one going away) and are never folded into `sub`. */
   var KINDS = ['open', 'sub', 'rst', 'lap', 'act', 'cap', 'hrv', 'pay', 'not', 'pot', 'see', 'err',
-    'osh', 'odm', 'oac', 'log', 'use', 'fnd', 'rpt', 'rdg', 'mbp', 'stp', 'rvw'];
+    'osh', 'odm', 'oac', 'log', 'use', 'fnd', 'rpt', 'rdg', 'mbp', 'stp', 'rvw', 'rvc'];
 
   /* The report's platform letters, and the names the filter bar speaks. */
   var PLATFORM_LETTER = { ios: 'I', android: 'A', unknown: 'U', I: 'I', A: 'A', U: 'U' };

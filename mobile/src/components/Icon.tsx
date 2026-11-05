@@ -97,8 +97,14 @@ const P: Record<IconName, string[]> = {
 // Icons that need extra <circle>/<rect> elements beyond the path list.
 const EXTRAS: Partial<Record<IconName, React.ReactNode>> = {};
 
-export function Icon({ name, size = 22, color = '#000', strokeWidth = 1.9 }: { name: IconName; size?: number; color?: string; strokeWidth?: number }) {
-  const common = { stroke: color, strokeWidth, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, fill: 'none' as const };
+export function Icon({ name, size = 22, color = '#000', strokeWidth = 1.9, filled = false }: {
+  name: IconName; size?: number; color?: string; strokeWidth?: number;
+  /** Draw the glyph SOLID in `color` rather than as an outline. Only meaningful
+   *  for a closed shape (a star, a heart); an open path like `chevron` thickens
+   *  into a blob, so this is opt-in per call site rather than a per-icon fact. */
+  filled?: boolean;
+}) {
+  const common = { stroke: color, strokeWidth, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, fill: filled ? color : ('none' as const) };
   return (
     <Svg width={size} height={size} viewBox="0 0 24 24">
       {name === 'bike' && (<><Circle cx={18.5} cy={17.5} r={3.5} {...common} /><Circle cx={5.5} cy={17.5} r={3.5} {...common} /><Circle cx={15} cy={5} r={1} {...common} /></>)}

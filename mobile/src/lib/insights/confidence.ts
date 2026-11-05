@@ -109,7 +109,7 @@ export function dataConfidence(days: DaysMap, dk: string): DataConfidence {
     {
       key: 'hrv', label: 'HRV readings', weight: 0.30, ratio: clamp01(withHrv / (N * 0.7)),
       detail: `${withHrv} days with a full HRV reading`,
-      fix: withHrv >= N * 0.7 ? '' : 'Take a seated HRV reading on more mornings. It feeds more findings here than anything else.',
+      fix: withHrv >= N * 0.7 ? '' : 'Take an HRV reading lying still on more mornings. It feeds more findings here than anything else.',
     },
     {
       key: 'sleep', label: 'Sleep recorded', weight: 0.20, ratio: clamp01(withSleep / (N * 0.85)),

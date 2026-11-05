@@ -13,17 +13,20 @@ import { MMKV } from 'react-native-mmkv';
 import type { Entry } from '../types';
 import { computeScores, profileCtx } from '../scoring';
 import { addDays, todayKey, uid } from '../dates';
-import { typesFor } from '../typeCatalog';
+import { addCustomType, typesFor } from '../typeCatalog';
 import { rrCoverageSec } from '../hrvQuality';
 import { rrWaveform } from '../waveforms';
 import { applyIntent, claimWatchIntent } from '../garmin/intent';
 import { logError } from '../diagnostics/errorLog';
 import { deleteEntry, ensureDay, getState, save, storeSleepSeries, storeWaveform, upsertEntry } from '../../store/store';
-import { health, healthAppName, type ImportedMed, type ImportedReading, type ImportedWorkout } from './index';
+import {
+  health, healthAppName,
+  type ImportedMed, type ImportedReading, type ImportedSymptom, type ImportedWorkout,
+} from './index';
 import {
   allItemKeys, buildUpdateSet, emptyUpdateSet, filterDeclined, filterSeen, splitForReview,
   sleepToFile, updateCount, updateSignature,
-  type HealthUpdateSet, type UpdateMed, type UpdateReading,
+  type HealthUpdateSet, type ReviewItem, type UpdateMed, type UpdateReading, type UpdateSymptom,
 } from './updateSet';
 import { withAuthTimeout } from './askedAuth';
 import { workoutCandidateOf } from './workoutCandidate';
@@ -31,7 +34,7 @@ import { correctedDistance } from './workoutDistance';
 
 export { allItemKeys, emptyUpdateSet, filterDeclined, filterSeen, splitForReview, updateCount, updateSignature };
 export { getDeclinedKeys, markDeclinedKeys } from './declined';
-export type { HealthUpdateSet, UpdateMed, UpdateReading };
+export type { HealthUpdateSet, ReviewItem, UpdateMed, UpdateReading, UpdateSymptom };
 
 /**
  * Read a day's health-store data and reduce it to the importable set. Returns
@@ -59,17 +62,27 @@ export async function checkHealthUpdates(dk: string, opts: { sinceMs?: number; i
   // quiet day — so each failure goes to the error log on its way to being
   // swallowed. This is the top suspect whenever health data never appears.
   const failed = (where: string) => (e: unknown) => { logError(`health.${where}`, e); };
-  const [imports, workouts, sleep, meds] = await Promise.all([
+  // Symptoms and medications are READ ONLY when the user asked for them
+  // (`settings.healthLogs`, Settings → Apple Health). Not a nicety: the symptom
+  // read is one native query per mapped type, and this check runs on every
+  // foreground. Off, those queries never happen and the check is exactly the
+  // work it was before the feature existed.
+  const logs = !!s.settings.healthLogs;
+  const [imports, workouts, sleep, meds, symptoms] = await Promise.all([
     api.readImports(dk).catch((e) => { failed('readImports')(e); return [] as ImportedReading[]; }),
     api.readWorkouts(dk).catch((e) => { failed('readWorkouts')(e); return [] as ImportedWorkout[]; }),
     opts.includeSleep === false ? Promise.resolve(null) : api.readSleep(dk).catch((e) => { failed('readSleep')(e); return null; }),
-    api.readMedications(dk).catch((e) => { failed('readMedications')(e); return [] as ImportedMed[]; }),
+    logs ? api.readMedications(dk).catch((e) => { failed('readMedications')(e); return [] as ImportedMed[]; })
+      : Promise.resolve([] as ImportedMed[]),
+    logs ? api.readSymptoms(dk).catch((e) => { failed('readSymptoms')(e); return [] as ImportedSymptom[]; })
+      : Promise.resolve([] as ImportedSymptom[]),
   ]);
   const after = <T extends { startMs: number }>(rows: T[]): T[] =>
     opts.sinceMs != null ? rows.filter((r) => r.startMs >= opts.sinceMs!) : rows;
   return buildUpdateSet(dk, s.days[dk], {
-    imports: after(imports), workouts: after(workouts), sleep, meds: after(meds),
-  }, typesFor(s, 'meds'));
+    imports: after(imports), workouts: after(workouts), sleep,
+    meds: after(meds), symptoms: after(symptoms),
+  }, { meds: typesFor(s, 'meds'), symptoms: typesFor(s, 'symptoms') });
 }
 
 /**
@@ -154,9 +167,45 @@ export function importUpdates(set: HealthUpdateSet, selected: Set<string> | null
 
   for (const m of set.meds) {
     if (!take(m.key)) continue;
-    const amount = m.amount ? (m.amount.match(/[\d.]+/)?.[0] ?? '') : '';
-    const entry: Entry = { id: uid(), type: m.type, time: m.time, note, amount, imported: true, healthKey: m.key };
+    // A type the user has no row for yet (their Health list is the authority on
+    // what they take). Resolved against the catalog first: `addCustomType`
+    // refuses a duplicate label, and between the check and here the user may
+    // have created it themselves, or two doses of the same new medication may
+    // be in one batch.
+    let type = m.type;
+    if (m.create) {
+      const want = m.create.label.trim().toLowerCase();
+      const catalog = typesFor(getState(), 'meds');
+      const existing = Object.keys(catalog)
+        .find((k) => catalog[k].label.trim().toLowerCase() === want);
+      const made = existing ?? addCustomType('meds', m.create.label);
+      if (!made) continue;            // a label the catalog would not take
+      type = made;
+    }
+    // The amount is filed WHOLE, unit included ("400 mg", "2 capsules"): the
+    // dose field is free text that already holds its unit everywhere else in
+    // the app, and the digits alone turned every dose into a bare number whose
+    // unit the user had to remember. Spreadsheet sums still parse it
+    // (lib/export/csv parseFloats the field).
+    const entry: Entry = {
+      id: uid(), type, time: m.time, note, amount: m.amount ?? '',
+      imported: true, healthKey: m.key,
+    };
     upsertEntry(set.dk, 'meds', entry);
+    added++;
+  }
+
+  for (const y of set.symptoms) {
+    if (!take(y.key)) continue;
+    // Severity rides the NOTE rather than a field: the journal's built-in
+    // symptoms carry none, and inventing one from an import would put a field
+    // on an entry the log form cannot edit.
+    const entry: Entry = {
+      id: uid(), type: y.type, time: y.time,
+      note: y.severity ? `${y.severity} · ${note}` : note,
+      imported: true, healthKey: y.key,
+    };
+    upsertEntry(set.dk, 'symptoms', entry);
     added++;
   }
 
@@ -204,7 +253,7 @@ export function undoImports(dk: string, keys: readonly string[]): number {
   if (!day || !keys.length) return 0;
   const wanted = new Set(keys);
   let removed = 0;
-  for (const arrKey of ['readings', 'activities', 'meds'] as const) {
+  for (const arrKey of ['readings', 'activities', 'meds', 'symptoms'] as const) {
     // Snapshot first: deleteEntry rewrites the array as we walk it.
     for (const e of [...(day[arrKey] || [])]) {
       if (typeof e.healthKey === 'string' && wanted.has(e.healthKey)) {

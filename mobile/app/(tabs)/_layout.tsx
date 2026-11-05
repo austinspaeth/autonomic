@@ -7,9 +7,10 @@ import Svg, { Path } from 'react-native-svg';
 import Animated, { Easing as REasing, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
-import { BrandMark, Icon, IconName } from '../../src/components/Icon';
+import { BrandMark, brandMarkWidth, Icon, IconName } from '../../src/components/Icon';
+import { TurkeyMark } from '../../src/components/TurkeyMark';
 import { PUMPKIN } from '../../src/lib/seasonal';
-import { useHalloween } from '../../src/store/seasonal';
+import { useHalloween, useThanksgiving } from '../../src/store/seasonal';
 import { useToast } from '../../src/components/Toast';
 import { HeaderRule, headerHeight } from '../../src/components/Header';
 import { navBarCover, useSheets } from '../../src/components/Sheet';
@@ -225,6 +226,7 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
   const gifted = useAccessGrant();
   const showPlan = tier !== 'pro' && !gifted;
   const halloween = useHalloween();
+  const thanksgiving = useThanksgiving();
   const toast = useToast();
   const [rowH, setRowH] = useState(0);
   const lift = showPlan ? Math.max(0, PLAN_TAB_H + PLAN_EDGE_GAP - 12 - insets.bottom) : 0;
@@ -242,8 +244,19 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
         style={{ flexDirection: 'row', alignItems: 'center', gap: 2, padding: PAD, backgroundColor: Platform.OS === 'ios' ? 'rgba(6,6,9,0.82)' : '#0a0a0e' }}
       >
         {markFits ? (
-          <Pressable disabled={!halloween} onPress={() => toast('Happy Halloween 🎃', 3000)} hitSlop={8} style={{ paddingLeft: 8, paddingRight: 6, marginRight: 8, justifyContent: 'center' }}>
-            <BrandMark size={20} color={halloween ? PUMPKIN : undefined} />
+          <Pressable
+            disabled={!halloween && !thanksgiving}
+            onPress={() => toast(thanksgiving ? 'Gobble gobble! Happy Thanksgiving! 🦃' : 'Happy Halloween 🎃', 3000)}
+            hitSlop={8}
+            style={{ paddingLeft: 8, paddingRight: 6, marginRight: 8, justifyContent: 'center' }}
+          >
+            {/* Thanksgiving week wears the turkey: the same mark, with a
+                feather fan behind it. Asked for at the BRAND MARK'S OWN WIDTH,
+                so the bar's layout — and the markFits overflow check, which is
+                measured off the row — is identical in and out of the week. */}
+            {thanksgiving
+              ? <TurkeyMark width={brandMarkWidth(20)} />
+              : <BrandMark size={20} color={halloween ? PUMPKIN : undefined} />}
           </Pressable>
         ) : null}
         {/* Sliding highlight pill sits behind the tabs. */}

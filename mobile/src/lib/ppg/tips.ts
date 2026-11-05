@@ -89,9 +89,9 @@ export const CAMERA_TIPS: Tip[] = [
   {
     id: 'steady',
     title: 'Support your hand and your elbow',
-    body: 'Rest the phone in your lap or on a table and let your elbow take the weight. Holding it up unsupported is where most of the movement comes from.',
+    body: 'Rest the phone on the bed, your chest or a table and let your elbow take the weight. Holding it up unsupported is where most of the movement comes from.',
     prep: true,
-    brief: 'Rest the phone in your lap, elbow supported.',
+    brief: 'Rest the phone on a surface, elbow supported.',
   },
   {
     id: 'cover',
@@ -127,7 +127,7 @@ export const STRAP_TIPS: Tip[] = [
   {
     id: 'still',
     title: 'Stay still and breathe normally',
-    body: 'Sit supported, feet on the floor, and let your breathing settle before you start.',
+    body: 'Lie down with your arms resting, and let your breathing settle before you start.',
   },
   {
     id: 'battery',

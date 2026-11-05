@@ -20,14 +20,23 @@
  *    and blood pressure — each deduped against the day's readings.
  *  - Exercises: the day's workouts, one row per session, excluding sessions
  *    this app authored (watch stand tests etc.).
- *  - Medications: doses that match a known med type by name (the platform
- *    read is a stub today — see HealthApi.readMedications).
+ *  - Medications (iOS 26+): doses logged as TAKEN in the Health app's own
+ *    medication list. A dose whose medication matches one of the user's med
+ *    types is filed under it; one that matches nothing is still OFFERED, and
+ *    importing it CREATES the type (`create` below) — the alternative was a
+ *    feature that silently imported nothing, since almost nobody's med list is
+ *    spelled the way the built-in types are (./medications).
+ *  - Symptoms: the symptoms the user logs in the Health app, mapped to the
+ *    journal's own symptom types (./symptomMap). Never a sample saying a
+ *    symptom was absent, and never one of our own cycle-symptom write-backs.
  */
 import type { DayRecord, SleepRecord, TypeDef } from '../types';
 import { fmtTime12 } from '../dates';
 import { isPoorImport, type ImportedHrvQuality } from '../hrvQuality';
-import type { ImportedMed, ImportedReading, ImportedWorkout, SleepImport } from './index';
+import type { ImportedMed, ImportedReading, ImportedSymptom, ImportedWorkout, SleepImport } from './index';
 import { workoutCandidateOf, type WorkoutCandidate } from './workoutCandidate';
+import { matchMedType, medTypeLabel } from './medications';
+import { slugify } from '../typeResolve';
 
 /** Minimum RR coverage for an importable HRV reading (sum of intervals). */
 const HRV_MIN_MS = 4 * 60 * 1000;
@@ -35,6 +44,11 @@ const HRV_MIN_MS = 4 * 60 * 1000;
 const NEAR_MIN = 10;
 /** A med dose within this window of a logged dose of the same type is a dupe. */
 const MED_NEAR_MIN = 60;
+/** A symptom within this window of a logged one of the same type is a dupe.
+ *  Wider than a reading's: a symptom has no instant, it has a stretch of the
+ *  day, so somebody who logs "dizzy" in the app and then again in Health half
+ *  an hour later means one episode, not two. */
+const SYMPTOM_NEAR_MIN = 45;
 
 export interface UpdateReading {
   key: string;
@@ -57,11 +71,28 @@ export interface UpdateReading {
 
 export interface UpdateMed {
   key: string;
-  type: string;                        // med type key (registry or custom)
+  /** The med type key this would be filed under. For a `create` row it is the
+   *  key the catalog is EXPECTED to mint, and is used only for the fingerprint:
+   *  the real key comes back from `addCustomType` at import. */
+  type: string;
   time: string;
   title: string;
   sub: string;
   amount: string | null;
+  /** Set when the user has no med type for this medication: importing the row
+   *  creates one with this label first. Absent means the type already exists. */
+  create?: { label: string };
+}
+
+export interface UpdateSymptom {
+  key: string;
+  type: string;                        // symptom type key (registry)
+  time: string;
+  title: string;
+  sub: string;
+  /** '' | 'Mild' | 'Moderate' | 'Severe' — rides the entry's note, since the
+   *  journal's built-in symptoms carry no severity field (./updates). */
+  severity: string;
 }
 
 export interface HealthUpdateSet {
@@ -70,10 +101,12 @@ export interface HealthUpdateSet {
   readings: UpdateReading[];
   workouts: WorkoutCandidate[];
   meds: UpdateMed[];
+  symptoms: UpdateSymptom[];
 }
 
 export function updateCount(set: HealthUpdateSet): number {
-  return (set.sleep ? 1 : 0) + set.readings.length + set.workouts.length + set.meds.length;
+  return (set.sleep ? 1 : 0) + set.readings.length + set.workouts.length
+    + set.meds.length + set.symptoms.length;
 }
 
 const clockMin = (hhmm: string): number => {
@@ -115,6 +148,7 @@ export function allItemKeys(set: HealthUpdateSet): string[] {
     ...set.readings.map((r) => r.key),
     ...set.workouts.map((w) => w.key),
     ...set.meds.map((m) => m.key),
+    ...set.symptoms.map((y) => y.key),
   ];
 }
 
@@ -127,6 +161,7 @@ export function filterSeen(set: HealthUpdateSet, seen: ReadonlySet<string>): Hea
     readings: set.readings.filter((r) => !seen.has(r.key)),
     workouts: set.workouts.filter((w) => !seen.has(w.key)),
     meds: set.meds.filter((m) => !seen.has(m.key)),
+    symptoms: set.symptoms.filter((y) => !seen.has(y.key)),
   };
 }
 
@@ -139,7 +174,7 @@ export function filterSeen(set: HealthUpdateSet, seen: ReadonlySet<string>): Hea
  * fallback match: the import writes the sample's local HH:MM verbatim, so a
  * re-read of the same sample lands on the same fingerprint.
  */
-export type ItemKind = 'reading' | 'workout' | 'med';
+export type ItemKind = 'reading' | 'workout' | 'med' | 'symptom';
 export function importFingerprint(dk: string, kind: ItemKind, type: string, time: string): string {
   return `fp:${dk}:${kind}:${type}:${time}`;
 }
@@ -161,12 +196,19 @@ export function importFingerprint(dk: string, kind: ItemKind, type: string, time
 export function dayAlreadyHas(
   day: DayRecord | undefined, kind: ItemKind, type: string, time: string,
 ): boolean {
-  const list = kind === 'reading' ? day?.readings : kind === 'workout' ? day?.activities : day?.meds;
+  const list = kind === 'reading' ? day?.readings : kind === 'workout' ? day?.activities
+    : kind === 'symptom' ? day?.symptoms : day?.meds;
   // A watch Breathe session files as `breathHrv` but is the same measurement,
   // the pairing buildUpdateSet makes above.
   const same = (t: unknown) => (type === 'hrv' ? t === 'hrv' || t === 'breathHrv' : t === type);
-  return (list || []).some((e) => same(e.type) && near(e.time, time, kind === 'med' ? MED_NEAR_MIN : NEAR_MIN));
+  return (list || []).some((e) => same(e.type) && near(e.time, time, tolFor(kind)));
 }
+
+/** How close counts as "the same thing", per kind. One table, so the journal
+ *  check, the tombstone check and the build all hold a candidate to the same
+ *  bar rather than repeating a ternary. */
+const tolFor = (kind: ItemKind): number =>
+  (kind === 'med' ? MED_NEAR_MIN : kind === 'symptom' ? SYMPTOM_NEAR_MIN : NEAR_MIN);
 
 /**
  * The deleted imports recorded for `dk`, read back out of their fingerprints.
@@ -209,19 +251,20 @@ export function filterDeclined(set: HealthUpdateSet, declined: ReadonlySet<strin
   const gone = (key: string, kind: ItemKind, type: string, time: string) =>
     declined.has(key)
     || stones.some((d) => d.kind === kind && sameType(kind, d.type, type)
-      && near(d.time, time, kind === 'med' ? MED_NEAR_MIN : NEAR_MIN));
+      && near(d.time, time, tolFor(kind)));
   return {
     dk: set.dk,
     sleep: set.sleep,
     readings: set.readings.filter((r) => !gone(r.key, 'reading', r.type, r.time)),
     workouts: set.workouts.filter((w) => !gone(w.key, 'workout', w.type, w.time)),
     meds: set.meds.filter((m) => !gone(m.key, 'med', m.type, m.time)),
+    symptoms: set.symptoms.filter((y) => !gone(y.key, 'symptom', y.type, y.time)),
   };
 }
 
 /** An empty set for `dk` — the shape every filter returns when nothing survives. */
 export const emptyUpdateSet = (dk: string): HealthUpdateSet =>
-  ({ dk, sleep: null, readings: [], workouts: [], meds: [] });
+  ({ dk, sleep: null, readings: [], workouts: [], meds: [], symptoms: [] });
 
 /**
  * Split a set into what the app will file on the user's behalf and what it
@@ -232,17 +275,40 @@ export const emptyUpdateSet = (dk: string): HealthUpdateSet =>
  * second decision. The exception is the same one capture makes: a reading the
  * app has DECLINED to file is offered instead, because the alternative is
  * recording a claim about somebody's body that nobody agreed to. `isPoorImport`
- * is that line (the `confidence` ladder's own 'fair' edge), and poor-quality
- * HRV is its only member today — nothing else the platform hands us carries a
- * quality verdict at all.
+ * is that line (the `confidence` ladder's own 'fair' edge).
  *
- * Sleep, workouts and meds never land in the review lane: there is no series
- * behind them to grade, so there would be nothing to tell the user.
+ * TWO kinds of thing wait, for the same reason in two registers:
+ *
+ *  - a poor-quality HRV reading, because filing it records a claim about
+ *    somebody's body that nobody agreed to; and
+ *  - a dose whose medication the user has no TYPE for, because importing it
+ *    creates one, and a silent foreground check must not reach into the type
+ *    catalog on its own. An entry can be deleted from the receipt; a type the
+ *    app minted while nobody was looking is a thing the user then has to find
+ *    and tidy up.
+ *
+ * Sleep, workouts, symptoms and a dose that lands on an EXISTING type are filed
+ * as found, like every other measurement that already happened.
  */
-export function splitForReview(set: HealthUpdateSet): { auto: HealthUpdateSet; review: UpdateReading[] } {
-  const review = set.readings.filter((r) => isPoorImport(r.quality));
-  if (!review.length) return { auto: set, review: [] };
-  return { auto: { ...set, readings: set.readings.filter((r) => !isPoorImport(r.quality)) }, review };
+export type ReviewItem =
+  | { kind: 'reading'; key: string; reading: UpdateReading }
+  | { kind: 'med'; key: string; med: UpdateMed };
+
+export function splitForReview(set: HealthUpdateSet): { auto: HealthUpdateSet; review: ReviewItem[] } {
+  const poor = set.readings.filter((r) => isPoorImport(r.quality));
+  const fresh = set.meds.filter((m) => m.create);
+  if (!poor.length && !fresh.length) return { auto: set, review: [] };
+  return {
+    auto: {
+      ...set,
+      readings: set.readings.filter((r) => !isPoorImport(r.quality)),
+      meds: set.meds.filter((m) => !m.create),
+    },
+    review: [
+      ...poor.map((r): ReviewItem => ({ kind: 'reading', key: r.key, reading: r })),
+      ...fresh.map((m): ReviewItem => ({ kind: 'med', key: m.key, med: m })),
+    ],
+  };
 }
 
 /** Stable id of a result set — lets the pill remember "already dismissed this
@@ -254,6 +320,7 @@ export function updateSignature(set: HealthUpdateSet): string {
     ...set.readings.map((r) => r.key),
     ...set.workouts.map((w) => w.key),
     ...set.meds.map((m) => m.key),
+    ...set.symptoms.map((y) => y.key),
   ].join('|');
 }
 
@@ -275,6 +342,15 @@ export interface RawHealthDay {
   workouts: ImportedWorkout[];
   sleep: SleepImport | null;
   meds: ImportedMed[];
+  symptoms?: ImportedSymptom[];
+}
+
+/** The type catalogs the build needs to name things: the user's own med and
+ *  symptom types, resolved by the caller (`typesFor`), so a custom type is
+ *  matched and labelled exactly like a built-in. */
+export interface ImportTypes {
+  meds: Record<string, TypeDef>;
+  symptoms: Record<string, TypeDef>;
 }
 
 /** Filter a day's raw health-store reads down to what's actually importable. */
@@ -282,13 +358,15 @@ export function buildUpdateSet(
   dk: string,
   day: DayRecord | undefined,
   raw: RawHealthDay,
-  medTypes: Record<string, TypeDef>,
+  types: ImportTypes,
 ): HealthUpdateSet {
   const readings = day?.readings || [];
   const activities = day?.activities || [];
   const meds = day?.meds || [];
+  const symptoms = day?.symptoms || [];
+  const medTypes = types.meds;
 
-  const out: HealthUpdateSet = { dk, sleep: null, readings: [], workouts: [], meds: [] };
+  const out: HealthUpdateSet = { dk, sleep: null, readings: [], workouts: [], meds: [], symptoms: [] };
 
   // Sleep — while the day has none, or to finish an imported night read early.
   out.sleep = sleepToFile(day?.sleep, raw.sleep);
@@ -342,20 +420,56 @@ export function buildUpdateSet(
     out.workouts.push(workoutCandidateOf(w));
   }
 
-  const medLabelToKey = new Map(Object.keys(medTypes).map((k) => [medTypes[k].label.toLowerCase(), k]));
+  // Medications. A dose is matched to one of the user's own med types through
+  // the canonical-name rules in ./medications (brand↔generic, strength and dose
+  // form ignored) rather than by an exact label, which matched almost nothing.
+  // A dose that still matches nothing is offered WITH a type to create: the
+  // user's Health list is the authority on what they take, and the only other
+  // options were to drop it silently or to guess at a near-enough type.
+  const medLabels = Object.fromEntries(Object.keys(medTypes).map((k) => [k, medTypes[k].label]));
   for (const m of raw.meds) {
     if (m.ownApp) continue;
-    const key = medLabelToKey.get(m.name.trim().toLowerCase());
-    if (!key) continue; // no matching med type — nothing sane to file it under
+    const existing = matchMedType(m.name, medLabels);
+    const label = existing ? medTypes[existing].label : medTypeLabel(m);
+    if (!label.trim()) continue;      // a nameless dose can never be filed
+    const key = existing ?? `custom-${slugify(label)}`;
     if (meds.some((e) => e.type === key && near(e.time, m.time, MED_NEAR_MIN))) continue;
     if (out.meds.some((c) => c.type === key && near(c.time, m.time, MED_NEAR_MIN))) continue;
     out.meds.push({
-      key: `med-${key}-${m.startMs}`, type: key, time: m.time,
-      title: medTypes[key].label,
+      // The item key is the SAMPLE's identity, not the type's: a dose offered
+      // under a type to create and then imported must dedup against the same
+      // key on the next check, whatever the catalog minted.
+      key: `med-${m.startMs}-${slugify(label)}`,
+      type: key,
+      time: m.time,
+      title: label,
+      // Just the facts of the dose. That it would create a type is the CHIP's
+      // job in both surfaces that render this (features/HealthUpdates), so the
+      // sub-line does not say it a second time.
       sub: [m.amount, fmtTime12(m.time)].filter(Boolean).join(' · '),
       amount: m.amount,
+      ...(existing ? {} : { create: { label } }),
     });
   }
+  out.meds.sort((a, b) => a.time.localeCompare(b.time));
+
+  // Symptoms. Already mapped to journal type keys by the reader, so a type the
+  // catalog does not hold (a built-in the user DELETED) is dropped here rather
+  // than resurrected behind their back.
+  for (const y of raw.symptoms || []) {
+    if (y.ownApp) continue;           // our own cycle-symptom write-backs
+    const def = types.symptoms[y.type];
+    if (!def) continue;
+    if (symptoms.some((e) => e.type === y.type && near(e.time, y.time, SYMPTOM_NEAR_MIN))) continue;
+    if (out.symptoms.some((c) => c.type === y.type && near(c.time, y.time, SYMPTOM_NEAR_MIN))) continue;
+    out.symptoms.push({
+      key: `sym-${y.type}-${y.startMs}`, type: y.type, time: y.time,
+      title: def.label,
+      sub: [y.severity || null, fmtTime12(y.time)].filter(Boolean).join(' · '),
+      severity: y.severity,
+    });
+  }
+  out.symptoms.sort((a, b) => a.time.localeCompare(b.time));
 
   return out;
 }

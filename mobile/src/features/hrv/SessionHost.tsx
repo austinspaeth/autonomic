@@ -31,6 +31,7 @@ import { openCapture } from './Setup';
 import { TroubleSheet } from './Trouble';
 import { StrapSuggestionSheet } from './StrapSuggestion';
 import { weakSensorFor } from '../../lib/strapSuggest';
+import { noteReadingFailure } from '../../lib/review/cardMemory';
 import { strapSuggestionDue } from '../../store/strapSuggest';
 import { GarminSyncSheet } from './GarminSync';
 import { startGarminSync, stopGarminSync } from './garminSyncStore';
@@ -90,6 +91,9 @@ export function HrvSessionHost() {
   // only opens with the app in front of the user, stacked over whatever is up
   // (usually the Garmin sync card, which its ✕ returns to).
   useEffect(() => subscribeGarminFailures(() => {
+    // Counted whether or not the app is in front of the user: a reading that
+    // failed on the wrist failed (../../lib/review/cardMemory).
+    noteReadingFailure();
     const active = AppState.currentState === 'active';
     if (!strapSuggestionDue('garmin', active)) return;
     const s = getSessionSnapshot();
@@ -114,6 +118,11 @@ export function HrvSessionHost() {
     // since the session card is not the thing that ends a reading.
     if (s.stopReason) {
       const cfg = s.config;
+      // A reading that did not get there, on ANY sensor, permanently retires
+      // the review request card. A camera reading finished by hand inside the
+      // grace period ('early') is an abandon rather than a failure, the same
+      // line the strap card draws below.
+      if (s.stopReason !== 'early') noteReadingFailure();
       // The app's own two endings carry what it saw; a reading the user gave up
       // on from `Having issues?` needs no account of itself.
       const stopped = s.stopReason === 'signal' || s.stopReason === 'early'

@@ -24,6 +24,7 @@ import { cycleMetricValue } from '../lib/insights/cycle';
 import { TrendCard } from './TrendCard';
 import { HrvSetup } from './hrv/Setup';
 import { MilestoneProgressCard } from './Milestones';
+import { ReviewRequestCard } from './ReviewRequestCard';
 import { ProtocolEditor } from './ProtocolEditor';
 import { fonts, radius, type as T, usePalette } from '../theme';
 import { SCORE_COLORS, GRADE_LABEL, GRADE_PTS, catFromBands, profileCtx } from '../lib/scoring';
@@ -355,8 +356,8 @@ export function DaySummary({ dk }: { dk: string }) {
           )}
         </GradientBorderCard>
       )}
-      {/* The awareness-month giveaway: today only. The live card until the window
-          closes, then a "has ended" row through November 10th. */}
+      {/* The awareness-month giveaway: today only, and only while the window
+          is open. Nothing once it closes. */}
       <GiveawayCard dk={dk} />
       {/* Directly under the Outlook: the half-off year, time-boxed to 24h. */}
       <AnnualOfferCard />
@@ -382,6 +383,10 @@ export function DaySummary({ dk }: { dk: string }) {
           onPress={() => { requestInsightsCard('pressure'); router.navigate('/insights'); }} />
       ) : null}
       <TrendCard dk={dk} />
+      {/* The one time the app asks for something back, directly above
+          Milestones. It owns every rule about when it may appear
+          (../lib/review/card) and it is asked exactly once. */}
+      <ReviewRequestCard dk={dk} />
       <MilestoneProgressCard dk={dk} />
       <StreakCard dk={dk} />
     </View>
