@@ -15,8 +15,8 @@ import HealthKit
  *  - MEDICATION DOSE EVENTS (iOS 26+): the Health app's own medication log.
  *    `HKMedicationDoseEvent` carries the dose, the unit and the log status but
  *    NOT the medication's name — that lives on `HKUserAnnotatedMedication`,
- *    reached through its own query and joined on the concept identifier. Both
- *    halves need their own read authorization, which is why `requestMedicationAuth`
+ *    reached through its own query and joined on the concept identifier. The
+ *    permission is PER OBJECT (`requestMedicationAuth` below), which is why it
  *    is separate from the ECG request: it is asked from a tap, never from a
  *    launch path (src/lib/health/index.ts, scope 'logs').
  */
@@ -96,10 +96,30 @@ public class EcgHealthModule: Module {
       return false
     }
 
-    // Medication READ authorization: the dose events AND the medication list,
-    // which is the only place a dose's name lives. Its own request, never
-    // folded into the ECG one above: that one rides every launch-path
-    // `requestAuth`, and a permission sheet nobody tapped anything to get is
+    // Medication READ authorization, and it is NOT the batch request every
+    // other permission in the app goes through. A medication is an OBJECT the
+    // person authorizes one at a time, not a sample type, so the only legal way
+    // to ask is `requestPerObjectReadAuthorization`, which presents the Health
+    // app's own medication picker (WWDC25 "Meet the HealthKit Medications API").
+    //
+    // Putting either medication type in `requestAuthorization(toShare:read:)`
+    // is not a refusal, a failure or an error callback — it KILLS THE PROCESS.
+    // Apple documents it as failing with `errorInvalidArgument`; what actually
+    // happens is that HealthKit raises from
+    // `-[HKHealthStoreImplementation _throwIfAuthorizationDisallowedForSharing:types:]`,
+    // and an ObjC exception is not something Swift can catch, so the app
+    // SIGABRTs on the frame below. 1.39.0 (92) passed both types here and
+    // crashed every phone that turned the toggle on, the instant the symptom
+    // sheet closed.
+    //
+    // Dose events are deliberately not asked for at all: authorizing a
+    // medication grants its doses with it (WWDC25 "Meet the HealthKit
+    // Medications API"), and `HKMedicationDoseEventType` is read-only to third
+    // parties, so there is nothing left for a second request to add.
+    //
+    // Its own request, never folded into the ECG one above: that one rides
+    // every launch-path `requestAuth`, and this sheet is presented EVERY time
+    // it is called, granted or not — a picker nobody tapped anything to get is
     // the nag src/lib/health/askedAuth.ts exists to prevent.
     AsyncFunction("requestMedicationAuth") { (promise: Promise) in
       guard HKHealthStore.isHealthDataAvailable() else {
@@ -110,13 +130,14 @@ public class EcgHealthModule: Module {
         promise.resolve(false)
         return
       }
-      let readTypes: Set<HKObjectType> = [
-        HKObjectType.medicationDoseEventType(),
-        HKObjectType.userAnnotatedMedicationType(),
-      ]
-      self.store.requestAuthorization(toShare: nil, read: readTypes) { success, error in
+      self.store.requestPerObjectReadAuthorization(
+        for: HKObjectType.userAnnotatedMedicationType(),
+        predicate: nil
+      ) { success, error in
         // A refusal is not an error here: the caller's answer is "no doses",
-        // and the JS read degrades to an empty day either way.
+        // and the JS read degrades to an empty day either way. `success` says
+        // the request was PROCESSED, never that anything was shared — which
+        // medications came back is the list query's answer, not this one's.
         if error != nil { promise.resolve(false) } else { promise.resolve(success) }
       }
     }
@@ -217,9 +238,9 @@ public class EcgHealthModule: Module {
    * The order matters: a dose event names its medication only by
    * `medicationConceptIdentifier`, so without the list a row has a dose and no
    * subject. A dose whose medication is not in the list (deleted from Health,
-   * or the list half of the permission refused) is DROPPED rather than filed as
-   * an unnamed medication — the JS side matches on the name, so a nameless row
-   * could only ever become a wrong entry or a dead one.
+   * or one the person did not tick in the per-object picker) is DROPPED rather
+   * than filed as an unnamed medication — the JS side matches on the name, so a
+   * nameless row could only ever become a wrong entry or a dead one.
    *
    * `HKHealthConceptIdentifier` is documented as stable and comparable, so it
    * is used directly as the dictionary key (NSMutableDictionary, which hashes

@@ -194,7 +194,21 @@ old web app so old `export.json` files import directly.
   and log status plus a `medicationConceptIdentifier`, and the NAME lives on
   `HKUserAnnotatedMedication`, so the module runs the medication-list query
   first and joins on that identifier (a dose it cannot name is DROPPED rather
-  than filed as an unnamed medication). Only `logStatus == .taken` is read, as a
+  than filed as an unnamed medication). **The permission is PER OBJECT and the
+  batch API is fatal**: a medication is an object authorized one tick at a time
+  rather than a sample type, so `requestMedicationAuth` calls
+  `requestPerObjectReadAuthorization` for
+  `HKUserAnnotatedMedicationType` alone, and naming either medication type in
+  `requestAuthorization(toShare:read:)` does not fail — HealthKit RAISES
+  (`_throwIfAuthorizationDisallowedForSharing`), which no Swift `catch` can
+  reach, so the process aborts. 1.39.0 (92) shipped that and SIGABRTed on every
+  phone that turned the toggle on. The DOSE type is never asked for at all:
+  authorizing a medication grants its doses with it, and the type is read-only
+  to third parties. The picker is also presented on EVERY call, granted or not,
+  which is a second reason it may only ever be reached from the tap. The shape
+  of that call is pinned from the Swift source in
+  `health/__tests__/authSets.test.ts`, since no JS test can reach it.
+  Only `logStatus == .taken` is read, as a
   predicate AND re-checked in JS: a skipped, snoozed or untouched reminder is a
   dose that did not happen. `src/lib/health/medications.ts` (pure + tested) is
   the matching and the dose text. A name is reduced to a CANONICAL form —

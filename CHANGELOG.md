@@ -9,6 +9,22 @@ crosses to a new `x.x` (a unit test fails if the shipping minor has no entry).
 
 ## Unreleased
 
+- **Turning on "Symptoms and medications" crashed the app** (1.39.0 build 92, iOS 26+).
+  `EcgHealthModule.requestMedicationAuth` asked for `HKMedicationDoseEventType` and
+  `HKUserAnnotatedMedicationType` through `requestAuthorization(toShare:read:)`. A
+  medication is a PER-OBJECT authorization, and naming one in the batch request is not
+  a refusal or an error callback: HealthKit raises from
+  `-[HKHealthStoreImplementation _throwIfAuthorizationDisallowedForSharing:types:]`, an
+  ObjC exception no Swift `catch` can reach, so the process took `SIGABRT` the moment
+  the symptom sheet closed — the reason it looked like the iOS access sheet itself was
+  the problem. It now calls `requestPerObjectReadAuthorization(for:predicate:)` with
+  `HKUserAnnotatedMedicationType` alone, which presents the Health app's own medication
+  picker. The dose type is no longer requested anywhere: authorizing a medication grants
+  its doses with it, and the type is read-only to third parties. Two new cases in
+  `health/__tests__/authSets.test.ts` pin the call's shape from the Swift source (they
+  fail against the crashing version) — nothing in JS can reach the call itself.
+  **Native: needs a new build, not an OTA update.**
+
 - **`react-native-reanimated` is pinned to 3.19.x, above Expo SDK 53's bundled 3.17**, and listed in `expo.install.exclude`: 3.19 carries the Android Fabric layout-animation fixes for the `RetryableMountingLayerException: Unable to find viewState for tag N` crash (facebook/react-native#49077) reported on 1.32.0. Our commit-hook patch (`mobile/patches/`) was ported to 3.19.5.
 
 ## 1.32.0

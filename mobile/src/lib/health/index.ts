@@ -785,8 +785,14 @@ export async function medicationsSupported(): Promise<boolean> {
   return !!medsSupported;
 }
 
-/** The medication log's own read sheet (dose events + the medication list).
- *  Only ever called from the 'logs' tap — see requestAuth. */
+/**
+ * The medication log's own read sheet: the Health app's medication PICKER, one
+ * tick per medication. A medication is a per-object authorization, so it can
+ * never ride the bridge's batch request — doing that raises inside HealthKit
+ * and takes the process with it (modules/ecg-health, which is why the native
+ * side owns the whole call). Only ever called from the 'logs' tap — see
+ * requestAuth — because the picker is presented on EVERY call, answered or not.
+ */
 async function requestMedicationAuth(): Promise<boolean> {
   const ask = ecgNative()?.requestMedicationAuth;
   if (!ask) return false;
