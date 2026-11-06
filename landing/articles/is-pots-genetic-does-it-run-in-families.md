@@ -20,8 +20,8 @@ app:
   hook: "Screen yourself or a relative at home."
   line: "If you or a family member wonder about POTS, Autonomic's guided stand test measures how much your heart rate rises when you stand, by Apple Watch, chest strap or by hand."
 
-photoLocation: "https://images.unsplash.com/photo-1524601500432-1e1a4c71d692?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1581998392741-67879e0ef04a?q=80&w=1760&auto=format&fit=crop"
+photoAttribution: "Bethany Beck / Unsplash"
 
 categories:
   - pots
