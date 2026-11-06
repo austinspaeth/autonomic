@@ -82,6 +82,20 @@ describe('the medication permission', () => {
     expect(SWIFT).toContain('for: HKObjectType.userAnnotatedMedicationType()');
   });
 
+  it('reopens the picker without marking any latch, and only from a tap', () => {
+    // The picker is presented on EVERY call, granted or not, so there is a
+    // second way in (Settings -> Apple Health) and it must not latch: a latch
+    // would be a claim about a sheet that always shows. Nor may it go through
+    // requestAuth, which would re-run the settled symptom batch for nothing.
+    const i = SRC.indexOf('export async function openMedicationPicker(');
+    expect(i).toBeGreaterThan(-1);
+    const body = SRC.slice(i, SRC.indexOf('\n}', i));
+    expect(body).toContain('requestMedicationAuth()');
+    expect(body).not.toContain('markAskedAuth');
+    expect(body).not.toContain('HK_LOGS_SET_KEY');
+    expect(body).not.toContain('requestAuth(');
+  });
+
   it('never reaches the batch API from the medication request', () => {
     // The body of the exported function, up to the next one. The crash was a
     // `requestAuthorization(toShare:read:)` HERE, over a type set assigned a

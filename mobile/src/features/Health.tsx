@@ -9,12 +9,14 @@ import { TimeField } from '../components/Field';
 import { useToast } from '../components/Toast';
 import { usePalette } from '../theme';
 import {
-  health, healthAppName, healthPermissionPath, medicationsSupported, revokeHealthAuth, SleepImport,
+  health, healthAppName, healthPermissionPath, medicationsSupported, openMedicationPicker,
+  revokeHealthAuth, SleepImport,
 } from '../lib/health';
 import { ensureDay, getState, save, storeSleepSeries, useStore } from '../store/store';
 import { fmtTime12, todayKey } from '../lib/dates';
 import { ImportedList, runHealthUpdateCheck } from './HealthUpdates';
 import { NotifRow } from './Reminders';
+import { StoreError } from './Paywall';
 
 export function HealthScreen() {
   const p = usePalette();
@@ -133,12 +135,17 @@ function LogsImportRow() {
   const on = useStore((s) => !!s.state.settings.healthLogs);
   const [meds, setMeds] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [picking, setPicking] = useState(false);
+  const [pickFailed, setPickFailed] = useState(false);
   useEffect(() => { void medicationsSupported().then(setMeds); }, []);
 
   if (Platform.OS !== 'ios') return null;
 
   const toggle = async () => {
     if (busy) return;
+    // Whichever way it goes, a stale picker error is about a tap that is no
+    // longer the state on screen.
+    setPickFailed(false);
     if (on) {
       // Off is ours alone to do: HealthKit cannot hand a read grant back, so
       // the honest thing is to stop reading, and say where to revoke.
@@ -154,6 +161,25 @@ function LogsImportRow() {
     if (!ok) { toast('Permission denied'); return; }
     getState().settings.healthLogs = true; save();
     toast('Importing from Apple Health');
+  };
+
+  // Reopening the picker. Tapping twice opens it twice, which is the API's own
+  // behaviour and not a bug: a medication is a per-object authorization, so
+  // the sheet is presented on EVERY call and its answer is which medications
+  // are ticked now.
+  //
+  // Success says nothing on screen, because `success` is not a grant (Apple:
+  // it "doesn't indicate whether the user actually granted") — the Health
+  // sheet the user just answered is the receipt, and which medications came
+  // back is the next dose read's answer, not this call's. Only a failure to
+  // PRESENT is worth reporting, and it is reported in the sheet's own content:
+  // this screen is opened with openSheet, the stack is one RN Modal painting
+  // above ToastProvider, so a toast() from in here would be invisible.
+  const pick = async () => {
+    if (picking) return;
+    setPicking(true); setPickFailed(false);
+    const ok = await openMedicationPicker();
+    setPicking(false); setPickFailed(!ok);
   };
 
   return (
@@ -176,6 +202,25 @@ function LogsImportRow() {
           ? 'Doses you mark as taken in Health are filed under your own medication types, and a medication you have no type for yet offers to create one. Skipped doses are never imported.'
           : 'Medication doses need iOS 26, which added the Health app\u2019s medication log. Symptoms import on any version.'}
       </Text>
+      {/* Only with the toggle ON and a medication log to pick from: a button
+          that opens a picker the OS cannot show is worse than no button. */}
+      {on && meds ? (
+        <View style={{ marginTop: 14 }}>
+          <Button
+            title={picking ? 'Opening Health\u2026' : 'Choose which medications to import'}
+            disabled={picking}
+            onPress={() => { void pick(); }}
+          />
+          <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 18, marginTop: 8 }}>
+            {'Doses only import for medications you share with Autonomic. Added a new one? Pick it here.'}
+          </Text>
+          {pickFailed ? (
+            <View style={{ marginTop: 10 }}>
+              <StoreError text={'Could not open the medication list. Try again, or share the medication from the Health app itself.'} />
+            </View>
+          ) : null}
+        </View>
+      ) : null}
       {busy ? <View style={{ alignItems: 'center', marginTop: 12 }}><ActivityIndicator color={p.accent} /></View> : null}
     </>
   );

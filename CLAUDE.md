@@ -208,6 +208,21 @@ old web app so old `export.json` files import directly.
   which is a second reason it may only ever be reached from the tap. The shape
   of that call is pinned from the Swift source in
   `health/__tests__/authSets.test.ts`, since no JS test can reach it.
+  **Because a grant covers only the medications ticked AT THAT MOMENT, there is
+  a way back to the picker**: "Choose which medications to import", under the
+  toggle's description in Settings → Apple Health, over the dedicated
+  `openMedicationPicker` export (iOS 26 + toggle on, or the row is absent).
+  Without it a prescription added later imported nothing and said nothing —
+  the dose carries only a concept identifier, the name comes from the
+  medication list, the list returns only what was shared, and an unnameable
+  dose is dropped — and the only route back was turning the feature off and
+  on. It deliberately does NOT go through `requestAuth({ scope: 'logs' })` (the
+  symptom batch is settled once; this half never is), marks NO latch (a latch
+  would be a claim about a sheet that always shows), and its answer is not a
+  grant: Apple's `success` is false only on an error, so nothing is persisted
+  on it and nothing reports "shared". It reports a failure to present with
+  `StoreError` inside the sheet, never `toast()`, which cannot be seen from in
+  there.
   Only `logStatus == .taken` is read, as a
   predicate AND re-checked in JS: a skipped, snoozed or untouched reminder is a
   dose that did not happen. `src/lib/health/medications.ts` (pure + tested) is

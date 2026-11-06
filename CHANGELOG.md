@@ -9,6 +9,33 @@ crosses to a new `x.x` (a unit test fails if the shipping minor has no entry).
 
 ## Unreleased
 
+- **A way back to the Apple Health medication picker.** "Choose which medications to
+  import" now sits under the "Symptoms and medications" description in Settings →
+  Apple Health (iOS 26+, toggle on; absent otherwise — a button that opens a picker
+  the OS cannot show is worse than no button). A medication grant covers only the
+  medications ticked at that moment, and `requestMedicationAuth` was reachable from
+  exactly one place, so a prescription added to the Health app afterwards imported
+  nothing and said nothing about it: a dose event carries only a
+  `medicationConceptIdentifier`, the name comes from the medication-list query, that
+  query returns only authorized medications, and a dose the module cannot name is
+  dropped rather than filed unnamed. The only route back was turning the feature off
+  and on again. A new `openMedicationPicker` export calls the native request directly
+  rather than going through `requestAuth({ scope: 'logs' })`, which would re-run the
+  settled symptom batch for nothing; it marks no latch (the picker is presented on
+  every call by design, so a latch would be a claim about a sheet that always shows),
+  stays out of every launch path, and persists nothing on its answer — Apple's
+  `success` flag is false only on an error and does not report what was granted.
+  Tapping twice opens it twice, which is the API's behaviour and not a bug. A failure
+  to present is reported with `StoreError` inside the sheet, since this screen lives
+  in the sheet stack where `toast()` cannot be seen. **JS only, but it must ride the
+  native build below, not a standalone OTA**: it calls the same native function the
+  toggle does, which on 1.39.0 (92) is the aborting one. Two things keep it off those
+  phones — the `fingerprint` runtime version means a bundle built beside the Swift
+  fix can never be served to build 92, and the row is gated on the toggle, which on
+  that binary can never reach "on" (the abort happens inside `requestAuth`, before
+  `healthLogs = true` is saved). Shipping this JS against an unfixed binary would
+  defeat both.
+
 - **Turning on "Symptoms and medications" crashed the app** (1.39.0 build 92, iOS 26+).
   `EcgHealthModule.requestMedicationAuth` asked for `HKMedicationDoseEventType` and
   `HKUserAnnotatedMedicationType` through `requestAuthorization(toShare:read:)`. A

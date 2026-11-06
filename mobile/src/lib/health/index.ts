@@ -800,6 +800,36 @@ async function requestMedicationAuth(): Promise<boolean> {
 }
 
 /**
+ * The way back to that picker, and the only one besides the toggle itself.
+ *
+ * A grant covers the medications that were ticked AT THAT MOMENT, and the
+ * module drops a dose it cannot name rather than filing it unnamed, so a
+ * prescription added to the Health app after the toggle went on imports
+ * nothing and says nothing: the dose carries a concept identifier, the name
+ * comes from the medication list, and the list returns only what was shared.
+ * Settings -> Apple Health is where that is fixed (features/Health.tsx).
+ *
+ * Three things it deliberately does not do. It does NOT go through
+ * `requestAuth({ scope: 'logs' })`, which would re-run the whole symptom batch
+ * for nothing — that half is settled once and this one never is. It marks NO
+ * latch (no markAskedAuth, no HK_LOGS_SET_KEY): the picker is presented on
+ * every call by design, so a latch would be a claim about a sheet that always
+ * shows. And it must stay out of every launch path, which is the askedAuth
+ * rule: only a tap may reach it.
+ *
+ * The answer is NOT a grant. Apple's `success` "doesn't indicate whether the
+ * user actually granted" — it is false only when something went wrong
+ * presenting or processing the request — so nothing may be persisted on it and
+ * nothing may report "shared". Which medications came back is the list query's
+ * answer, asked the next time doses are read.
+ */
+export async function openMedicationPicker(): Promise<boolean> {
+  if (Platform.OS !== 'ios') return false;
+  if (!(await medicationsSupported())) return false;
+  return requestMedicationAuth();
+}
+
+/**
  * Dev-only timing around each native leg of the authorization dance. Every one
  * of them is a promise the platform may simply never settle (an OS sheet that
  * didn't present has no callback), so when a check hangs, the packager log
