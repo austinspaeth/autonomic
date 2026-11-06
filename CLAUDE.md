@@ -2117,8 +2117,9 @@ old web app so old `export.json` files import directly.
   outside 15-60 days is implausible (a logging gap) and kept out of every
   statistic; **ovulation is counted BACK 14 days from the next period**
   (`retrospective`), or read off a three-over-six overnight temperature rise
-  (`temperature`, thermometer and wrist never mixed, Health Connect skin
-  temperature kept as a DELTA), and only the cycle in progress uses the
+  (`temperature`, thermometer and wrist never mixed; Health Connect skin
+  temperature is NOT read since Play refused it under minimum scope, so
+  Android detects from basal body temperature only), and only the cycle in progress uses the
   forecast (`calendar`, `predicted: true`); an unknown day is null. **The MODE is
   a promise about what may be claimed**: `regular` forecasts, `irregular` /
   `perimenopause` read finished cycles only, `contraception` knows bleeding days

@@ -54,7 +54,6 @@ type InstantRecord = { time: string; metadata?: Metadata };
  *  types call it instantaneous, so both shapes are read. */
 type PeriodRecord = { time?: string; startTime?: string; endTime?: string; metadata?: Metadata };
 type BbtRecord = { time: string; temperature: { inCelsius: number }; metadata?: Metadata };
-type SkinRecord = { startTime: string; endTime: string; deltas?: { time: string; delta: { inCelsius: number } }[]; metadata?: Metadata };
 
 interface HcModule {
   initialize: () => Promise<boolean>;
@@ -101,11 +100,13 @@ const WRITE_TYPES = [
  * set's once-only ask key: one more type there re-asks every install on its
  * next launch. Every one needs its android.permission.health.* line in app.json
  * (READ/WRITE_MENSTRUATION, READ/WRITE_INTERMENSTRUAL_BLEEDING,
- * READ_BASAL_BODY_TEMPERATURE, READ_SKIN_TEMPERATURE); an undeclared one loops
- * the consent sheet. SkinTemperature is newer than the rest, so on an older
- * Health Connect it simply lands in the ungrantable memory.
+ * READ_BASAL_BODY_TEMPERATURE); an undeclared one loops the consent sheet.
+ * SkinTemperature is deliberately NOT asked for: Play rejected it under the
+ * Health Connect minimum-scope policy (1.38), and basal body temperature is
+ * the input the ovulation read is built on. Do not add it back without a
+ * user-facing feature Play can see and a matching declaration.
  */
-const CYCLE_READ_TYPES = ['MenstruationFlow', 'MenstruationPeriod', 'IntermenstrualBleeding', 'BasalBodyTemperature', 'SkinTemperature'];
+const CYCLE_READ_TYPES = ['MenstruationFlow', 'MenstruationPeriod', 'IntermenstrualBleeding', 'BasalBodyTemperature'];
 const CYCLE_WRITE_TYPES = ['MenstruationFlow', 'IntermenstrualBleeding'];
 
 /** Health Connect flow constants: 0 unknown, 1 light, 2 medium, 3 heavy. An
@@ -649,12 +650,11 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
     async readCycle(fromDk, toDk): Promise<CycleImport> {
       const from = dateAt(fromDk, '00:00');
       const to = dateAt(toDk, '23:59');
-      const [flows, periods, spots, bbts, skins] = await Promise.all([
+      const [flows, periods, spots, bbts] = await Promise.all([
         readAll<FlowRecord>('MenstruationFlow', from, to),
         readAll<PeriodRecord>('MenstruationPeriod', from, to),
         readAll<InstantRecord>('IntermenstrualBleeding', from, to),
         readAll<BbtRecord>('BasalBodyTemperature', from, to),
-        readAll<SkinRecord>('SkinTemperature', from, to),
       ]);
       const rows: CycleImport['flows'] = [];
       const keyFor = (type: string, m: Metadata | undefined, t: string) => `hc:${m?.id || `${type}:${t}`}`;
@@ -673,20 +673,12 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
           rows.push({ dk, flow: 'medium', key: keyFor('period', r.metadata, `${r.startTime || r.time}:${dk}`), ownApp: isOwnRecord(r.metadata) });
         }
       }
-      const temps = new Map<string, { dk: string; bbt?: number; skin?: number }>();
+      const temps = new Map<string, { dk: string; bbt?: number }>();
       for (const r of bbts) {
         const v = r.temperature?.inCelsius;
         if (!Number.isFinite(v) || v < 30 || v > 43) continue;
         const dk = keyOf(new Date(r.time));
         temps.set(dk, { ...(temps.get(dk) || { dk }), bbt: Math.round(v * 100) / 100 });
-      }
-      // A night's skin-temperature deltas, averaged, on the morning it ends.
-      for (const r of skins) {
-        const ds = (r.deltas || []).map((x) => x.delta?.inCelsius).filter((v): v is number => Number.isFinite(v));
-        if (!ds.length) continue;
-        const dk = keyOf(new Date(r.endTime));
-        const avg = ds.reduce((a, b) => a + b, 0) / ds.length;
-        temps.set(dk, { ...(temps.get(dk) || { dk }), skin: Math.round(avg * 100) / 100 });
       }
       return { flows: heaviestPerDay(rows), temps: [...temps.values()].sort((a, b) => (a.dk < b.dk ? -1 : 1)) };
     },

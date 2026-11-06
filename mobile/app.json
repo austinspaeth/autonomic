@@ -112,8 +112,7 @@
         "android.permission.health.WRITE_MENSTRUATION",
         "android.permission.health.READ_INTERMENSTRUAL_BLEEDING",
         "android.permission.health.WRITE_INTERMENSTRUAL_BLEEDING",
-        "android.permission.health.READ_BASAL_BODY_TEMPERATURE",
-        "android.permission.health.READ_SKIN_TEMPERATURE"
+        "android.permission.health.READ_BASAL_BODY_TEMPERATURE"
       ],
       "blockedPermissions": [
         "android.permission.RECORD_AUDIO",
