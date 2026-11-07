@@ -220,9 +220,31 @@ old web app so old `export.json` files import directly.
   symptom batch is settled once; this half never is), marks NO latch (a latch
   would be a claim about a sheet that always shows), and its answer is not a
   grant: Apple's `success` is false only on an error, so nothing is persisted
-  on it and nothing reports "shared". It reports a failure to present with
-  `StoreError` inside the sheet, never `toast()`, which cannot be seen from in
-  there.
+  on it and nothing reports "shared".
+  **But almost everything that is not a success arrives as a HealthKit ERROR,
+  and the native side used to collapse all of it into one `false`** — so the
+  sheet said "Could not open the medication list" to a person who had closed
+  the picker, to a phone whose Health app holds no medications to pick
+  (`errorNoData`, and the fix for that one is not in this app at all), and to a
+  genuine failure, which is the only one of the three it was true of. The code
+  travels instead (`hkCode` in the Swift module → `normalizeMedPicker`), and
+  `src/lib/health/medPicker.ts` (pure + tested) owns both halves of what to do
+  with it: `medPickerNote` says which it was, in words, inside the sheet —
+  `StoreError` for a failure, the sheet's own body voice for "add them in
+  Health first", and NOTHING for a success or a cancel, since the Health sheet
+  the person just answered is the receipt — and `isMedPickerFault` keeps the
+  two ANSWERS off `/fault` (`health.medPicker`), or the Failures tab would
+  count people using the feature as people hitting a bug. `toast()` is never
+  used from here: this screen is in the sheet stack, where it cannot be seen.
+  Every answer, success included, is recorded by `medPickerMemory` for the
+  support dump's `medication picker` row — a code and the OS's own words, never
+  a medication name — because the picker's answer was the fourth silent gate
+  between "I log doses in Health" and an entry, and the only one that left no
+  trace at all. **The TOGGLE shows the same note**: `requestAuth` reports only
+  the symptom batch, so a toggle that turned on while the picker found nothing
+  looked like success and then imported nothing. The request is also made from
+  the MAIN queue (it presents a sheet; an Expo `AsyncFunction` body does not
+  run there, and Apple hands the answer back on an arbitrary queue either way).
   Only `logStatus == .taken` is read, as a
   predicate AND re-checked in JS: a skipped, snoozed or untouched reminder is a
   dose that did not happen. `src/lib/health/medications.ts` (pure + tested) is

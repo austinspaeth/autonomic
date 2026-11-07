@@ -27,6 +27,12 @@ import {
   hasAskedAuth, markAskedAuth, markPromptedThisLaunch, promptedThisLaunch, shareAuthRequest,
 } from './askedAuth';
 import { requestEcgAuth } from './ecg';
+import {
+  isMedPickerFault, type MedPickerOutcome, normalizeMedPicker,
+} from './medPicker';
+import { noteMedPicker } from './medPickerMemory';
+import { describeError } from '../diagnostics/format';
+import { reportFault } from '../../store/errorReport';
 import { ecgNative } from '../../../modules/ecg-health';
 import { groupNights, summarizeSleep, type StageSpan } from './sleepSummary';
 import { SYMPTOM_IMPORT, SYMPTOM_READ_IDS, symptomSeverity } from './symptomMap';
@@ -793,10 +799,20 @@ export async function medicationsSupported(): Promise<boolean> {
  * side owns the whole call). Only ever called from the 'logs' tap — see
  * requestAuth — because the picker is presented on EVERY call, answered or not.
  */
-async function requestMedicationAuth(): Promise<boolean> {
+async function requestMedicationAuth(): Promise<MedPickerOutcome> {
   const ask = ecgNative()?.requestMedicationAuth;
-  if (!ask) return false;
-  try { return (await step('meds', () => ask())) ?? false; } catch { return false; }
+  const out = await (async (): Promise<MedPickerOutcome> => {
+    if (!ask) return { ok: false, code: 'missing' };
+    try { return normalizeMedPicker(await step('meds', () => ask())); }
+    catch (e) { return { ok: false, code: 'threw', message: describeError(e) }; }
+  })();
+  // Every answer is recorded for the support dump; only a genuine failure is
+  // reported. Closing the picker, and a Health app with no medications in it,
+  // are answers (./medPicker) — a /fault row for either would count people
+  // using the feature as people hitting a bug.
+  noteMedPicker(out);
+  if (isMedPickerFault(out.code)) reportFault('health.medPicker', out.code);
+  return out;
 }
 
 /**
@@ -818,14 +834,20 @@ async function requestMedicationAuth(): Promise<boolean> {
  * rule: only a tap may reach it.
  *
  * The answer is NOT a grant. Apple's `success` "doesn't indicate whether the
- * user actually granted" — it is false only when something went wrong
- * presenting or processing the request — so nothing may be persisted on it and
- * nothing may report "shared". Which medications came back is the list query's
- * answer, asked the next time doses are read.
+ * user actually granted" — so nothing may be persisted on it and nothing may
+ * report "shared". Which medications came back is the list query's answer,
+ * asked the next time doses are read.
+ *
+ * What it DOES answer is which of the several things that are not a success
+ * happened, because almost all of them arrive as a HealthKit ERROR and were
+ * being collapsed into one false: the picker was closed, the Health app holds
+ * no medications to pick, access is off, or the request really failed. The
+ * caller renders ./medPicker's note for it; the outcome is recorded for the
+ * support dump either way.
  */
-export async function openMedicationPicker(): Promise<boolean> {
-  if (Platform.OS !== 'ios') return false;
-  if (!(await medicationsSupported())) return false;
+export async function openMedicationPicker(): Promise<MedPickerOutcome> {
+  if (Platform.OS !== 'ios') return { ok: false, code: 'unsupported' };
+  if (!(await medicationsSupported())) return { ok: false, code: 'unsupported' };
   return requestMedicationAuth();
 }
 

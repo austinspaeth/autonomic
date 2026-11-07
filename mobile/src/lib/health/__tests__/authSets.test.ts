@@ -96,6 +96,28 @@ describe('the medication permission', () => {
     expect(body).not.toContain('requestAuth(');
   });
 
+  it('hands the OS’s own reason back, and asks from the main queue', () => {
+    // Almost everything the per-object request can do but succeed arrives as a
+    // HealthKit ERROR — Apple documents a closed picker as `errorUserCanceled`
+    // — and resolving all of it as one `false` is what made "I tapped the
+    // button and nothing happened" unanswerable. The code travels instead, and
+    // ../medPicker decides what to say and what counts as a failure.
+    const i = SWIFT.indexOf('AsyncFunction("requestMedicationAuth")');
+    const next = SWIFT.indexOf('AsyncFunction(', i + 20);
+    const body = SWIFT.slice(i, next > -1 ? next : SWIFT.length);
+    expect(body).toContain('Self.hkCode(err)');
+    expect(body).not.toContain('promise.resolve(false)');
+    // The call presents a sheet and an Expo AsyncFunction body does not run on
+    // the main queue; the ANSWER still arrives on an arbitrary one.
+    expect(body).toContain('DispatchQueue.main.async');
+    // The two answers the UI must be able to tell apart from a real failure.
+    expect(SWIFT).toContain('case .errorUserCanceled: return "canceled"');
+    expect(SWIFT).toContain('case .errorNoData: return "nodata"');
+    // An unrecognised HealthKit error keeps its number rather than being
+    // flattened into the general failure.
+    expect(SWIFT).toContain('return "hk\\(err.code)"');
+  });
+
   it('never reaches the batch API from the medication request', () => {
     // The body of the exported function, up to the next one. The crash was a
     // `requestAuthorization(toShare:read:)` HERE, over a type set assigned a
