@@ -12,6 +12,8 @@ import {
   health, healthAppName, healthPermissionPath, medicationsSupported, openMedicationPicker,
   revokeHealthAuth, SleepImport,
 } from '../lib/health';
+import { medPickerNote, type MedPickerNote, outcomeOf } from '../lib/health/medPicker';
+import { lastMedPicker } from '../lib/health/medPickerMemory';
 import { ensureDay, getState, save, storeSleepSeries, useStore } from '../store/store';
 import { fmtTime12, todayKey } from '../lib/dates';
 import { ImportedList, runHealthUpdateCheck } from './HealthUpdates';
@@ -129,6 +131,11 @@ export function HealthScreen() {
  * Android does not render it at all: Health Connect has no symptom record and
  * no medication record, so the row would be a promise the platform cannot keep.
  */
+/** How recently the picker must have answered for its note to belong to the tap
+ *  that just happened. Only guards against reading an answer from an earlier
+ *  visit to this screen; the picker itself resolves in seconds either way. */
+const PICKER_FRESH_MS = 2 * 60 * 1000;
+
 function LogsImportRow() {
   const toast = useToast();
   const p = usePalette();
@@ -136,16 +143,16 @@ function LogsImportRow() {
   const [meds, setMeds] = useState(false);
   const [busy, setBusy] = useState(false);
   const [picking, setPicking] = useState(false);
-  const [pickFailed, setPickFailed] = useState(false);
+  const [note, setNote] = useState<MedPickerNote | null>(null);
   useEffect(() => { void medicationsSupported().then(setMeds); }, []);
 
   if (Platform.OS !== 'ios') return null;
 
   const toggle = async () => {
     if (busy) return;
-    // Whichever way it goes, a stale picker error is about a tap that is no
+    // Whichever way it goes, a stale picker note is about a tap that is no
     // longer the state on screen.
-    setPickFailed(false);
+    setNote(null);
     if (on) {
       // Off is ours alone to do: HealthKit cannot hand a read grant back, so
       // the honest thing is to stop reading, and say where to revoke.
@@ -161,6 +168,18 @@ function LogsImportRow() {
     if (!ok) { toast('Permission denied'); return; }
     getState().settings.healthLogs = true; save();
     toast('Importing from Apple Health');
+    // The medication half of that tap is a SECOND sheet, and `requestAuth`
+    // reports only the symptom batch — so whatever the medication picker
+    // answered was discarded here, and a toggle that turned on while the
+    // picker had refused or found nothing to offer looked like success that
+    // then imported no doses. The picker's own answer is recorded, so it can
+    // be said in the same place the button says it.
+    if (meds) {
+      const rec = lastMedPicker();
+      if (rec && Date.now() - rec.at < PICKER_FRESH_MS) {
+        setNote(medPickerNote(outcomeOf(rec), healthPermissionPath()));
+      }
+    }
   };
 
   // Reopening the picker. Tapping twice opens it twice, which is the API's own
@@ -171,15 +190,19 @@ function LogsImportRow() {
   // Success says nothing on screen, because `success` is not a grant (Apple:
   // it "doesn't indicate whether the user actually granted") — the Health
   // sheet the user just answered is the receipt, and which medications came
-  // back is the next dose read's answer, not this call's. Only a failure to
-  // PRESENT is worth reporting, and it is reported in the sheet's own content:
-  // this screen is opened with openSheet, the stack is one RN Modal painting
-  // above ToastProvider, so a toast() from in here would be invisible.
+  // back is the next dose read's answer, not this call's. Everything else DOES
+  // say something, and says which it was: the picker reports a cancellation,
+  // an empty medication list and a genuine failure all as HealthKit errors,
+  // and one "Could not open the medication list" for the three of them was
+  // wrong about the first two and useless about the third. Reported in the
+  // sheet's own content, never with toast(): this screen is opened with
+  // openSheet, and the stack is one RN Modal painting above ToastProvider.
   const pick = async () => {
     if (picking) return;
-    setPicking(true); setPickFailed(false);
-    const ok = await openMedicationPicker();
-    setPicking(false); setPickFailed(!ok);
+    setPicking(true); setNote(null);
+    const out = await openMedicationPicker();
+    setPicking(false);
+    setNote(medPickerNote(out, healthPermissionPath()));
   };
 
   return (
@@ -214,10 +237,20 @@ function LogsImportRow() {
           <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 18, marginTop: 8 }}>
             {'Doses only import for medications you share with Autonomic. Added a new one? Pick it here.'}
           </Text>
-          {pickFailed ? (
-            <View style={{ marginTop: 10 }}>
-              <StoreError text={'Could not open the medication list. Try again, or share the medication from the Health app itself.'} />
-            </View>
+          {/* The picker's own answer, in words. A success and a closed picker
+              say nothing (the Health sheet was the receipt); everything else
+              names which of the several not-successes it was, since they all
+              arrive as a HealthKit error and used to read as one failure. */}
+          {note ? (
+            note.kind === 'error' ? (
+              <View style={{ marginTop: 10 }}><StoreError text={note.text} /></View>
+            ) : (
+              // Full-strength, not dim: it is an answer to the tap, and the
+              // line directly above it is dim body copy.
+              <Text style={{ color: p.text, fontSize: 13, lineHeight: 18, marginTop: 10 }}>
+                {note.text}
+              </Text>
+            )
           ) : null}
         </View>
       ) : null}

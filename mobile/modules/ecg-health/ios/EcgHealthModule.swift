@@ -121,24 +121,57 @@ public class EcgHealthModule: Module {
     // every launch-path `requestAuth`, and this sheet is presented EVERY time
     // it is called, granted or not — a picker nobody tapped anything to get is
     // the nag src/lib/health/askedAuth.ts exists to prevent.
+    //
+    // It answers with the OS's OWN REASON, not a bare bool. Everything this
+    // call can do but succeed is reported to the user through an error: Apple
+    // documents cancellation as `HKError.errorUserCanceled`, and a medication
+    // list with nothing in it as `errorNoData`. Collapsing all of that to
+    // `false` made "I tapped the button and nothing happened" unanswerable —
+    // a picker the person closed, a phone with no medications logged in the
+    // Health app, and a genuine failure to present were one outcome wearing one
+    // message ("Could not open the medication list"), and only the third of
+    // those is true. So the code travels to JS and the sheet says which it was
+    // (src/lib/health/medPicker.ts).
     AsyncFunction("requestMedicationAuth") { (promise: Promise) in
+      // Every answer is a [String: Any], annotated rather than inferred: the
+      // promise takes `Any?`, so a bare heterogeneous literal is only a
+      // warning away from being the thing that fails the build.
       guard HKHealthStore.isHealthDataAvailable() else {
-        promise.resolve(false)
+        let out: [String: Any] = ["ok": false, "code": "unavailable"]
+        promise.resolve(out)
         return
       }
       guard #available(iOS 26.0, *) else {
-        promise.resolve(false)
+        let out: [String: Any] = ["ok": false, "code": "unsupported"]
+        promise.resolve(out)
         return
       }
-      self.store.requestPerObjectReadAuthorization(
-        for: HKObjectType.userAnnotatedMedicationType(),
-        predicate: nil
-      ) { success, error in
-        // A refusal is not an error here: the caller's answer is "no doses",
-        // and the JS read degrades to an empty day either way. `success` says
-        // the request was PROCESSED, never that anything was shared — which
-        // medications came back is the list query's answer, not this one's.
-        if error != nil { promise.resolve(false) } else { promise.resolve(success) }
+      // Asked from the MAIN queue, because the whole point of the call is that
+      // it presents a sheet, and an Expo `AsyncFunction` body runs on the
+      // module's own queue. Apple hands the ANSWER back "on an arbitrary
+      // background queue", so the only thing this changes is where the request
+      // is made from.
+      DispatchQueue.main.async {
+        self.store.requestPerObjectReadAuthorization(
+          for: HKObjectType.userAnnotatedMedicationType(),
+          predicate: nil
+        ) { success, error in
+          // `success` says the request was PROCESSED, never that anything was
+          // shared — which medications came back is the list query's answer,
+          // not this one's — so nothing may be persisted on it either way.
+          if let error = error {
+            let err = error as NSError
+            let out: [String: Any] = [
+              "ok": false,
+              "code": Self.hkCode(err),
+              "message": err.localizedDescription,
+            ]
+            promise.resolve(out)
+            return
+          }
+          let out: [String: Any] = ["ok": success, "code": success ? "ok" : "failed"]
+          promise.resolve(out)
+        }
       }
     }
 
@@ -160,6 +193,33 @@ public class EcgHealthModule: Module {
         return
       }
       self.queryEcg(sinceMs: sinceMs, limit: max(1, limit), promise: promise)
+    }
+  }
+
+  /**
+   * One stable word for a HealthKit error, for the medication picker's answer.
+   *
+   * The words are the contract with src/lib/health/medPicker.ts, which turns
+   * them into what the sheet says and decides which of them is a FAILURE worth
+   * reporting: a person closing the picker and a phone with no medications in
+   * the Health app are answers, not faults. Anything unrecognised keeps its
+   * number (`hk14`) rather than being flattened into the general failure, so a
+   * case nobody anticipated is still identifiable from a support dump.
+   */
+  private static func hkCode(_ err: NSError) -> String {
+    guard err.domain == HKError.errorDomain,
+          let code = HKError.Code(rawValue: err.code) else { return "failed" }
+    switch code {
+    case .errorUserCanceled: return "canceled"
+    case .errorNoData: return "nodata"
+    case .errorAuthorizationDenied: return "denied"
+    case .errorAuthorizationNotDetermined: return "notdetermined"
+    case .errorRequiredAuthorizationDenied: return "denied"
+    case .errorHealthDataUnavailable: return "unavailable"
+    case .errorHealthDataRestricted: return "restricted"
+    case .errorInvalidArgument: return "invalid"
+    case .errorDatabaseInaccessible: return "locked"
+    default: return "hk\(err.code)"
     }
   }
 

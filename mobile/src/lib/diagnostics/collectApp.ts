@@ -33,6 +33,7 @@ import { liveOffer } from '../upsell/annual';
 import { annualMemory } from '../upsell/annualMemory';
 import { getDeclinedKeys } from '../health/declined';
 import { health, healthAppName, medicationsSupported } from '../health';
+import { lastMedPicker } from '../health/medPickerMemory';
 import { bleIfStarted } from '../ble/manager';
 import { garminLinkIntact } from '../garmin/receiver';
 import { isSideloadedAndroidBuild, isTestFlightBuild } from '../../../modules/app-env';
@@ -408,6 +409,16 @@ async function bluetoothRows(s: AppState): Promise<Rows> {
   };
 }
 
+/** The picker's last answer: its code, its age, and the OS's own words when
+ *  there were any. 'never opened' is itself the finding for a phone that
+ *  imports no doses. */
+function medPickerRow(): string {
+  const rec = lastMedPicker();
+  if (!rec) return 'never opened';
+  const when = daysAgo(rec.at) ?? 'unknown';
+  return `${rec.code} (${when})${rec.message ? ` — ${rec.message}` : ''}`;
+}
+
 async function healthRows(s: AppState): Promise<Rows> {
   return {
     app: healthAppName(),
@@ -419,6 +430,12 @@ async function healthRows(s: AppState): Promise<Rows> {
     // otherwise unanswerable.
     'symptom/med import': !!s.settings.healthLogs,
     'medication log supported': await safe(() => medicationsSupported(), false),
+    // The fourth silent gate: the per-object picker's own answer. It is
+    // deliberately never persisted as a grant (Apple's `success` does not
+    // report what was shared), so without this row "I tapped Choose which
+    // medications and nothing happened" leaves no trace at all. A code, never
+    // a medication name.
+    'medication picker': medPickerRow(),
     'history imported': s.meta?.healthHistoryImported ? daysAgo(s.meta.healthHistoryImported) : 'never',
     'declined samples': getDeclinedKeys().size,
   };
