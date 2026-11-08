@@ -240,8 +240,16 @@ old web app so old `export.json` files import directly.
   reach, so the process aborts. 1.39.0 (92) shipped that and SIGABRTed on every
   phone that turned the toggle on. The DOSE type is never asked for at all:
   authorizing a medication grants its doses with it, and the type is read-only
-  to third parties. The picker is also presented on EVERY call, granted or not,
-  which is why it may only ever be reached from a TAP. The shape of that call is
+  to third parties. The picker may only ever be reached from a TAP, since it may
+  present a sheet on any call.
+  **It is NOT in fact "presented on every call, granted or not" — that claim was
+  wrong and the whole shape of this row rested on it.** Measured on a real
+  phone: with the install's medications already shared and the rest archived,
+  HealthKit had nothing to ask, returned `ok` INSTANTLY and presented nothing,
+  so the button visibly did nothing. A sheet appears only when something is
+  undetermined AND unarchived. Apple also asks about a medication when it is
+  ADDED in the Health app, which is why a new prescription is less invisible
+  than the row's original justification assumed. The shape of that call is
   pinned from the Swift source in `health/__tests__/authSets.test.ts`, since no
   JS test can reach it.
   **Because a grant covers only the medications ticked AT THAT MOMENT, there is
@@ -281,11 +289,27 @@ old web app so old `export.json` files import directly.
   dump and a `/fault` row carry has to be the word on screen too. Reported
   inside the sheet (`StoreError` for an error, the sheet's own body text for
   info), never with `toast()`, which cannot be seen from in there.
-  `isMedPickerFault` is false for `ok`, `canceled` and `nodata` — a cancel is
+  **An `ok` is TIMED, because `success` cannot say whether a sheet was SHOWN**
+  (`MED_PICKER_PRESENT_MS` = 800, `resolveMedPicker`, pure + tested): HealthKit
+  reports it both ways, and only one of the two needs a HUMAN — a presented
+  sheet costs its animation up, a decision and its animation down, over a
+  second even when dismissed at once, while a non-presentation returns in
+  milliseconds. Under the bar an `ok` becomes `nosheet`, which is the ONE case
+  that must say something, since the user tapped a button and watched nothing
+  happen; the note is INFO and says what they can do (add or unarchive a
+  medication in Health, which asks there), never what is or is not shared —
+  only the medication-list query knows that. It is a HEURISTIC and is named as
+  one in the source; the exact alternative is a second native function
+  returning the medication-list count, which is more Swift for one sentence.
+  Nothing else is timed: a cancel, a denial or a failure means what it says at
+  any speed, and an `ok` that cannot be timed is left alone rather than given
+  an invented verdict.
+  `isMedPickerFault` is false for `ok`, `canceled`, `nodata` and `nosheet` — a cancel is
   the commonest outcome there is and an empty medication list is the person's
-  own data, so a `/fault` row for either would count people USING the feature as
-  people hitting a bug — and `health.medPicker` carries the code for everything
-  else. `medPickerMemory.ts` keeps the LAST answer only (code, age, the OS's
+  own data, and `nosheet` describes somebody's own Health app and is the NORMAL
+  answer once their medications are settled, so a `/fault` row for any of them
+  would count people USING the feature as people hitting a bug —
+  and `health.medPicker` carries the code for everything else. `medPickerMemory.ts` keeps the LAST answer only (code, age, the OS's
   words, capped; NO medication name ever reaches it) for the support dump's
   `medication picker` row, where `never opened` is itself the finding for a
   phone that imports no doses.

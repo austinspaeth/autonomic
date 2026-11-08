@@ -1,5 +1,6 @@
 import {
-  isMedPickerFault, medPickerNote, normalizeMedPicker, outcomeOf,
+  isMedPickerFault, medPickerNote, MED_PICKER_PRESENT_MS, normalizeMedPicker,
+  outcomeOf, resolveMedPicker,
 } from '../medPicker';
 
 const PATH = 'Apple Health → your profile → Apps';
@@ -59,13 +60,48 @@ describe('outcomeOf', () => {
   });
 });
 
+describe('resolveMedPicker', () => {
+  const OK = { ok: true, code: 'ok' };
+
+  it('calls a fast ok a sheet that never showed', () => {
+    // Measured on a real phone whose medications were already shared and
+    // otherwise archived: HealthKit had nothing to ask, returned `ok` at once,
+    // and presented nothing — and the silent-on-ok rule made the button look
+    // dead. Only a HUMAN makes this call slow.
+    expect(resolveMedPicker(OK, 40)).toEqual({ ok: false, code: 'nosheet' });
+    expect(resolveMedPicker(OK, MED_PICKER_PRESENT_MS - 1).code).toBe('nosheet');
+  });
+
+  it('leaves an ok that took a person alone', () => {
+    expect(resolveMedPicker(OK, MED_PICKER_PRESENT_MS)).toEqual(OK);
+    expect(resolveMedPicker(OK, 4_000)).toEqual(OK);
+  });
+
+  it('never touches any other code, however fast', () => {
+    // A cancel, a denial or a failure means what it says at any speed; only
+    // `ok` is ambiguous about whether anything was presented.
+    ['canceled', 'nodata', 'denied', 'failed', 'missing', 'hk7'].forEach((code) => {
+      const o = { ok: false, code };
+      expect(resolveMedPicker(o, 1)).toEqual(o);
+    });
+  });
+
+  it('keeps an ok it cannot time, rather than inventing a verdict', () => {
+    expect(resolveMedPicker(OK, NaN)).toEqual(OK);
+    expect(resolveMedPicker(OK, Infinity)).toEqual(OK);
+  });
+});
+
 describe('isMedPickerFault', () => {
   it('leaves the two outcomes that are not failures alone', () => {
     // A cancel is the commonest outcome there is — the picker presenting and
     // being answered IS the feature working — and an empty medication list is
     // the person's own data. A /fault row for either would count people using
     // the feature as people hitting a bug.
-    ['ok', 'canceled', 'nodata'].forEach((c) => expect(isMedPickerFault(c)).toBe(false));
+    // `nosheet` is among them: "already answered for, or archived" describes
+    // somebody's own Health app and is the NORMAL answer once their
+    // medications are settled, so a fault row would count them as a bug.
+    ['ok', 'canceled', 'nodata', 'nosheet'].forEach((c) => expect(isMedPickerFault(c)).toBe(false));
   });
 
   it('reports everything else', () => {
@@ -101,7 +137,7 @@ describe('medPickerNote', () => {
   });
 
   it('gives every not-success its own words', () => {
-    const codes = ['nodata', 'denied', 'notdetermined', 'restricted', 'locked',
+    const codes = ['nosheet', 'nodata', 'denied', 'notdetermined', 'restricted', 'locked',
       'unsupported', 'unavailable', 'missing', 'invalid', 'failed', 'hk99'];
     const seen = new Set<string>();
     codes.forEach((code) => {
@@ -113,6 +149,18 @@ describe('medPickerNote', () => {
     // Nothing is left sharing a sentence except the default branch's two,
     // which name their own code and so still differ.
     expect(seen.size).toBe(codes.length);
+  });
+
+  it('explains a sheet that never showed, as information and not an error', () => {
+    // The one case that MUST say something: the user tapped a button and
+    // watched nothing happen, and silence there is the bug.
+    const n = medPickerNote({ ok: false, code: 'nosheet' }, PATH)!;
+    expect(n.kind).toBe('info');
+    // Said in terms of what they can do about it, and never claiming what is
+    // or is not being shared — only the medication-list query knows that.
+    expect(n.text).toContain('archived');
+    expect(n.text).toContain('Health');
+    expect(n.text).not.toContain('shared with');
   });
 
   it('puts the code in the default branch’s sentence', () => {

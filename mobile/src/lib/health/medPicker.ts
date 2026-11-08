@@ -39,6 +39,42 @@ export interface MedPickerRecord {
   message?: string;
 }
 
+/**
+ * Under this many milliseconds, an `ok` did NOT present a sheet.
+ *
+ * The one thing the answer cannot tell us. `requestPerObjectReadAuthorization`
+ * reports `success` both when the picker was shown and answered AND when
+ * HealthKit had nothing to ask and showed nothing at all — and the second case
+ * is the common one, not an edge: measured on a real phone whose medications
+ * were already shared and otherwise archived, the call returned `ok` instantly
+ * and no sheet appeared. The design that shipped assumed "the picker is
+ * presented on EVERY call, granted or not" and so said nothing on `ok`,
+ * treating the sheet as its own receipt; with no sheet, that silence is a
+ * button that visibly does nothing.
+ *
+ * Elapsed time separates them, because one of the two needs a HUMAN. A
+ * presented sheet costs its animation up, a decision, and its animation down —
+ * over a second even when somebody dismisses it at once — while a
+ * non-presentation returns in milliseconds. This bar sits well clear of both.
+ *
+ * It IS a heuristic, and it is named as one. The exact alternative is a second
+ * native function returning the medication-list count; that is more Swift for
+ * a sentence, and this is the cheap half that can ship with the copy.
+ */
+export const MED_PICKER_PRESENT_MS = 800;
+
+/**
+ * Fold how long the call took into its code. `ok` that came back too fast to
+ * have shown anything becomes `nosheet`, which is NOT a failure — it is the
+ * answer "there was nothing to offer you" — and is the one case that has to
+ * say something, since the user tapped a button and watched nothing happen.
+ */
+export function resolveMedPicker(outcome: MedPickerOutcome, elapsedMs: number): MedPickerOutcome {
+  if (outcome.code !== 'ok') return outcome;
+  if (!Number.isFinite(elapsedMs) || elapsedMs >= MED_PICKER_PRESENT_MS) return outcome;
+  return { ...outcome, ok: false, code: 'nosheet' };
+}
+
 /** Longest OS message we keep. Enough to identify one, short enough that it
  *  cannot turn a support dump or a `/fault` row into a wall of text. */
 export const MED_PICKER_MSG_MAX = 140;
@@ -86,7 +122,10 @@ export function outcomeOf(rec: MedPickerRecord | null | undefined): MedPickerOut
  * hitting a bug, and the Failures tab ranks by breadth.
  */
 export function isMedPickerFault(code: string): boolean {
-  return code !== 'ok' && code !== 'canceled' && code !== 'nodata';
+  // `nosheet` joins them: "everything you have is already answered for, or
+  // archived" is a description of somebody's own Health app, not a bug, and
+  // for a user who has shared their medications once it is the NORMAL answer.
+  return code !== 'ok' && code !== 'canceled' && code !== 'nodata' && code !== 'nosheet';
 }
 
 /** A line to render under the button, or null when there is nothing to say. */
@@ -111,6 +150,17 @@ export function medPickerNote(
   const { code } = outcome;
   if (code === 'ok' || code === 'canceled') return null;
   switch (code) {
+    case 'nosheet':
+      // The case this module exists for now. Said in terms of what the reader
+      // can DO: Apple asks about a medication when it is ADDED (which is also
+      // why a new prescription is not in fact invisible), and an archived one
+      // is never offered. It never claims what is being shared — `success` is
+      // not a grant, and the medication-list query is the only thing that
+      // knows.
+      return {
+        kind: 'info',
+        text: 'Health had nothing to ask about, so no list appeared. Medications you have already answered for are not offered again, and archived ones are not offered at all. To change what you share, add or unarchive a medication in Health — it asks you there.',
+      };
     case 'nodata':
       // Not an error: there is nothing wrong here and nothing this button can
       // do. The medication list is the Health app's, and it is empty.

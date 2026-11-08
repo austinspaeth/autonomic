@@ -9,6 +9,33 @@ crosses to a new `x.x` (a unit test fails if the shipping minor has no entry).
 
 ## Unreleased
 
+- **"Choose which medications to import" did nothing, and said nothing about it**
+  (found on a real phone running 1.39.2 build 94). `requestPerObjectReadAuthorization`
+  reports `success` both when the picker was shown and answered AND when HealthKit had
+  nothing to ask and presented nothing at all — and the second is the common case, not
+  an edge: with the install's medications already shared and the rest archived, the call
+  returned `ok` instantly and no sheet appeared. Two claims the row was built on were
+  wrong. "The picker is presented on EVERY call, granted or not" is false (a sheet
+  appears only when something is undetermined and unarchived — and Apple separately asks
+  about a medication when it is ADDED, so a new prescription was less invisible than the
+  justification assumed); and the silent-on-`ok` rule, whose reasoning was "the Health
+  sheet just answered is the receipt", turns a no-op into a button that visibly does
+  nothing. `ok` is now TIMED (`MED_PICKER_PRESENT_MS` = 800, `resolveMedPicker`, pure +
+  tested): only one of the two outcomes needs a human — a presented sheet costs its
+  animation up, a decision and its animation down, over a second even when dismissed at
+  once, while a non-presentation returns in milliseconds — so under the bar an `ok`
+  becomes `nosheet`, with an INFO note saying what the reader can actually do (add or
+  unarchive a medication in Health, which asks there) and never claiming what is or is
+  not shared, since only the medication-list query knows that. It is a heuristic and is
+  named as one in the source; the exact alternative is a second native function
+  returning the medication-list count, which is more Swift for one sentence. `nosheet`
+  is not a `/fault` ("already answered for, or archived" describes somebody's own Health
+  app and is the normal answer once their medications are settled) but it does ride the
+  support dump, so a phone that imports no doses still says why. Nothing else is timed —
+  a cancel, a denial or a failure means what it says at any speed, and an `ok` that
+  cannot be timed is left alone rather than given an invented verdict. **JS only**, and
+  iOS only: the row does not exist on Android.
+
 - **Symptoms now import automatically; medications are chosen in Apple Health's own
   picker.** One change in two halves, because the two halves were never the same kind
   of object. A SYMPTOM is an ordinary HealthKit read permission, so it belongs in the

@@ -28,7 +28,8 @@ import {
 } from './askedAuth';
 import { requestEcgAuth } from './ecg';
 import {
-  isMedPickerFault, medPickerNote, normalizeMedPicker, type MedPickerOutcome,
+  isMedPickerFault, medPickerNote, normalizeMedPicker, resolveMedPicker,
+  type MedPickerOutcome,
 } from './medPicker';
 import { noteMedPicker } from './medPickerMemory';
 import { reportFault } from '../../store/errorReport';
@@ -814,12 +815,19 @@ export async function medicationsSupported(): Promise<boolean> {
  */
 async function requestMedicationAuth(): Promise<MedPickerOutcome> {
   const ask = ecgNative()?.requestMedicationAuth;
-  const out = ask
+  // Timed, because `success` alone cannot say whether a sheet was SHOWN —
+  // HealthKit reports it either way, and "nothing to ask about" is the common
+  // answer once somebody's medications are already settled. Only the native
+  // call is inside the clock; `medicationsSupported` is cached and resolves
+  // from memory, and including it would only ever shorten the measurement.
+  const t0 = Date.now();
+  const raw = ask
     ? await (async () => {
       try { return normalizeMedPicker(await step('meds', () => ask())); }
       catch (e) { return { ok: false, code: 'failed', message: String((e as Error)?.message ?? '') || undefined }; }
     })()
     : normalizeMedPicker(undefined);
+  const out = resolveMedPicker(raw, Date.now() - t0);
   // Recorded for the support dump: every answer, including the two that are
   // not faults, because "nothing imports" is answered by WHICH of them it was.
   noteMedPicker(out);
