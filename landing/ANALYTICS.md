@@ -34,7 +34,8 @@ reports as an anonymous section. Rules:
 | `download_modal_open` | A download CTA on desktop opens the QR modal | `placement`, `cta` |
 | `cta_view` | A named CTA is half on screen (once per page load). Click-through = `cta_click` / `cta_view` | `cta`, `feature` |
 | `download_redirect` | Every pass through `/download` or a campaign link (QR codes land here); also fires `app_store_redirect` / `play_store_redirect` / `site_redirect` | `platform`, `destination` (`app_store` / `play_store` / `site`), `campaign` |
-| `blog_to_site` | A reader on a blog page clicks through to a non-blog page of the site (feature, condition, comparison, pricing, home). Downloads are not counted here; they are `download_click` | `target` (the page they went to), `cta` (what they clicked), `from_type` (`blog_article` / `blog_hub`) |
+| `blog_to_site` | **Key event.** A reader on a blog page clicks an EDITORIAL link through to a page that sells the app (home, `/features`, `/conditions`, `/compare`, `/pricing`, `/story`, `/press`). Once per page load. Never from the nav, the burger menu, the footer, the breadcrumb, the sticky bar or a giveaway promo, and never to the legal pages, `/download` or the giveaway. Downloads are not counted here; they are `download_click` | `target` (the page they went to), `cta` (what they clicked), `from_type` (`blog_article` / `blog_hub`) |
+| `download_intent` | **Key event.** The visitor asked for the app: a store badge, a phone deep-link tap, or the desktop QR modal opening. **Once per session** | `how` (`store_link` / `store_badge_in_modal` / `download_modal`), `placement`, `cta`, `platform`, `plan`, `feature` |
 
 A store badge **inside the download modal** has `placement: download_modal`
 but `cta` set to the CTA that **opened** the modal, so a desktop download is
@@ -84,9 +85,63 @@ GA4 only shows a custom parameter in reports once it is registered. In
 
 `cta`, `cta_type`, `feature`, `placement`, `via`, `plan`, `platform`,
 `target`, `article`, `article_target`, `page_type`, `from_type`, `percent`,
-`network`, `query`, `symptom`, `section`, `link_type`, `destination`, `campaign`.
+`network`, `query`, `symptom`, `section`, `link_type`, `destination`, `campaign`,
+`how`.
 
-**Key events:** `cta_click`, `download_click`, `blog_to_site` and `download_redirect`.
-`download_click` is the one to optimise; `cta_click` counts every CTA
-(downloads included) and `blog_to_site` counts readers the blog sent into
-the rest of the site.
+**Key events: `download_intent` and `blog_to_site`. Those two only.**
+
+They are the two questions the site is answered by — did this visitor ask for
+the app, and did the blog send this reader into the product — and each is a
+HEADCOUNT: `download_intent` fires once per session, `blog_to_site` once per
+page load.
+
+Three events used to be marked alongside them, and all three were wrong for the
+job. None of them is a headcount, so marking them put the same visitor in the
+conversion column several times over and made the four key events read as one
+number:
+
+- `cta_click` fires on every CTA of any kind, pitch included, and fires TWICE on
+  a desktop download (opening the modal, then the badge inside it).
+- `download_click` fires per store badge, so one visitor weighing up iPhone
+  against Android is two conversions.
+- `download_redirect` is INBOUND traffic through `/download`, not an action
+  taken on the site at all. It belongs to acquisition, and as a key event it
+  books every QR-code arrival as a conversion before the visitor has done
+  anything.
+
+All three stay exactly as they are, as the reporting splits underneath the two
+key events. Do not add them together with each other or with the key events.
+
+## Two things that make the numbers lie, and what was done about them
+
+**Scripted browsers.** A link checker, an SEO auditor, an uptime or
+accessibility scanner and an AI browsing agent all enumerate a page by
+DISPATCHING CLICKS at every anchor they find, and inside a listener a dispatched
+click is indistinguishable from a finger. One pass over an article therefore
+fires the whole engagement set at once, which is how a visitor who never left an
+article comes to look like a conversion. GA's own bot filtering only knows
+DECLARED crawlers, and these declare nothing. `_ajBlocked` in `src/app.html` now
+includes `navigator.webdriver`, the W3C automation flag that a browser under
+automation is required to set and that no ordinary browsing mode sets: the tag
+never loads, no event is queued, and `/download` redirects immediately instead
+of waiting on a callback.
+
+**Realtime pools a session, not a page.** GA's realtime user view shows every
+event in the visitor's last 30 minutes whatever page it came from, and its
+event-name card is site-wide across all visitors. A visitor who arrived through
+`/download`, was bounced to the home page, then read an article will show
+`download_redirect` while sitting on the article — correctly. Every event this
+site sends carries a `location` param naming the page that fired it; that param
+is the only way to tell "this page fired it" from "an earlier page in the
+session did", and realtime does not show params.
+
+**DebugView on any device.** Add `?aj_debug=1` to any URL. It sets GA's
+`debug_mode` for the rest of that browser session (sessionStorage, so it cannot
+leak into an ordinary visit) and makes the page log every event and its
+parameters to the console; `?aj_debug=0` turns it off. Debug hits are still
+counted in reports, so it is safe to leave on while watching.
+
+`landing/tests/tracking.test.mjs` drives a built article in jsdom and pins all
+of it: that a page load fires no key event, that the chrome cannot fire
+`blog_to_site`, that the article body can and only once, and that two store
+badges are one `download_intent`.

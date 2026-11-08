@@ -20,13 +20,58 @@
          form. -->
     <script>
       window.dataLayer = window.dataLayer || [];
+
+      /* Headless browsers. A scripted browser does not just READ the page, it
+         drives it: link checkers, SEO auditors, uptime and accessibility
+         scanners and AI browsing agents all enumerate a page by dispatching
+         real clicks at every anchor they find, and a dispatched click is
+         indistinguishable from a finger inside a listener. One pass over an
+         article therefore fires the whole engagement set at once -- the CTA, a
+         store badge, a link off to the product pages -- which is how a visitor
+         who never left the article comes to look like a conversion. GA's own
+         bot filtering only knows DECLARED crawlers (a user agent on the IAB
+         list), and these declare nothing.
+
+         `navigator.webdriver` is the W3C automation flag: the spec REQUIRES it
+         to be true in a browser under automation, and no ordinary browsing mode
+         sets it, so this excludes the scripted traffic without touching a
+         single real visitor. It is folded into `_ajBlocked` rather than checked
+         per event so that it covers everything at once -- the tag never loads,
+         no event is queued, and the /download sniffer takes its blocked path
+         and redirects immediately instead of waiting on a callback. */
+      function _ajAutomated() {
+        try { return navigator.webdriver === true; } catch (e) { return false; }
+      }
+
       function _ajBlocked() {
         if (window.location.hostname === 'localhost') return true;
         // /master is the private analytics dashboard, not a page of the site:
         // noindex, one signed-in visitor, nothing to measure.
         if (/^\/master(\/|$)/.test(window.location.pathname)) return true;
+        if (_ajAutomated()) return true;
         try { return localStorage.getItem('aj-cookie-consent') === 'blocked'; } catch (e) { return true; }
       }
+
+      /* DebugView. GA streams a hit to DebugView only when the hit carries
+         `debug_mode`, which is normally set by a Chrome extension -- no use at
+         all for the question "what is this visitor's phone actually sending".
+         `?aj_debug=1` turns it on for the rest of the browser session and
+         `?aj_debug=0` turns it off; it lives in sessionStorage so it expires
+         with the tab and can never leak into an ordinary visit. Debug hits are
+         still counted in reports, so this is safe to leave on while watching.
+
+         It also makes the body script log every event it sends to the console,
+         which is the one view that shows the PARAMETERS -- and `location` is
+         the parameter that answers "which page did this come from", the thing
+         GA's own realtime view will not tell you. */
+      function _ajDebug() {
+        try {
+          if (/[?&]aj_debug=1(&|$)/.test(window.location.search)) sessionStorage.setItem('aj-debug', '1');
+          else if (/[?&]aj_debug=0(&|$)/.test(window.location.search)) sessionStorage.removeItem('aj-debug');
+          return sessionStorage.getItem('aj-debug') === '1';
+        } catch (e) { return false; }
+      }
+
       function gtag(){ if (!_ajBlocked()) dataLayer.push(arguments); }
       if (!_ajBlocked()) {
         var s = document.createElement('script');
@@ -34,7 +79,7 @@
         s.src = 'https://www.googletagmanager.com/gtag/js?id=G-3R3E75CLGQ';
         document.head.appendChild(s);
         gtag('js', new Date());
-        gtag('config', 'G-3R3E75CLGQ');
+        gtag('config', 'G-3R3E75CLGQ', _ajDebug() ? { debug_mode: true } : {});
       }
     </script>
 
@@ -228,16 +273,59 @@
           // the kind of page, and (on an article) which article, so any event
           // can be split by where it happened without parsing URLs in GA.
           // gtag() is always defined (head loader) and no-ops when blocked.
+          var ajDebugOn = typeof _ajDebug === 'function' && _ajDebug();
           function ajEvent(name, params) {
             if (typeof gtag !== 'function') return;
             var p = params || {};
             p.location = pagePath;
             p.page_type = pageType;
             if (articleSlug) p.article = articleSlug;
+            // `?aj_debug=1`: every event, with its parameters, in the console
+            // of the phone that sent it. GA's realtime view names the event and
+            // hides the parameters, so this is the only place `location` can be
+            // read -- and `location` is what separates "this page fired it"
+            // from "an earlier page in the same session did".
+            if (ajDebugOn) try { console.log('[aj] ' + name, p); } catch (e) {}
             gtag('event', name, p);
           }
           // Page scripts (the blog search) report through the same helper.
           window.ajEvent = ajEvent;
+
+          /* DOWNLOAD INTENT, once per session: "did this visitor ask for the
+             app", which is the other question the key events exist to answer.
+             It needs its own event because none of the three that were being
+             read as the answer can be:
+
+               `cta_click`      fires on every CTA of any kind, download or
+                                pitch, and fires TWICE on a desktop download
+                                (once opening the modal, once on the badge
+                                inside it);
+               `download_click` fires per store badge, so a visitor weighing up
+                                iPhone and Android is two conversions;
+               `download_redirect` is INBOUND traffic through /download, not an
+                                action taken on the site at all -- it belongs to
+                                acquisition, and marking it a key event puts
+                                every QR-code arrival in the conversion column
+                                before the visitor has done anything.
+
+             All three stay, unchanged, as the reporting splits. This is the
+             headcount: first ask wins, the rest of the session is a no-op, and
+             it carries where the ask happened so it still breaks down by
+             surface. sessionStorage, so it expires with the tab -- a visitor
+             who comes back tomorrow is a new ask, which is what a daily
+             conversion count should mean. */
+          var dlIntentSent = false;
+          function noteDownloadIntent(how, params) {
+            if (dlIntentSent) return;
+            try {
+              if (sessionStorage.getItem('aj-dl-intent') === '1') { dlIntentSent = true; return; }
+              sessionStorage.setItem('aj-dl-intent', '1');
+            } catch (e) { /* private mode: the in-page flag still holds */ }
+            dlIntentSent = true;
+            var p = params || {};
+            p.how = how;
+            ajEvent('download_intent', p);
+          }
 
           // Every CTA names itself with data-cta ("article_mid_card",
           // "page_cta", "nav_get_app"…). A name used twice on one page (two
@@ -411,6 +499,7 @@
               ajEvent(platform === 'android' ? 'play_store_click' : 'app_store_click', { placement: place, plan: plan, cta: cta, feature: feature });
               ajEvent('download_click', { platform: platform, placement: place, plan: plan, cta: cta, feature: feature });
               ajEvent('cta_click', { cta: cta, cta_type: inModal ? 'store' : 'download', platform: platform, plan: plan, feature: feature, via: inModal ? 'download_modal' : 'direct' });
+              noteDownloadIntent(inModal ? 'store_badge_in_modal' : 'store_link', { placement: place, cta: cta, platform: platform, plan: plan, feature: feature });
             }
             window.ajTrackDownload = trackDownload;
 
@@ -426,6 +515,7 @@
               modalFeature = tf ? tf.getAttribute('data-feature') : '';
               ajEvent('download_modal_open', { placement: modalOpener, cta: modalOpener });
               ajEvent('cta_click', { cta: modalOpener, cta_type: 'download', platform: 'desktop', plan: (trigger && trigger.getAttribute && trigger.getAttribute('data-dl-plan')) || 'unspecified', feature: modalFeature, via: 'download_modal' });
+              noteDownloadIntent('download_modal', { placement: modalOpener, cta: modalOpener, platform: 'desktop', plan: (trigger && trigger.getAttribute && trigger.getAttribute('data-dl-plan')) || 'unspecified', feature: modalFeature });
               lastFocus = document.activeElement;
               modal.hidden = false;
               document.body.style.overflow = 'hidden';
@@ -900,6 +990,15 @@
           });
 
           // ---- Engagement tracking -------------------------------------
+          // Page chrome: present on every page, identical on all of them, and
+          // so never evidence of anything about the article it surrounds.
+          // `blog_to_site` may not be fired from inside any of it.
+          var AJ_CHROME = '#nav, #aj-sticky-cta, #dlModal, footer, .bl-crumb, .awareness, .gva, .gvs, .gvm';
+          // The pages that sell the app, as a WHITELIST rather than a list of
+          // exclusions: a page added to the site later cannot start counting
+          // itself as a conversion by simply not being the blog.
+          var AJ_SITE_PAGE = /^\/(features|conditions|compare|pricing|story|press)(\/|$)/;
+          var blogToSiteSent = false;
           // One delegated listener maps every remaining interactive element
           // to a GA event (store badges/CTAs are wired individually above,
           // so they're excluded here to avoid double-counting).
@@ -909,15 +1008,38 @@
             // Store CTAs/badges are wired individually above (they resolve the
             // platform first); skip them here so nothing double-counts.
             if (t.closest('[data-dl-cta],[data-dl-store]')) return;
-            // Leaving the blog for the rest of the site (a feature, condition,
-            // comparison or pricing page, home): `blog_to_site`, a key event.
+            // Leaving the blog for the PRODUCT site: `blog_to_site`, a key
+            // event, and the thing the whole blog is for.
+            //
+            // THREE guards, all of them narrowing, because the first version
+            // had none of them: it fired on any same-origin link whose path was
+            // not under /insights, which is every link in the nav bar, the
+            // burger menu, the footer, the breadcrumb and the brand logo. Every
+            // article is wrapped in chrome full of such links, so the event did
+            // not measure a reader going deeper into the product -- it measured
+            // "clicked something that was not another article", and tracked the
+            // engaged-reader count instead.
+            //
+            //  1. the link sits in the EDITORIAL part of the page, never the
+            //     chrome (`AJ_CHROME`);
+            //  2. the destination is a page that sells the app
+            //     (`AJ_SITE_PAGE`, a whitelist) -- not the legal pages, not
+            //     /download, not the giveaway, each of which has its own event;
+            //  3. once per page load. A reader leaves for the site once; one
+            //     who clicks through, comes back and clicks again is still one
+            //     person doing one thing, and as a KEY event this has to be a
+            //     headcount rather than a tap count.
+            //
             // It fires ALONGSIDE whatever the link reports below. Downloads are
             // excluded above; they are download_click.
-            var bl = t.closest('a[href]');
-            if (bl && (pageType === 'blog_article' || pageType === 'blog_hub')) {
+            var bl = !blogToSiteSent && (pageType === 'blog_article' || pageType === 'blog_hub')
+              ? t.closest('a[href]') : null;
+            if (bl && !bl.closest(AJ_CHROME)) {
               var bu = null;
               try { bu = new URL(bl.getAttribute('href'), window.location.href); } catch (e) { /* bad href */ }
-              if (bu && bu.origin === window.location.origin && !/^\/(insights|blog)(\/|$)/.test(bu.pathname) && bu.pathname !== pagePath) {
+              if (bu && bu.origin === window.location.origin && bu.pathname !== pagePath &&
+                  (bu.pathname === '/' || AJ_SITE_PAGE.test(bu.pathname))) {
+                blogToSiteSent = true;
                 ajEvent('blog_to_site', { target: bu.pathname, cta: ctaOf(bl) || placementOf(bl), from_type: pageType });
               }
             }

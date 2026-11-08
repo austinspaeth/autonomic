@@ -34,8 +34,9 @@ For each row: **Dimension name** and **Event parameter** are the same word,
 - [ ] `percent`
 - [ ] `destination` (the download redirect: `app_store`, `play_store` or `site`)
 - [ ] `campaign` (which QR code or campaign link a redirect came from)
+- [ ] `how` (how download intent was given: `store_link`, `store_badge_in_modal`, `download_modal`)
 
-(20 of GA's 50 allowed.)
+(21 of GA's 50 allowed.)
 
 ---
 
@@ -44,13 +45,21 @@ For each row: **Dimension name** and **Event parameter** are the same word,
 GA → **Admin → Data display → Key events → New key event**. Type each name
 exactly; this works before any data has arrived.
 
-- [ ] `download_click`: the real conversion, a tap on a store badge or link
-- [ ] `cta_click`: any CTA tap
-- [ ] `blog_to_site`: a blog reader moving on to the rest of the site
-- [ ] `download_redirect`: someone came through `/download` or a campaign link / QR code. It also counts desktop visitors sent to the site (`destination: site`); if you want store sends only, mark `app_store_redirect` and `play_store_redirect` instead
+**Two, and only two:**
 
-`cta_click` includes downloads and `download_redirect` overlaps them, so do not add these together. Treat
-`download_click` as the headline number.
+- [ ] `download_intent`: the visitor asked for the app (a store badge, a phone deep-link tap, or the desktop QR modal opening). **Once per session**, so a day's count is people
+- [ ] `blog_to_site`: a blog reader clicked an editorial link through to a page that sells the app. **Once per page load**
+
+**Un-mark these three if they are currently marked** (Admin → Data display →
+Key events → the row's ⋮ → *Unmark as key event*). They are all real events
+worth reporting on, but none of them is a headcount, so as key events they
+count the same visitor several times and the four numbers collapse into one:
+
+- [ ] `cta_click` — every CTA of any kind, pitch included, and twice on a desktop download (modal open, then the badge inside)
+- [ ] `download_click` — per store badge, so one visitor comparing iPhone and Android is two conversions
+- [ ] `download_redirect` — INBOUND traffic through `/download` or a QR code. Acquisition, not an action on the site; as a key event it books every QR arrival as a conversion before the visitor does anything
+
+They stay as the splits underneath the two key events. Never add them together.
 
 ---
 
@@ -112,7 +121,35 @@ Name it **Blog funnel**.
    - a store badge in the modal → `app_store_click` / `play_store_click` + `download_click` + `cta_click` (`cta_type: store`)
    - "How Insights works →" in the mid-article card → `app_pitch_click` + `cta_click` + `blog_to_site`
    - a related article → `article_click` (no `blog_to_site`, it stays on the blog)
+   - a **nav, footer or breadcrumb** link → `nav_click` / `link_click` only, never `blog_to_site`
+   - a second store badge → a second `download_click`, but **no** second `download_intent`
 
 Notes:
 - Nothing records on `localhost`; test on the live site.
 - New custom dimensions take up to 24 hours to show in reports.
+
+### Watching a real visitor's phone, without the Chrome extension
+
+Add **`?aj_debug=1`** to any URL. It turns on GA's `debug_mode` for the rest of
+that browser session, so the hits appear in **DebugView**, and it makes the page
+log every event with its parameters to the browser console. `?aj_debug=0` turns
+it off. It lives in sessionStorage, so it expires with the tab and cannot leak
+into an ordinary visit, and debug hits are still counted in reports.
+
+### Before believing "this visitor fired everything"
+
+Two things make realtime read that way, and neither is a tracking fault:
+
+1. **Realtime pools the whole session.** The user view lists every event in that
+   visitor's last 30 minutes whatever page it came from, and the event-name card
+   is site-wide across all visitors. Someone who arrived through `/download`,
+   got bounced to the home page and then opened an article will show
+   `download_redirect` while sitting on the article — correctly. Every event
+   carries a **`location`** param naming the page that fired it; that is the
+   only way to tell the two apart, and realtime does not show params. Use
+   DebugView (above) or an Explore with `location` as a dimension.
+2. **Scripted browsers click.** Link checkers, SEO and accessibility scanners
+   and AI browsing agents walk a page by dispatching clicks at every anchor,
+   which fires the whole engagement set in one pass. GA's bot filter only knows
+   declared crawlers. `src/app.html` now blocks anything with
+   `navigator.webdriver` set, so the tag never loads for them at all.
