@@ -3,10 +3,14 @@
  * pill (src/features/HealthUpdates.tsx) and Settings → Apple Health → "Check
  * for updates". The dedup rules themselves are pure and live in ./updateSet.
  *
- * The product model: at most once an hour (plus once per launch), quietly look
- * at today's Apple Health / Health Connect data and offer ONLY what the journal
- * doesn't already have. `importUpdates` writes the accepted items through the
- * store's normal entry paths (scores + waveform sidecar included).
+ * The product model: on launch, on every foreground and on the Journal's
+ * pull-to-refresh, quietly look at today's Apple Health / Health Connect data
+ * and offer ONLY what the journal doesn't already have. There is deliberately
+ * no throttle on the check itself (opening the app IS the request to bring it
+ * up to date); the one paced part is the pair of "what you log in Health
+ * itself" reads, for the reason in ./logsSweep. `importUpdates` writes the
+ * accepted items through the store's normal entry paths (scores + waveform
+ * sidecar included).
  */
 import { Platform } from 'react-native';
 import { MMKV } from 'react-native-mmkv';
@@ -20,9 +24,11 @@ import { applyIntent, claimWatchIntent } from '../garmin/intent';
 import { logError } from '../diagnostics/errorLog';
 import { deleteEntry, ensureDay, getState, save, storeSleepSeries, storeWaveform, upsertEntry } from '../../store/store';
 import {
-  health, healthAppName,
+  health, healthAppName, medicationsSupported,
   type ImportedMed, type ImportedReading, type ImportedSymptom, type ImportedWorkout,
 } from './index';
+import { logsSweepDue, noteLogsSweep } from './logsSweep';
+import { logsSweepMemory, saveLogsSweepMemory } from './logsSweepMemory';
 import {
   allItemKeys, buildUpdateSet, emptyUpdateSet, filterDeclined, filterSeen, splitForReview,
   sleepToFile, updateCount, updateSignature,
@@ -52,8 +58,10 @@ export type { HealthUpdateSet, ReviewItem, UpdateMed, UpdateReading, UpdateSympt
  * `sinceMs` drops samples older than that instant (the Settings check's
  * 24-hour window); `includeSleep: false` skips the night read (used for the
  * yesterday half of that window — the night belongs to the day it ends on).
+ * `explicit` marks a check the USER asked for, which bypasses the logs-read
+ * throttle below (and only that — nothing else in a check is ever paced).
  */
-export async function checkHealthUpdates(dk: string, opts: { sinceMs?: number; includeSleep?: boolean } = {}): Promise<HealthUpdateSet | null> {
+export async function checkHealthUpdates(dk: string, opts: { sinceMs?: number; includeSleep?: boolean; explicit?: boolean } = {}): Promise<HealthUpdateSet | null> {
   const api = health();
   const s = getState();
   if (!api.available || !s.settings.healthEnabled) return null;
@@ -62,21 +70,43 @@ export async function checkHealthUpdates(dk: string, opts: { sinceMs?: number; i
   // quiet day — so each failure goes to the error log on its way to being
   // swallowed. This is the top suspect whenever health data never appears.
   const failed = (where: string) => (e: unknown) => { logError(`health.${where}`, e); };
-  // Symptoms and medications are READ ONLY when the user asked for them
-  // (`settings.healthLogs`, Settings → Apple Health). Not a nicety: the symptom
-  // read is one native query per mapped type, and this check runs on every
-  // foreground. Off, those queries never happen and the check is exactly the
-  // work it was before the feature existed.
-  const logs = !!s.settings.healthLogs;
+  // What the user logs in Health ITSELF — symptoms, and on iOS 26 medication
+  // doses — rides the Apple Health connect ask now rather than a toggle, so
+  // the gate per read is the platform's own answer plus a throttle.
+  //
+  // The throttle is NOT the check's: `readSymptoms` is one native category
+  // query per mapped type (23 of them) and this runs on every foreground, and
+  // HealthKit never reports read grants, so somebody who DENIED the symptom
+  // types in the connect sheet is indistinguishable from somebody with nothing
+  // logged there and would be swept forever. See ./logsSweep — once an hour,
+  // always on a new day, and always when the user asked.
+  const sweep = logsSweepDue(logsSweepMemory(), dk, Date.now(), !!opts.explicit);
+  // `shouldRequest` means the sheet has never been shown for these types,
+  // which is the one honest question iOS allows here — there is nothing to
+  // read. Health Connect answers `denied` (it has no symptom record at all),
+  // so this is also what keeps the Android side from running a no-op read.
+  const logsStatus = sweep
+    ? await api.readAuthStatus('logs').catch(() => 'unknown' as const)
+    : 'unknown' as const;
+  const readSymptoms = sweep && logsStatus !== 'shouldRequest' && logsStatus !== 'denied';
+  // Doses need iOS 26 (and the local module's own per-object grant, which the
+  // Settings picker is the way to). Everywhere else the read answers [].
+  const readMeds = sweep && await medicationsSupported().catch(() => false);
+  // Note the ORDER: the throttle is asked first, so a check inside the hour
+  // costs exactly what it did before the feature existed — no status read, no
+  // support probe, and neither of the two queries.
   const [imports, workouts, sleep, meds, symptoms] = await Promise.all([
     api.readImports(dk).catch((e) => { failed('readImports')(e); return [] as ImportedReading[]; }),
     api.readWorkouts(dk).catch((e) => { failed('readWorkouts')(e); return [] as ImportedWorkout[]; }),
     opts.includeSleep === false ? Promise.resolve(null) : api.readSleep(dk).catch((e) => { failed('readSleep')(e); return null; }),
-    logs ? api.readMedications(dk).catch((e) => { failed('readMedications')(e); return [] as ImportedMed[]; })
+    readMeds ? api.readMedications(dk).catch((e) => { failed('readMedications')(e); return [] as ImportedMed[]; })
       : Promise.resolve([] as ImportedMed[]),
-    logs ? api.readSymptoms(dk).catch((e) => { failed('readSymptoms')(e); return [] as ImportedSymptom[]; })
+    readSymptoms ? api.readSymptoms(dk).catch((e) => { failed('readSymptoms')(e); return [] as ImportedSymptom[]; })
       : Promise.resolve([] as ImportedSymptom[]),
   ]);
+  // Stamped only once a read actually went out, so a skipped one never pushes
+  // the next sweep an hour further away.
+  if (readSymptoms || readMeds) saveLogsSweepMemory(noteLogsSweep(dk, Date.now()));
   const after = <T extends { startMs: number }>(rows: T[]): T[] =>
     opts.sinceMs != null ? rows.filter((r) => r.startMs >= opts.sinceMs!) : rows;
   return buildUpdateSet(dk, s.days[dk], {
@@ -95,8 +125,8 @@ export async function checkHealthUpdatesLast24h(): Promise<HealthUpdateSet[]> {
   const sinceMs = Date.now() - 24 * 60 * 60 * 1000;
   const today = todayKey();
   const [yesterday, current] = await Promise.all([
-    checkHealthUpdates(addDays(today, -1), { sinceMs, includeSleep: false }),
-    checkHealthUpdates(today, { sinceMs }),
+    checkHealthUpdates(addDays(today, -1), { sinceMs, includeSleep: false, explicit: true }),
+    checkHealthUpdates(today, { sinceMs, explicit: true }),
   ]);
   return [yesterday, current].filter((s): s is HealthUpdateSet => !!s && updateCount(s) > 0);
 }

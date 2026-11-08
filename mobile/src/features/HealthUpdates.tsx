@@ -94,7 +94,11 @@ let importSheetOpen = false;
 // Manual check requests (Journal pull-to-refresh) → the mounted pill.
 const checkRequests = new Set<() => void>();
 /** Ask the pill to run a check now. No-ops while
- *  the pill or the import card is already showing in any state. */
+ *  the pill or the import card is already showing in any state.
+ *
+ *  This is an EXPLICIT request — the user pulled the Journal down — so it also
+ *  bypasses the logs-read throttle (lib/health/logsSweep), which a launch or a
+ *  foreground does not. */
 export function requestHealthUpdateCheck(): void {
   checkRequests.forEach((l) => l());
 }
@@ -263,7 +267,7 @@ export function HealthUpdatePill() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [phase, foundW]);
 
-  const runCheck = async () => {
+  const runCheck = async (explicit = false) => {
     if (running.current || importSheetOpen || phaseRef.current !== 'hidden') return;
     const s = getState();
     if (!health().available || !s.settings.healthEnabled) return;
@@ -284,7 +288,7 @@ export function HealthUpdatePill() {
       // round-trip (health-store reads, and a permission request that only
       // resolves once the user answers the OS sheet), so any one of them
       // pending would otherwise leave "Checking…" on screen forever.
-      const set = await withTimeout(checkHealthUpdates(todayKey()), CHECK_TIMEOUT_MS);
+      const set = await withTimeout(checkHealthUpdates(todayKey(), { explicit }), CHECK_TIMEOUT_MS);
       // Period days other apps logged, filed by the same check so they get the
       // same receipt. Only TODAY's can lead the pill (it names one day); older
       // ones still file, silently, and show in their own day's list.
@@ -353,7 +357,7 @@ export function HealthUpdatePill() {
     const appSub = AppState.addEventListener('change', (st) => { if (st === 'active') void runCheck(); });
     // Journal pull-to-refresh: check now, debounce aside (runCheck still no-ops
     // while the pill or card is visible).
-    const onRequest = () => { void runCheck(); };
+    const onRequest = () => { void runCheck(true); };
     checkRequests.add(onRequest);
     return () => { appSub.remove(); checkRequests.delete(onRequest); };
     // eslint-disable-next-line react-hooks/exhaustive-deps

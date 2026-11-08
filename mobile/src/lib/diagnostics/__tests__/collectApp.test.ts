@@ -48,6 +48,7 @@ jest.mock('../../health/declined', () => ({ getDeclinedKeys: () => new Set(['a']
 jest.mock('../../health', () => ({
   health: () => ({ available: true, readAuthStatus: async () => 'unknown' }),
   healthAppName: () => 'Apple Health',
+  medicationsSupported: async () => true,
 }));
 jest.mock('../../ble/manager', () => ({ bleIfStarted: () => null }));
 // Reached for the "garmin link" capability row. Mocked for the same reason the
@@ -144,6 +145,20 @@ describe('collectAppDiagnostics', () => {
     expect(d.journal['hrv counted']).toBe(2);   // the 30s imported samples don't count
     expect(d.journal['imported entries']).toBe(2);
     expect(d.journal['nights with stages']).toBe(2);
+  });
+
+  it('names the three gates between logging in Health and an import', async () => {
+    // All three fail silently, so "nothing imports" is only answerable from
+    // the dump: the read permission (HealthKit never reports a grant — the one
+    // honest answer is `shouldRequest`, meaning never asked), the OS version
+    // for doses, and the medication picker's own answer.
+    const txt = formatAppDiagnostics(await collectAppDiagnostics());
+    expect(txt).toContain('logs permission');
+    expect(txt).toContain('medication log supported');
+    // No record at all is itself the finding for a phone importing no doses.
+    expect(txt).toMatch(/medication picker +never opened/);
+    // The retired toggle is gone, with nothing claiming to read it.
+    expect(txt).not.toContain('symptom/med import');
   });
 
   it('never starts the Bluetooth radio — that would raise a permission prompt', async () => {

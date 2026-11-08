@@ -508,7 +508,14 @@ function Onboarding({ onDone }: { onDone: () => void }) {
     // The whole set, ECG included (requestAuth folds in the local native
     // module's sheet), so the watch-sync flow never has to prompt after a
     // finished reading. `force` skips the once-per-launch pacing.
-    const ok = await api.requestAuth({ force: true });
+    //
+    // `scope: 'connect'` adds the symptom reads: what the user logs in the
+    // Health app itself is an ordinary read permission and belongs in the one
+    // connect-time sheet rather than behind a toggle. It is a WIDER set under
+    // its OWN latch key, so the core set — every background path's once-only
+    // ask — is untouched (lib/health/index.ts). No-op on Android, which has no
+    // symptom record to ask for.
+    const ok = await api.requestAuth({ force: true, scope: 'connect' });
     setHealthBusy(false);
     if (!ok) { toast('Permission denied'); return; }
     getState().settings.healthEnabled = true; save(); toast('Health connected');

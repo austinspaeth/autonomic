@@ -9,13 +9,12 @@ import { TimeField } from '../components/Field';
 import { useToast } from '../components/Toast';
 import { usePalette } from '../theme';
 import {
-  health, healthAppName, healthPermissionPath, medicationsSupported, openMedicationPicker,
-  revokeHealthAuth, SleepImport,
+  health, healthAppName, healthPermissionPath, medicationsSupported, medPickerNote,
+  openMedicationPicker, revokeHealthAuth, SleepImport, type MedPickerOutcome,
 } from '../lib/health';
 import { ensureDay, getState, save, storeSleepSeries, useStore } from '../store/store';
 import { fmtTime12, todayKey } from '../lib/dates';
 import { ImportedList, runHealthUpdateCheck } from './HealthUpdates';
-import { NotifRow } from './Reminders';
 import { StoreError } from './Paywall';
 
 export function HealthScreen() {
@@ -43,7 +42,8 @@ export function HealthScreen() {
     setBusy(true);
     // Asks for the whole set, ECG included (requestAuth folds in the local
     // native module's sheet); `force` skips the once-per-launch pacing.
-    const ok = await api.requestAuth({ force: true });
+    // `scope: 'connect'` adds the symptom reads — see Onboarding's Connect.
+    const ok = await api.requestAuth({ force: true, scope: 'connect' });
     setBusy(false);
     toast(ok ? 'Health connected' : 'Permission denied');
     if (ok) { getState().settings.healthEnabled = true; save(); }
@@ -94,11 +94,20 @@ export function HealthScreen() {
       {connected
         ? <Button title={`Disconnect ${healthAppName()}`} variant="danger" onPress={disconnect} />
         : <Button title={`Connect ${healthAppName()}`} variant="primary" onPress={connect} />}
+      {/* No control, just the fact — a behaviour nobody can see is worse than
+          one nobody chose. Symptoms logged in the Health app are an ordinary
+          read permission and ride the Connect ask above. Only once connected:
+          before that it would be a claim about a feature that is not running. */}
+      {connected && Platform.OS === 'ios' ? (
+        <Text style={{ color: p.textDim, fontSize: 13, marginTop: 12, lineHeight: 18 }}>
+          {'Symptoms you log in the Health app itself are brought in too, the same way. Anything imported shows under "Imported today" below, and removing it there means it is never offered again.'}
+        </Text>
+      ) : null}
       <View style={{ height: 20 }} />
       <Text style={{ color: p.textDim, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>Troubleshooting</Text>
       <Button title={`Check ${healthAppName()} for updates`} onPress={checkForUpdates} disabled={busy} />
       {busy ? <View style={{ alignItems: 'center', marginTop: 14 }}><ActivityIndicator color={p.accent} /></View> : null}
-      {connected ? <LogsImportRow /> : null}
+      {connected ? <LogsSection /> : null}
       {connected ? (
         <>
           {/* The same list the import pill opens, so anything it filed can be
@@ -114,114 +123,155 @@ export function HealthScreen() {
 }
 
 /**
- * "Also import what I log in Health itself" — symptoms, and on iOS 26 the
+ * What the user logs in Health ITSELF, on iOS: symptoms, and on iOS 26 the
  * medication doses from the Health app's own medication list.
  *
- * OPT-IN, and off by default, for three reasons that all point the same way.
- * It needs a read permission the core set deliberately does not ask for (a
- * sheet nobody tapped anything to get is the nag lib/health/askedAuth exists to
- * prevent); the symptom read is one query per mapped type and the periodic
- * check runs on every foreground, so off has to mean NOT READ rather than read
- * and discarded; and somebody who logs symptoms in both places may genuinely
- * not want them merged. `settings.healthLogs` is the source of truth and the
- * permission is derived — the same arrangement the morning reminder uses.
+ * It used to be one toggle over both, which was wrong, because the two halves
+ * are not the same kind of object:
  *
- * Android does not render it at all: Health Connect has no symptom record and
- * no medication record, so the row would be a promise the platform cannot keep.
+ *  - a SYMPTOM is an ordinary HealthKit read permission, so it belongs in the
+ *    one Apple Health connect ask (`scope: 'connect'`). Connecting Apple
+ *    Health is the consent, the same way it already is for readings, sleep and
+ *    workouts. There is no switch here any more;
+ *  - a MEDICATION is a PER-OBJECT authorization. It can never ride a batch
+ *    request (naming it in `requestAuthorization(toShare:read:)` raises inside
+ *    HealthKit and takes the process with it — the 1.39.0 SIGABRT), the picker
+ *    is presented on EVERY call whether or not anything was granted, and a
+ *    grant covers only the medications ticked at that moment, so there has to
+ *    be a permanent way back to it. That is not a permission toggle, it is a
+ *    "manage which medications" ACTION, closer to the strap picker.
+ *
+ * Its "on" state is unverifiable in any case: Apple's `success` is false only
+ * on an error and says nothing about what was shared, so nothing here may draw
+ * one, and inventing one would be a claim the OS does not support.
+ *
+ * Android renders none of it: Health Connect has no symptom record and no
+ * medication record, so every row would be a promise the platform cannot keep.
  */
-function LogsImportRow() {
-  const toast = useToast();
-  const p = usePalette();
-  const on = useStore((s) => !!s.state.settings.healthLogs);
+function LogsSection() {
   const [meds, setMeds] = useState(false);
-  const [busy, setBusy] = useState(false);
-  const [picking, setPicking] = useState(false);
-  const [pickFailed, setPickFailed] = useState(false);
   useEffect(() => { void medicationsSupported().then(setMeds); }, []);
-
   if (Platform.OS !== 'ios') return null;
+  return (
+    <>
+      <LogsCatchUpRow />
+      {meds ? <MedicationsRow /> : null}
+    </>
+  );
+}
 
-  const toggle = async () => {
-    if (busy) return;
-    // Whichever way it goes, a stale picker error is about a tap that is no
-    // longer the state on screen.
-    setPickFailed(false);
-    if (on) {
-      // Off is ours alone to do: HealthKit cannot hand a read grant back, so
-      // the honest thing is to stop reading, and say where to revoke.
-      getState().settings.healthLogs = false; save();
-      toast('Will stop importing symptoms');
-      return;
-    }
-    setBusy(true);
-    // The whole 'logs' set in one tap: the symptom types through the normal
-    // bridge, then (iOS 26) the medication log's own sheet.
-    const ok = await health().requestAuth({ force: true, scope: 'logs' });
-    setBusy(false);
-    if (!ok) { toast('Permission denied'); return; }
-    getState().settings.healthLogs = true; save();
-    toast('Importing from Apple Health');
+/**
+ * The one-time catch-up ask, for installs that already connected.
+ *
+ * Somebody who connected Apple Health before this shipped will never tap
+ * Connect again, so they would never be asked for the symptom types. This row
+ * shows only while `readAuthStatus('logs')` is `shouldRequest` — the one
+ * honest question iOS allows, meaning the sheet has never been shown for these
+ * types — and disappears for good once it has been, because the status is no
+ * longer `shouldRequest`. No toggle and no stored flag: the platform already
+ * holds the answer, and a second copy of it could only ever disagree.
+ */
+function LogsCatchUpRow() {
+  const p = usePalette();
+  const [due, setDue] = useState(false);
+  const [busy, setBusy] = useState(false);
+
+  const refresh = () => {
+    void health().readAuthStatus('logs')
+      .then((st) => setDue(st === 'shouldRequest'))
+      .catch(() => setDue(false));
   };
+  useEffect(refresh, []);
 
-  // Reopening the picker. Tapping twice opens it twice, which is the API's own
-  // behaviour and not a bug: a medication is a per-object authorization, so
-  // the sheet is presented on EVERY call and its answer is which medications
-  // are ticked now.
-  //
-  // Success says nothing on screen, because `success` is not a grant (Apple:
-  // it "doesn't indicate whether the user actually granted") — the Health
-  // sheet the user just answered is the receipt, and which medications came
-  // back is the next dose read's answer, not this call's. Only a failure to
-  // PRESENT is worth reporting, and it is reported in the sheet's own content:
-  // this screen is opened with openSheet, the stack is one RN Modal painting
-  // above ToastProvider, so a toast() from in here would be invisible.
-  const pick = async () => {
-    if (picking) return;
-    setPicking(true); setPickFailed(false);
-    const ok = await openMedicationPicker();
-    setPicking(false); setPickFailed(!ok);
+  if (!due) return null;
+
+  const ask = async () => {
+    if (busy) return;
+    setBusy(true);
+    await health().requestAuth({ force: true, scope: 'logs' });
+    setBusy(false);
+    // The answer is the platform's, not ours: re-read it rather than assuming
+    // the sheet was granted (HealthKit never says) or even that it presented.
+    refresh();
   };
 
   return (
     <>
       <View style={{ height: 20 }} />
-      <Text style={{ color: p.textDim, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 2 }}>
+      <Text style={{ color: p.textDim, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
         What you log in Health
       </Text>
-      <NotifRow
-        icon="alert"
-        title={meds ? 'Symptoms and medications' : 'Symptoms'}
-        sub={meds
-          ? 'Bring in what you log in the Health app itself'
-          : 'Bring in the symptoms you log in the Health app'}
-        on={on}
-        onToggle={() => { void toggle(); }}
+      <Button
+        title={busy ? 'Opening Health\u2026' : 'Also import what you log in Health'}
+        disabled={busy}
+        onPress={() => { void ask(); }}
       />
       <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 18, marginTop: 8 }}>
-        {meds
-          ? 'Doses you mark as taken in Health are filed under your own medication types, and a medication you have no type for yet offers to create one. Skipped doses are never imported.'
-          : 'Medication doses need iOS 26, which added the Health app\u2019s medication log. Symptoms import on any version.'}
+        {'Symptoms you log in the Health app are filed under your own symptom types. Asked once.'}
       </Text>
-      {/* Only with the toggle ON and a medication log to pick from: a button
-          that opens a picker the OS cannot show is worse than no button. */}
-      {on && meds ? (
-        <View style={{ marginTop: 14 }}>
-          <Button
-            title={picking ? 'Opening Health\u2026' : 'Choose which medications to import'}
-            disabled={picking}
-            onPress={() => { void pick(); }}
-          />
-          <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 18, marginTop: 8 }}>
-            {'Doses only import for medications you share with Autonomic. Added a new one? Pick it here.'}
-          </Text>
-          {pickFailed ? (
-            <View style={{ marginTop: 10 }}>
-              <StoreError text={'Could not open the medication list. Try again, or share the medication from the Health app itself.'} />
-            </View>
-          ) : null}
+    </>
+  );
+}
+
+/**
+ * The way back to Apple Health's medication picker, and the only one.
+ *
+ * A BUTTON, not a toggle. A grant covers the medications that were ticked AT
+ * THAT MOMENT, and the import drops a dose it cannot name rather than filing
+ * it unnamed, so a prescription added to the Health app later imports nothing
+ * and says nothing: the dose carries a concept identifier, the name comes from
+ * the medication list, and the list returns only what was shared. Without this
+ * row the only route back was turning a feature off and on again.
+ *
+ * Tapping twice opens it twice, which is the API's own behaviour and not a
+ * bug: the sheet is presented on every call and its answer is which
+ * medications are ticked now.
+ *
+ * What it says afterwards is `medPickerNote` (lib/health/medPicker) and it is
+ * reported INSIDE the sheet. `toast()` is never used from here: this screen is
+ * in the sheet stack, which is one RN Modal painting above ToastProvider, so a
+ * toast from in here is invisible and a failure path that only calls one looks
+ * exactly like a tap that did nothing. Success says nothing at all, because
+ * `success` is not a grant — the Health sheet the user just answered is the
+ * receipt, and which medications came back is the next dose read's answer.
+ */
+function MedicationsRow() {
+  const p = usePalette();
+  const [picking, setPicking] = useState(false);
+  const [out, setOut] = useState<MedPickerOutcome | null>(null);
+
+  const pick = async () => {
+    if (picking) return;
+    setPicking(true); setOut(null);
+    const answer = await openMedicationPicker();
+    setPicking(false); setOut(answer);
+  };
+
+  const note = medPickerNote(out, healthPermissionPath());
+
+  return (
+    <>
+      <View style={{ height: 20 }} />
+      <Text style={{ color: p.textDim, fontSize: 13, fontWeight: '700', textTransform: 'uppercase', letterSpacing: 0.5, marginBottom: 8 }}>
+        Medications
+      </Text>
+      <Button
+        title={picking ? 'Opening Health\u2026' : 'Choose which medications to import'}
+        disabled={picking}
+        onPress={() => { void pick(); }}
+      />
+      <Text style={{ color: p.textDim, fontSize: 13, lineHeight: 18, marginTop: 8 }}>
+        {'Doses you mark as taken in Health are filed under your own medication types, and one you have no type for yet offers to create it. Skipped doses are never imported. Doses only import for medications you share with Autonomic, so pick a newly prescribed one here.'}
+      </Text>
+      {note ? (
+        <View style={{ marginTop: 10 }}>
+          {note.kind === 'error'
+            ? <StoreError text={note.text} />
+            /* Full strength, not dim: it is the answer to a tap, and the line
+               above it is dim body copy. */
+            : <Text style={{ color: p.text, fontSize: 13, lineHeight: 19 }}>{note.text}</Text>}
         </View>
       ) : null}
-      {busy ? <View style={{ alignItems: 'center', marginTop: 12 }}><ActivityIndicator color={p.accent} /></View> : null}
     </>
   );
 }

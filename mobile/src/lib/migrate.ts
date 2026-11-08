@@ -388,7 +388,12 @@ export function migrate(s: unknown): AppState {
   if (settings.lastBleDeviceId !== undefined && typeof settings.lastBleDeviceId !== 'string') delete settings.lastBleDeviceId;
   if (settings.lastBleDeviceName !== undefined && typeof settings.lastBleDeviceName !== 'string') delete settings.lastBleDeviceName;
   if (settings.healthEnabled !== undefined) settings.healthEnabled = !!settings.healthEnabled;
-  if (settings.healthLogs !== undefined) settings.healthLogs = !!settings.healthLogs;
+  // RETIRED (1.40): symptoms ride the Apple Health connect ask and medications
+  // are a picker, not a toggle (lib/health/index.ts). Deleted rather than left
+  // alone, because `settings` is SPREAD from the stored object rather than
+  // rebuilt field by field, so an untouched key would sit in the journal — and
+  // in every export of it — for good, as a setting nothing reads.
+  delete (settings as Record<string, unknown>).healthLogs;
   if (settings.units !== undefined && settings.units !== 'imperial' && settings.units !== 'metric') delete settings.units;
   if (settings.lastHrvSource !== undefined && !['polar', 'watch', 'garmin', 'camera'].includes(settings.lastHrvSource as string)) delete settings.lastHrvSource;
   // A reminder only ever schedules from a real HH:MM; anything else is dropped

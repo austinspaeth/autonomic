@@ -9,10 +9,94 @@ crosses to a new `x.x` (a unit test fails if the shipping minor has no entry).
 
 ## Unreleased
 
+- **Symptoms now import automatically; medications are chosen in Apple Health's own
+  picker.** One change in two halves, because the two halves were never the same kind
+  of object. A SYMPTOM is an ordinary HealthKit read permission, so it belongs in the
+  one Apple Health connect ask: `requestAuth` gains `scope: 'connect'`, whose read set
+  is `CORE_READ_IDS + LOGS_READ_IDS` under a new `HK_CONNECT_SET_KEY` (`hk1connect:`),
+  passed by exactly the two Connect buttons (the wizard's "Connect your data" and
+  Settings → Connect Apple Health). Every other `requestAuth({ force: true })` call
+  site stays on the core set — those are mid-flow asks for one feature, and a strap
+  setup card has no business listing 23 symptom types. `CORE_READ_IDS`, `WRITE_IDS` and
+  `HK_SET_KEY` are byte-identical, which is the whole reason the widening is its own
+  scope under its own key: the core key is the once-only ask latch for every background
+  path, so adding to it would make `hasAskedAuth` read false for every existing install
+  and raise a HealthKit sheet on the next quiet update check. On Android the scope
+  resolves to the core set and nothing new is requested — Health Connect has no symptom
+  record, and a record type with no `android.permission.health.*` behind it is the
+  documented consent-loop trap. A MEDICATION is a per-object authorization, so it is not
+  a permission toggle at all but a *manage which medications* action: `MedicationsRow`
+  (iOS 26 only) is a button over `openMedicationPicker()` and nothing else. The
+  `settings.healthLogs` switch is gone, along with its type, its migrator line (the key
+  is now DELETED, because `settings` is spread from the stored object rather than
+  rebuilt field by field, so an untouched key would sit in the journal and every export
+  of it for good) and its support-dump row. An install that already connected meets a
+  one-time catch-up row — "Also import what you log in Health", shown only while
+  `readAuthStatus('logs')` is `shouldRequest`, which is the one honest question iOS
+  allows, and gone for good once the sheet has been shown. No toggle and no stored flag:
+  the platform already holds the answer, and a second copy of it could only disagree.
+  **Behaviour change worth stating plainly**: symptoms logged in the Health app now file
+  themselves on a foreground check for everyone who connects Health, where before
+  nothing happened unless the user opted in. The import pill's receipt names what was
+  written and the permanent declined list makes a deletion stick, so it is undoable, and
+  a line of copy under the Apple Health section says it happens. The historical backfill
+  is deliberately untouched: it imports no historical symptoms (23 queries × a year is a
+  different cost question) and no historical doses (there is no dose query to sweep).
+
+- **The two "what you log in Health" reads are now throttled, and only those two.**
+  `lib/health/logsSweep.ts` (pure + tested) plus a flags-MMKV shell: at most once an
+  hour per day key, always on the first check of a new day key, always on an explicit
+  user action (Settings → "Check for updates" and the Journal's pull-to-refresh both
+  pass `explicit`), and stamped only once a read actually went out, so a skipped read
+  never pushes the next sweep an hour away. It is needed because `readSymptoms` is one
+  native category query per mapped type and `checkHealthUpdates` runs on every
+  foreground: while symptoms were opt-in those queries never ran for an install that had
+  not opted in, and now they would run for everyone who connected — including everyone
+  who DENIED the symptom types, since HealthKit never reports read grants and "denied"
+  is indistinguishable from "nothing logged there" from here. The no-throttle rule for
+  the check as a whole is untouched (opening the app is the request to bring it up to
+  date), and there is deliberately no "stop after N empty sweeps" back-off, which would
+  silently retire the feature for anyone who logs symptoms in Health only occasionally.
+
+- **The medication picker now says what it actually answered.** Supersedes #136.
+  `requestPerObjectReadAuthorization` reports almost everything that is not a success as
+  a HealthKit *error* rather than as `success == false`: Apple's own example catches
+  `errorUserCanceled` for a picker the person closed, and a Health app with no
+  medications in its list answers `errorNoData`. The native side resolved a bare `false`
+  for all of it, so one sentence — "Could not open the medication list" — stood for four
+  different outcomes and was simply wrong about the two commonest. `hkCode` in
+  `EcgHealthModule.swift` maps each HealthKit error to one stable word (`canceled`,
+  `nodata`, `denied`, `notdetermined`, `unavailable`, `restricted`, `invalid`, `locked`,
+  and `hk<code>` for a case nobody anticipated, which stays identifiable from a support
+  dump rather than flattened into the general failure); `requestMedicationAuth` now
+  resolves `{ ok, code, message? }` and presents inside `DispatchQueue.main.async`,
+  since the call's whole purpose is to show a sheet and an Expo `AsyncFunction` body
+  does not run on the main queue — also a plausible cause of a picker that never
+  presents at all. `lib/health/medPicker.ts` (pure + tested) reads the structured
+  answer, an older binary's bare boolean as `ok`/`failed`, and an absent native function
+  as `missing`, and `medPickerNote` gives every not-success its own sentence: nothing at
+  all for `ok` AND for `canceled` (the Health sheet just answered is the receipt, and
+  `success` is not a grant, so there is nothing to claim either way), `nodata` as
+  information rather than an error (the fix is in the Health app and this button can do
+  nothing about it), `denied`/`notdetermined` pointing at `healthPermissionPath()`, and
+  a default branch that puts the CODE in the sentence — that branch exists because
+  nobody knew what would land in it, so the word a support dump and a `/fault` row carry
+  has to be the word on screen too. `isMedPickerFault` is false for `ok`, `canceled` and
+  `nodata`, so `health.medPicker` never counts people using the feature as people
+  hitting a bug; `medPickerMemory.ts` keeps the last answer only (code, age, the OS's
+  own words, capped — no medication name ever reaches it) for a new `medication picker`
+  support-dump row, where `never opened` is itself the finding for a phone that imports
+  no doses. The dump's retired `symptom/med import` row is replaced by `logs permission`
+  (`readAuthStatus('logs')`). **Native build, not an OTA** — the Swift is half the fix.
+  The JS reads the bare boolean an older binary resolves, so a bundle reaching an
+  unfixed binary degrades rather than breaking.
+
 - **A way back to the Apple Health medication picker.** "Choose which medications to
-  import" now sits under the "Symptoms and medications" description in Settings →
-  Apple Health (iOS 26+, toggle on; absent otherwise — a button that opens a picker
-  the OS cannot show is worse than no button). A medication grant covers only the
+  import" now sits in Settings → Apple Health (iOS 26+; absent otherwise — a button
+  that opens a picker the OS cannot show is worse than no button). *(It landed under
+  the "Symptoms and medications" toggle and gated on it; the entry above retired that
+  toggle and the button is now its own row, which is the only shape it was ever: a
+  manage-which-medications action rather than a permission switch.)* A medication grant covers only the
   medications ticked at that moment, and `requestMedicationAuth` was reachable from
   exactly one place, so a prescription added to the Health app afterwards imported
   nothing and said nothing about it: a dose event carries only a

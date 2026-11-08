@@ -23,6 +23,19 @@ export interface RawMedicationDose {
   scheduledAt?: number;
 }
 
+/**
+ * What the medication picker answered. `ok` is Apple's `success`, which says
+ * the request was PROCESSED and never what was shared; `code` is the reason,
+ * one stable word (see the Swift `hkCode`), because most not-successes arrive
+ * as a HealthKit error and two of them ('canceled', 'nodata') are not faults
+ * at all.
+ */
+export interface MedicationAuthResult {
+  ok: boolean;
+  code: string;
+  message?: string;
+}
+
 interface EcgHealthNative {
   isAvailable(): Promise<boolean>;
   requestAuthorization(): Promise<boolean>;
@@ -34,8 +47,10 @@ interface EcgHealthNative {
    *  built before 1.39 do not carry any of the three below. */
   medicationsAvailable?(): Promise<boolean>;
   /** READ authorization for dose events + the medication list. Its own sheet,
-   *  asked only from a tap. */
-  requestMedicationAuth?(): Promise<boolean>;
+   *  asked only from a tap. Resolves the structured answer; the `boolean` arm
+   *  is what a binary built before this shipped resolves, and the JS reads it
+   *  as ok/failed (../../src/lib/health/medPicker.ts). */
+  requestMedicationAuth?(): Promise<MedicationAuthResult | boolean>;
   /** Doses logged as taken inside [startMs, endMs). */
   queryMedications?(startMs: number, endMs: number, limit: number): Promise<RawMedicationDose[]>;
 }

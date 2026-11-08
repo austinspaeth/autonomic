@@ -27,6 +27,11 @@ import {
   hasAskedAuth, markAskedAuth, markPromptedThisLaunch, promptedThisLaunch, shareAuthRequest,
 } from './askedAuth';
 import { requestEcgAuth } from './ecg';
+import {
+  isMedPickerFault, medPickerNote, normalizeMedPicker, type MedPickerOutcome,
+} from './medPicker';
+import { noteMedPicker } from './medPickerMemory';
+import { reportFault } from '../../store/errorReport';
 import { ecgNative } from '../../../modules/ecg-health';
 import { groupNights, summarizeSleep, type StageSpan } from './sleepSummary';
 import { SYMPTOM_IMPORT, SYMPTOM_READ_IDS, symptomSeverity } from './symptomMap';
@@ -38,7 +43,7 @@ import { activityTypeFromHk, workoutHrSeries } from './workoutMap';
 const OWN_BUNDLE = 'com.autonomic.journal';
 
 /** Which slice of the read set a permission question is about. */
-export type HealthScope = 'all' | 'workouts' | 'steps' | 'cycle' | 'logs';
+export type HealthScope = 'all' | 'workouts' | 'steps' | 'cycle' | 'logs' | 'connect';
 /**
  * What we can honestly say about read access.
  *  - `shouldRequest` — the OS still has questions to ask; requesting shows UI.
@@ -718,6 +723,20 @@ const HK_STEPS_SET_KEY = `hk1steps:${[...CORE_READ_IDS, ...STEPS_READ_IDS].join(
 const HK_CYCLE_SET_KEY = `hk1cycle:${[...CORE_READ_IDS, ...CYCLE_READ_IDS].join(',')}|${[...WRITE_IDS, ...CYCLE_WRITE_IDS].join(',')}`;
 /** The symptoms/medications set, with its own latch for the same reason. */
 const HK_LOGS_SET_KEY = `hk1logs:${[...CORE_READ_IDS, ...LOGS_READ_IDS].join(',')}|${WRITE_IDS.join(',')}`;
+/**
+ * What the two CONNECT buttons ask for: the core set plus the symptom reads,
+ * under its own key again.
+ *
+ * Symptoms logged in the Health app are ordinary read permissions and belong
+ * in the one connect-time sheet — connecting Apple Health is the consent, the
+ * same way it already is for readings, sleep and workouts. They still cannot
+ * join CORE_READ_IDS: that set's key is the once-only ask latch for every
+ * BACKGROUND path, so widening it would make `hasAskedAuth` read false for
+ * every existing install and raise a HealthKit sheet on the next quiet update
+ * check. Its own scope under its own key is the same arrangement STEPS and
+ * CYCLE already use, and the only one that leaves the core alone.
+ */
+const HK_CONNECT_SET_KEY = `hk1connect:${[...CORE_READ_IDS, ...LOGS_READ_IDS].join(',')}|${WRITE_IDS.join(',')}`;
 
 /**
  * Has HealthKit been asked about this set yet? The only honest question iOS
@@ -793,10 +812,23 @@ export async function medicationsSupported(): Promise<boolean> {
  * side owns the whole call). Only ever called from the 'logs' tap — see
  * requestAuth — because the picker is presented on EVERY call, answered or not.
  */
-async function requestMedicationAuth(): Promise<boolean> {
+async function requestMedicationAuth(): Promise<MedPickerOutcome> {
   const ask = ecgNative()?.requestMedicationAuth;
-  if (!ask) return false;
-  try { return (await step('meds', () => ask())) ?? false; } catch { return false; }
+  const out = ask
+    ? await (async () => {
+      try { return normalizeMedPicker(await step('meds', () => ask())); }
+      catch (e) { return { ok: false, code: 'failed', message: String((e as Error)?.message ?? '') || undefined }; }
+    })()
+    : normalizeMedPicker(undefined);
+  // Recorded for the support dump: every answer, including the two that are
+  // not faults, because "nothing imports" is answered by WHICH of them it was.
+  noteMedPicker(out);
+  // Reported only when it is actually a failure. A cancel is the commonest
+  // outcome there is and an empty medication list is the person's own data;
+  // a /fault row for either would count people using the feature as people
+  // hitting a bug (./medPicker).
+  if (isMedPickerFault(out.code)) reportFault('health.medPicker', out.code);
+  return out;
 }
 
 /**
@@ -823,11 +855,13 @@ async function requestMedicationAuth(): Promise<boolean> {
  * nothing may report "shared". Which medications came back is the list query's
  * answer, asked the next time doses are read.
  */
-export async function openMedicationPicker(): Promise<boolean> {
-  if (Platform.OS !== 'ios') return false;
-  if (!(await medicationsSupported())) return false;
+export async function openMedicationPicker(): Promise<MedPickerOutcome> {
+  if (Platform.OS !== 'ios') return { ok: false, code: 'unsupported' };
+  if (!(await medicationsSupported())) return { ok: false, code: 'unsupported' };
   return requestMedicationAuth();
 }
+
+export { medPickerNote, type MedPickerOutcome };
 
 /**
  * Dev-only timing around each native leg of the authorization dance. Every one
@@ -931,12 +965,15 @@ function makeReal(mod: HkModule): HealthApi {
       // is untouched by this feature existing.
       const cycle = opts?.scope === 'cycle';
       const logs = opts?.scope === 'logs';
-      const wide = opts?.scope === 'steps' || cycle || logs;
+      // The Connect buttons: core + the symptom reads, one sheet, its own key.
+      const connect = opts?.scope === 'connect';
+      const wide = opts?.scope === 'steps' || cycle || logs || connect;
       const readIds = cycle ? [...CORE_READ_IDS, ...CYCLE_READ_IDS]
-        : logs ? [...CORE_READ_IDS, ...LOGS_READ_IDS]
+        : logs || connect ? [...CORE_READ_IDS, ...LOGS_READ_IDS]
         : wide ? [...CORE_READ_IDS, ...STEPS_READ_IDS] : CORE_READ_IDS;
       const writeIds = cycle ? [...WRITE_IDS, ...CYCLE_WRITE_IDS] : WRITE_IDS;
       const setKey = cycle ? HK_CYCLE_SET_KEY : logs ? HK_LOGS_SET_KEY
+        : connect ? HK_CONNECT_SET_KEY
         : wide ? HK_STEPS_SET_KEY : HK_SET_KEY;
       return shareAuthRequest(async () => {
         try {
@@ -978,7 +1015,8 @@ function makeReal(mod: HkModule): HealthApi {
       try {
         const read = scope === 'workouts' ? [WORKOUT_TYPE, QID.heartRate]
           : scope === 'steps' ? STEPS_READ_IDS : scope === 'cycle' ? CYCLE_READ_IDS
-          : scope === 'logs' ? LOGS_READ_IDS : READ_IDS;
+          : scope === 'logs' ? LOGS_READ_IDS
+          : scope === 'connect' ? [...CORE_READ_IDS, ...LOGS_READ_IDS] : READ_IDS;
         const write = scope === 'all' ? WRITE_IDS : scope === 'cycle' ? CYCLE_WRITE_IDS : [];
         const st = await mod.getRequestStatusForAuthorization?.(read, write);
         return st === 1 ? 'shouldRequest' : 'unknown';

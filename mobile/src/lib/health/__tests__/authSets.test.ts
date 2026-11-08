@@ -55,6 +55,19 @@ describe('iOS permission sets', () => {
     expect(block('CORE_READ_IDS', SRC)).not.toContain('LOGS');
   });
 
+  it('puts the connect ask in its own set under its own key', () => {
+    // The two Connect buttons ask for core + the symptom reads in ONE sheet:
+    // what the user logs in Health is an ordinary read permission. It still
+    // cannot join CORE_READ_IDS, whose key is every background path's
+    // once-only ask latch, so it is its own scope under its own key — the
+    // arrangement steps and the cycle already use.
+    expect(SRC).toContain('const HK_CONNECT_SET_KEY = `hk1connect:${[...CORE_READ_IDS, ...LOGS_READ_IDS].join(\',\')}|${WRITE_IDS.join(\',\')}`');
+    expect(SRC).toContain("const connect = opts?.scope === 'connect';");
+    expect(SRC).toContain('connect ? HK_CONNECT_SET_KEY');
+    // And the core set still names no symptom type, which is the whole point.
+    expect(block('CORE_READ_IDS', SRC)).not.toContain('SYMPTOM');
+  });
+
   it('asks for the medication log separately, and only in the logs tap', () => {
     // A dose event is not a category type, so it cannot ride the bridge's
     // set; it is a second native sheet and must never be raised from a launch
@@ -94,6 +107,51 @@ describe('the medication permission', () => {
     expect(body).not.toContain('markAskedAuth');
     expect(body).not.toContain('HK_LOGS_SET_KEY');
     expect(body).not.toContain('requestAuth(');
+  });
+
+  it('presents the picker on the main queue and resolves a reason, not a bool', () => {
+    const i = SWIFT.indexOf('AsyncFunction("requestMedicationAuth")');
+    const next = SWIFT.indexOf('AsyncFunction(', i + 20);
+    const body = SWIFT.slice(i, next > -1 ? next : SWIFT.length);
+    // The call's whole purpose is to present a sheet, and an Expo
+    // AsyncFunction body does not run on the main queue.
+    expect(body).toContain('DispatchQueue.main.async');
+    // A bare `false` made one JS sentence stand for four outcomes, two of
+    // which are not failures (a closed picker, an empty medication list).
+    expect(body).not.toContain('promise.resolve(false)');
+    expect(body).toContain('EcgHealthModule.hkCode(err)');
+    expect(body).toContain('"code": "unsupported"');
+    expect(body).toContain('"code": "unavailable"');
+    // Promise.resolve takes Any?, so each payload is annotated rather than
+    // inferred — an inferred heterogeneous literal is one warning from
+    // failing the build.
+    expect(body).toContain('let out: [String: Any]');
+  });
+
+  it('maps each HealthKit error to one stable word, and keeps the unknown one', () => {
+    const i = SWIFT.indexOf('private static func hkCode(');
+    expect(i).toBeGreaterThan(-1);
+    const body = SWIFT.slice(i, SWIFT.indexOf('\n  }', i));
+    // Guarded on the domain, or a non-HealthKit error would be read as one.
+    expect(body).toContain('err.domain == HKError.errorDomain');
+    expect(body).toContain('HKError.Code(rawValue: err.code)');
+    ([
+      ['.errorUserCanceled', 'canceled'],
+      ['.errorNoData', 'nodata'],
+      ['.errorAuthorizationDenied', 'denied'],
+      ['.errorRequiredAuthorizationDenied', 'denied'],
+      ['.errorAuthorizationNotDetermined', 'notdetermined'],
+      ['.errorHealthDataUnavailable', 'unavailable'],
+      ['.errorHealthDataRestricted', 'restricted'],
+      ['.errorInvalidArgument', 'invalid'],
+      ['.errorDatabaseInaccessible', 'locked'],
+    ] as const).forEach(([swiftCase, word]) => {
+      expect(body).toContain(swiftCase);
+      expect(body).toContain(`"${word}"`);
+    });
+    // The case nobody anticipated stays identifiable from a support dump
+    // rather than being flattened into the general failure.
+    expect(body).toContain('return "hk\\(err.code)"');
   });
 
   it('never reaches the batch API from the medication request', () => {

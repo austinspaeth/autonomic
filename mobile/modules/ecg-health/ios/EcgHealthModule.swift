@@ -123,22 +123,43 @@ public class EcgHealthModule: Module {
     // the nag src/lib/health/askedAuth.ts exists to prevent.
     AsyncFunction("requestMedicationAuth") { (promise: Promise) in
       guard HKHealthStore.isHealthDataAvailable() else {
-        promise.resolve(false)
+        let out: [String: Any] = ["ok": false, "code": "unavailable"]
+        promise.resolve(out)
         return
       }
       guard #available(iOS 26.0, *) else {
-        promise.resolve(false)
+        let out: [String: Any] = ["ok": false, "code": "unsupported"]
+        promise.resolve(out)
         return
       }
-      self.store.requestPerObjectReadAuthorization(
-        for: HKObjectType.userAnnotatedMedicationType(),
-        predicate: nil
-      ) { success, error in
-        // A refusal is not an error here: the caller's answer is "no doses",
-        // and the JS read degrades to an empty day either way. `success` says
-        // the request was PROCESSED, never that anything was shared — which
-        // medications came back is the list query's answer, not this one's.
-        if error != nil { promise.resolve(false) } else { promise.resolve(success) }
+      // On the MAIN queue, because the whole purpose of this call is to PRESENT
+      // a sheet and an Expo `AsyncFunction` body does not run there. Apple
+      // hands the answer back "on an arbitrary background queue" either way,
+      // so that is all it changes — and a picker that never presents at all is
+      // one of the things it plausibly explains.
+      DispatchQueue.main.async {
+        self.store.requestPerObjectReadAuthorization(
+          for: HKObjectType.userAnnotatedMedicationType(),
+          predicate: nil
+        ) { success, error in
+          // `success` says the request was PROCESSED, never that anything was
+          // shared — which medications came back is the list query's answer,
+          // not this one's. But almost everything that is NOT a success
+          // arrives as a HealthKit ERROR rather than as `success == false`:
+          // Apple's own example catches `errorUserCanceled` for a picker the
+          // person closed, and a Health app holding no medications answers
+          // `errorNoData`. Resolving a bare `false` for all of it made one
+          // sentence on the JS side stand for four different outcomes, two of
+          // which are not failures at all. So the reason travels.
+          if let err = error as NSError? {
+            var out: [String: Any] = ["ok": false, "code": EcgHealthModule.hkCode(err)]
+            out["message"] = err.localizedDescription
+            promise.resolve(out)
+            return
+          }
+          let out: [String: Any] = ["ok": success, "code": success ? "ok" : "failed"]
+          promise.resolve(out)
+        }
       }
     }
 
@@ -365,6 +386,30 @@ public class EcgHealthModule: Module {
     case .none: return "none"
     case .present: return "present"
     @unknown default: return "notSet"
+    }
+  }
+
+  /**
+   * One stable word per HealthKit error, so the JS side can say WHICH thing
+   * happened (../../src/lib/health/medPicker.ts) and a `/fault` row can be
+   * grouped by it. An unanticipated case keeps its raw code rather than being
+   * flattened into the general failure — that is the branch which exists
+   * because nobody knew what would land in it, so it has to stay identifiable
+   * from a support dump.
+   */
+  private static func hkCode(_ err: NSError) -> String {
+    guard err.domain == HKError.errorDomain,
+          let code = HKError.Code(rawValue: err.code) else { return "failed" }
+    switch code {
+    case .errorUserCanceled: return "canceled"
+    case .errorNoData: return "nodata"
+    case .errorAuthorizationDenied, .errorRequiredAuthorizationDenied: return "denied"
+    case .errorAuthorizationNotDetermined: return "notdetermined"
+    case .errorHealthDataUnavailable: return "unavailable"
+    case .errorHealthDataRestricted: return "restricted"
+    case .errorInvalidArgument: return "invalid"
+    case .errorDatabaseInaccessible: return "locked"
+    default: return "hk\(err.code)"
     }
   }
 }

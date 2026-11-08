@@ -166,18 +166,52 @@ old web app so old `export.json` files import directly.
   (`checkHealthUpdatesLast24h`). Imports write through the normal store paths
   (scores + waveform sidecar).
 - **What the user logs in Health ITSELF — symptoms and medication doses — is
-  imported too, and it is OPT-IN** (1.39, iOS only: Health Connect has no record
-  for either, which is why the write side has none). `settings.healthLogs` is
-  the source of truth and the permission is derived, the morning reminder's
-  arrangement; undefined is OFF, and while it is off `checkHealthUpdates` does
-  not RUN the two reads — the symptom read is one query per mapped type on every
-  foreground, so off has to mean absent rather than discarded. The tap is
-  Settings → Apple Health (`LogsImportRow`), and it asks the whole thing at once
-  under its OWN latch (`scope: 'logs'`, `LOGS_READ_IDS` = the import map's own
-  keys so the permission can never drift from what can be filed,
-  `HK_LOGS_SET_KEY`); `CORE_READ_IDS` is byte-identical, pinned by
-  `health/__tests__/authSets.test.ts`, or every existing install would meet a
-  sheet it tapped nothing to get. **Symptoms** are a curated join
+  imported too, and the two halves are asked for in completely different ways,
+  because they are not the same kind of object** (1.39, iOS only: Health
+  Connect has no record for either, which is why the write side has none, and
+  why `scope: 'connect'` resolves to the core set there — a record type with no
+  `android.permission.health.*` behind it is the consent-loop trap).
+  **A SYMPTOM is an ordinary HealthKit read permission, so it rides the Apple
+  Health CONNECT ask** (`scope: 'connect'`, `HK_CONNECT_SET_KEY`, `hk1connect:`
+  = `CORE_READ_IDS` + `LOGS_READ_IDS`, passed by exactly the two Connect
+  buttons — the wizard's "Connect your data" and Settings → Connect Apple
+  Health). Connecting Apple Health IS the consent, the way it already is for
+  readings, sleep and workouts. It is its OWN scope under its OWN key and may
+  never join `CORE_READ_IDS`: that set's key is the once-only ask latch for
+  every BACKGROUND path, so widening it makes `hasAskedAuth` read false for
+  every existing install and the next quiet update check raises a HealthKit
+  sheet nobody tapped anything to get. `CORE_READ_IDS` / `WRITE_IDS` /
+  `HK_SET_KEY` stay byte-identical, pinned by
+  `health/__tests__/authSets.test.ts`. The other `requestAuth({ force: true })`
+  call sites stay on the CORE set (`WatchPrep`, `HealthImport`, `WatchBrands`,
+  `health/sources.ts`): those are mid-flow asks for one feature, and a strap
+  setup card has no business listing 23 symptom types. An install that already
+  connected meets a ONE-TIME catch-up row in Settings → Apple Health
+  (`LogsCatchUpRow`, "Also import what you log in Health"), shown only while
+  `readAuthStatus('logs') === 'shouldRequest'` — the one honest question iOS
+  allows, meaning the sheet has never been shown for these types — which
+  disappears for good once it has, with no toggle and no stored flag: the
+  platform already holds the answer and a second copy could only disagree.
+  `settings.healthLogs` is GONE (1.40); `migrate` DELETES the key rather than
+  normalising it, because `settings` is spread from the stored object rather
+  than rebuilt field by field, so an untouched key would sit in the journal and
+  in every export of it for good.
+  **The two logs reads are the one PACED part of the import check**
+  (`lib/health/logsSweep.ts` pure + tested, `logsSweepMemory.ts` the flags-MMKV
+  shell): at most once per `LOGS_SWEEP_MIN_MS` (1h) per day key, always on the
+  first check of a new day key, always on an explicit user action
+  (`checkHealthUpdatesLast24h` and the Journal's pull-to-refresh both pass
+  `explicit`), and stamped only after a read actually went out so a skipped one
+  never pushes the next sweep an hour away. `readSymptoms` is one native
+  category query per mapped type and `checkHealthUpdates` runs on every
+  foreground; HealthKit never reports read grants, so somebody who DENIED the
+  symptom types in the connect sheet is indistinguishable from somebody with
+  nothing logged there and would be swept forever. **The no-throttle rule for
+  the check AS A WHOLE is untouched** — opening the app is the request to bring
+  it up to date — and there is deliberately no "stop after N empty sweeps"
+  back-off, which would silently retire the feature for anyone who logs
+  symptoms in Health only occasionally.
+  **Symptoms** are a curated join
   (`src/lib/health/symptomMap.ts`, pure + tested): a HealthKit type is mapped
   only where the journal means the SAME thing, every omission is a decision
   (diarrhea and constipation are BOWEL MOVEMENTS here, with a Bristol form, so
@@ -188,16 +222,18 @@ old web app so old `export.json` files import directly.
   the two enums agree on. Severity rides the entry's NOTE ("Moderate · From
   Apple Health"), since the built-in symptoms carry no severity field and
   inventing one would put a field on an entry the log form cannot edit.
-  **Medication doses need iOS 26** and ride `modules/ecg-health`, not the
-  kingstinct bridge: a dose event is neither a quantity nor a category type, and
-  its name is not even on it — `HKMedicationDoseEvent` carries the dose, unit
-  and log status plus a `medicationConceptIdentifier`, and the NAME lives on
+  **A MEDICATION is a PER-OBJECT authorization, so it is not a permission
+  toggle at all — it is a "manage which medications" ACTION, closer to the
+  strap picker than to a switch.** Doses need iOS 26 and ride
+  `modules/ecg-health`, not the kingstinct bridge: a dose event is neither a
+  quantity nor a category type, and its name is not even on it —
+  `HKMedicationDoseEvent` carries the dose, unit and log status plus a
+  `medicationConceptIdentifier`, and the NAME lives on
   `HKUserAnnotatedMedication`, so the module runs the medication-list query
   first and joins on that identifier (a dose it cannot name is DROPPED rather
-  than filed as an unnamed medication). **The permission is PER OBJECT and the
-  batch API is fatal**: a medication is an object authorized one tick at a time
-  rather than a sample type, so `requestMedicationAuth` calls
-  `requestPerObjectReadAuthorization` for
+  than filed as an unnamed medication). **The batch API is fatal**: a medication
+  is an object authorized one tick at a time rather than a sample type, so
+  `requestMedicationAuth` calls `requestPerObjectReadAuthorization` for
   `HKUserAnnotatedMedicationType` alone, and naming either medication type in
   `requestAuthorization(toShare:read:)` does not fail — HealthKit RAISES
   (`_throwIfAuthorizationDisallowedForSharing`), which no Swift `catch` can
@@ -205,24 +241,54 @@ old web app so old `export.json` files import directly.
   phone that turned the toggle on. The DOSE type is never asked for at all:
   authorizing a medication grants its doses with it, and the type is read-only
   to third parties. The picker is also presented on EVERY call, granted or not,
-  which is a second reason it may only ever be reached from the tap. The shape
-  of that call is pinned from the Swift source in
-  `health/__tests__/authSets.test.ts`, since no JS test can reach it.
+  which is why it may only ever be reached from a TAP. The shape of that call is
+  pinned from the Swift source in `health/__tests__/authSets.test.ts`, since no
+  JS test can reach it.
   **Because a grant covers only the medications ticked AT THAT MOMENT, there is
-  a way back to the picker**: "Choose which medications to import", under the
-  toggle's description in Settings → Apple Health, over the dedicated
-  `openMedicationPicker` export (iOS 26 + toggle on, or the row is absent).
-  Without it a prescription added later imported nothing and said nothing —
-  the dose carries only a concept identifier, the name comes from the
-  medication list, the list returns only what was shared, and an unnameable
-  dose is dropped — and the only route back was turning the feature off and
-  on. It deliberately does NOT go through `requestAuth({ scope: 'logs' })` (the
-  symptom batch is settled once; this half never is), marks NO latch (a latch
-  would be a claim about a sheet that always shows), and its answer is not a
-  grant: Apple's `success` is false only on an error, so nothing is persisted
-  on it and nothing reports "shared". It reports a failure to present with
-  `StoreError` inside the sheet, never `toast()`, which cannot be seen from in
-  there.
+  a permanent way back to the picker**: `MedicationsRow` in Settings → Apple
+  Health ("Choose which medications to import"), rendered only when
+  `medicationsSupported()` (iOS 26), over the dedicated `openMedicationPicker`.
+  Without it a prescription added later imported nothing and said nothing, and
+  the only route back was turning the feature off and on. It deliberately does
+  NOT go through `requestAuth({ scope: 'logs' })` (the symptom batch is settled
+  once; this half never is), marks NO latch (a latch would be a claim about a
+  sheet that always shows), and its answer is NOT a grant: Apple's `success` is
+  false only on an error, so nothing is persisted on it and nothing reports
+  "shared". There is no "on" state to draw and inventing one would be a claim
+  the OS does not support.
+  **The picker reports its own reason, and most not-successes are HealthKit
+  ERRORS rather than `success == false`**: Apple's own example catches
+  `errorUserCanceled` for a closed picker and a Health app with no medications
+  answers `errorNoData`. The native side used to resolve a bare `false` for all
+  of it, so one sentence ("Could not open the medication list") stood for four
+  different outcomes and was WRONG about the two commonest. `hkCode` in the
+  Swift maps each error to one stable word (`canceled`, `nodata`, `denied`,
+  `notdetermined`, `unavailable`, `restricted`, `invalid`, `locked`, and
+  `hk<code>` for the case nobody anticipated, which stays identifiable from a
+  support dump rather than flattened into the general failure); the call
+  resolves `{ ok, code, message? }` and runs inside `DispatchQueue.main.async`,
+  since its whole purpose is to PRESENT a sheet and an Expo `AsyncFunction` body
+  does not run there. `lib/health/medPicker.ts` (pure + tested) reads all three
+  shapes — the structured answer, an older binary's bare boolean as `ok`/
+  `failed`, and absent as `missing` — and `medPickerNote` gives every
+  not-success its own sentence: **null for `ok` AND for `canceled`** (the Health
+  sheet just answered is the receipt, and `success` is not a grant, so there is
+  nothing to claim either way), `nodata` as INFO rather than an error (the fix
+  is in the Health app, which this button can do nothing about), `denied` /
+  `notdetermined` pointing at `healthPermissionPath()` (passed in, so the module
+  stays pure), and the default branch putting the CODE in the sentence — that
+  branch exists because nobody knew what would land in it, so the word a support
+  dump and a `/fault` row carry has to be the word on screen too. Reported
+  inside the sheet (`StoreError` for an error, the sheet's own body text for
+  info), never with `toast()`, which cannot be seen from in there.
+  `isMedPickerFault` is false for `ok`, `canceled` and `nodata` — a cancel is
+  the commonest outcome there is and an empty medication list is the person's
+  own data, so a `/fault` row for either would count people USING the feature as
+  people hitting a bug — and `health.medPicker` carries the code for everything
+  else. `medPickerMemory.ts` keeps the LAST answer only (code, age, the OS's
+  words, capped; NO medication name ever reaches it) for the support dump's
+  `medication picker` row, where `never opened` is itself the finding for a
+  phone that imports no doses.
   Only `logStatus == .taken` is read, as a
   predicate AND re-checked in JS: a skipped, snoozed or untouched reminder is a
   dose that did not happen. `src/lib/health/medications.ts` (pure + tested) is
@@ -243,17 +309,20 @@ old web app so old `export.json` files import directly.
   says what a `count` is counting from the medication's form), because the dose
   field is free text that holds its unit everywhere else in the app; the import
   used to strip everything but the digits. A dose with no recorded amount gets
-  NO amount, never "0". The support dump carries the switch, the OS support and
-  the declined count, since all three gates fail silently. Native build (new
-  read types + the module's two new functions).
+  NO amount, never "0". The support dump carries the logs PERMISSION
+  (`readAuthStatus('logs')`), the OS support and the picker's last answer, since
+  all three gates fail silently. Native build (new read types + the module's
+  changed signature).
 - **One-time historical backfill.** Connecting Health in the welcome wizard offers
   a one-shot import of the last year (`HealthApi.readHistory`, `HISTORY_DAYS` in
   `src/features/Onboarding.tsx`): readings (HRV only with real RR ≥ 4 min; Android
   imports no historical HRV at all — Health Connect has no beat-to-beat series),
   nights of sleep with overnight HR + stages, workouts with their HR trace, and
-  meds (which read empty unless the user has already opted into the symptom/med
-  set below, and which NEVER create a type — a year-long sweep would mint them
-  in bulk with nobody looking). Guarded by `meta.healthHistoryImported` and written
+  meds (which read EMPTY — there is no historical dose query — and which may
+  never create a type: a year-long sweep would mint them in bulk with nobody
+  looking). It deliberately imports NO historical symptoms either, opt-in or
+  not: that is 23 queries × a year, a different cost question, and it has never
+  been imported. Guarded by `meta.healthHistoryImported` and written
   in a single `mutate()`. Sleep uses one range query bucketed by `groupNights`
   (`src/lib/health/sleepSummary.ts`, pure + tested) instead of 365 per-day reads;
   per-night HR and per-workout HR are the only per-item queries, pooled a few at

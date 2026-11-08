@@ -33,6 +33,7 @@ import { liveOffer } from '../upsell/annual';
 import { annualMemory } from '../upsell/annualMemory';
 import { getDeclinedKeys } from '../health/declined';
 import { health, healthAppName, medicationsSupported } from '../health';
+import { medPickerLast } from '../health/medPickerMemory';
 import { bleIfStarted } from '../ble/manager';
 import { garminLinkIntact } from '../garmin/receiver';
 import { isSideloadedAndroidBuild, isTestFlightBuild } from '../../../modules/app-env';
@@ -408,17 +409,32 @@ async function bluetoothRows(s: AppState): Promise<Rows> {
   };
 }
 
+/** The picker's last answer: the code, how long ago, and the OS's own words.
+ *  'never opened' is itself the finding for a phone that imports no doses.
+ *  No medication name can reach here — see ../health/medPickerMemory. */
+function medPickerRow(): string {
+  const rec = medPickerLast();
+  if (!rec) return 'never opened';
+  const when = rec.at ? daysAgo(rec.at) : null;
+  return [rec.code, when, rec.message].filter(Boolean).join(' · ');
+}
+
 async function healthRows(s: AppState): Promise<Rows> {
   return {
     app: healthAppName(),
     available: health().available,
     'connected in settings': !!s.settings.healthEnabled,
     // Three gates sit between "I log symptoms in Health" and an import, and
-    // all three fail silently: the switch, the OS permission (which HealthKit
-    // will never report) and, for doses, the OS version. "Nothing imports" is
-    // otherwise unanswerable.
-    'symptom/med import': !!s.settings.healthLogs,
+    // all three fail silently: the read permission (which HealthKit will never
+    // report — `shouldRequest` is the one honest answer it gives, and it means
+    // the types have never been asked for), the OS version for doses, and the
+    // medication picker's own answer. "Nothing imports" is otherwise
+    // unanswerable, and the picker is the gate that hides the most: `nodata`
+    // says the Health app's own medication list is empty, `canceled` says the
+    // picker really did present and was closed.
+    'logs permission': await safe(() => health().readAuthStatus('logs'), 'unreadable'),
     'medication log supported': await safe(() => medicationsSupported(), false),
+    'medication picker': medPickerRow(),
     'history imported': s.meta?.healthHistoryImported ? daysAgo(s.meta.healthHistoryImported) : 'never',
     'declined samples': getDeclinedKeys().size,
   };

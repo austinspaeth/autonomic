@@ -319,6 +319,12 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
       // The cycle set is its own request with its own key, so asking for it
       // never disturbs (or re-asks) the core set.
       const cycle = opts?.scope === 'cycle';
+      // Every other scope resolves to the core set, `scope: 'connect'`
+      // included: that scope exists to add the SYMPTOM reads to the connect
+      // sheet, and Health Connect has no symptom record. Requesting a record
+      // type with no `android.permission.health.*` declared behind it is the
+      // documented consent-loop trap (the sheet returns forever), so the
+      // widening must never reach this side.
       const reads = cycle ? CYCLE_READ_TYPES : READ_TYPES;
       const writes = cycle ? CYCLE_WRITE_TYPES : WRITE_TYPES;
       return shareAuthRequest(async () => {
@@ -384,6 +390,12 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
     async readAuthStatus(scope) {
       // Health Connect, unlike HealthKit, reports its grants — so an empty
       // workout list here can be blamed accurately instead of guessed at.
+      // 'logs' is symptoms and medication doses. Health Connect has a record
+      // for neither, so there is nothing to be granted and `denied` is the
+      // honest answer — which is also what keeps the two logs reads from
+      // running here at all (./updates). Answered BEFORE the init, since
+      // nothing about it depends on the platform's state.
+      if (scope === 'logs') return 'denied';
       try {
         if (!(await ensureInit())) return 'unknown';
         const granted = await mod.getGrantedPermissions();
