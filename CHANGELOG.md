@@ -9,6 +9,40 @@ crosses to a new `x.x` (a unit test fails if the shipping minor has no entry).
 
 ## Unreleased
 
+- **"Choose which medications to import" said one wrong thing about four different
+  answers.** `requestPerObjectReadAuthorization` reports almost everything that is
+  not a success as a HealthKit ERROR — Apple's own example catches
+  `HKError.errorUserCanceled` for a closed picker, and an empty medication list
+  arrives as `errorNoData` — and the native side resolved `false` for all of it. So
+  one sentence, "Could not open the medication list", covered a picker the person
+  had just closed, a Health app with no medications in it to pick (where the fix is
+  in the Health app and this button can never do anything), medication access being
+  off, and a genuine failure to present: it was wrong about the first two, and named
+  no reason for the last. "I tapped the button and nothing happened" had nothing
+  behind it to read. Now the reason travels. `EcgHealthModule.hkCode` maps the
+  HealthKit error to one stable word (an unrecognised one keeps its number, `hk14`,
+  rather than being flattened into the general failure) and the call resolves
+  `{ ok, code, message }`; `src/lib/health/medPicker.ts` (pure + tested) turns that
+  into what the sheet says — `StoreError` for a failure, the sheet's own body voice
+  for "add them in Health first", and nothing at all for a success or a cancel,
+  since the Health sheet the person just answered is the receipt and `success` is
+  still not a grant. `isMedPickerFault` keeps the two ANSWERS off `/fault`
+  (`health.medPicker`): a cancel is the commonest outcome there is, and counting it
+  would report people using the feature as people hitting a bug. Three more things
+  came with it. The **toggle** shows the same note, because `requestAuth` reports
+  only the symptom batch and the medication half of that one tap was discarded — a
+  toggle that turned on while the picker had refused looked like success and then
+  imported nothing. Every answer, success included, is recorded for the support
+  dump's new `medication picker` row (a code, the OS's words and an age; never a
+  medication name), since the picker's answer was the fourth silent gate between "I
+  log doses in Health" and an entry and the only one with no trace. And the request
+  is now made from the **main queue**: its whole purpose is to present a sheet, an
+  Expo `AsyncFunction` body does not run there, and Apple hands the answer back on
+  an arbitrary queue regardless, so that is all it changes. The Swift shape is
+  pinned in `health/__tests__/authSets.test.ts` as before. **Native: needs a new
+  build.** The JS also reads the bare boolean an older binary resolves, so it cannot
+  break on a phone the Swift has not reached.
+
 - **A way back to the Apple Health medication picker.** "Choose which medications to
   import" now sits under the "Symptoms and medications" description in Settings →
   Apple Health (iOS 26+, toggle on; absent otherwise — a button that opens a picker
