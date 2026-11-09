@@ -115,6 +115,19 @@ fewer is ideal (the page adds " | Autonomic"). The check enforces this for
 anything dated after 2026-11-04. Older articles keep the titles they rank
 with, and carry the question in their `question` field instead.
 
+**So the `question` field is no longer shown on a new article, and that is
+correct.** It is still written, always: the blog's typeahead searches it and it
+ships as `alternativeHeadline`. But the page only puts it in the bubble above
+the title when it is not the title again (`restatesTitle` in
+`src/lib/v2/questionBubble.ts`, which compares the two on content words, so
+"Does stress make **my** POTS worse?" over "Does Stress Make POTS Worse?" is a
+restatement and the bubble is dropped). Do not write it as the title with a
+first-person pronoun inserted and do not reach for a looser phrasing to force
+the bubble back: on a question-titled article the H1 IS the question, and the
+bubble belongs to the older catalogue, whose essay titles it translates
+("Coat Hanger Pain: Why Your Neck and Shoulders Ache When You Stand" over
+"Why do my neck and shoulders ache when I stand?").
+
 ---
 
 ## Frontmatter
@@ -131,9 +144,10 @@ updated: 2026-11-05                             # bump whenever the content chan
 reviewed: 2026-11-05                            # the day it was last checked against its sources (shown as "Reviewed")
 author: "Austin Spaeth"                         # a key in src/lib/writers.ts
 
-# The question, in the reader's own words. Shown in a bubble above the title,
-# searched by the blog's typeahead, and sent to search engines as the
-# alternative headline. First person, under 80 characters, ends with "?".
+# The question, in the reader's own words. Searched by the blog's typeahead and
+# sent to search engines as the alternative headline. First person, under 80
+# characters, ends with "?". Shown in a bubble above the title ONLY when it is
+# not a restatement of it, which on a question-titled article it usually is.
 question: "Why do hot showers make me dizzy with POTS?"
 
 summary: "One or two sentences under the title and on every card."
@@ -322,7 +336,8 @@ does this too, softly).
 
 Do not repeat these in the markdown:
 
-- The **question bubble** above the title (from `question`).
+- The **question bubble** above the title (from `question`), when it says
+  something the title does not. See *The question rule*.
 - **The short answer** box (from `tldr`), first sentence in bold.
 - **Your answer**: the feature's headline, a download button and a link to the feature.
 - The **app card** in the middle of the article, moved there by script: the

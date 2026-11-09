@@ -37,7 +37,7 @@ for (const slug of slugs) {
     `${base}/og-card/${slug}/`
   ], { stdio: 'ignore' });
   // Rendered at 2x for crisp type, delivered at the 1200 x 630 the platforms ask for.
-  await sharp(png).resize(1200, 630).jpeg({ quality: 86, mozjpeg: true }).toFile(join(out, `${slug}.jpg`));
+  await sharp(png).resize(1200, 630).jpeg({ quality: 86, progressive: false, trellisQuantisation: true, overshootDeringing: true, quantisationTable: 3 })  // baseline: see gen-og.mjs.toFile(join(out, `${slug}.jpg`));
   console.log(`og/features/${slug}.jpg`);
 }
 rmSync(tmp, { recursive: true, force: true });

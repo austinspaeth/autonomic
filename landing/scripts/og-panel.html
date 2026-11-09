@@ -1,0 +1,78 @@
+<!doctype html>
+<!--
+  The OG card's brand plate, rendered ONCE by gen-og-panel.mjs into
+  og-panel.png. Every article's social card is that one PNG composited into the
+  top-right corner of its cover, over a blurred patch of the cover itself -
+  which is why gen-og.mjs needs no browser and no fonts: all the text here was
+  set at design time.
+
+  One line: mark, wordmark, then both store badges. The plate SHRINKS TO FIT -
+  the canvas below is oversized on purpose and the renderer trims it, so the
+  plate's width is whatever its contents need and is never a number anybody has
+  to keep in sync with the type. PANEL_R is substituted from og-panel.mjs.
+
+  Transparent background on purpose: the plate's own fill is translucent, so the
+  blurred photo beneath it shows through.
+-->
+<html><head><meta charset="utf-8"/>
+<link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+  /* Brighter than the site's --accent (#e03127): the mark sits on a dark glass
+     plate over a photograph, not on the page's own background. */
+  :root{ --accent:#ff5347; --display:"Space Grotesk",sans-serif; }
+  *{box-sizing:border-box;margin:0;padding:0}
+  html,body{background:transparent}
+  body{overflow:hidden}
+
+  .plate{
+    display:inline-flex;align-items:center;gap:20px;
+    height:82px;padding:0 16px 2px;border-radius:PANEL_Rpx;
+    color:#fff;
+    /* Glass: the blur is done in sharp on the photo underneath, so what the
+       plate itself contributes is a dark translucent wash, a hairline edge and
+       a soft inner top highlight.
+       The wash is deliberately almost FLAT. A gradient that darkened toward the
+       bottom was measurably even above and below the badges (14px each) and
+       still read as badges sitting low, because the darker band beneath them
+       merged into their black fill and swallowed the gap. */
+    background:linear-gradient(to bottom, rgba(9,9,11,.72), rgba(7,7,9,.75));
+    border:1px solid rgba(255,255,255,.16);
+    box-shadow:inset 0 1px 0 rgba(255,255,255,.14);
+  }
+
+  .brand{display:flex;align-items:center;gap:10px;flex:none}
+  .mark{height:25px;width:auto;color:var(--accent);flex:none}
+  .word{font-family:var(--display);font-weight:700;font-size:23px;letter-spacing:-.02em;line-height:1}
+
+  .badges{display:flex;gap:12px;flex:none}
+  .badge{display:flex;align-items:center;gap:10px;height:54px;padding:0 16px 0 15px;
+         border:1px solid rgba(255,255,255,.5);border-radius:9px;background:#000}
+  .glyph{flex:none}
+  .bt{display:flex;flex-direction:column;justify-content:center;line-height:1;color:#fff}
+  .bt .small{font-family:-apple-system,"Helvetica Neue",Arial,sans-serif;font-size:10px;font-weight:400;margin-bottom:4px}
+  .bt .big{font-family:-apple-system,"Helvetica Neue",Arial,sans-serif;font-size:20px;font-weight:500;letter-spacing:-.01em}
+</style></head>
+<body>
+<div class="plate">
+  <div class="brand">
+    <svg class="mark" viewBox="0 0 651.59 348.34" fill="currentColor"><path d="MARKPATH"/></svg>
+    <div class="word">Autonomic</div>
+  </div>
+  <div class="badges">
+    <div class="badge">
+      <svg class="glyph" width="24" height="29" viewBox="0 0 384 512" fill="#fff"><path d="M318.7 268.7c-.2-36.7 16.4-64.4 50-84.8-18.8-26.9-47.2-41.7-84.7-44.6-35.5-2.8-74.3 20.7-88.5 20.7-15 0-49.4-19.7-76.4-19.7C63.3 141.2 4 184.8 4 273.5q0 39.3 14.4 81.2c12.8 36.7 59 126.7 107.2 125.2 25.2-.6 43-17.9 75.8-17.9 31.8 0 48.3 17.9 76.4 17.9 48.6-.7 90.4-82.5 102.6-119.3-65.2-30.7-61.7-90-61.7-91.9zm-56.6-164.2c27.3-32.4 24.8-61.9 24-72.5-24.1 1.4-52 16.4-67.9 34.9-17.5 19.8-27.8 44.3-25.6 71.9 26.1 2 49.9-11.4 69.5-34.3z"/></svg>
+      <div class="bt"><span class="small">Available on the</span><span class="big">App Store</span></div>
+    </div>
+    <div class="badge">
+      <svg class="glyph" width="25" height="28" viewBox="0 0 24 24">
+        <path fill="#00D3FF" d="M3.6 1.8 13.8 12 3.6 22.2A2 2 0 0 1 3 20.77V3.23c0-.55.24-1.05.6-1.43z"/>
+        <path fill="#FFCE00" d="M16.8 15 13.8 12l3-3 3.86 2.19c.66.38.66 1.24 0 1.62L16.8 15z"/>
+        <path fill="#FF3A44" d="M16.8 15 6.05 21.11c-.6.34-1.28.24-1.74-.18l.05-.05L13.8 12l3 3z"/>
+        <path fill="#00C853" d="M4.36 3.07 4.31 3.02c.46-.42 1.14-.52 1.74-.18L16.8 9l-3 3L4.36 3.07z"/>
+      </svg>
+      <div class="bt"><span class="small">Available on</span><span class="big">Google Play</span></div>
+    </div>
+  </div>
+</div>
+</body></html>

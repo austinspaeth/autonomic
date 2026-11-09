@@ -14,6 +14,13 @@ GA → **Admin → Data display → Custom definitions → Create custom dimensi
 For each row: **Dimension name** and **Event parameter** are the same word,
 **Scope = Event**.
 
+- [ ] **`location`** — **do this one first.** `ajEvent()` stamps it on EVERY
+      event and it is the ONLY thing that names the page that FIRED an event.
+      GA's `page_title` / `page_location` are the page the SESSION was on, not
+      the page the event came from: a redirect page's own page_view does not
+      survive `location.replace`, so `download_redirect` gets hung on whichever
+      article the visitor landed on next and reads as though an article fired
+      it. Without this registered that mistake is unfalsifiable.
 - [ ] `cta`
 - [ ] `cta_type`
 - [ ] `feature`
@@ -36,7 +43,31 @@ For each row: **Dimension name** and **Event parameter** are the same word,
 - [ ] `campaign` (which QR code or campaign link a redirect came from)
 - [ ] `how` (how download intent was given: `store_link`, `store_badge_in_modal`, `download_modal`)
 
-(21 of GA's 50 allowed.)
+Then the content parameters, which the event tables in `ANALYTICS.md` use:
+
+- [ ] `text`
+- [ ] `author`
+- [ ] `topic`
+- [ ] `action`
+- [ ] `report`
+- [ ] `rank`
+- [ ] `kind`
+- [ ] `available`
+- [ ] `from`
+- [ ] `question`
+- [ ] `label`
+- [ ] `field`
+- [ ] `calc`
+- [ ] `seconds`
+- [ ] `reason`
+- [ ] `referrer`
+
+(38 of GA's 50 allowed.)
+
+**Registration is not retroactive.** A parameter is recorded from the day it
+is registered and never backfilled, so an event sent before today will carry
+no `location` for ever. Expect to read the first useful `location` split a day
+after this step, not in the history.
 
 ---
 

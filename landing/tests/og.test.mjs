@@ -55,11 +55,36 @@ const stale = articles.filter((a) => manifest[a.slug] && !manifest[a.slug].start
 check('no card was built from a cover the article has since changed', stale.length === 0,
   stale.map((a) => a.slug).join(', ') + '  (run `npm run og`)');
 
-/* One hash of the overlay across the whole manifest: a strip redesign that only
-   reached half the articles is a fleet of cards disagreeing about the brand. */
-const overlays = new Set(Object.values(manifest).map((v) => v.split('|')[1]));
-check('every card carries the same brand strip', overlays.size === 1,
-  [...overlays].join(', ') + '  (run `npm run og -- --force`)');
+/* One hash of the plate across the whole manifest: a redesign that only reached
+   half the articles is a fleet of cards disagreeing about the brand. */
+const plates = new Set(Object.values(manifest).map((v) => v.split('|')[1]));
+check('every card carries the same brand plate', plates.size === 1,
+  [...plates].join(', ') + '  (run `npm run og -- --force`)');
+
+/* --------------------------------------------------- baseline, not progressive */
+
+/* The two platforms that drop these cards drop them silently: the post just
+   goes out with no picture, and the markup, the URL and the bytes all look
+   right. The one thing that differed was progressive encoding, which is what
+   `mozjpeg: true` turns on - so a card is checked for SOF0 (baseline, 0xFFC0)
+   rather than SOF2 (progressive, 0xFFC2), because the way this regresses is
+   somebody putting that one word back. */
+const sof = (buf) => {
+  for (let i = 2; i < buf.length - 1;) {
+    if (buf[i] !== 0xff) { i += 1; continue; }
+    const marker = buf[i + 1];
+    if (marker >= 0xc0 && marker <= 0xcf && marker !== 0xc4 && marker !== 0xc8 && marker !== 0xcc) return marker;
+    i += 2 + buf.readUInt16BE(i + 2);
+  }
+  return 0;
+};
+
+const progressive = articles
+  .map((a) => path.join(CARDS, `${a.slug}.jpg`))
+  .filter((f) => fs.existsSync(f))
+  .filter((f) => sof(fs.readFileSync(f)) !== 0xc0);
+check('every card is a baseline JPEG', progressive.length === 0,
+  `${progressive.length} progressive: ${progressive.slice(0, 3).map((f) => path.basename(f)).join(', ')}`);
 
 /* ------------------------------------------------------------ the head */
 
@@ -82,7 +107,7 @@ if (!fs.existsSync(BUILD)) {
 
   /* A handful of articles have no cover of their own and so no card. They fall
      back to the site-wide image, and a card of the site-wide image wearing the
-     brand strip would be the strip over the logo. */
+     brand plate would be the plate over the logo. */
   const heads = all.filter(({ slug }) => manifest[slug]);
   const cardless = all.filter(({ slug }) => !manifest[slug]);
   check('an article with no cover falls back to the site card',

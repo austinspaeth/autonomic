@@ -9,7 +9,7 @@ date: 2026-11-09
 updated: 2026-11-09
 reviewed: 2026-11-09
 author: "Austin Spaeth"
-question: "Why do I crave salt all the time with POTS?"
+question: "Why do I crave salt with POTS?"
 tldr: "You crave salt with POTS because the condition often comes with low blood volume, and salt helps your body hold on to fluid and push that volume back up, which eases the racing heart and dizziness on standing. That is also why extra salt and fluids are a standard first-line treatment. But a hormone paradox in POTS means your salt-retaining system does not work the usual way, so how much you actually need is individual, and you should follow your clinician's guidance, especially if you have high blood pressure or a kidney or heart condition."
 app:
   feature: insights

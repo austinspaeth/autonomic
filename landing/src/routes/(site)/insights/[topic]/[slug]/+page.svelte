@@ -13,6 +13,7 @@
   import { TOPIC_PAGE, firstSentence } from '$lib/v2/blogData';
   import { pitchFor, TOPIC_CONDITION, type ArticleApp } from '$lib/v2/articlePitch';
   import { CONDITIONS } from '$lib/v2/conditions';
+  import { questionBubble } from '$lib/v2/questionBubble';
   import { appLd, APP_ID } from '$lib/v2/appLd';
   import type { Citation } from './+page';
   import { topicLabel } from '$lib/topics';
@@ -69,7 +70,11 @@
 
   // The question this answers: its own field, else a title that is one.
   $: question = meta.question || (/\?\s*$/.test(meta.title) ? meta.title : '');
-  $: showQuestion = !!meta.question && meta.question.trim() !== meta.title.trim();
+  // Shown above the title only when it is not the title again: since the
+  // question rule a new article's title IS its question, so the bubble would
+  // read as a stutter. One rule, used here and by alternativeHeadline below,
+  // or the page and its structured data would disagree about what is new.
+  $: bubble = questionBubble(meta.question, meta.title);
   $: pitch = pitchFor(meta.app, primaryCat);
   $: band = TOPIC_PAGE[primaryCat ?? ''] ?? TOPIC_PAGE.basics;
   $: condLink = TOPIC_CONDITION[primaryCat ?? ''];
@@ -164,7 +169,7 @@
         '@type': 'Article',
         '@id': `${canonical}#article`,
         headline: meta.title,
-        ...(question && question !== meta.title ? { alternativeHeadline: question } : {}),
+        ...(questionBubble(question, meta.title) ? { alternativeHeadline: question } : {}),
         description: meta.description || meta.summary,
         ...(meta.tldr ? { abstract: meta.tldr } : {}),
         image: [ogImage, ...(meta.photoLocation && ogCard ? [meta.photoLocation.startsWith('/') ? `https://autonomic.care${meta.photoLocation}` : meta.photoLocation] : [])],
@@ -267,7 +272,7 @@
         <a href="/insights/">Questions people ask</a>
         {#if primaryCat}<span aria-hidden="true">/</span><a href={`/insights/${primaryCat}/`}>{topicLabel(primaryCat)}</a>{/if}
       </nav>
-      {#if showQuestion}<p class="bl-aq"><span aria-hidden="true">“</span>{meta.question}<span aria-hidden="true">”</span></p>{/if}
+      {#if bubble}<p class="bl-aq"><span aria-hidden="true">“</span>{bubble}<span aria-hidden="true">”</span></p>{/if}
       <h1 class="bl-ah1">{meta.title}</h1>
       {#if meta.summary}<p class="bl-lead">{meta.summary}</p>{/if}
       <div class="bl-byline">

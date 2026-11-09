@@ -1,7 +1,10 @@
 // Builds one social-share card per article into static/og/<slug>.jpg.
 //
 // The card is the article's OWN cover, cropped to 1200x630, with the brand
-// strip (scripts/og-overlay.png) composited along the bottom. The article page
+// plate (scripts/og-panel.png) composited into the top-right corner over a
+// blurred patch of the cover itself - the glass is real, and it is done HERE
+// rather than in the plate's own render, because a standalone HTML page has no
+// photo behind it to blur. The article page
 // keeps pointing at photoLocation for the cover it renders; only og:image and
 // twitter:image point here. Facebook's scraper is impatient and caches hard, so
 // these are plain static files on CloudFront rather than anything rendered per
@@ -18,14 +21,16 @@
 // not be able to stop the site from shipping. tests/og.test.mjs is the strict
 // half, and is where a missing card should be caught.
 //
-// A card is rebuilt when its source URL changes or when the overlay does (the
-// manifest stores a hash of each), so a design change to the strip is
-// `npm run og:overlay && npm run og`.
+// A card is rebuilt when its source URL changes or when the plate does (the
+// manifest stores a hash of the plate PNG and of its geometry together, so
+// moving the rectangle rebuilds the cards even if the plate's pixels are
+// unchanged), so a design change is `npm run og:panel && npm run og`.
 import { readFileSync, writeFileSync, readdirSync, mkdirSync, existsSync } from 'node:fs';
 import { createHash } from 'node:crypto';
 import { fileURLToPath } from 'node:url';
 import { dirname, join, basename } from 'node:path';
 import sharp from 'sharp';
+import { PANEL, panelRect } from './og-panel.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const ARTICLES = join(here, '../articles');
@@ -34,10 +39,57 @@ const OUT = join(STATIC, 'og');
 // The manifest is source, not an asset: the article page imports it to decide
 // whether a card exists for a slug, so it lives in src/lib and not in static/.
 const MANIFEST = join(here, '../src/lib/og-cards.json');
-const OVERLAY = join(here, 'og-overlay.png');
+const PLATE = join(here, 'og-panel.png');
 
 export const OG_WIDTH = 1200;
 export const OG_HEIGHT = 630;
+
+const RECT = panelRect(OG_WIDTH);
+
+/** The plate's corners, as an alpha mask. Blurring a region of the photo gives
+ *  a rectangle; this is what makes it the plate's shape instead. */
+const cornerMask = Buffer.from(
+  `<svg width="${RECT.width}" height="${RECT.height}">`
+  + `<rect width="${RECT.width}" height="${RECT.height}" rx="${PANEL.radius}" ry="${PANEL.radius}" fill="#fff"/>`
+  + `</svg>`,
+);
+
+/** The card: the cover, with the photo under the plate blurred, and the plate
+ *  on top. Exported so a test can build one without touching the filesystem. */
+export async function composeCard(coverBytes, plate) {
+  const base = await sharp(coverBytes)
+    .resize(OG_WIDTH, OG_HEIGHT, { fit: 'cover', position: 'attention' })
+    .toFormat('png')
+    .toBuffer();
+
+  // The glass. Blur is taken from the cover itself, then cut to the plate's
+  // rounded shape, then dropped back where it came from.
+  const glass = await sharp(await sharp(base).extract(RECT).blur(PANEL.blur).toFormat('png').toBuffer())
+    .composite([{ input: cornerMask, blend: 'dest-in' }])
+    .toFormat('png')
+    .toBuffer();
+
+  return sharp(base)
+    .composite([
+      { input: glass, left: RECT.left, top: RECT.top },
+      { input: plate, left: RECT.left, top: RECT.top },
+    ])
+    // BASELINE, not progressive. A progressive JPEG is the one difference
+    // between the platforms that render these cards (Facebook, Reddit) and the
+    // two that quietly drop them (LinkedIn, X), and nothing else about the card
+    // is worth that. mozjpeg's flags are spelled out rather than taken as the
+    // `mozjpeg: true` preset, because that preset sets jpegProgressive LAST and
+    // so silently wins over a `progressive: false` sitting beside it -
+    // `optimiseScans` is left off for the same reason, it needs progressive.
+    .jpeg({
+      quality: 82,
+      progressive: false,
+      trellisQuantisation: true,
+      overshootDeringing: true,
+      quantisationTable: 3,
+    })
+    .toBuffer();
+}
 
 const force = process.argv.includes('--force');
 const soft = process.argv.includes('--soft');
@@ -81,8 +133,11 @@ async function sourceBytes(photoLocation) {
 
 async function main() {
   mkdirSync(OUT, { recursive: true });
-  const overlay = readFileSync(OVERLAY);
-  const overlayHash = createHash('sha1').update(overlay).digest('hex').slice(0, 12);
+  const plate = readFileSync(PLATE);
+  // The geometry is hashed with the pixels: a plate moved to a new corner is a
+  // different card even when the PNG is byte-identical.
+  const plateHash = createHash('sha1')
+    .update(plate).update(JSON.stringify(PANEL)).digest('hex').slice(0, 12);
   const manifest = existsSync(MANIFEST) ? JSON.parse(readFileSync(MANIFEST, 'utf8')) : {};
 
   const files = readdirSync(ARTICLES).filter((f) => f.endsWith('.md')).sort();
@@ -93,21 +148,15 @@ async function main() {
     const { slug, photoLocation } = frontmatter(readFileSync(join(ARTICLES, file), 'utf8'));
     if (!slug) { failed.push(`${file}: no slug`); continue; }
     // One article points photoLocation at the site-wide card; it needs no card
-    // of its own and would otherwise get the strip twice.
+    // of its own and would otherwise wear the brand twice.
     if (!photoLocation || basename(photoLocation) === 'og.png') { skipped++; continue; }
 
-    const key = `${photoLocation}|${overlayHash}`;
+    const key = `${photoLocation}|${plateHash}`;
     const dest = join(OUT, `${slug}.jpg`);
     if (!force && manifest[slug] === key && existsSync(dest)) { skipped++; continue; }
 
     try {
-      const base = sharp(await sourceBytes(photoLocation))
-        .resize(OG_WIDTH, OG_HEIGHT, { fit: 'cover', position: 'attention' });
-      const buf = await sharp(await base.toFormat('png').toBuffer())
-        .composite([{ input: overlay, gravity: 'south' }])
-        .jpeg({ quality: 82, mozjpeg: true })
-        .toBuffer();
-      writeFileSync(dest, buf);
+      writeFileSync(dest, await composeCard(await sourceBytes(photoLocation), plate));
       manifest[slug] = key;
       built++;
       process.stdout.write(`  ${slug}\n`);

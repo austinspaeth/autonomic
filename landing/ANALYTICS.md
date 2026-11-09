@@ -83,10 +83,56 @@ credited to the article card or page CTA that started it.
 GA4 only shows a custom parameter in reports once it is registered. In
 **Admin → Custom definitions → Create custom dimension** (scope: Event), add:
 
+**`location` first.** `ajEvent()` stamps it on EVERY event, and it is the only
+thing that names the page that FIRED an event. GA's own `page_title` and
+`page_location` cannot do that job: a redirect page's own page_view does not
+survive `location.replace`, so GA hangs the event on whatever page the visitor
+landed on next, and `download_redirect` turns up reported against an article
+nobody could have fired it from. Unregistered, `location` is invisible, and
+every "which page did this come from" question is unanswerable — which is
+exactly the hole this list used to leave while the DebugView section below told
+you to build an Explore with `location` as a dimension.
+
+Then the rest:
+
 `cta`, `cta_type`, `feature`, `placement`, `via`, `plan`, `platform`,
 `target`, `article`, `article_target`, `page_type`, `from_type`, `percent`,
 `network`, `query`, `symptom`, `section`, `link_type`, `destination`, `campaign`,
-`how`.
+`how`, `text`, `author`, `topic`, `action`, `report`, `rank`, `kind`,
+`available`, `from`, `question`, `label`, `field`, `calc`, `seconds`,
+`reason`, `referrer`.
+
+The full set is what the code sends; `landing/tests/tracking.test.mjs` drives
+the real bytes, so the way to re-derive it is to read the `ajEvent()` call
+sites rather than to trust this paragraph.
+
+**NEVER create an event in GA with a name this site already sends.** The site
+sends every event in the tables above from the page, with its parameters. A
+GA-side *created event* does not add to that, it MANUFACTURES a second event
+wearing the same name, and it copies only the SOURCE event's parameters.
+
+This shipped once and cost a long afternoon. Four rules —`blog_to_site`,
+`cta_click`, `download_click`, `download_redirect` — were created with the
+condition `page_location contains <the site>`, which matches every page, so
+each fired once per `page_view`. The signature, for next time:
+
+- every fabricated event's count EQUALS `page_view` exactly (and so equals
+  `session_start`, and so equals users, one of everything per person);
+- the hit carries exactly `page_view`'s seven automatic parameters
+  (`batch_ordering_id`, `batch_page_id`, `debug_mode`, `ga_session_id`,
+  `ga_session_number`, `page_location`, `page_title`) and NONE of ours —
+  no `location`, no `page_type`, no `platform`;
+- no COMPANION events. Nothing here fires alone: `download_click` only ever
+  comes with `app_store_click`/`play_store_click`, `cta_click` and
+  `download_intent`, because they are consecutive statements in `trackDownload`.
+  One of the four arriving by itself is proof it did not come from the page.
+
+`location is not (not set)` separates real events from manufactured ones in any
+Explore, which is the only way to read history written while such a rule was
+live — created events never apply retroactively, so the bad rows stay for good.
+
+The screen is **Admin → Data streams → <stream> → Configure tag settings →
+Create custom events**, NOT Admin → Data display → Events (that is Key events).
 
 **Key events: `download_intent` and `blog_to_site`. Those two only.**
 
@@ -134,6 +180,18 @@ event-name card is site-wide across all visitors. A visitor who arrived through
 site sends carries a `location` param naming the page that fired it; that param
 is the only way to tell "this page fired it" from "an earlier page in the
 session did", and realtime does not show params.
+
+**DebugView pools a session too, and its summary panel is the trap.**
+DebugView's right-hand *Top events* list is every event from that device in the
+last 30 minutes, ACROSS PAGES — the same pooling Realtime does, one screen
+further in. Read the TIMELINE in the middle column instead: it is ordered, and
+clicking an event shows its parameters, `location` included. DebugView shows
+every parameter on a hit whether or not it is registered as a custom dimension,
+so it is the one view that can answer "which page fired this" before the
+dimensions are set up. A download CTA clicked on an article, followed by the
+redirect page, puts `cta_click`, `download_click` and `download_redirect` in one
+session summary under the article's name, and none of them came from the
+article.
 
 **DebugView on any device.** Add `?aj_debug=1` to any URL. It sets GA's
 `debug_mode` for the rest of that browser session (sessionStorage, so it cannot
