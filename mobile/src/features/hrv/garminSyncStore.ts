@@ -16,9 +16,13 @@ export interface GarminSyncState {
   minimized: boolean;
   /** Device name, for the pill's label. */
   deviceName: string | null;
+  /** The watch gave up on the reading and said why (a `diag` message:
+   *  `nopulse` / `nobeats` / `thin`). Nothing is coming, so the wait is over
+   *  and the card says what the watch saw instead of spinning for ever. */
+  failed: string | null;
 }
 
-let state: GarminSyncState = { waiting: false, minimized: false, deviceName: null };
+let state: GarminSyncState = { waiting: false, minimized: false, deviceName: null, failed: null };
 const listeners = new Set<() => void>();
 
 export const getGarminSyncState = () => state;
@@ -34,12 +38,17 @@ function set(patch: Partial<GarminSyncState>) {
 }
 
 export function startGarminSync(deviceName: string | null) {
-  set({ waiting: true, minimized: false, deviceName });
+  set({ waiting: true, minimized: false, deviceName, failed: null });
+}
+
+/** The watch reported a reading it could not take. Ends the wait. */
+export function failGarminSync(signal: string, deviceName: string | null) {
+  set({ waiting: false, minimized: false, failed: signal, deviceName: deviceName ?? state.deviceName });
 }
 
 /** The reading landed, or the user gave up on it. */
 export function stopGarminSync() {
-  set({ waiting: false, minimized: false });
+  set({ waiting: false, minimized: false, failed: null });
 }
 
 export const minimizeGarminSync = () => set({ minimized: true });
