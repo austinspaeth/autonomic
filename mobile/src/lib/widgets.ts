@@ -18,7 +18,7 @@ import { addDays, fmtNum, fmtShort, keyOf, todayKey } from './dates';
 import { hasOwnData } from './demo';
 import { emberStops } from './ember';
 import {
-  BANDS, SCORE_COLORS, catFromBands, restingHrBands, type ScoreContext,
+  BANDS, SCORE_COLORS, catFromBands, restingHrBands, rmssdUBands, type ScoreContext,
   profileCtx,
 } from './scoring';
 import {
@@ -469,7 +469,7 @@ export function buildWidgetPayload(state: AppState, dk = todayKey(), opts: Widge
   // training bands when a training reading exists (same split day.ts uses).
   const sdnn = hrvDayAvg(d, 'sdnn');
   const rmssd = hrvDayAvg(d, 'rmssd');
-  const rmssdBands = d && acReadVals(d, 'breathHrv', 'rmssd').length ? BANDS.rmssdS : BANDS.rmssdU;
+  const rmssdBands = d && acReadVals(d, 'breathHrv', 'rmssd').length ? BANDS.rmssdS : rmssdUBands(ctx);
   const pnn50 = hrvDayAvg(d, 'pnn50');
   const rhr = restingHrDay(d, !!ctx.pacemaker);
   const sleep = sleepHours(days, dk);

@@ -1,4 +1,4 @@
-import { hrvNorm, isNormMetric, NORM_MAX_AGE, NORM_MIN_AGE } from '../hrvNorms';
+import { hrvNorm, isNormMetric, normMedian, NORM_MAX_AGE, NORM_MIN_AGE } from '../hrvNorms';
 
 const pick = (n: { typical: number; low: number; high: number }) => ({ typical: n.typical, low: n.low, high: n.high });
 
@@ -28,10 +28,29 @@ describe('hrvNorm (Voss et al. 2015, supplement S1)', () => {
     expect(hrvNorm('sdnn', 20, 'Female')).toMatchObject({ label: 'Healthy 20 year old women', ...pick(hrvNorm('sdnn', 25, 'Female')!) });
   });
 
-  it('stops at 54: from 55 the healthy median grades red on the app\'s own bands', () => {
+  // The cap used to be 54, because the healthy median itself graded red on the
+  // app's absolute bands. The baseline band is recentered on this same table
+  // now, so the card speaks for every decade the study covers and stops where
+  // the DATA stops.
+  it('covers the whole study and stops at its top decade', () => {
+    expect(hrvNorm('rmssd', 60, 'Female')).not.toBeNull();
+    expect(hrvNorm('rmssd', 70, 'Female')).not.toBeNull();
     expect(hrvNorm('sdnn', NORM_MAX_AGE, 'Male')).not.toBeNull();
     expect(hrvNorm('sdnn', NORM_MAX_AGE + 1, 'Male')).toBeNull();
-    expect(hrvNorm('rmssd', 70, 'Female')).toBeNull();
+  });
+
+  // normMedian is the RATIO's source and so has no upper cap: the display card
+  // may decline to speak past the study, a grade may not.
+  it('normMedian is raw, uncapped above, and null below the minimum age', () => {
+    expect(normMedian('rmssd', 38, 'Female')).toBe(30.5);
+    expect(normMedian('rmssd', 58, 'Female')).toBe(18.9);
+    // Past the top decade it borrows 65-74, as 18-24 borrows 25-34.
+    expect(normMedian('rmssd', 90, 'Female')).toBe(normMedian('rmssd', 70, 'Female'));
+    expect(normMedian('rmssd', 20, 'Female')).toBe(normMedian('rmssd', 30, 'Female'));
+    // No sex: the two sexes averaged, unrounded.
+    expect(normMedian('rmssd', 38, '')).toBeCloseTo((30.5 + 28.7) / 2, 10);
+    expect(normMedian('rmssd', NORM_MIN_AGE - 1, 'Female')).toBeNull();
+    expect(normMedian('rmssd', null, 'Female')).toBeNull();
   });
 
   it('shows nothing without an age or for a minor', () => {

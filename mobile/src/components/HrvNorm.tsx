@@ -2,7 +2,8 @@
  * "Healthy 38 year old men: 21-39 ms" as an inset bubble closing an HRV metric
  * card, on the reading summary and on Progress alike. A reference beside the
  * user's own figure, never a grade (see `lib/hrvNorms.ts`), so it wears no
- * colour at all. Renders nothing without a birthday, or outside ages 18-54.
+ * colour at all. Renders nothing without a birthday, or outside the ages the
+ * study covers (`NORM_MIN_AGE`..`NORM_MAX_AGE`).
  */
 import React from 'react';
 import { Text, View } from 'react-native';

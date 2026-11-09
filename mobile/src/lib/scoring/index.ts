@@ -6,6 +6,8 @@
  * Pure module: no UI or store imports. Anything needing profile data
  * (height for BMI, sex for QTc) takes it as an argument.
  */
+import { ageFromBirthday } from '../dates';
+import { normMedian } from '../hrvNorms';
 import type { Band, CustomTypes, Entry, Protocol, ScoreCat } from '../types';
 import type { HelpContent } from '../help';
 
@@ -57,9 +59,94 @@ export const numOr = (v: unknown): number | null => {
   return isNaN(n) ? null : n;
 };
 
+/* ---------- the baseline RMSSD band, recentered on age ---------- */
+/**
+ * THE SHIPPED EDGES ENCODE ONE DECADE. 34 / 27 / 22 / 17 ms sit almost exactly
+ * on the healthy medians for 35-44 (`lib/hrvNorms`, Voss 2015), and RMSSD falls
+ * about half from 25-34 to 55-64. So a 55-year-old woman whose resting RMSSD is
+ * 14 ms — the 27th percentile of SCREENED-HEALTHY women her age, which is
+ * low-normal and not pathological — scored the floor grade of 10/100 on day
+ * after day of clean, high-confidence readings. The day score reads absolute
+ * LEVEL only, so there was nothing downstream that could rescue her.
+ *
+ * The fix is a RECENTERING, not a new scale: every edge is multiplied by this
+ * person's own decade's median over the SAME SEX's median at the reference
+ * decade. At 35-44 that factor is exactly 1 and the ladder is byte-identical to
+ * what shipped — for men, for women, and for the sex-averaged case. That
+ * identity is the whole justification for the shape, and `scoring.test.ts` pins
+ * it. Everything else follows from the table.
+ *
+ * Measured:  55-64 F -> 21.1 / 16.7 / 13.6 / 10.5
+ *            25-34 F -> 42.8 / 34.0 / 27.7 / 21.4
+ * Younger users are therefore graded more strictly, which is correct: 30 ms is
+ * below a thirty-year-old's own peer median.
+ *
+ * BASELINE ONLY. These are spontaneous-breathing supine readings, and paced
+ * breathing inflates RMSSD by design, so `sRMSSDs` is untouched. The day
+ * score's pNN50 / Total power / VLF / LF peak components come from training
+ * readings only and are untouched for the same reason, pnn50 norms or not.
+ */
+export const RMSSD_U_EDGES = [34, 27, 22, 17] as const;
+
+/** The decade the shipped edges already encode: 35-44. */
+const BAND_REF_AGE = 40;
+
+/**
+ * Must a known sex be on the profile before age is applied?
+ *
+ * NO, and it is one constant so the decision is visible and reversible.
+ * Age is a -51% effect across the table; sex is about +-5% around the average.
+ * Requiring sex would discard nearly all of the benefit for a small refinement,
+ * and the user whose readings prompted this has a birthday and a blank sex. The
+ * profile UI offers only Male or Female, so blank is common. With no sex the
+ * sex-averaged median is used at BOTH ends of the ratio, which is what keeps it
+ * exactly 1 at the reference decade.
+ */
+export const ADJUST_REQUIRES_SEX = false;
+
+/**
+ * The factor the baseline edges are scaled by. 1 means "behave exactly as the
+ * app always has", and it is what EVERY path with no birthday returns: no
+ * birthday at all, a birthday under `NORM_MIN_AGE`, and (were the constant
+ * above flipped) a blank sex.
+ */
+export function rmssdBaselineScale(ctx: ScoreContext = {}): number {
+  const age = ctx.age;
+  if (age == null || !isFinite(age)) return 1;
+  if (ADJUST_REQUIRES_SEX && !/^[mf]/i.test((ctx.sex || '').trim())) return 1;
+  const mine = normMedian('rmssd', age, ctx.sex);
+  const ref = normMedian('rmssd', BAND_REF_AGE, ctx.sex);
+  if (mine == null || ref == null || !(ref > 0)) return 1;
+  return mine / ref;
+}
+
+/** The four baseline edges for this person, high to low. Rounded to 0.1 ms:
+ *  the edges are read out in copy and on band strips, and an unrounded
+ *  21.07058823529412 has no business on a chart. At scale 1 the rounding is
+ *  the identity, so the shipped integers come back as themselves. */
+export function rmssdBaselineEdges(ctx: ScoreContext = {}): number[] {
+  const k = rmssdBaselineScale(ctx);
+  return k === 1 ? [...RMSSD_U_EDGES] : RMSSD_U_EDGES.map((e) => Math.round(e * k * 10) / 10);
+}
+
+/** Sparkline grade zones matching `sRMSSDu` for this person. `BANDS.rmssdU`
+ *  stays the unrecentered table, for the metrics that mix baseline and
+ *  training readings and so have no single scale. */
+export function rmssdUBands(ctx: ScoreContext = {}): Band[] {
+  const [great, good, ok, bad] = rmssdBaselineEdges(ctx);
+  return [{ max: bad, cat: 'crash' }, { max: ok, cat: 'bad' }, { max: good, cat: 'ok' }, { max: great, cat: 'good' }, { max: Infinity, cat: 'great' }];
+}
+
 /* ---------- per-metric graders (s*) ---------- */
 // higher-is-better metrics (terminal category = crash)
-export const sRMSSDu = (v: unknown): ScoreCat | null => { const n = numOr(v); return n == null ? null : n >= 34 ? 'great' : n >= 27 ? 'good' : n >= 22 ? 'ok' : n >= 17 ? 'bad' : 'crash'; };
+/** Unpaced (baseline) RMSSD. Age- and sex-aware when `ctx` carries an age; with
+ *  no age the thresholds are the shipped 34 / 27 / 22 / 17. */
+export const sRMSSDu = (v: unknown, ctx: ScoreContext = {}): ScoreCat | null => {
+  const n = numOr(v);
+  if (n == null) return null;
+  const [great, good, ok, bad] = rmssdBaselineEdges(ctx);
+  return n >= great ? 'great' : n >= good ? 'good' : n >= ok ? 'ok' : n >= bad ? 'bad' : 'crash';
+};
 export const sRMSSDs = (v: unknown): ScoreCat | null => { const n = numOr(v); return n == null ? null : n >= 32 ? 'great' : n >= 27 ? 'good' : n >= 22 ? 'ok' : n >= 17 ? 'bad' : 'crash'; };
 export const sPNN50 = (v: unknown): ScoreCat | null => { const n = numOr(v); return n == null ? null : n >= 10 ? 'great' : n >= 7 ? 'good' : n >= 4 ? 'ok' : n >= 2 ? 'bad' : 'crash'; };
 export const sSDNN = (v: unknown): ScoreCat | null => { const n = numOr(v); return n == null ? null : n >= 60 ? 'great' : n >= 50 ? 'good' : n >= 40 ? 'ok' : n >= 30 ? 'bad' : 'crash'; };
@@ -164,7 +251,10 @@ export const restingHrBands = (pos?: unknown): Band[] =>
     ? [{ max: 63, cat: 'great' }, { max: 69, cat: 'good' }, { max: 76, cat: 'ok' }, { max: 86, cat: 'bad' }, { max: Infinity, cat: 'concerning' }]
     : [{ max: 69, cat: 'great' }, { max: 79, cat: 'good' }, { max: 89, cat: 'ok' }, { max: 99, cat: 'bad' }, { max: Infinity, cat: 'concerning' }];
 
-export function bandsFor(type: string, key: string): Band[] | null {
+/** `ctx` only affects the BASELINE RMSSD row, whose zones have to agree with
+ *  the grade beside them (`sRMSSDu`); every other row is a fixed table. */
+export function bandsFor(type: string, key: string, ctx?: ScoreContext): Band[] | null {
+  if (type === 'hrv' && key === 'rmssd') return rmssdUBands(ctx);
   const map: Record<string, Record<string, string>> = {
     hrv: { rmssd: 'rmssdU', sdnn: 'sdnn', avgHr: 'hrBreath', pnn50: 'pnn50', vlowPower: 'vlf', lfPeak: 'lfPeak', hfPeak: 'hfPeak', meanRr: 'rrMode', mode: 'rrMode', mxdmn: 'mxdmn', amo50: 'amo50', cv: 'cv', pns: 'pns', sns: 'sns', stressIndex: 'stressIndex' },
     breathHrv: { sdnn: 'sdnn', rmssd: 'rmssdS', pnn50: 'pnn50', vlowPower: 'vlf', lfPeak: 'lfPeak', hfPeak: 'hfPeak', hr: 'hrBreath', meanRr: 'rrMode', mode: 'rrMode', mxdmn: 'mxdmn', amo50: 'amo50', cv: 'cv', pns: 'pns', sns: 'sns', stressIndex: 'stressIndex' },
@@ -184,6 +274,11 @@ export const catFromBands = (v: number, bands?: Band[] | null): ScoreCat | null 
 /* ---------- computeScores ---------- */
 export interface ScoreContext {
   sex?: string;
+  /** Years, from `profile.birthday` via `profileCtx`. Recenters the BASELINE
+   *  RMSSD band on this person's own decade (`rmssdBaselineEdges`). Null or
+   *  absent means no adjustment at all, which is the default and what most
+   *  installs are in. */
+  age?: number | null;
   height?: string | number;
   /** Clean-day protocol used by dayCleanliness/streakInfo (defaults applied). */
   protocol?: Protocol;
@@ -202,9 +297,10 @@ export interface ScoreContext {
 
 /** The profile half of a ScoreContext. Build contexts through this so a new
  *  profile-driven scoring input cannot be forgotten at one of the call sites. */
-export const profileCtx = (profile?: { sex?: string; height?: string | number; pacemaker?: boolean } | null): ScoreContext => ({
+export const profileCtx = (profile?: { sex?: string; height?: string | number; birthday?: string; pacemaker?: boolean } | null): ScoreContext => ({
   sex: profile?.sex,
   height: profile?.height,
+  age: ageFromBirthday(profile?.birthday),
   pacemaker: !!profile?.pacemaker,
 });
 
@@ -213,7 +309,7 @@ export function computeScores(r: Entry, ctx: ScoreContext = {}): Record<string, 
   const put = (k: string, c: ScoreCat | null) => { if (c) s[k] = c; };
   switch (r.type) {
     case 'hrv': {
-      put('rmssd', sRMSSDu(r.rmssd));
+      put('rmssd', sRMSSDu(r.rmssd, ctx));
       put('sdnn', sSDNN(r.sdnn));
       put('avgHr', sHR(r.avgHr));
       put('pnn50', sPNN50(r.pnn50));

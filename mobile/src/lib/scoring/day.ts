@@ -10,7 +10,7 @@ import { isTrustedReading } from '../hrvQuality';
 import { ACTIVITY_TYPES, MED_TYPES, TRIGGER_TYPES } from '../registry';
 import type { Band, CustomTypes, DayRecord, Entry, Protocol, ScoreCat, SleepRecord, SleepStages } from '../types';
 import {
-  BANDS, GRADE_PTS, computeScores, numOr, restingHrBands, totalPower,
+  BANDS, GRADE_PTS, computeScores, numOr, restingHrBands, rmssdUBands, totalPower,
   type ScoreContext,
 } from './index';
 import { personalBaselineCat, usualBaseline } from './baseline';
@@ -429,7 +429,7 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
   ].filter(Boolean).join(' ');
   const baseDetail: CompDetail = {
     value: rmUv != null ? `${rmUv} ms` : '',
-    metrics: rmUv != null ? [{ label: 'RMSSD (baseline)', raw: rmUv, bands: BANDS.rmssdU, unit: 'ms' }] : [],
+    metrics: rmUv != null ? [{ label: 'RMSSD (baseline)', raw: rmUv, bands: rmssdUBands(ctx), unit: 'ms' }] : [],
     note: baseNote || undefined,
   };
 

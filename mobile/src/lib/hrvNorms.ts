@@ -18,12 +18,15 @@
  * quartiles are real observed values, so the low end is where a quarter of
  * healthy people genuinely sit.
  *
- * SHOWN ONLY UNDER 55 (`NORM_MAX_AGE`). From 55 the healthy median itself
- * grades Compromised or Crash on the app's absolute bands (SDNN 29 ms against a
- * Crash edge of 30), so the card would wear a red dot above a bubble calling
- * that number healthy. The grades are the product and are not age-adjusted;
- * until they are, the reference stays off where the two would contradict each
- * other. The 55+ decades are kept below so that lifting the cap is one line.
+ * SHOWN FOR EVERY ADULT AGE THE STUDY COVERS (`NORM_MIN_AGE`..`NORM_MAX_AGE`).
+ * It used to stop at 54, because from 55 the healthy median itself graded
+ * Compromised or Crash on the app's absolute bands and the card would have worn
+ * a red dot above a bubble calling that number healthy. The BASELINE RMSSD band
+ * is now recentered on this same table (`normMedian`, used by `sRMSSDu`), so the
+ * contradiction the cap existed to hide is gone and the cap went with it.
+ *
+ * The table's own top row is 65-74, and ages above it borrow that decade exactly
+ * as 18-24 borrows 25-34.
  *
  * Only resting (baseline) readings are comparable: paced breathing inflates
  * SDNN and pNN50 by design, so callers show this for baseline readings only.
@@ -56,8 +59,11 @@ const MALE: Record<NormMetric, Decades> = {
 /** Youngest age this is shown for. The study has no one under 25, and the
  *  app's reference is for adults. */
 export const NORM_MIN_AGE = 18;
-/** Oldest age this is shown for; see the header for why it stops at 54. */
-export const NORM_MAX_AGE = 54;
+/** Oldest age this is shown for: the upper edge of the study's top decade.
+ *  Past it there is no data, so the card declines to speak rather than
+ *  stretching 65-74 across another twenty years. `normMedian` has no such
+ *  cap — see its own note. */
+export const NORM_MAX_AGE = 74;
 
 export interface HrvNorm {
   /** "Healthy 38 year old women" / "Healthy adults age 38". Says HEALTHY
@@ -93,6 +99,31 @@ const round = (v: number) => Math.round(v);
  * decade figures are averaged, a fair approximation since they differ by a few
  * ms at most (quartiles do not strictly average, but they sit this close).
  */
+/**
+ * The RAW, unrounded median for this age and sex, which is what a RATIO may be
+ * taken from. `hrvNorm` rounds for display, and a ratio of two rounded medians
+ * drifts enough to break the one property the band recentering rests on (that
+ * it reproduces the shipped edges exactly at the reference decade).
+ *
+ * Unlike `hrvNorm` it has NO UPPER CAP: the decade lookup clamps, so an
+ * 80-year-old is priced on the 65-74 row the way an 18-year-old is priced on
+ * 25-34. The display card may decline to speak outside the study; a GRADE may
+ * not, because the alternative is silently grading an 80-year-old on a
+ * 40-year-old's scale. Null below `NORM_MIN_AGE` and with no age at all, which
+ * is what the no-adjustment default reads.
+ *
+ * With no sex (or "Other") the two sexes' medians are averaged, as `hrvNorm`
+ * does. Both ends of a ratio must use the same rule or the ratio is not 1 at
+ * the reference decade.
+ */
+export function normMedian(metric: NormMetric, age: number | null | undefined, sex?: string | null): number | null {
+  if (age == null || !isFinite(age) || age < NORM_MIN_AGE) return null;
+  const i = decadeIndex(age);
+  const k = sexKey(sex);
+  const f = FEMALE[metric][i][0], m = MALE[metric][i][0];
+  return k === 'female' ? f : k === 'male' ? m : (f + m) / 2;
+}
+
 export function hrvNorm(metric: NormMetric, age: number | null | undefined, sex?: string | null): HrvNorm | null {
   if (age == null || !isFinite(age) || age < NORM_MIN_AGE || age > NORM_MAX_AGE + 0.999) return null;
   const i = decadeIndex(age);

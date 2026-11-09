@@ -108,12 +108,12 @@ export function TrendCard({ dk }: { dk: string }) {
   const found = useMemo(
     () => (search === null ? null : findTrend(
       state.days, dk,
-      profileCtx({ sex: state.profile.sex, height: state.profile.height, pacemaker: state.profile.pacemaker }),
+      profileCtx({ sex: state.profile.sex, height: state.profile.height, birthday: state.profile.birthday, pacemaker: state.profile.pacemaker }),
       resolveProtocol(state.settings.protocol),
       state.customTypes,
       search,
     )),
-    [search, state.days, dk, state.profile.sex, state.profile.height, state.profile.pacemaker, state.settings.protocol, state.customTypes],
+    [search, state.days, dk, state.profile.sex, state.profile.height, state.profile.birthday, state.profile.pacemaker, state.settings.protocol, state.customTypes],
   );
 
   // A pinned claim and a fresh finding both carry `metric` + `headline`, which

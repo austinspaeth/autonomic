@@ -95,7 +95,7 @@ export function SleepReportSheet({ dk }: { dk: string }) {
   useAppState(); // re-render after an edit underneath
   const state = getState();
   const report = useMemo(() => {
-    const ctx = profileCtx({ sex: state.profile.sex, height: state.profile.height, pacemaker: state.profile.pacemaker });
+    const ctx = profileCtx({ sex: state.profile.sex, height: state.profile.height, birthday: state.profile.birthday, pacemaker: state.profile.pacemaker });
     // The night's series lives in the waveform sidecar, never the journal, so
     // it is read here and handed to the (store-free) builder.
     const w = getSleepSeries(dk);
@@ -110,7 +110,7 @@ export function SleepReportSheet({ dk }: { dk: string }) {
     return buildSleepReport(state.days, dk, addDays, ctx, state.settings.protocol, {
       hr: w?.sampledHr, resp: w?.sampledResp, spans: w?.stageSpans, hrByDay,
     });
-  }, [state.days, dk, state.settings.protocol, state.profile.sex, state.profile.height, state.profile.pacemaker]);
+  }, [state.days, dk, state.settings.protocol, state.profile.sex, state.profile.height, state.profile.birthday, state.profile.pacemaker]);
 
   if (!report) return null;
   // "Logged by hand" is the honest label for a night with no heart rate and no

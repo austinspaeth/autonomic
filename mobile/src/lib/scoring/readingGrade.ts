@@ -13,7 +13,7 @@
  * number, no sentence. Advice belongs to the Outlook.
  */
 import { isTrustedReading } from '../hrvQuality';
-import { GRADE_PTS, sRMSSDs, sRMSSDu } from './index';
+import { GRADE_PTS, sRMSSDs, sRMSSDu, type ScoreContext } from './index';
 import { personalBaselineCat, usualBaseline } from './baseline';
 import type { DaysMap } from './day';
 import type { Entry, ScoreCat } from '../types';
@@ -42,12 +42,15 @@ export interface ReadingGrade {
   counts: boolean;
 }
 
-export function readingGrade(r: Entry, days: DaysMap, dk: string | null): ReadingGrade {
+/** `ctx` carries the profile, so the baseline half is graded on this person's
+ *  own age band — the same one `scoreSet` uses. With none, the shipped
+ *  absolute edges, exactly as before. */
+export function readingGrade(r: Entry, days: DaysMap, dk: string | null, ctx: ScoreContext = {}): ReadingGrade {
   const kind = r.type === 'breathHrv' ? 'training' : 'baseline';
   const rmssd = num(r.rmssd);
   const counts = isTrustedReading(r);
   if (kind === 'training') return { kind, counts, cat: sRMSSDs(rmssd) };
-  const abs = sRMSSDu(rmssd);
+  const abs = sRMSSDu(rmssd, ctx);
   const usual = dk ? usualBaseline(days, dk) : null;
   let cat = abs;
   // scoreSet's baselinePts, verbatim: the personal half may only LOWER.

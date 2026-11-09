@@ -243,8 +243,8 @@ function GradientBorderCard({ color, trigger, corner = 'topLeft', glow: wash, fl
 export function DaySummary({ dk }: { dk: string }) {
   const { openSheet } = useSheets();
   const state = useAppState();
-  const { sex, height, pacemaker } = state.profile;
-  const ctx = useMemo(() => profileCtx({ sex, height, pacemaker }), [sex, height, pacemaker]);
+  const { sex, height, birthday, pacemaker } = state.profile;
+  const ctx = useMemo(() => profileCtx({ sex, height, birthday, pacemaker }), [sex, height, birthday, pacemaker]);
   // scoreSet makes several passes over the day's readings; memoize so renders
   // not caused by a data change (sheets, animations) don't re-score.
   const { d, readings, all } = useMemo(() => {

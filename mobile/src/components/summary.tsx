@@ -18,7 +18,7 @@ import { TAIL_STYLE, fonts, radius, readoutTail, usePalette } from '../theme';
 import type { Band, Entry, ScoreCat } from '../lib/types';
 import type { HelpContent } from '../lib/help';
 import {
-  BANDS, GRADE_LABEL, HRV_EXPLAIN, HRV_HELP, SCORE_COLORS, bandsFor,
+  BANDS, GRADE_LABEL, HRV_EXPLAIN, HRV_HELP, SCORE_COLORS, bandsFor, rmssdUBands,
   bpBce, bpKerdo, bpKvas, bpMap, bpPP, bpRobinson, catFromBands, computeScores,
   expectedHf, numOr, orthoDeltaCat, orthoMaxDelta, restingHrBands,
   rowScoreCategory, totalPower, type ScoreContext,
@@ -548,12 +548,14 @@ function HrvSummaryBody({ r, days, ctx, type, afterGrade }: SummaryProps & { typ
   const s = computeScores(r, ctx);
   // The day score's own input from this reading, never a second score.
   const dk = useMemo(() => entryDayKey(days, String(r.id)) ?? todayKey(), [days, r.id]);
-  const grade = useMemo(() => readingGrade(r, days, dk), [r, days, dk]);
+  const grade = useMemo(() => readingGrade(r, days, dk, ctx), [r, days, dk, ctx]);
   const trace = useMemo(() => traceFor(r), [r]);
   const rr = trace && trace.rr;
   // The spectrum is drawn over the beats the numbers used, not the dropped stretches.
   const rrUsed = useMemo(() => (trace ? trace.rr.filter((_, i) => !trace.dropped[i]) : null), [trace]);
-  const rmssdBand = type === 'breathHrv' ? BANDS.rmssdS : BANDS.rmssdU;
+  // The baseline strip is recentered on the user's own decade, so it cannot
+  // disagree with the grade printed beside it (`sRMSSDu`).
+  const rmssdBand = type === 'breathHrv' ? BANDS.rmssdS : rmssdUBands(ctx);
   const hrKey = type === 'breathHrv' ? 'hr' : 'avgHr';
   const n = (k: string) => { const x = parseFloat(r[k] as string); return isNaN(x) ? null : x; };
   const vlf = n('vlowPower'), lf = n('lowPower'), hf = n('highPower');
@@ -1464,7 +1466,7 @@ export function GenericSummary({ r, days, ctx }: SummaryProps) {
         return (
           <MetricSection
             key={f.key} label={f.label!} value={String(v)} unit={f.unit} cat={s[f.key!]}
-            days={days} type={r.type} ex={numEx(f.key!)} bands={bandsFor(r.type, f.key!)}
+            days={days} type={r.type} ex={numEx(f.key!)} bands={bandsFor(r.type, f.key!, ctx)}
           />
         );
       })}
