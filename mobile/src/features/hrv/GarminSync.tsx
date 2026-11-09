@@ -30,7 +30,11 @@ export function garminFailureCopy(signal: string): string {
   if (signal === 'thin') {
     return 'Your watch found your pulse but caught too few beats to use. Rest your arm still and try again.';
   }
-  return 'Your watch found your pulse but its sensor would not send beat-to-beat data. Snug the band one notch and try again. If it keeps happening, close the Autonomic app on the watch and reopen it.';
+  // `nobeats` is the sensor, not the wearer: the pulse proves contact, and on
+  // some Garmin models and firmware the optical sensor never hands
+  // beat-to-beat data to a Connect IQ app at all. Telling somebody to tighten a
+  // band that is already tight sends them round the loop again for nothing.
+  return 'Your watch found your pulse, but its sensor did not share the beat-to-beat data an HRV reading needs. Some Garmin models do not share it with apps, and a tighter band will not change that. Your phone camera or a chest strap can take the reading instead.';
 }
 
 export function GarminSyncSheet({ controls }: { controls: SheetControls }) {
