@@ -204,7 +204,7 @@ window.Analytics = (function () {
   var NOTIFY_NAME = { M: 'Morning reminder', C: 'Crash warning', P: 'Pacing alerts' };
   var POTS_NAME = { T: 'Stand test', E: 'Episode' };
   var VIEW_NAME = { I: 'Insights', P: 'Progress', B: 'Pacing budget (locked)' };
-  var OFFER_NAME = { A: 'Half-off annual', F: 'Founding member' };
+  var OFFER_NAME = { A: 'Half-off annual', F: 'Founding member', H: 'Black Friday' };
   var LOG_NAME = {
     S: 'Sleep', A: 'Activity', M: 'Med or supplement', Y: 'Symptom',
     W: 'Water', B: 'Bowel movement', P: 'Blood pressure', R: 'Resting heart rate'
@@ -241,7 +241,7 @@ window.Analytics = (function () {
     act: METHOD_ORDER, cap: METHOD_ORDER, hrv: METHOD_ORDER,
     pay: SURFACE_ORDER,
     not: ['M', 'C', 'P', '?'], pot: ['T', 'E', '?'], see: ['I', 'P', 'B', '?'],
-    osh: ['A', 'F', '?'], odm: ['A', 'F', '?'], oac: ['A', 'F', '?'],
+    osh: ['A', 'F', 'H', '?'], odm: ['A', 'F', 'H', '?'], oac: ['A', 'F', 'H', '?'],
     log: ['S', 'A', 'M', 'Y', 'W', 'B', 'P', 'R', '?'],
     use: ['M', 'P', 'B', '?'], fnd: ['E', 'U', 'C', 'R', '?'], rpt: ['D', 'H', 'C', '?'],
     rdg: ['M', 'B', 'T', '?'], mbp: ['S', 'T', 'X', '?'], stp: ['C', 'G', 'T', '?'],

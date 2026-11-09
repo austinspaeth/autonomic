@@ -2,9 +2,9 @@
  * The shared cool-down between offers — pure logic, unit-tested
  * (see __tests__/pacing).
  *
- * There are exactly two proactive offers (./annual, ./founder) and each owns
- * its own trigger, but "when may an offer be raised AT ALL" is not a question
- * either of them can answer alone: each one only knows about itself. The result
+ * There are three proactive offers (./annual, ./founder, ./holiday) and each
+ * owns its own trigger, but "when may an offer be raised AT ALL" is not a
+ * question any of them can answer alone: each one only knows about itself. The result
  * shipped: the annual card used to unlock Pro for 24 hours, which reports
  * 'trial', and the founding-member card fires inside a trial — so opening the
  * annual offer immediately made the founder card due and the Journal showed a
@@ -19,7 +19,13 @@
  * day) goes on drawing itself against its own memory, or the clock it set would
  * retire it a frame after it appeared.
  *
- * Blocked is DEFERRED, not spent — the same rule both offers already follow for
+ * ./holiday is the one deliberate asymmetry: it STAMPS the clock but never ASKS
+ * it, because its window is four fixed calendar days and is shorter than the
+ * cool-down, so a card met in the preceding week would otherwise cancel a
+ * promotion the app is running for everybody. It stands down to a STANDING
+ * annual card instead, which is the case the clock cannot reach anyway.
+ *
+ * Blocked is DEFERRED, not spent — the same rule the offers already follow for
  * a crash-alert day. The annual milestone stays due and is raised a week later;
  * the
  * founder card, which lives for a single day, simply is not due yet.
@@ -32,9 +38,8 @@ const DAY_MS = 86_400_000;
 /** How long the app stays quiet after raising any offer. */
 export const OFFER_COOLDOWN_MS = 7 * DAY_MS;
 
-/** The offers that share the clock. A string rather than a union of the two
- *  names so a third offer is a new module and not an edit here. */
-export type OfferSurface = 'annual' | 'founder';
+/** The offers that share the clock. */
+export type OfferSurface = 'annual' | 'founder' | 'holiday';
 
 export interface OfferPacing {
   /** Which offer was last raised — diagnostics, and the reason a blocked card

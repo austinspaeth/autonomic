@@ -3,7 +3,7 @@
  * aren't ours and wouldn't duplicate a journal entry may be offered.
  */
 import {
-  allItemKeys, buildUpdateSet, dayAlreadyHas, filterDeclined, filterSeen, importFingerprint,
+  allItemKeys, buildUpdateSet, dayAlreadyHas, filedFromSample, filterDeclined, filterSeen, importFingerprint,
   sleepItemKey, sleepToFile, splitForReview, updateCount, updateSignature, type RawHealthDay,
 } from '../updateSet';
 import type { ImportedMed, ImportedReading, ImportedSymptom, ImportedWorkout, SleepImport } from '../index';
@@ -115,6 +115,26 @@ describe('buildUpdateSet', () => {
       ],
     }), TYPES);
     expect(set.readings).toHaveLength(0);
+  });
+
+  it('drops a sample the journal already holds under its own key', () => {
+    // The watch-sync card files the reading the session was for, stamped with
+    // the sample's key. The clock the entry claims can then be edited, or the
+    // card can have filed it under a kind that renames the type — neither
+    // changes which sample it IS, and the quiet check must not offer it back.
+    const d = day({ readings: [entry({ type: 'breathHrv', time: '23:30', healthKey: 'hrv-1000' })] });
+    const set = buildUpdateSet(DK, d, raw({ imports: [hrvImport()] }), TYPES);
+    expect(set.readings).toHaveLength(0);
+  });
+
+  it('finds the entry that already holds a sample, by key or by the clock', () => {
+    const byKey = entry({ id: 'k', type: 'breathHrv', time: '23:30', healthKey: 'hrv-1000' });
+    const byClock = entry({ id: 'c', type: 'hrv', time: '06:55' });
+    expect(filedFromSample(day({ readings: [byKey] }), 'reading', 'hrv-1000', 'hrv', '06:52')?.id).toBe('k');
+    expect(filedFromSample(day({ readings: [byClock] }), 'reading', 'hrv-1000', 'hrv', '06:52')?.id).toBe('c');
+    // A different sample at a different time is not it.
+    expect(filedFromSample(day({ readings: [entry({ time: '12:00' })] }), 'reading', 'hrv-1000', 'hrv', '06:52')).toBeUndefined();
+    expect(filedFromSample(day(), 'reading', 'hrv-1000', 'hrv', '06:52')).toBeUndefined();
   });
 
   it('offers one row per sample when the health store returns duplicates', () => {

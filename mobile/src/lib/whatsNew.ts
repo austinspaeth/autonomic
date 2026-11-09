@@ -50,6 +50,15 @@ export function fmtReleaseDate(iso: string): string {
 
 export const RELEASES: Release[] = [
   {
+    version: '1.40',
+    date: '2026-11-09',
+    notes: [
+      'The lowest daily grade is now called Severe instead of Crash. Plenty of people live with an unusually low HRV every day, and that is not a crash. Crash warnings still use the word for an actual slide.',
+      'Your HRV grades are now based on clinical data for your age and sex, when your profile has a birthday. An improvement to the model behind your grades.',
+      'Fixed a number of bugs and made the app faster throughout.',
+    ],
+  },
+  {
     version: '1.39',
     date: '2026-11-05',
     notes: [

@@ -165,6 +165,46 @@ old web app so old `export.json` files import directly.
   Apple Health → "Check for updates" ignores that memory and sweeps the last 24h
   (`checkHealthUpdatesLast24h`). Imports write through the normal store paths
   (scores + waveform sidecar).
+- **ONE Apple Health sample is ONE journal reading, whoever files it first.**
+  A watch session reaches the journal two ways — the watch-sync card (and the
+  on-demand "import from Apple Health" card) building a reading out of the
+  heartbeat series, and the quiet import check filing the same series on its
+  own initiative. There is no throttle on that check and a foreground is what
+  triggers it, so putting the phone down to use the watch and picking it up
+  again IS the moment it fires; it filed the sample under a kind nobody told it
+  (`kindOpen`, "Apple Watch HRV") and the card then wrote a second copy beside
+  it as "Baseline HRV". The sample therefore has ONE identity, the import's own
+  item key (`hrv-<startMs>`, from the series' `startDate`, which `rrSearch` and
+  the daily read derive identically): `HrvResults` takes it as `healthKey`,
+  stamps it on the entry, and `filedFromSample` (`health/updateSet.ts`, pure +
+  tested) asks whether the day already holds it — by key first, then by the
+  same type/time tolerance the check itself uses. If it does, the write lands
+  ON that entry (same id, so the sidecar blob replaces the import's rather than
+  orphaning it) and the kind the user chose in the session replaces the
+  undecided one. The import's note is kept when the card has none; `imported`
+  deliberately is NOT, because the trust rule for an imported HRV reading gates
+  on `durationSec` meaning real RR coverage and this entry's is the session's
+  elapsed time. `buildUpdateSet` skips a candidate whose key is already stamped
+  on a reading, which is the one rule that still holds when the two paths
+  disagree about the minute. And a `healthKey` alone now tombstones on delete
+  (`noteDeclinedImport`): a watch-synced reading is not marked `imported`, so
+  deleting one used to leave the sample free for the next check to file
+  straight back. The pairs already in a journal are two entries with two ids,
+  so fixing the write paths cannot merge them: `repairDuplicateWristReadings`
+  (`health/updates.ts`, over `health/dupeRepair.ts`, pure + tested) folds them
+  ONCE per install. It needs no health read and no permission — the evidence is
+  entirely in the journal — which is why it sweeps the WHOLE of it rather than a
+  recent window, and runs whether or not Health is still connected. The rule is
+  deliberately only this bug's own signature: two wrist HRV readings close
+  enough to be one series (the key when both carry one, else `NEAR_MIN`), one of
+  them `imported` and one not, EACH MATCHING ONLY THE OTHER. Two readings
+  somebody genuinely took minutes apart are both un-imported, and two copies
+  from the check cannot exist, so the mixed pair is the fingerprint; an
+  ambiguous day is left alone, because deleting a measurement on a guess is not
+  a tidying job. The card's own entry stays (it carries the kind the user chose
+  and the capture-quality stamp) and takes the sample's key BEFORE the copy is
+  deleted — the delete tombstones the sample, so the entry that will be the only
+  thing claiming it has to be holding its key first. JS only.
 - **What the user logs in Health ITSELF — symptoms and medication doses — is
   imported too, and the two halves are asked for in completely different ways,
   because they are not the same kind of object** (1.39, iOS only: Health
@@ -356,6 +396,55 @@ old web app so old `export.json` files import directly.
   run plus the phone's step-based distance was filed at 18.76 km for 10.75.
   `repairWorkoutDistances` (flags `workoutDistanceRepaired`) re-read and
   LOWERED the inflated ones once; it never raises a distance.
+- **Reading heart rate from Health Connect can KILL THE PROCESS, and the
+  breaker for it is per DAY, not per install** (1.40, `lib/health/hrPoison.ts`
+  pure + tested, `hrPoisonMemory.ts` the flags-MMKV shell). Android's own
+  module validates a heart-rate record in the Builder's CONSTRUCTOR
+  (`if (heartRateSamples.isEmpty()) throw new IllegalArgumentException("record
+  samples should not be empty")`), and the READ path builds every returned
+  record through it — `HeartRateRecordInternal.toExternalRecord()` calls
+  `buildWithoutValidation()`, which was plainly written to skip exactly that
+  check and cannot, because the check sits one level up. So a stored record
+  with no samples (the APK-based Health Connect on Android 13 validated
+  nothing, so one could be written then and read now) takes down any app that
+  reads heart rate over the window holding it. **No `catch` of ours can see
+  it**: the conversion runs inside the platform's own AIDL callback
+  (`HealthConnectManager.getReadCallback().onResult()`, on a binder thread,
+  under a `catch (ClassCastException)` and nothing else), so it never reaches
+  the library's coroutine, never becomes a rejected promise, never reaches
+  `readAll`'s catch, and the awaiting promise simply never settles. We learn of
+  it only from the Java uncaught handler's `native.crash` row on the NEXT
+  launch, which is why the signature matched is the platform's SENTENCE and not
+  `IllegalArgumentException` (half of Android throws that). Every HeartRate
+  read therefore goes through `readHr`, which returns NULL — never `[]`, or a
+  poisoned day would read as a day the user's heart was never measured — for a
+  window already known to crash us. The breaker is a set of DAY KEYS and a read
+  is refused when any day it touches is in it: coarse in the safe direction (a
+  poisoned night also blocks that day's pacing read, which is right — the
+  record is somewhere in those hours), and narrow enough that every other day
+  keeps its full curve. **Per install would be the wrong unit**: the poison is
+  one record from one app, and switching raw reads off for the install would
+  cost every day its heart-rate bands and recovery credit for ever. **BOTH
+  HALVES ARE REQUIRED.** The crash says nothing about which window, so the
+  shell stamps the days it is about to read BEFORE reading them (MMKV lands
+  synchronously, which is the only reason a dying process can be trusted to
+  have written it) and a day is poisoned only when a left-behind marker and a
+  matching crash are both found; a marker alone is a swipe-away or an OOM and
+  blacklisting on it would cost a user their curve for nothing. The marker is
+  the UNION of concurrent reads (the year backfill pools nights, so a crash
+  there poisons the batch — over-blocking beats a backfill that crashes,
+  restarts and crashes on the same night for ever) and it is MOVED to
+  `hrReadPrev` rather than deleted on capture, cleared only by the drain:
+  the Android background wake-up reads the day's heart rate every quarter hour
+  and never mounts the app, so it would otherwise eat the evidence before
+  anything looked at it. Fallbacks go through `hrAggregate`, which returns
+  scalars and never materialises a record: a night keeps its low and high (so
+  the nocturnal dip still works) and a workout keeps min/avg/max, merged across
+  apps — a mean cannot double-count the way a summed distance can. The pacing
+  day load gets NO fallback (`hr: null`), because the curve is the one thing a
+  scalar cannot stand in for and a thin day is a state the budget already draws
+  honestly. Reported as `hc.hrPoison` once per state change, never per skipped
+  read, and standing in the support dump as `heart rate reads blocked`. JS only.
 - **A night is STITCHED, and an imported night can still grow.** Google Health
   (Fitbit, Pixel Watch) writes one night to Health Connect as several sessions
   cut wherever the wearer woke, and Android used to file the longest PIECE
@@ -972,11 +1061,11 @@ old web app so old `export.json` files import directly.
   may still sit in the flags MMKV and is read by nothing. **Nothing in the
   paywall, the store listing or the landing site may promise a free week of
   pacing.**
-- **The app raises exactly TWO offers on its own initiative, and each owns its
+- **The app raises exactly THREE offers on its own initiative, and each owns its
   own rules.** `src/lib/upsell/` holds only `annual.ts` + `annualMemory.ts`,
-  `founder.ts` + `founderMemory.ts` and the one thing they SHARE,
-  `pacing.ts` + `pacingMemory.ts` (each a pure module plus its flags-MMKV
-  shell). **The two offers share ONE cool-down clock**: an offer may only be
+  `founder.ts` + `founderMemory.ts`, `holiday.ts` + `holidayMemory.ts` and the
+  one thing they SHARE, `pacing.ts` + `pacingMemory.ts` (each a pure module plus
+  its flags-MMKV shell). **The offers share ONE cool-down clock**: an offer may only be
   RAISED when nothing else has been raised in the last 7 days, whichever opens
   first stamps it, and a blocked offer is DEFERRED, never spent. That gate is on
   STARTING only — a window already claimed (the annual card's live 24 hours, the
@@ -985,7 +1074,38 @@ old web app so old `export.json` files import directly.
   in fact independent: the annual card's 24h unlock reports `'trial'`, which is
   exactly the state the founder card waits for, so opening the half-price year
   made "join us early" due underneath it. A phone that raised an offer before
-  this shipped has its clock backfilled once from the two offer memories. There is deliberately no generic surface engine: `eligibility.ts` /
+  this shipped has its clock backfilled once from the two offer memories.
+  **`holiday.ts` is the one offer whose trigger is a DATE, and the one that
+  TAKES PRECEDENCE.** Black Friday through 11:59pm Cyber Monday US Eastern
+  (`HOLIDAY_START_MS` / `HOLIDAY_END_MS`, written with an explicit offset so the
+  window is one global four days rather than one per timezone; `
+  HOLIDAY_OFFER_ENABLED` is the switch and next November is those three
+  constants). Free AND trial — the other two split the tiers between them, and a
+  seasonal sale is not an argument about where somebody is in their trial. It
+  sells `FOUNDER_YEARLY_SKU`, the same permanently discounted year the other two
+  sell, so the promotion is the OCCASION and not a fourth price. The card is the
+  design's: the wordmark stacked against the price, a WEEKEND pill, a live
+  DAYS/HRS/MIN/SEC countdown (`holidayCountdown`, pure + tested; the hero price
+  SHRINKS to fit, because the design budgeted 46px for "$36" and the store
+  returns "$35.99" or something longer again). **Its window cannot be deferred,
+  which is why it treats the shared clock asymmetrically**: it STAMPS the clock
+  when raised (so neither other card may open during the sale or for a week
+  after) and never ASKS it, since four days is shorter than the cool-down and an
+  install that met either other card last week would otherwise miss the sale
+  entirely. **And it reaches a card already STANDING**, which the clock cannot:
+  `holidayOwnsSlot` is read by `AnnualOffer`, `FounderOffer` and
+  `ReviewRequestCard`, and it answers from the WINDOW rather than from whether
+  this card has been raised — the raise happens in an effect, so a liveness read
+  that waited for it would let the annual card paint one frame beside it on the
+  launch that opens the sale. Nothing is answered or spent by standing down: a
+  standing annual card is exactly where it was on the Tuesday. Once raised it
+  STANDS for the rest of the window (the bad-day gates are gates on STARTING, so
+  a downturn beginning on the Saturday cannot withdraw a card the reader was
+  still deciding on) and the ✕ ends it for good. Ping letter `H` on
+  `osh`/`odm`/`oac`/`ofl` and as a `-W` door on `sub`, purchase origin
+  `'holiday'`; **the lambda must be deployed before a build carrying it ships**,
+  or the letter is dropped and the offer reports nothing.
+  There is deliberately no generic surface engine: `eligibility.ts` /
   `index.ts` (`nextUpsell`, a rotating six-surface rota with a shared pacing
   clock, retirement counters and a `lastUpsellSurface` diagnostics row) was built
   and never wired to anything — four of its six surfaces were permanent TODOs,
@@ -993,7 +1113,9 @@ old web app so old `export.json` files import directly.
   user had taken enough readings for the app to have anything to show them, and
   its only remaining callers were bookkeeping for itself. It is gone; do not
   reintroduce a generic rota. A new proactive offer is a new module beside those
-  two, with its own trigger stated in terms of the user's own data.
+  three, with its own trigger stated in terms of the user's own data — or, as
+  `holiday.ts` is, in terms of a date, which buys it precedence and costs it the
+  right to be deferred.
   **Reactive paywalls are not
   upsells**: a user who taps a locked thing gets `usePaywall()` instantly and is
   never gated, delayed or counted. Greyed-out UI is neither, and never counted.
@@ -2823,6 +2945,70 @@ old web app so old `export.json` files import directly.
   EVERY source (the HRV readings' average HR too), redistributing its weight.
   Resting HR is still shown everywhere, just uncoloured. It does not touch HRV,
   the nocturnal dip, strain or the budget.
+- **A DAY BAND'S IDENTITY IS ITS `key`, NEVER ITS LABEL, AND THE WORST ONE IS
+  `severe`.** `SCORE_CATS` (`lib/scoring/day.ts`) is Excellent / Good /
+  Moderate / Compromised / Bad / **Severe** at 85/70/55/40/25/0. It used to end
+  in "Crash Day", and `short` was a LOGIC KEY as well as a display string: the
+  pacing budget suppressed its number on `scoreCat(score).short === 'Crash'`,
+  `budget/outcome` marked a day dipped the same way, the `badDays` trend row
+  tested two words, and `OUTLOOK_GUIDE` / `TOMORROW` / `PRIOR_BY_GRADE` were all
+  Records keyed on the words — so renaming a band on screen silently changed
+  what the app DID. Every band now carries `key` (`DayKey`), the worst one is
+  named once as `WORST_DAY_KEY`, and **nothing anywhere may branch on `label` or
+  `short`.** The rename itself is about KIND of word: the day score reads
+  absolute LEVEL only (nothing in `scoreCat` consults the user's own trend), so
+  a stable low baseline was getting the same word as an acute collapse.
+  **"Crash" is now the exclusive property of the DEVIATION path** —
+  `detectDownturn`, the crash notification, `settings.crashAlert` and the
+  landing site's "Crash warnings" — and none of it may be renamed. The worst
+  band's Outlook copy lost "System in a crash state" (an event the number
+  cannot see) and "seek care if symptoms warrant" (a computed score may not say
+  that to anybody). `GRADE_LABEL`'s `concerning` is 'Severe' too, so the
+  per-metric ladder and the day ladder share one vocabulary; that label shows on
+  metric pills and in the CSV export's grade columns.
+- **The BASELINE RMSSD band is recentered on the user's own decade, and the
+  reference decade is the identity.** `sRMSSDu`'s shipped edges
+  (34/27/22/17 ms) sit almost exactly on the healthy medians for 35-44
+  (`lib/hrvNorms.ts`, Voss 2015), and RMSSD falls about half from 25-34 to
+  55-64 — so the ladder quietly encoded one age group. A real 55F took 39 clean
+  Apple Watch readings (0% artifacts on 34 of them, high confidence) with a
+  median RMSSD of 14 ms, which is the 27th percentile of SCREENED-HEALTHY women
+  her age, and scored the FLOOR grade of 10/100 on 14 of 23 days. Every edge is
+  now multiplied by `normMedian('rmssd', age, sex)` over the SAME SEX's median
+  at 35-44 (`rmssdBaselineScale` / `rmssdBaselineEdges` in `lib/scoring`).
+  **At 35-44 the factor is exactly 1 and the ladder is byte-identical to what
+  shipped** — for men, for women AND for the sex-averaged case — which is the
+  whole justification for the shape and is pinned by
+  `scoring/__tests__/baselineAge.test.ts`. Measured: 55-64F → 21.1/16.7/13.6/10.5,
+  25-34F → 42.8/34.0/27.7/21.4, so **younger users are graded more strictly**,
+  which is correct (30 ms is below a thirty-year-old's peer median).
+  **The ratio must come from `normMedian`, never `hrvNorm`**, which ROUNDS for
+  display — two rounded medians drift enough to break the identity above.
+  **The gate:** no birthday ⇒ NO adjustment, byte-identical to today (the
+  default, and where most installs are); a birthday under `NORM_MIN_AGE` ⇒ none
+  (`normMedian` returns null and that is honoured); a birthday with Male/Female
+  ⇒ sex-matched; **a birthday with a BLANK sex ⇒ still adjusts**, on the
+  sex-averaged median at both ends of the ratio, because age is a -51% effect
+  across the table where sex is about ±5% and the profile UI offers only Male or
+  Female so blank is common. That decision is one named constant,
+  `ADJUST_REQUIRES_SEX = false`. **Scope is BASELINE ONLY**: `sRMSSDs` (paced)
+  is untouched, since the norms are spontaneous-breathing supine readings and
+  paced breathing inflates RMSSD by design, and the day score's pNN50 / Total
+  power / VLF / LF peak come from training readings only. `bandsFor('hrv',
+  'rmssd', ctx)` and `rmssdUBands(ctx)` carry the same recentering into the
+  reading card's band strip, the score-explain sheet and the widget tile, so a
+  chart can never contradict the grade beside it; `BANDS.rmssdU` stays the
+  unrecentered table for the metrics that MIX baseline and training readings
+  (the trends registry's `rmssd` row, and so Progress) and therefore have no one
+  scale. Age rides `ScoreContext.age`, built by `profileCtx` — the single funnel
+  all ~40 call sites go through, so no call site can forget it. Lifting this
+  also removed `NORM_MAX_AGE`'s reason to exist: the HRV reference card stopped
+  at 54 ONLY because the healthy median itself graded red on absolute bands, and
+  it now runs to 74, the top of the study's own decades. `personalBaselineCat` /
+  `usualBaseline` are untouched, including the only-ever-lowers rule: that is a
+  percent comparison against the user's own history and is a different question.
+  **It RE-SCORES HISTORY, so it ships as a store build, not an OTA** — the call
+  made for 1.35.
 - **Reading scoring**: on render, `computeScores(r, ctx)` categorizes each scorable
   metric (great/good/ok/bad/crash|concerning, plus a `warning` blue zone) per the
   framework thresholds; rows tint their value via the score category and sparklines

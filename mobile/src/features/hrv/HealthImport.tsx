@@ -74,6 +74,7 @@ export function HealthRrImportSheet({ kind }: { kind: 'breath' | 'unstructured' 
         config={config}
         durationSec={durationSec}
         startedAtMs={c.startMs}
+        healthKey={c.key}
         watchFallback={c.avgHr != null ? { hr: c.avgHr } : null}
         controls={sc}
       />

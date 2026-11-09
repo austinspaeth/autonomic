@@ -20,6 +20,7 @@ import {
   hasAskedAuth, markAskedAuth, markPromptedThisLaunch, markUngrantable, promptedThisLaunch,
   shareAuthRequest, ungrantable, ungrantableScope,
 } from './askedAuth';
+import { hrWindowBlocked, markHrReadDone, markHrReadStart } from './hrPoisonMemory';
 import { NIGHT_END_HOUR, NIGHT_START_HOUR, nightKeyOf, summarizeHcSessions, type SleepSummary } from './sleepSummary';
 import { thinSeries, type HrPoint, type RespPoint } from '../sleep/night';
 import { activityTypeFromHc, workoutHrSeries } from './workoutMap';
@@ -189,6 +190,57 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
   const avgOf = (values: number[]): number | null =>
     values.length ? values.reduce((s, v) => s + v, 0) / values.length : null;
 
+  /**
+   * The raw heart-rate records for a window, or NULL when reading them is
+   * known to kill the process.
+   *
+   * Every HeartRate read in this file goes through here. The reason is in
+   * ./hrPoison: a stored record with no samples throws inside the platform's
+   * own read callback, on a binder thread, where `readAll`'s catch — or any
+   * other catch of ours — cannot reach it. So a window that has already
+   * crashed us once is never read again, and the callers fall back to the
+   * aggregation, which returns scalars and never materialises a record.
+   *
+   * Null is deliberately NOT the same as `[]`: an empty list is a window with
+   * no heart rate in it, and a caller that confused the two would report a
+   * poisoned day as a day the user's heart was never measured.
+   */
+  async function readHr(from: Date, to: Date): Promise<HrRecord[] | null> {
+    if (hrWindowBlocked(from, to)) return null;
+    const token = markHrReadStart(from, to);
+    try {
+      return await readAll<HrRecord>('HeartRate', from, to);
+    } finally {
+      markHrReadDone(token);
+    }
+  }
+
+  /**
+   * Heart rate as the aggregation sees it: the fallback for a poisoned window.
+   *
+   * One call rather than three (the result map carries all of them), and a
+   * zero is read as absent — react-native-health-connect fills a missing
+   * metric with 0.0, and nobody's heart rate is zero.
+   *
+   * It merges every writing app by Health Connect's own priority, where
+   * `workoutOf` otherwise restricts heart rate to the session's own app. That
+   * is a real loss of precision and still the right trade: a mean cannot
+   * double-count the way a summed distance can, and the alternative is a
+   * workout with no heart rate at all.
+   */
+  async function hrAggregate(from: Date, to: Date): Promise<{ avg: number | null; min: number | null; max: number | null }> {
+    const none = { avg: null, min: null, max: null };
+    if (!mod.aggregateRecord || !(await ensureInit())) return none;
+    try {
+      const res = await mod.aggregateRecord({ recordType: 'HeartRate', timeRangeFilter: between(from, to) });
+      const bpm = (k: string): number | null => {
+        const v = Number(res?.[k]);
+        return Number.isFinite(v) && v > 0 ? Math.round(v) : null;
+      };
+      return { avg: bpm('BPM_AVG'), min: bpm('BPM_MIN'), max: bpm('BPM_MAX') };
+    } catch { return none; }
+  }
+
   // One insertRecords call per record TYPE. The native side parses a whole
   // batch with the FIRST record's type (`parseWriteRecords` in
   // react-native-health-connect), so the HRV session's [RMSSD, HeartRate] pair
@@ -229,9 +281,9 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
     // The overnight heart-rate curve, kept rather than reduced to min/max on
     // the way past — the iOS side keeps it too, and the report reads the same
     // sidecar on both platforms.
-    const hrRecords = await readAll<HrRecord>('HeartRate', bed, wake);
+    const hrRecords = await readHr(bed, wake);
     const hrPts: HrPoint[] = [];
-    for (const rec of hrRecords) {
+    for (const rec of hrRecords || []) {
       for (const smp of rec.samples || []) {
         const bpm = smp.beatsPerMinute;
         if (!Number.isFinite(bpm) || bpm <= 0) continue;
@@ -241,6 +293,11 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
     hrPts.sort((a, b) => a.t - b.t);
     const hrSeries = thinSeries(hrPts, NIGHT_SERIES_MAX);
     const bpms = hrSeries.map((q) => q.bpm);
+    // A poisoned night (hrRecords === null) keeps its low and high through the
+    // aggregation, so the nocturnal dip still has a minimum to work from; it
+    // loses only the curve, which is the state every night imported before the
+    // series shipped is already in.
+    const agg = hrRecords ? null : await hrAggregate(bed, wake);
 
     // Respiratory rate across the same window.
     const respRecords = await readAll<RespRecord>('RespiratoryRate', bed, wake);
@@ -254,8 +311,8 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
       wake: hhmm(wake),
       bedISO: bed.toISOString(),
       wakeISO: wake.toISOString(),
-      hrLow: bpms.length ? Math.round(Math.min(...bpms)) : null,
-      hrHigh: bpms.length ? Math.round(Math.max(...bpms)) : null,
+      hrLow: bpms.length ? Math.round(Math.min(...bpms)) : agg?.min ?? null,
+      hrHigh: bpms.length ? Math.round(Math.max(...bpms)) : agg?.max ?? null,
       interrupted: night.interrupted,
       minutesAsleep: night.minutesAsleep,
       stages: night.stages,
@@ -280,7 +337,7 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
     if (durationMin < 1) return null;
     const [dist, hrRecords] = await Promise.all([
       readAll<DistanceRecord>('Distance', start, end),
-      readAll<HrRecord>('HeartRate', start, end),
+      readHr(start, end),
     ]);
     const origin = s.metadata?.dataOrigin;
     const meters = sessionOwnMeters(dist, origin)
@@ -289,7 +346,7 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
     let avgHr: number | null = null; let minHr: number | null = null; let maxHr: number | null = null;
     let hrSum = 0; let hrN = 0;
     const hrPoints: { ms: number; bpm: number }[] = [];
-    for (const rec of recordsForSession(hrRecords, origin)) {
+    for (const rec of recordsForSession(hrRecords || [], origin)) {
       for (const smp of rec.samples || []) {
         hrSum += smp.beatsPerMinute; hrN++;
         if (minHr == null || smp.beatsPerMinute < minHr) minHr = smp.beatsPerMinute;
@@ -298,6 +355,10 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
       }
     }
     if (hrN) { avgHr = Math.round(hrSum / hrN); minHr = Math.round(minHr!); maxHr = Math.round(maxHr!); }
+    // A poisoned window keeps its three numbers (merged across apps, see
+    // hrAggregate) and loses the trace, so the workout still carries zones
+    // rather than reading as one taken with no heart-rate monitor at all.
+    if (!hrRecords) ({ avg: avgHr, min: minHr, max: maxHr } = await hrAggregate(start, end));
     return {
       type: activityTypeFromHc(s.exerciseType),
       time: hhmm(start),
@@ -465,7 +526,7 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
       // the double-count `stepTotalFromRecords` describes.
       const [stepRecords, hrRecords, stepAgg] = await Promise.all([
         readAll<StepsRecord>('Steps', from, to),
-        readAll<HrRecord>('HeartRate', from, to),
+        readHr(from, to),
         aggregate('Steps', 'COUNT_TOTAL', from, to),
       ]);
 
@@ -482,8 +543,13 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
 
       // Flattened the way `nightOf` does it: a Health Connect heart-rate
       // record is a bucket of samples, not one reading.
+      // A poisoned day charges nothing from heart rate and says so through the
+      // burn's own coverage sentence: `hr: null` is the day the app could not
+      // watch, which is a state the budget already draws honestly. There is no
+      // aggregate fallback here because the pacing curve is the one thing a
+      // scalar cannot stand in for.
       const hr: { t: number; bpm: number }[] = [];
-      hrRecords.forEach((r) => {
+      (hrRecords || []).forEach((r) => {
         (r.samples || []).forEach((sm) => {
           const bpm = Number(sm.beatsPerMinute);
           const t = Math.round((new Date(sm.time).getTime() - baseMs) / 1000);

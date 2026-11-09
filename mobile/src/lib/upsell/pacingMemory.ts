@@ -39,7 +39,8 @@ function read(): OfferPacing {
   try {
     const parsed = JSON.parse(raw) as OfferPacing;
     return {
-      lastSurface: parsed.lastSurface === 'annual' || parsed.lastSurface === 'founder' ? parsed.lastSurface : undefined,
+      lastSurface: parsed.lastSurface === 'annual' || parsed.lastSurface === 'founder'
+        || parsed.lastSurface === 'holiday' ? parsed.lastSurface : undefined,
       lastShownAtMs: Number.isFinite(parsed.lastShownAtMs) ? parsed.lastShownAtMs : undefined,
     };
   } catch {

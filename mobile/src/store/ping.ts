@@ -838,7 +838,8 @@ export function pingErrorSeen(): void {
 
 /**
  * The offer funnel: shown, then dismissed or accepted. `'annual'` is the
- * half-off annual window, `'founder'` the founding-member card.
+ * half-off annual window, `'founder'` the founding-member card, `'holiday'` the
+ * dated Black Friday card.
  *
  * Three routes rather than one route with a phase letter, the same call the
  * capture pair makes: these are read AGAINST each other (`oac / osh` is the
@@ -852,20 +853,25 @@ export function pingErrorSeen(): void {
  * instead of silently folded into the offer's conversion rate. `ofl` below is
  * that gap reported from the inside, with the store's reason attached.
  *
- * Per-letter caps, so the two offers never mask each other — though in practice
- * they cannot both be due on one day, by their own design.
+ * Per-letter caps, so the offers never mask each other — though in practice
+ * no two of them can be on screen at once, by their own design.
  */
-export function pingOfferShown(offer: 'annual' | 'founder'): void {
+export function pingOfferShown(offer: OfferName): void {
   offerPing('osh', offer);
 }
-export function pingOfferDismissed(offer: 'annual' | 'founder'): void {
+export function pingOfferDismissed(offer: OfferName): void {
   offerPing('odm', offer);
 }
-export function pingOfferAccepted(offer: 'annual' | 'founder'): void {
+export function pingOfferAccepted(offer: OfferName): void {
   offerPing('oac', offer);
 }
 
-function offerPing(kind: 'osh' | 'odm' | 'oac', offer: 'annual' | 'founder'): void {
+/** The offer cards the app raises on its own initiative. Not the paywall, which
+ *  nothing shows and nothing dismisses, and which therefore rides the FAILURE
+ *  route alone (see OfferCode in ../lib/ping). */
+type OfferName = 'annual' | 'founder' | 'holiday';
+
+function offerPing(kind: 'osh' | 'odm' | 'oac', offer: OfferName): void {
   const slot = offerCode(offer);
   pingDaily(kind, slotKey(`${KEY_LAST_OFF}${kind}`, slot), slot);
 }

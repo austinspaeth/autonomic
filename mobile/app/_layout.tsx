@@ -35,7 +35,7 @@ import { initWidgetSync } from '../src/lib/widgets';
 import { initGiveawaySync } from '../src/store/giveaway';
 import { initAccessCodes } from '../src/store/accessCode';
 import { initBudgetSync } from '../src/store/budget';
-import { repairSplitNights, repairWorkoutDistances } from '../src/lib/health/updates';
+import { repairDuplicateWristReadings, repairSplitNights, repairWorkoutDistances } from '../src/lib/health/updates';
 import { initPressureWatch } from '../src/store/pressure';
 import { initPacingAlertWatcher } from '../src/store/pacingAlerts';
 import { initPacingBackground } from '../src/store/pacingBackground';
@@ -137,6 +137,10 @@ export default function RootLayout() {
     // Once per install (Android): lower workout distances that summed every
     // app's records instead of the session's own (see repairWorkoutDistances).
     repairWorkoutDistances().catch((e) => logError('health.repairDistance', e));
+    // Once per install: fold the watch readings that were filed twice, once by
+    // the sync card and once by the quiet check (see repairDuplicateWristReadings).
+    // Journal-only, so it needs no Health permission and cannot fail soft.
+    repairDuplicateWristReadings();
     // Pacing alerts: re-check after every journal change (the health reads
     // above land as journal changes), and keep the background half registered
     // exactly while an alert could fire. The task itself is defined in index.js.

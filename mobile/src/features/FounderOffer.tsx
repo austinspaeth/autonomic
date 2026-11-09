@@ -53,6 +53,7 @@ import { FORCE_FOUNDER_OFFER, founderMemory, noteFounderDismissed, noteFounderSh
 import { noteOfferShown, offerPacingClear } from '../lib/upsell/pacingMemory';
 import { liveOffer } from '../lib/upsell/annual';
 import { annualMemory } from '../lib/upsell/annualMemory';
+import { holidayOwnsSlot } from '../lib/upsell/holidayMemory';
 import { pingOfferAccepted, pingOfferDismissed, pingOfferShown } from '../store/ping';
 import { profileCtx } from '../lib/scoring';
 
@@ -88,6 +89,12 @@ export function FounderOfferCard() {
    *  in ../lib/upsell/founder. Read on every render rather than latched,
    *  because this card must come back when that window closes. */
   const annualOfferLive = liveOffer(annualMemory()) != null;
+  /** The Black Friday window owns the slot (../lib/upsell/holiday). It is four
+   *  fixed days that cannot be deferred and it sells this card's own product,
+   *  so it TAKES PRECEDENCE — including over a day this card had already
+   *  claimed. Read on every render, so this card returns when the window
+   *  closes; nothing is answered or spent by standing down. */
+  const holidayLive = holidayOwnsSlot();
 
   // Resolve an already-claimed day during the first render (a pure read), the
   // same reason AnnualOfferCard does: settling it a frame later pops the card
@@ -127,6 +134,7 @@ export function FounderOfferCard() {
       offerCooldown: !offerPacingClear(),
       codeAccess: hasAccessGrant(),
       annualOfferLive,
+      holidayOfferLive: holidayLive,
     });
     // Asked twice, deliberately: this effect re-runs on every journal change,
     // and detectDownturn is an O(week) sweep. The cheap gates (memory, tier,
@@ -145,12 +153,12 @@ export function FounderOfferCard() {
     settled.current = true;
     if (v.claim) { noteFounderShown(dk); noteOfferShown('founder'); }
     setLive(true);
-  }, [tier, depth, state, dk, dismissed, annualOfferLive]);
+  }, [tier, depth, state, dk, dismissed, annualOfferLive, holidayLive]);
 
   // Shown: this card lives for a single day, so the day it claims is the day
   // this fires. Capped per Eastern day in the store, which for this card means
   // once in its whole life.
-  useEffect(() => { if (live && tier !== 'pro' && !annualOfferLive) pingOfferShown('founder'); }, [live, tier, annualOfferLive]);
+  useEffect(() => { if (live && tier !== 'pro' && !annualOfferLive && !holidayLive) pingOfferShown('founder'); }, [live, tier, annualOfferLive, holidayLive]);
 
   const end = () => {
     noteFounderDismissed();
@@ -177,7 +185,7 @@ export function FounderOfferCard() {
   // trial, so a subscription bought (or a trial expiring) later the same day
   // retires the card rather than leaving it selling into a state it doesn't
   // apply to.
-  if (!live || dismissed || tier !== 'trial' || annualOfferLive || gifted) return null;
+  if (!live || dismissed || tier !== 'trial' || annualOfferLive || holidayLive || gifted) return null;
 
   return (
     <View

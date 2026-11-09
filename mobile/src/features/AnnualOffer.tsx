@@ -45,6 +45,7 @@ import { dueMilestone, liveOffer } from '../lib/upsell/annual';
 import { discountPct } from '../lib/upsell/founder';
 import { perMonth } from '../lib/upsell/price';
 import { FORCE_ANNUAL_OFFER, annualMemory, noteAnnualOfferDismissed, noteAnnualOfferStarted } from '../lib/upsell/annualMemory';
+import { holidayOwnsSlot } from '../lib/upsell/holidayMemory';
 import { noteOfferShown, offerPacingClear } from '../lib/upsell/pacingMemory';
 import { pingOfferAccepted, pingOfferDismissed, pingOfferShown } from '../store/ping';
 import { profileCtx } from '../lib/scoring';
@@ -106,6 +107,10 @@ export function AnnualOfferCard() {
     // below. Asked only here, on the raise path — a card already standing was
     // adopted above and must not be retired by the clock it set itself.
     if (!offerPacingClear(now)) return;
+    // The dated Black Friday window owns the slot (../lib/upsell/holiday). It
+    // cannot be moved and it sells the same product this card does, so the
+    // milestone waits for it rather than being spent.
+    if (holidayOwnsSlot(now)) return;
     // Never raise it on a day the user is already having a bad time. The
     // milestone is not spent, so it lands on a calmer open instead.
     if (state.settings.crashAlert?.lastFired === todayKey()) return;
@@ -133,7 +138,12 @@ export function AnnualOfferCard() {
   // device): there is nothing left to sell, so the card goes rather than sitting
   // in front of a paying subscriber. It is not dismissed — nothing was answered
   // — so the milestone memory is left exactly as it is.
-  if (!offer || tier === 'pro') return null;
+  // The Black Friday window TAKES PRECEDENCE, and that reaches a card already
+  // STANDING here — which is the one case the shared clock cannot, since a
+  // standing card renders from its own memory and never asks it again. Nothing
+  // is answered and no memory is touched: the milestone is exactly where it was
+  // when the window opened, and the card returns on the Tuesday.
+  if (!offer || tier === 'pro' || holidayOwnsSlot()) return null;
 
   const promo = priceOf(products.find((s) => s.productId === FOUNDER_YEARLY_SKU), FOUNDER_YEARLY_SKU);
   const full = priceOf(products.find((s) => s.productId === YEARLY_SKU), YEARLY_SKU);

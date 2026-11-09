@@ -17,6 +17,7 @@ import { SumCard, MetricRow } from '../components/summary';
 import { Button, useAccordion } from '../components/ui';
 import { AnnualOfferCard } from './AnnualOffer';
 import { FounderOfferCard } from './FounderOffer';
+import { HolidayOfferCard } from './HolidayOffer';
 import { GiveawayCard } from './Giveaway';
 import { HeavyFlowNote } from './cycle/Cycle';
 import { ScoreByCycleDay } from './cycle/CycleCharts';
@@ -359,6 +360,13 @@ export function DaySummary({ dk }: { dk: string }) {
       {/* The awareness-month giveaway: today only, and only while the window
           is open. Nothing once it closes. */}
       <GiveawayCard dk={dk} />
+      {/* The dated Black Friday card. Mounted ABOVE the other two on purpose:
+          child effects run in mount order, so on a launch where this window and
+          one of the other triggers are both due, this is the one that opens and
+          stamps the shared clock (src/lib/upsell/pacing). It never asks that
+          clock itself — four days is shorter than the cool-down, so a card met
+          last week would otherwise cancel the whole promotion. */}
+      <HolidayOfferCard />
       {/* Directly under the Outlook: the half-off year, time-boxed to 24h. */}
       <AnnualOfferCard />
       {/* The one-day founding-member offer. It and the card above share ONE

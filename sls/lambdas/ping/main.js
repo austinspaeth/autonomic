@@ -292,7 +292,7 @@ const EVIDENCE = { V: 'verified', S: 'store' };
  * is simply absent from the map, which reads as "not known" and never as a
  * door of its own.
  */
-const DOORS = { ...SURFACES, A: 'annual-offer', F: 'founder-offer' };
+const DOORS = { ...SURFACES, A: 'annual-offer', F: 'founder-offer', H: 'holiday-offer' };
 
 /** Which notification was turned ON — the NOT route. Only enables are sent. */
 const NOTIFY = { M: 'morning-reminder', C: 'crash-warning', P: 'pacing-alerts' };
@@ -307,8 +307,10 @@ const POTS = { T: 'stand-test', E: 'episode' };
 const VIEWS = { I: 'insights', P: 'progress', B: 'pacing' };
 
 /** Which offer — the OSH / ODM / OAC routes, one alphabet across all three so
- *  the three counts are directly comparable per offer. */
-const OFFERS = { A: 'annual-half-off', F: 'founding-member' };
+ *  the three counts are directly comparable per offer. `H` is the dated Black
+ *  Friday card, the one offer whose trigger is a calendar window rather than
+ *  something about the user. */
+const OFFERS = { A: 'annual-half-off', F: 'founding-member', H: 'holiday' };
 
 /**
  * The OFL route speaks a WIDER alphabet than the three offer routes above it,
@@ -323,7 +325,8 @@ const OFFERS = { A: 'annual-half-off', F: 'founding-member' };
  * for months.
  *
  * So `P` is a failure that is not an offer's failure, and the consequence for
- * a consumer is that **`ofl / oac` is only meaningful per letter, for A and F**.
+ * a consumer is that **`ofl / oac` is only meaningful per letter, for A, F and
+ * H**.
  * `P`'s denominator is `pay` (a paywall was raised), which is a different
  * route with a different cap, so the two cannot simply be divided.
  */

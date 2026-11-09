@@ -107,6 +107,7 @@ export function WatchSyncSheet({ controls }: { controls: SheetControls }) {
         config={st.config}
         durationSec={durationSec}
         startedAtMs={chosen.startMs}
+        healthKey={chosen.key}
         watchFallback={chosen.avgHr != null ? { hr: chosen.avgHr } : null}
         controls={controls}
       />

@@ -44,6 +44,7 @@ import { paywallSeenThisSession, reviewMemory } from '../lib/review';
 import { pingReviewCard } from '../store/ping';
 import { SUPPORT_EMAIL, supportMailtoUrl } from '../lib/diagnostics/supportEmail';
 import { liveOffer } from '../lib/upsell/annual';
+import { holidayOwnsSlot } from '../lib/upsell/holidayMemory';
 import { annualMemory } from '../lib/upsell/annualMemory';
 import { founderMemory } from '../lib/upsell/founderMemory';
 
@@ -56,10 +57,11 @@ import { founderMemory } from '../lib/upsell/founderMemory';
  */
 const STAR_GOLD = '#e3a51c';
 
-/** Is one of the two proactive offer cards holding the slot under the Outlook?
- *  Read the same way FounderOffer reads the annual card's liveness. */
+/** Is one of the three proactive offer cards holding the slot under the
+ *  Outlook? Read the same way FounderOffer reads the annual card's liveness. */
 function offerLive(dk: string): boolean {
   if (liveOffer(annualMemory()) != null) return true;
+  if (holidayOwnsSlot()) return true;
   const f = founderMemory();
   return f.shownDk === dk && !f.dismissed;
 }

@@ -4122,7 +4122,7 @@
      and not a purchase. `sub` is where money is counted, and the gap between the
      two is the store sheet — abandoned, or declined. Naming this "converted"
      would quietly close that gap. */
-  var OFFER_COLOR = { A: ENTITY.sales, F: COLOR.gold, '?': COLOR.muted };
+  var OFFER_COLOR = { A: ENTITY.sales, F: COLOR.gold, H: COLOR.s1, '?': COLOR.muted };
 
   /* The three OUTCOMES, which are what the chart is now about. Fixed colours,
      never assigned by rank, and read the same way on the chart as in the table

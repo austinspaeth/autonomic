@@ -120,6 +120,14 @@ export interface FounderInput {
    * spent either way.
    */
   annualOfferLive?: boolean;
+  /**
+   * The dated Black Friday card is standing on the Journal right now
+   * (./holiday). Same treatment as `annualOfferLive`, for the same reason and
+   * in the same position: that window is four fixed days, it cannot be moved,
+   * and it already sells this card's own product at this card's own price.
+   * Suppressed outright, including on a day this card had already claimed.
+   */
+  holidayOfferLive?: boolean;
 }
 
 export type FounderVerdict =
@@ -155,6 +163,7 @@ export function founderRules(input: FounderInput): FounderVerdict {
   // Checked BEFORE the claimed-day shortcut below: two offers on screen at once
   // is worse than this one going quiet, whatever it has already claimed.
   if (input.annualOfferLive) return { ok: false, reason: 'annual-offer-live' };
+  if (input.holidayOfferLive) return { ok: false, reason: 'holiday-offer-live' };
   // Already claimed a day. Today or never.
   if (memory.shownDk) {
     return memory.shownDk === dk ? { ok: true, claim: false } : { ok: false, reason: 'day-passed' };

@@ -223,10 +223,23 @@ export function drainNativeCrashes(): void {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
     const appEnv = require('../../../modules/app-env') as typeof import('../../../modules/app-env');
     const raw = appEnv.takeNativeCrashLog();
+    const described: string[] = [];
     for (const crash of parseNativeCrashes(raw)) {
       const hang = crash.kind === 'hang';
       const where = previousTrail(crash.source === 'metrickit' ? undefined : crash.at);
-      logError(tagForNativeCrash(crash), new Error(describeNativeCrash(crash)), hang ? undefined : { fatal: true, where });
+      const msg = describeNativeCrash(crash);
+      described.push(msg);
+      logError(tagForNativeCrash(crash), new Error(msg), hang ? undefined : { fatal: true, where });
+    }
+    // One crash signature is also an INSTRUCTION, not just a record: Health
+    // Connect kills the process from inside its own read callback when it
+    // hands back an empty heart-rate record, so the only way to stop the loop
+    // is to stop reading that window (see lib/health/hrPoison). Lazily
+    // required, like the ping and fault stores above, and it cannot route back
+    // here — nothing in it logs.
+    if (described.length) {
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      try { require('../health/hrPoisonMemory').noteNativeCrashes(described); } catch { /* not wired up yet */ }
     }
     if (!crashLogSub) crashLogSub = appEnv.onNativeCrashLog(() => drainNativeCrashes());
   } catch { /* nothing recorded, or no native module — either way there is nothing to say */ }

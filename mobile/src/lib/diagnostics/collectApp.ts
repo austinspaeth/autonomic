@@ -33,6 +33,7 @@ import { liveOffer } from '../upsell/annual';
 import { annualMemory } from '../upsell/annualMemory';
 import { getDeclinedKeys } from '../health/declined';
 import { health, healthAppName, medicationsSupported } from '../health';
+import { hrPoisonDump } from '../health/hrPoisonMemory';
 import { medPickerLast } from '../health/medPickerMemory';
 import { bleIfStarted } from '../ble/manager';
 import { garminLinkIntact } from '../garmin/receiver';
@@ -437,6 +438,12 @@ async function healthRows(s: AppState): Promise<Rows> {
     'medication picker': medPickerRow(),
     'history imported': s.meta?.healthHistoryImported ? daysAgo(s.meta.healthHistoryImported) : 'never',
     'declined samples': getDeclinedKeys().size,
+    // Days whose heart rate this app refuses to read because doing so killed
+    // the process (Android's own empty-samples bug, see lib/health/hrPoison).
+    // "none" for almost every phone, and it has to be SAID rather than
+    // omitted: a pacing day that reads thin for ever is otherwise
+    // unanswerable from a dump.
+    'heart rate reads blocked': hrPoisonDump(),
   };
 }
 

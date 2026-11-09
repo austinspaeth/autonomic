@@ -569,7 +569,11 @@ export function upsertEntry(dk: string, arrKey: 'readings' | 'activities' | 'med
  *  the import pill never offers that sample back (src/lib/health/declined.ts).
  *  Settings → Apple Health's manual check still shows it. */
 function noteDeclinedImport(dk: string, arrKey: 'readings' | 'activities' | 'meds' | 'symptoms', entry: Entry | undefined) {
-  if (!entry?.imported) return;
+  // A `healthKey` is enough on its own: a watch-synced reading carries one and
+  // is not marked `imported` (it was taken in a session, not offered by the
+  // pill), and without this deleting one left the sample free for the next
+  // quiet check to file straight back as an undecided "Apple Watch HRV".
+  if (!entry || !(entry.imported || typeof entry.healthKey === 'string')) return;
   const kind = arrKey === 'readings' ? 'reading' : arrKey === 'activities' ? 'workout'
     : arrKey === 'meds' ? 'med' : arrKey === 'symptoms' ? 'symptom' : null;
   if (!kind) return;

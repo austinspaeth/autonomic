@@ -26,6 +26,7 @@ import { getState, storeWaveform, upsertEntry } from '../../store/store';
 import { splitWaveform } from '../../lib/waveforms';
 import { health, healthAppName } from '../../lib/health';
 import { hrvHealthWrite } from '../../lib/health/hrvWrite';
+import { filedFromSample } from '../../lib/health/updateSet';
 import { confirmDelete, EntryForm } from '../EntryForm';
 import { READING_TYPES } from '../../lib/registry';
 import { keyOf, nowTime, pad, todayKey, uid } from '../../lib/dates';
@@ -42,7 +43,7 @@ const CONFIDENCE_LABEL: Record<'high' | 'fair' | 'low', string> = {
   low: 'Low confidence',
 };
 
-export function HrvResults({ rr, segmentStarts, seamGapsMs, hrSamples, sdnnSamples, config, durationSec, startedAtMs, watchFallback, onRetry, controls }: {
+export function HrvResults({ rr, segmentStarts, seamGapsMs, hrSamples, sdnnSamples, config, durationSec, startedAtMs, healthKey, watchFallback, onRetry, controls }: {
   rr: number[]; hrSamples: { t: number; bpm: number }[]; sdnnSamples?: { t: number; sdnn: number }[];
   /** Indices into `rr` where camera tracking resumed after a dropout. */
   segmentStarts?: number[];
@@ -52,6 +53,16 @@ export function HrvResults({ rr, segmentStarts, seamGapsMs, hrSamples, sdnnSampl
   /** When the reading actually began (watch-synced / imported readings) — the
    *  entry is stamped with this time and day, not the moment Save is pressed. */
   startedAtMs?: number | null;
+  /**
+   * The Apple Health sample this reading IS, for the two paths that build one
+   * out of a health store (the watch-sync card and the on-demand import). It is
+   * the same item key the periodic import check uses (`hrv-<startMs>`), so the
+   * sample has ONE identity whichever path files it: stamped on the entry, it
+   * stops the quiet check offering the sample back, it makes a delete a
+   * permanent decline of it, and it is what `filedFromSample` matches on when
+   * the check got there first.
+   */
+  healthKey?: string | null;
   watchFallback: { sdnn?: number; hr?: number } | null;
   /**
    * Take the reading again, supplied by whoever raised this card.
@@ -92,6 +103,7 @@ export function HrvResults({ rr, segmentStarts, seamGapsMs, hrSamples, sdnnSampl
       source: config.source, durationSec,
       rrRaw: rr, rrClean: result.rrClean, sampledHr: hrSamples,
     };
+    if (healthKey) base.healthKey = healthKey;
     if (segmentStarts && segmentStarts.length) {
       base.rrSegments = segmentStarts;
       if (seamGapsMs?.length === segmentStarts.length) base.rrSeamGaps = seamGapsMs;
@@ -214,7 +226,33 @@ export function HrvResults({ rr, segmentStarts, seamGapsMs, hrSamples, sdnnSampl
     // The preview `reading` carries its arrays inline (ReadingSummary renders
     // from them pre-save); persisting splits them into the waveform sidecar,
     // written before the entry so the journal never references a missing blob.
-    const { entry, waveform } = splitWaveform(degraded ? { ...reading, degraded: true } : reading);
+    //
+    // ONE health sample is ONE journal reading, whoever files it first.
+    //
+    // This card is a receipt for a sample that is already in Apple Health, and
+    // the quiet import check runs on EVERY foreground — so putting the phone
+    // down to use the watch and picking it up again is itself the moment the
+    // check fires, and it files the sample on its own initiative under a kind
+    // nobody told it ("Apple Watch HRV", `kindOpen`). The card then wrote a
+    // second copy beside it, which is how one watch session came to sit in the
+    // journal twice, once as "Apple Watch HRV" and once as "Baseline HRV".
+    //
+    // So the write lands ON that entry: same id, so the sidecar blob replaces
+    // the import's rather than orphaning it, and the kind the user chose in the
+    // session replaces the undecided one the check had to leave open. The
+    // import's own note is kept when this card has none, because it is still
+    // true about where the beats came from. `imported` deliberately is NOT:
+    // the trust rule for an imported HRV reading gates on `durationSec` meaning
+    // real RR coverage, and this entry's is the session's elapsed time
+    // (src/lib/hrvQuality) — and a reading the user sat through in a session is
+    // what every other watch-sync reading is filed as.
+    const prior = healthKey
+      ? filedFromSample(getState().days[dk], 'reading', healthKey, String(reading.type), String(reading.time || ''))
+      : undefined;
+    const built = degraded ? { ...reading, degraded: true } : reading;
+    const { entry, waveform } = splitWaveform(prior
+      ? { ...built, id: prior.id, note: built.note || prior.note || '' }
+      : built);
     if (waveform) storeWaveform(entry.id, waveform);
     saved.current = entry;
     upsertEntry(dk, 'readings', entry);

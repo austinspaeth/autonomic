@@ -738,7 +738,7 @@ export const clearIapError = () => { if (state.error) set({ error: undefined });
  *  meant `reportOfferOutcome` dropped every attempt made from the app's MAIN
  *  purchase door: it reports only attempts carrying an origin. So the one path
  *  most purchases take was the one path with no failure reporting at all. */
-export type PurchaseOrigin = 'annual' | 'founder' | 'paywall';
+export type PurchaseOrigin = 'annual' | 'founder' | 'holiday' | 'paywall';
 export type PurchaseOutcomeEvent = {
   sku: string; origin?: PurchaseOrigin; outcome: PurchaseOutcome; error?: unknown;
 };

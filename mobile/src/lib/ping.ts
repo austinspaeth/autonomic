@@ -228,7 +228,7 @@ export type PotsCode = 'T' | 'E';
 export type ViewCode = 'I' | 'P' | 'B';
 
 /** Which offer: `A` the half-off annual window, `F` the founding-member card,
- *  `P` the ordinary paywall.
+ *  `H` the dated Black Friday card, `P` the ordinary paywall.
  *
  *  `P` rides the FAILURE route only. The paywall is not an offer card — nothing
  *  raises it on the app's initiative, so it has no `osh`/`odm`/`oac` — but a
@@ -237,15 +237,17 @@ export type ViewCode = 'I' | 'P' | 'B';
  *  store which could not sell to a large share of Android phones moved no
  *  counter for months: the only instrumented purchase paths were the two cards.
  *
- *  The consequence for a consumer: **`ofl / oac` is a rate only for A and F**.
+ *  The consequence for a consumer: **`ofl / oac` is a rate only for A, F and
+ *  H**.
  *  `P`'s denominator is the `pay` route, which has its own cap and shape, so
  *  the two must not simply be divided. */
-export type OfferCode = 'A' | 'F' | 'P';
+export type OfferCode = 'A' | 'F' | 'H' | 'P';
 
 /**
  * The DOOR a purchase came through: which wall raised the paywall it was bought
- * from (a {@link SurfaceCode}), or which of the two offer cards (`A` the annual
- * note, `F` the founding-member card). Sent on `sub` as a `-W` token.
+ * from (a {@link SurfaceCode}), or which of the offer cards (`A` the annual
+ * note, `F` the founding-member card, `H` the Black Friday card). Sent on `sub`
+ * as a `-W` token.
  *
  * It exists because `pay` and `sub` were two counters with nothing between
  * them: one said which locked thing people tapped, the other that somebody
@@ -253,17 +255,18 @@ export type OfferCode = 'A' | 'F' | 'P';
  * wall that is met constantly and never bought from looks identical, in `pay`,
  * to the one that sells the app.
  *
- * The two alphabets do not collide (walls R I P B O M N S, offers A F), so one
- * letter says both which kind of door and which one. Undefined whenever the
+ * The two alphabets do not collide (walls R I P B O M N S, offers A F H), so
+ * one letter says both which kind of door and which one. Undefined whenever the
  * purchase had no buy tap behind it in this session (a payment that cleared
  * after its sheet closed), or the paywall's wall is not known: an unknown door
  * is left off, never guessed.
  */
-export type DoorCode = SurfaceCode | 'A' | 'F';
+export type DoorCode = SurfaceCode | 'A' | 'F' | 'H';
 
 export function doorCode(origin: string | undefined, wall?: SurfaceCode): DoorCode | undefined {
   if (origin === 'annual') return 'A';
   if (origin === 'founder') return 'F';
+  if (origin === 'holiday') return 'H';
   if (origin === 'paywall') return wall;
   return undefined;
 }
@@ -272,6 +275,7 @@ export function doorCode(origin: string | undefined, wall?: SurfaceCode): DoorCo
 export function offerCode(offer: string | undefined): OfferCode | undefined {
   if (offer === 'annual') return 'A';
   if (offer === 'founder') return 'F';
+  if (offer === 'holiday') return 'H';
   if (offer === 'paywall') return 'P';
   return undefined;
 }

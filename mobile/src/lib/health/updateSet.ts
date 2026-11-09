@@ -30,7 +30,7 @@
  *    journal's own symptom types (./symptomMap). Never a sample saying a
  *    symptom was absent, and never one of our own cycle-symptom write-backs.
  */
-import type { DayRecord, SleepRecord, TypeDef } from '../types';
+import type { DayRecord, Entry, SleepRecord, TypeDef } from '../types';
 import { fmtTime12 } from '../dates';
 import { isPoorImport, type ImportedHrvQuality } from '../hrvQuality';
 import type { ImportedMed, ImportedReading, ImportedSymptom, ImportedWorkout, SleepImport } from './index';
@@ -196,12 +196,44 @@ export function importFingerprint(dk: string, kind: ItemKind, type: string, time
 export function dayAlreadyHas(
   day: DayRecord | undefined, kind: ItemKind, type: string, time: string,
 ): boolean {
-  const list = kind === 'reading' ? day?.readings : kind === 'workout' ? day?.activities
-    : kind === 'symptom' ? day?.symptoms : day?.meds;
-  // A watch Breathe session files as `breathHrv` but is the same measurement,
-  // the pairing buildUpdateSet makes above.
-  const same = (t: unknown) => (type === 'hrv' ? t === 'hrv' || t === 'breathHrv' : t === type);
-  return (list || []).some((e) => same(e.type) && near(e.time, time, tolFor(kind)));
+  return listFor(day, kind).some((e) => sameItemType(kind, type, e.type) && near(e.time, time, tolFor(kind)));
+}
+
+/** The day's entries of an item's kind. */
+const listFor = (day: DayRecord | undefined, kind: ItemKind): Entry[] =>
+  (kind === 'reading' ? day?.readings : kind === 'workout' ? day?.activities
+    : kind === 'symptom' ? day?.symptoms : day?.meds) || [];
+
+const hrvish = (t: unknown) => t === 'hrv' || t === 'breathHrv';
+/** Two types that mean the same measurement. A watch Breathe session files as
+ *  `breathHrv` and a baseline as `hrv`, and one heartbeat series is one
+ *  reading whichever of the two the wearer called it (../hrvKind). */
+const sameItemType = (kind: ItemKind, a: string, b: unknown) =>
+  (kind === 'reading' && hrvish(a) ? hrvish(b) : a === b);
+
+/**
+ * The entry that ALREADY holds this health sample, if the day holds one.
+ *
+ * `dayAlreadyHas` asks the same question for the import build, which has no
+ * entry to hand back. This one is for the WRITE paths: the watch-sync card and
+ * the on-demand HRV import file a reading for a sample the quiet check may have
+ * filed on its own initiative minutes earlier (it runs on every foreground, and
+ * putting the phone down to use the watch IS a foreground), and the answer has
+ * to be the entry itself so the second write can land ON it rather than beside
+ * it. One Apple Health sample is one journal reading, whoever gets there first.
+ *
+ * The sample's own key leads — `healthKey` is exact, and it is the only thing
+ * that still matches when the two paths disagree about the minute. The
+ * type/time rule behind it is the fallback for an entry written before the
+ * stamp existed, and is the same rule, to the same tolerance, that keeps the
+ * import from offering a sample the journal already holds.
+ */
+export function filedFromSample(
+  day: DayRecord | undefined, kind: ItemKind, key: string, type: string, time: string,
+): Entry | undefined {
+  const list = listFor(day, kind);
+  return list.find((e) => typeof e.healthKey === 'string' && e.healthKey === key)
+    ?? list.find((e) => sameItemType(kind, type, e.type) && near(e.time, time, tolFor(kind)));
 }
 
 /** How close counts as "the same thing", per kind. One table, so the journal
@@ -246,11 +278,9 @@ function declinedOn(dk: string, declined: ReadonlySet<string>): { kind: string; 
  */
 export function filterDeclined(set: HealthUpdateSet, declined: ReadonlySet<string>): HealthUpdateSet {
   const stones = declinedOn(set.dk, declined);
-  const sameType = (kind: ItemKind, a: string, b: string) =>
-    (kind === 'reading' && (a === 'hrv' || a === 'breathHrv') ? b === 'hrv' || b === 'breathHrv' : a === b);
   const gone = (key: string, kind: ItemKind, type: string, time: string) =>
     declined.has(key)
-    || stones.some((d) => d.kind === kind && sameType(kind, d.type, type)
+    || stones.some((d) => d.kind === kind && sameItemType(kind, d.type, type)
       && near(d.time, time, tolFor(kind)));
   return {
     dk: set.dk,
@@ -373,6 +403,13 @@ export function buildUpdateSet(
 
   for (const im of raw.imports) {
     if (im.ownApp) continue;
+    // The day already holds this exact sample. Every path that files one stamps
+    // its key (`importUpdates` below, and the watch-sync / on-demand import
+    // cards through features/hrv/Results), so the identity is exact — which is
+    // what the time rules below cannot be: a reading the watch-sync card filed
+    // and a reading the user then corrected the clock of are the same sample
+    // whatever minute they now claim.
+    if (readings.some((e) => e.healthKey === `${im.type}-${im.startMs}`)) continue;
     if (im.type === 'hrv') {
       // Only trustworthy HRV: real beat-to-beat RR spanning at least 4 minutes
       // (SDNN-only samples carry no series and are excluded outright).

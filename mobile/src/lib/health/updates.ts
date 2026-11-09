@@ -34,6 +34,7 @@ import {
   sleepToFile, updateCount, updateSignature,
   type HealthUpdateSet, type ReviewItem, type UpdateMed, type UpdateReading, type UpdateSymptom,
 } from './updateSet';
+import { findDuplicateWristReadings } from './dupeRepair';
 import { withAuthTimeout } from './askedAuth';
 import { workoutCandidateOf } from './workoutCandidate';
 import { correctedDistance } from './workoutDistance';
@@ -325,6 +326,43 @@ export async function repairSplitNights(): Promise<number> {
   }
   try { seenStore()?.set(KEY_SLEEP_REPAIRED, true); } catch { /* runs again next launch */ }
   return repaired;
+}
+
+/* ---------- one-time repair of watch readings filed twice ---------- */
+
+// Before 1.41 a heartbeat series had no single identity, so the watch-sync card
+// and the quiet import check could each file it: one session, two readings, one
+// of them the check's undecided "Apple Watch HRV" copy (./dupeRepair has the
+// whole story). The write paths can't go back and merge what they already
+// wrote, so this folds each pair ONCE — the card's own entry stays and takes
+// the sample's key, the check's copy goes.
+//
+// No health read and no permission: the evidence is entirely in the journal,
+// which is why it sweeps all of it rather than a recent window, and why it runs
+// whether or not Health is still connected.
+const KEY_DUPE_REPAIRED = 'wristDupeRepaired';
+
+export function repairDuplicateWristReadings(): number {
+  try { if (seenStore()?.getBoolean(KEY_DUPE_REPAIRED)) return 0; } catch { return 0; }
+  let fixed = 0;
+  try {
+    for (const pair of findDuplicateWristReadings(getState().days)) {
+      const keep = (getState().days[pair.dk]?.readings || []).find((e) => e.id === pair.keepId);
+      if (!keep) continue;
+      // The key moves to the survivor FIRST. `deleteEntry` tombstones the
+      // sample as it removes the copy (./declined), and an entry that is about
+      // to be the only thing in the journal claiming that sample has to be
+      // carrying its key before the tombstone lands — otherwise the next check
+      // has a declined sample and no reading to show for it.
+      if (pair.healthKey && typeof keep.healthKey !== 'string') {
+        upsertEntry(pair.dk, 'readings', { ...keep, healthKey: pair.healthKey });
+      }
+      deleteEntry(pair.dk, 'readings', pair.dropId);
+      fixed++;
+    }
+  } catch (e) { logError('health.repairDupe', e); }
+  try { seenStore()?.set(KEY_DUPE_REPAIRED, true); } catch { /* runs again next launch */ }
+  return fixed;
 }
 
 /* ---------- one-time repair of inflated workout distances ---------- */
