@@ -16,7 +16,7 @@
  *
  * Pure: no store, no native, no React.
  */
-import { scoreCat, scoreSet, type DaysMap, type ScoreSetResult } from '../scoring/day';
+import { WORST_DAY_KEY, scoreCat, scoreSet, type DaysMap, type ScoreSetResult } from '../scoring/day';
 import type { ScoreContext } from '../scoring';
 import type { Entry } from '../types';
 
@@ -116,7 +116,7 @@ export function outcomeOf(
     seen++;
     // A crash is a dip whatever the arithmetic says: a day that scored 22
     // after a day that scored 30 is not an 8-point wobble.
-    if (base - s > DECLINE_PTS || scoreCat(s).short === 'Crash') dipped = true;
+    if (base - s > DECLINE_PTS || scoreCat(s).key === WORST_DAY_KEY) dipped = true;
   }
 
   // One scored day out of two is not a window. Requiring both is what stops a

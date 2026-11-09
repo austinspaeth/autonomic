@@ -1,6 +1,6 @@
 import { addDays, todayKey } from '../../dates';
 import { demoDays } from '../../demo';
-import { scoreCat, type DaysMap } from '../../scoring/day';
+import { WORST_DAY_KEY, scoreCat, type DaysMap } from '../../scoring/day';
 import { dayScore } from '../../trends/metrics';
 import { keyRange } from '../../trends/series';
 import { crashIsFall, CRASH_REL_WINDOW } from '../envelope';
@@ -99,7 +99,7 @@ describe('the demo journal, run through the real engine', () => {
     let floors = 0;
     keys.forEach((dk) => {
       const s = dayScore(st.days[dk], dk, st.days, {});
-      if (s == null || scoreCat(s).short !== 'Crash') return;
+      if (s == null || scoreCat(s).key !== WORST_DAY_KEY) return;
       const recent = keyRange(addDays(dk, -1), CRASH_REL_WINDOW, addDays)
         .map((k) => dayScore(st.days[k], k, st.days, {}))
         .filter((x): x is number => x != null);
@@ -131,7 +131,7 @@ describe('the demo journal, run through the real engine', () => {
       days[addDays(dk, -i)] = day({ readings: [{ id: `c${i}`, type: 'breathHrv', time: '07:30', rmssd: '12' } as Entry] });
     }
     const s = dayScore(days[dk], dk, days, {})!;
-    expect(scoreCat(s).short).toBe('Crash');
+    expect(scoreCat(s).key).toBe(WORST_DAY_KEY);
     const recent = keyRange(addDays(dk, -1), CRASH_REL_WINDOW, addDays)
       .map((k) => dayScore(days[k], k, days, {}))
       .filter((x): x is number => x != null);
@@ -145,7 +145,7 @@ describe('the demo journal, run through the real engine', () => {
     const graded = keys
       .map((dk) => ({ dk, s: dayScore(st.days[dk], dk, st.days, {}) }))
       .filter((r): r is { dk: string; s: number } => r.s != null);
-    const worst = graded.slice().sort((a, b) => a.s - b.s).filter((r) => scoreCat(r.s).short !== 'Crash')[0];
+    const worst = graded.slice().sort((a, b) => a.s - b.s).filter((r) => scoreCat(r.s).key !== WORST_DAY_KEY)[0];
     const best = graded.slice().sort((a, b) => b.s - a.s)[0];
     const bad = buildBudget(st, worst.dk, {}, { ...OPTS, now: AT_2PM(), brief: true });
     const good = buildBudget(st, best.dk, {}, { ...OPTS, now: AT_2PM(), brief: true });

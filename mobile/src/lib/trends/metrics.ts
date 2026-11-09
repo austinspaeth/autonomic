@@ -17,7 +17,7 @@
  */
 import type { DayRecord, Entry } from '../types';
 import { orthoMaxDelta, totalPower, type ScoreContext } from '../scoring';
-import { DEFAULT_PROTOCOL, dayCleanliness, scoreCat, scoreSet, sleepHours, type DaysMap } from '../scoring/day';
+import { DEFAULT_PROTOCOL, WORST_DAY_KEY, dayCleanliness, scoreCat, scoreSet, sleepHours, type DaysMap } from '../scoring/day';
 import { isTrustedReading } from '../hrvQuality';
 import { dayBristol, movementCount } from '../digestion';
 import { fmtWater, waterNum, waterUnit } from '../units';
@@ -248,8 +248,8 @@ export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
     value: (d, dk, days, ctx) => {
       const s = dayScore(d, dk, days, ctx);
       if (s == null) return null;
-      const short = scoreCat(s).short;
-      return short === 'Bad' || short === 'Crash' ? 1 : 0;
+      const k = scoreCat(s).key;
+      return k === 'bad' || k === WORST_DAY_KEY ? 1 : 0;
     },
     phrase: (delta) => `${dir(delta, 'up', 'down')} ${Math.abs(Math.round(delta))} ${plural(Math.round(delta), 'day', 'days')}`,
     fmt: (v) => String(Math.round(v)),

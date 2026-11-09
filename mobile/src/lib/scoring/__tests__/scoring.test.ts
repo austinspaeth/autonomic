@@ -10,8 +10,9 @@ import {
   restingHrBands, rowScoreCategory, sHfPeak, sLfPeak, sSys, totalPower, worstCat,
 } from '../index';
 import {
-  DEFAULT_PROTOCOL, activityGrade, blueZone, dayCleanliness, metricHistory, numEx,
-  resolveProtocol, scoreCat, scoreSet, sleepGrade, sleepHours, streakInfo, streakTier,
+  DEFAULT_PROTOCOL, OUTLOOK_GUIDE, SCORE_CATS, TOMORROW, activityGrade, blueZone,
+  dayCleanliness, metricHistory, numEx, resolveProtocol, scoreCat, scoreSet,
+  sleepGrade, sleepHours, streakInfo, streakTier,
 } from '../day';
 
 const day = (over: Partial<DayRecord> = {}): DayRecord => ({
@@ -275,13 +276,27 @@ describe('day scoring', () => {
     expect(res.trainingHeld!.uncapped).toBe(Math.round((25 * 35 + 15 * 100) / 40));
     expect(res.score).toBe(35 + 15);
   });
+  // Keyed on `key`, never on the label: the label is copy and has been
+  // rewritten once already. See DayKey in scoring/day.
   it('scoreCat bands', () => {
-    expect(scoreCat(90).short).toBe('Excellent');
-    expect(scoreCat(84).short).toBe('Good');
-    expect(scoreCat(55).short).toBe('Moderate');
-    expect(scoreCat(41).short).toBe('Compromised');
-    expect(scoreCat(30).short).toBe('Bad');
-    expect(scoreCat(5).short).toBe('Crash');
+    expect(scoreCat(90).key).toBe('excellent');
+    expect(scoreCat(84).key).toBe('good');
+    expect(scoreCat(55).key).toBe('moderate');
+    expect(scoreCat(41).key).toBe('compromised');
+    expect(scoreCat(30).key).toBe('bad');
+    expect(scoreCat(5).key).toBe('severe');
+  });
+  it('every band has a distinct key, label and short', () => {
+    const uniq = (a: string[]) => new Set(a).size === a.length;
+    expect(uniq(SCORE_CATS.map((c) => c.key))).toBe(true);
+    expect(uniq(SCORE_CATS.map((c) => c.label))).toBe(true);
+    expect(uniq(SCORE_CATS.map((c) => c.short))).toBe(true);
+    // Both copy records cover every band, so a new band cannot ship with no
+    // guidance behind it.
+    SCORE_CATS.forEach((c) => {
+      expect(OUTLOOK_GUIDE[c.key]).toBeTruthy();
+      expect(TOMORROW[c.key]).toBeTruthy();
+    });
   });
   it('blueZone', () => {
     const readings: Entry[] = [

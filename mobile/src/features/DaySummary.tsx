@@ -782,13 +782,13 @@ function ScoredHero({ dk, readings, d, all, ctx, trend, budget, pulse, onExplain
 
   let guide: string;
   if (hasEvening) {
-    if (delta == null) guide = 'Evening reading logged. ' + (TOMORROW[cat.short] || '');
-    else if (delta <= -20) guide = 'Major setback versus this morning. Multiple triggers likely stacked. ' + TOMORROW[cat.short];
-    else if (delta <= -10) guide = 'Day cost more than the morning predicted. Check food, exertion, or stress. ' + TOMORROW[cat.short];
-    else if (delta >= 10) guide = 'Day went better than the morning predicted. Note what worked and repeat it. ' + TOMORROW[cat.short];
-    else guide = 'Day held its morning baseline; activity matched capacity. ' + TOMORROW[cat.short];
+    if (delta == null) guide = 'Evening reading logged. ' + (TOMORROW[cat.key] || '');
+    else if (delta <= -20) guide = 'Major setback versus this morning. Multiple triggers likely stacked. ' + TOMORROW[cat.key];
+    else if (delta <= -10) guide = 'Day cost more than the morning predicted. Check food, exertion, or stress. ' + TOMORROW[cat.key];
+    else if (delta >= 10) guide = 'Day went better than the morning predicted. Note what worked and repeat it. ' + TOMORROW[cat.key];
+    else guide = 'Day held its morning baseline; activity matched capacity. ' + TOMORROW[cat.key];
   } else {
-    guide = OUTLOOK_GUIDE[cat.short];
+    guide = OUTLOOK_GUIDE[cat.key];
     if ((readings.length >= 2 || readings.some((r) => readingPeriod(r) === 'midday')) && delta != null && Math.abs(delta) >= 5)
       guide = (delta < 0 ? 'Trending down from this morning. Watch food and activity through the afternoon. ' : 'Trending up from this morning. ') + guide;
   }

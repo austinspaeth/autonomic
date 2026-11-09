@@ -22,7 +22,7 @@
  * Pure: no store, no native, no React.
  */
 import type { ScoreContext } from '../scoring';
-import { scoreCat, type DaysMap } from '../scoring/day';
+import { scoreCat, type DayKey, type DaysMap } from '../scoring/day';
 import { median } from '../trends/compare';
 import { keyRange, metricSeries } from '../trends/series';
 import type { TypeDef } from '../types';
@@ -130,13 +130,13 @@ export const RESOLUTION_OUTLIER_RATIO = 2;
  * (./envelope's `crashIsFall`), that day is the one that most needs the
  * smallest prior in the table.
  */
-export const PRIOR_BY_GRADE: Record<string, number> = {
-  Excellent: 300,
-  Good: 270,
-  Moderate: 220,
-  Compromised: 170,
-  Bad: 120,
-  Crash: 80,
+export const PRIOR_BY_GRADE: Record<DayKey, number> = {
+  excellent: 300,
+  good: 270,
+  moderate: 220,
+  compromised: 170,
+  bad: 120,
+  severe: 80,
 };
 /** Used when the day has no score at all yet. */
 export const PRIOR_DEFAULT = 200;
@@ -242,7 +242,7 @@ export function capacityBaseline(
 ): CapacityBaseline {
   // The prior, from today's own grade.
   const todayScore = scoreAt(dk);
-  const prior0 = todayScore == null ? PRIOR_DEFAULT : (PRIOR_BY_GRADE[scoreCat(todayScore).short] ?? PRIOR_DEFAULT);
+  const prior0 = todayScore == null ? PRIOR_DEFAULT : (PRIOR_BY_GRADE[scoreCat(todayScore).key] ?? PRIOR_DEFAULT);
 
   // Walk the complete days behind today, oldest first, collecting verdicts.
   const keys = keyRange(addDays(dk, -1), BASELINE_DAYS, addDays);

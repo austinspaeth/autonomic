@@ -19,15 +19,27 @@ import { fmtWater } from '../units';
 export type DaysMap = Record<string, DayRecord>;
 
 /* ---------- final-score bands ---------- */
-export interface DayCat { min: number; label: string; short: string; color: string }
+/**
+ * The stable identity of a day band. EVERY comparison, Record lookup and test
+ * assertion keys on this; `label` and `short` are display strings and nothing
+ * may branch on them. The two used to be one thing — the pacing budget
+ * suppressed its number on `scoreCat(score).short === 'Crash'`, the ceiling
+ * calibration marked a day dipped the same way, and the prior table was keyed
+ * on the words — so renaming a band on screen silently changed what the app
+ * DID. A label is copy; copy gets rewritten.
+ */
+export type DayKey = 'excellent' | 'good' | 'moderate' | 'compromised' | 'bad' | 'severe';
+export interface DayCat { min: number; key: DayKey; label: string; short: string; color: string }
 export const SCORE_CATS: DayCat[] = [
-  { min: 85, label: 'Excellent Autonomic Day', short: 'Excellent', color: '#2ee06a' },
-  { min: 70, label: 'Good Autonomic Day', short: 'Good', color: '#16a34a' },
-  { min: 55, label: 'Moderate Autonomic Day', short: 'Moderate', color: '#eab308' },
-  { min: 40, label: 'Compromised Day', short: 'Compromised', color: '#f97316' },
-  { min: 25, label: 'Bad Day', short: 'Bad', color: '#ef4444' },
-  { min: 0, label: 'Crash Day', short: 'Crash', color: '#b91c1c' },
+  { min: 85, key: 'excellent', label: 'Excellent Autonomic Day', short: 'Excellent', color: '#2ee06a' },
+  { min: 70, key: 'good', label: 'Good Autonomic Day', short: 'Good', color: '#16a34a' },
+  { min: 55, key: 'moderate', label: 'Moderate Autonomic Day', short: 'Moderate', color: '#eab308' },
+  { min: 40, key: 'compromised', label: 'Compromised Day', short: 'Compromised', color: '#f97316' },
+  { min: 25, key: 'bad', label: 'Bad Day', short: 'Bad', color: '#ef4444' },
+  { min: 0, key: 'severe', label: 'Crash Day', short: 'Crash', color: '#b91c1c' },
 ];
+/** The worst band: what the budget suppresses on and the calibration calls a dip. */
+export const WORST_DAY_KEY: DayKey = 'severe';
 export const scoreCat = (s: number): DayCat => SCORE_CATS.find((c) => s >= c.min) || SCORE_CATS[SCORE_CATS.length - 1];
 
 /** Guidance shown on the Autonomic Outlook card. Keep this general: it speaks to
@@ -35,21 +47,21 @@ export const scoreCat = (s: number): DayCat => SCORE_CATS.find((c) => s >= c.min
  *  tell someone to exercise — on strong days it offers headroom for their own
  *  protocol and whatever activity they already tolerate, and it always defers to
  *  their plan over the number. */
-export const OUTLOOK_GUIDE: Record<string, string> = {
-  Excellent: 'Strong autonomic baseline with reserves to spare. A good day for your full protocol, and for whatever activity you normally tolerate. Work within your plan rather than past it.',
-  Good: 'Solid baseline. Enough reserve for your protocol and a normal day. Keep anything demanding at a level you already know you handle well.',
-  Moderate: 'Reduced reserves. Keep the day easy and stay with the basics of your protocol. Lean on hydration, pacing, and rest, and hold back on anything demanding.',
-  Compromised: 'Significantly reduced reserves. This is a recovery day: rest, hydration, and essentials only. Avoid added load and late meals.',
-  Bad: 'System is stressed. Rest and gentle breathing. Look at what’s driving it: sleep, food, illness, or accumulated load.',
-  Crash: 'System in a crash state. Full rest and your protocol. Check for illness or stacked triggers; seek care if symptoms warrant.',
+export const OUTLOOK_GUIDE: Record<DayKey, string> = {
+  excellent: 'Strong autonomic baseline with reserves to spare. A good day for your full protocol, and for whatever activity you normally tolerate. Work within your plan rather than past it.',
+  good: 'Solid baseline. Enough reserve for your protocol and a normal day. Keep anything demanding at a level you already know you handle well.',
+  moderate: 'Reduced reserves. Keep the day easy and stay with the basics of your protocol. Lean on hydration, pacing, and rest, and hold back on anything demanding.',
+  compromised: 'Significantly reduced reserves. This is a recovery day: rest, hydration, and essentials only. Avoid added load and late meals.',
+  bad: 'System is stressed. Rest and gentle breathing. Look at what’s driving it: sleep, food, illness, or accumulated load.',
+  severe: 'System in a crash state. Full rest and your protocol. Check for illness or stacked triggers; seek care if symptoms warrant.',
 };
-export const TOMORROW: Record<string, string> = {
-  Excellent: 'Tomorrow likely Good to Excellent.',
-  Good: 'Tomorrow likely Good.',
-  Moderate: 'Tomorrow likely Moderate, so plan a lighter day.',
-  Compromised: 'Tomorrow likely Compromised to Moderate, so keep it light.',
-  Bad: 'Tomorrow likely Bad. Plan a rest day.',
-  Crash: 'Tomorrow Bad to Crash. Prepare for full rest.',
+export const TOMORROW: Record<DayKey, string> = {
+  excellent: 'Tomorrow likely Good to Excellent.',
+  good: 'Tomorrow likely Good.',
+  moderate: 'Tomorrow likely Moderate, so plan a lighter day.',
+  compromised: 'Tomorrow likely Compromised to Moderate, so keep it light.',
+  bad: 'Tomorrow likely Bad. Plan a rest day.',
+  severe: 'Tomorrow Bad to Crash. Prepare for full rest.',
 };
 
 export const SCORE_TIPS: Record<string, string> = {

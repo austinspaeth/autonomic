@@ -28,7 +28,7 @@
  * Pure: no store, no native, no React.
  */
 import type { ScoreContext } from '../scoring';
-import { scoreCat, sleepGradeParts, sleepHours, type DaysMap } from '../scoring/day';
+import { WORST_DAY_KEY, scoreCat, sleepGradeParts, sleepHours, type DaysMap } from '../scoring/day';
 import { baselineHistory, firstBaselineRmssd, shift } from '../scoring/baseline';
 import { median } from '../trends/compare';
 import { keyRange, metricSeries } from '../trends/series';
@@ -415,7 +415,7 @@ export function buildEnvelope(opts: EnvelopeOpts): Envelope {
 
   /* ---- the days that publish no number at all ---- */
   const score = scoreAt(dk);
-  const crashGrade = score != null && scoreCat(score).short === 'Crash';
+  const crashGrade = score != null && scoreCat(score).key === WORST_DAY_KEY;
   const suppressed: Envelope['suppressed'] =
     downturn ? 'downturn'
       : strain === 'alert' ? 'strain-alert'
