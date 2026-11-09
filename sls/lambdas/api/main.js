@@ -237,6 +237,10 @@ const cleanSale = (raw) => {
   // not share one, so it never carries a cohort — see sales.js rule FOUR.
   if (out.qty === 1 && isIsoDate(raw.cohort) && raw.cohort <= out.date) out.cohort = raw.cohort;
   if (isIsoDate(raw.cancelled) && raw.cancelled >= out.date) out.cancelled = raw.cancelled;
+  // A winback only means anything on a cancelled row, and only after it: it
+  // undoes the cancellation FORWARD (sales.js rule FIVE), so the period that
+  // lost the money keeps reporting the loss.
+  if (out.cancelled && isIsoDate(raw.winback) && raw.winback >= out.cancelled) out.winback = raw.winback;
   if (raw.refunded) out.refunded = true;
   if (raw.note) out.note = String(raw.note).slice(0, 2000);
   // The subscribe ping this purchase was recorded from, as `<arrival day>|<key>`
@@ -268,6 +272,9 @@ const cleanChurn = (raw) => {
   out.plan = raw.plan === 'monthly' || raw.plan === 'annual' ? raw.plan : 'unknown';
   const units = Number(raw.units);
   if (Number.isFinite(units) && units > 0) out.units = Math.round(units);
+  // Won back on or after the day it was lost: it stops subtracting from the
+  // book there and the loss stays recorded on `date` (rule FIVE).
+  if (isIsoDate(raw.winback) && raw.winback >= out.date) out.winback = raw.winback;
   if (raw.note) out.note = String(raw.note).slice(0, 2000);
   return out;
 };

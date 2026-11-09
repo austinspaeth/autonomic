@@ -22,13 +22,28 @@ export type Sale = {
   qty: number;
   cohort?: string;
   cancelled?: string;
+  /** Won back: the day this cancelled subscription started paying again. The
+   *  cancellation stays on its own date (the period keeps its loss) and the
+   *  subscription counts as live again from here. */
+  winback?: string;
   refunded?: boolean;
   note?: string;
   /** The subscribe ping this purchase was recorded from: `<arrival day>|<cohort key>`. */
   ping?: string;
 };
 
-export type Churn = { id: string; date: string; mrr: number; plan?: 'monthly' | 'annual' | 'unknown'; platform?: Platform; units?: number; note?: string };
+export type Churn = {
+  id: string;
+  date: string;
+  mrr: number;
+  plan?: 'monthly' | 'annual' | 'unknown';
+  platform?: Platform;
+  units?: number;
+  note?: string;
+  /** Won back: the day this lost MRR came back. It stops subtracting from the
+   *  book here, and the loss stays recorded on `date`. */
+  winback?: string;
+};
 
 export type Cost = {
   id: string;

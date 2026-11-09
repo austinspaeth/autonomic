@@ -58,6 +58,7 @@ import {
   SMALL_COHORT,
   newOn,
   offerFunnel,
+  reviewAsks,
   paceDay,
   pctChange,
   platformsOver,
@@ -1035,6 +1036,7 @@ function RangeSection({
     { key: '?', label: 'Not stated', color: '#2e2e33' },
   ];
   const offers = offerFunnel(ix, days);
+  const ra = reviewAsks(ix, days);
   const fdays = days.map((d) => ({ d, f: faultDay(ix, d) }));
   const lineRows = (lines: { kind: PingKind; L?: string; label: string }[]) =>
     lines
@@ -1315,6 +1317,40 @@ function RangeSection({
               .map(({ L, f }) => ({ label: L === 'A' ? 'Half-off annual' : 'Founding member', value: `${pct(f.acceptPct)} accepted`, sub: `${int(f.shown)} shown · ${int(f.dismissed)} dismissed` })),
           ]}
         />
+      </Card>
+
+      <Card title="Review asks">
+        <OverlayBars
+          title="Offered vs intent"
+          back={{ key: 'off', label: 'Offered', color: '#c98500' }}
+          front={{ key: 'int', label: 'Intent', color: '#199e70' }}
+          rows={days.map((d) => {
+            const r = reviewAsks(ix, [d]);
+            return { x: d, back: r.known ? r.offered : null, front: r.cardKnown ? r.intent : null };
+          })}
+          xLabel={xl}
+          summary={ra.known ? `${int(ra.offered)} offered` : ''}
+        />
+        {ra.known ? (
+          <Rows
+            rows={[
+              { label: 'Offered a review', value: int(ra.offered), sub: `${int(ra.card)} in-app card · ${int(ra.prompt)} store prompt` },
+              { label: 'Intent', value: `${int(ra.intent)} · ${pct(ra.intentPct, 1)}`, sub: 'Tapped through to a review or a note, of the cards raised' },
+              { label: 'Left a review', value: int(ra.review) },
+              { label: 'Sent a note instead', value: int(ra.note) },
+              { label: 'Dismissed the card', value: int(ra.dismissed) },
+              { label: 'Neither', value: int(ra.ignored), sub: 'Card raised, nothing tapped' },
+            ]}
+          />
+        ) : (
+          <Note>Neither review counter has reported yet. Builds from the release that added them send both.</Note>
+        )}
+        <Note>
+          The in-app card is the app's own, so it reports what was tapped. The store prompt is only ever counted as ASKED: no store says whether the sheet
+          appeared, and iOS swallows every ask past three a year. One install meets one of the two asks ever, so the two add up, but intent is a share of the
+          cards alone.
+          {ra.promptKnown ? '' : ' No store prompt has been asked in this range.'}
+        </Note>
       </Card>
 
       <Card title="What people do in there">

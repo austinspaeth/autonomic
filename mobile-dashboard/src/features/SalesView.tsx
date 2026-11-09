@@ -17,11 +17,11 @@ import { RenewalCalendar } from './RenewalCalendar';
 import { useData } from '../lib/data';
 import { addDays, dayDate, shortDate } from '../lib/dates';
 import { int, money } from '../lib/format';
-import { addMonths, bookOn, bookingsOf, daysToBuy, ledger, LTV_MIN_DAYS, ltv, mrrOf, PLANS, renewals, summarize, type PlanKey, type SalesFilter } from '../lib/sales';
+import { addMonths, bookOn, bookingsOf, churnItems, daysToBuy, ledger, LTV_MIN_DAYS, ltv, mrrOf, PLANS, renewals, summarize, type ChurnItem, type PlanKey, type SalesFilter } from '../lib/sales';
 import type { Sale } from '../lib/types';
 import { rangeDays } from '../lib/usage';
 import { C, num } from '../theme';
-import { SaleEditor } from './AddSheet';
+import { ChurnEditor, SaleEditor } from './AddSheet';
 import { RevenueBody } from './RevenueDeepDive';
 import { asIs, byWeekday, revenueOf, running } from './specs';
 
@@ -32,6 +32,7 @@ export function SalesView({ dk, range, platform }: { dk: string; range: '7' | '3
   const cur = snap?.load?.settings?.currency || '$';
   const $ = (n: number) => money(n, cur);
   const [editing, setEditing] = useState<Sale | null>(null);
+  const [churnEdit, setChurnEdit] = useState<ChurnItem | null>(null);
 
   const m = useMemo(() => {
     const l = ledger(snap?.load?.sales, snap?.load?.churn, platform);
@@ -80,9 +81,18 @@ export function SalesView({ dk, range, platform }: { dk: string; range: '7' | '3
       if (r.cancelled) bump(lost, r.cancelled, mrrOf(r));
     });
     l.churn.forEach((c) => bump(lost, c.date, c.mrr));
+    /* Rule FIVE: money that came BACK, on the day it came back. Never netted
+       off `lost`, which is what the period actually lost. */
+    const won = new Map<string, number>();
+    l.rows.forEach((r) => {
+      if (r.winback && r.cancelled && !r.refunded) bump(won, r.winback, mrrOf(r));
+    });
+    l.churn.forEach((c) => {
+      if (c.winback) bump(won, c.winback, c.mrr);
+    });
     ren.forEach((r) => bump(renew, r.date, r.amount));
     const rev = revenueOf(snap, platform, { from, to: dk, prevFrom, prevTo, deltaOK: prevOK }, days.length);
-    return { rev, books, added, lost, fresh, units, renew, l, ltvMonthly, ltvMixed, from, days, prevOK, book, book30, s, ps, ren, renPrev, renAll, upcoming, ahead, ios, android, buckets, inBucket, monthly };
+    return { rev, books, added, lost, won, fresh, units, renew, l, ltvMonthly, ltvMixed, from, days, prevOK, book, book30, s, ps, ren, renPrev, renAll, upcoming, ahead, ios, android, buckets, inBucket, monthly };
   }, [snap, dk, range, platform]);
 
   const ch = (a: number, b: number): Change => (m.prevOK ? { value: a, base: b } : null);
@@ -369,8 +379,13 @@ export function SalesView({ dk, range, platform }: { dk: string; range: '7' | '3
       note: 'Every renewal since the first sale, through the selected date. The range does not cut it; the arrow is how far the range moved it. Estimated: nothing reports a renewal, so each subscription not marked cancelled is assumed to renew on its term.',
       comparisons: [
         { label: 'Charges', value: int(m.renAll.length) },
+        /* The range's own renewals, said in as many words: this card's figure
+           is the whole ledger, so without this row the only renewal number on
+           it is one the range never cut. */
+        { label: `Renewed in the range`, value: `${$(renTotal)} · ${int(m.ren.length)} ${m.ren.length === 1 ? 'charge' : 'charges'}` },
+        { label: 'Share of the whole', value: renAllTotal ? `${((renTotal / renAllTotal) * 100).toFixed(0)}%` : '–' },
         { label: 'Per charge', value: m.renAll.length ? $(renAllTotal / m.renAll.length) : '–' },
-        ...(range === 'all' ? [] : [{ label: `On ${shortDate(addDays(m.from, -1))}`, value: $(renBefore) }, { label: 'Added in range', value: $(renAllTotal - renBefore) }]),
+        ...(range === 'all' ? [] : [{ label: `On ${shortDate(addDays(m.from, -1))}`, value: $(renBefore) }]),
         { label: `After the stores' ${cut}%`, value: $(renAllTotal * (1 - cut / 100)) },
         { label: 'Since', value: m.l.rows[0] ? shortDate(m.l.rows[0].date) : '–' },
       ],
@@ -387,11 +402,15 @@ export function SalesView({ dk, range, platform }: { dk: string; range: '7' | '3
       label: 'Churned MRR',
       value: $(m.s.churnedMrr),
       change: m.prevOK ? { value: m.s.churnedMrr, base: m.ps.churnedMrr } : null,
-      note: 'Cancellations you marked on a purchase, plus churn entered from store reports.',
+      note: 'Cancellations you marked on a purchase, plus churn entered from store reports. GROSS: what the range lost, winbacks included, because the period lost it.',
       comparisons: [
         { label: 'Cancellations', value: `${$(m.s.cancelledMrr)} · ${int(m.s.cancelledUnits)}` },
         { label: 'Entered from reports', value: $(m.s.unattachedMrr) },
-        { label: `Of MRR on ${shortDate(addDays(m.from, -1))}`, value: churnStart ? `${((m.s.churnedMrr / churnStart) * 100).toFixed(1)}%` : '–' },
+        { label: 'Won back in the range', value: m.s.wonBackMrr ? `${$(m.s.wonBackMrr)}${m.s.wonBackUnits ? ` · ${int(m.s.wonBackUnits)}` : ''}` : '–' },
+        { label: 'Net of winbacks', value: $(m.s.netChurnedMrr) },
+        { label: `Gross rate, of MRR on ${shortDate(addDays(m.from, -1))}`, value: churnStart ? `${((m.s.churnedMrr / churnStart) * 100).toFixed(1)}%` : '–' },
+        { label: 'Net rate, same base', value: churnStart ? `${((m.s.netChurnedMrr / churnStart) * 100).toFixed(1)}%` : '–' },
+        ...(m.s.wonBackLaterMrr ? [{ label: 'Of this gross, since won back', value: $(m.s.wonBackLaterMrr) }] : []),
         { label: 'Added in the same range', value: $(netNew + m.s.churnedMrr) },
         { label: 'Worst day', value: peak(perDay(m.lost), $) },
         { label: 'A year of it', value: $(m.s.churnedMrr * 12) },
@@ -409,6 +428,7 @@ export function SalesView({ dk, range, platform }: { dk: string; range: '7' | '3
       charts: [
         { title: per, series: flow(m.lost), format: $, color: '#e66767', xLabel: xl },
         { title: 'Running total over the range', series: running(perDay(m.lost)), format: $, color: '#e66767' },
+        { title: `Won back, ${per.toLowerCase()}`, series: flow(m.won), format: $, color: '#5ac8fa', xLabel: xl },
         { title: `MRR added, ${per.toLowerCase()}`, series: flow(m.added), format: $, color: '#199e70', xLabel: xl },
       ],
     },
@@ -464,6 +484,12 @@ export function SalesView({ dk, range, platform }: { dk: string; range: '7' | '3
     return { x: b, values: v };
   });
   const list = [...m.l.rows].filter((r) => r.date >= m.from && r.date <= dk).reverse();
+  /* EVERY churn event ever, for the list: an item is edited long after the
+     range that lost it has scrolled away, so the list is not cut by the range
+     (the charts above it are). */
+  const churnAll = churnItems(m.l);
+  const wonRows = m.buckets.map((b) => ({ day: b, value: m.days.filter((d) => m.inBucket(d, b)).reduce((t, d) => t + (m.won.get(d) || 0), 0) }));
+  const wonBackAll = churnAll.filter((x) => x.winback);
 
   return (
     <>
@@ -568,6 +594,119 @@ export function SalesView({ dk, range, platform }: { dk: string; range: '7' | '3
             <Text style={s.note}>Estimated: each live subscription renewing on its own date.</Text>
           </Card>
 
+        </DeepDive>
+
+        <DeepDive
+          icon="arrow.down.right"
+          title="Churn"
+          sub={`${$(m.s.churnedMrr)} lost in range${m.s.wonBackMrr ? ` · ${$(m.s.wonBackMrr)} won back` : ''}`}
+        >
+          <Card>
+            <View style={s.stats}>
+              {[
+                { label: 'Lost in range (gross)', value: $(m.s.churnedMrr), sub: `${int(m.s.cancelledUnits)} cancelled` },
+                { label: 'Won back in range', value: $(m.s.wonBackMrr), sub: m.s.wonBackUnits ? `${int(m.s.wonBackUnits)} subscriptions` : 'none' },
+                { label: 'Net of winbacks', value: $(m.s.netChurnedMrr), sub: 'what stayed lost' },
+                {
+                  label: 'Net rate',
+                  value: churnStart ? `${((m.s.netChurnedMrr / churnStart) * 100).toFixed(1)}%` : '–',
+                  sub: churnStart ? `of ${$(churnStart)} at the start` : 'no book to measure against',
+                },
+              ].map((x) => (
+                <View key={x.label} style={s.stat}>
+                  <Text style={s.statLabel}>{x.label}</Text>
+                  <Text style={[s.statValue, num]}>{x.value}</Text>
+                  <Text style={[s.statSub, num]}>{x.sub}</Text>
+                </View>
+              ))}
+            </View>
+            <Text style={s.note}>
+              Gross is what the range lost and never changes: a subscriber who came back later did still leave that month. Net allows for the money that came
+              back inside the range, and is the rate the forecast and the lifetime are struck from.
+            </Text>
+          </Card>
+
+          <Card>
+            <StackedBars
+              title="What was lost"
+              keys={[
+                { key: 'cancelled', label: 'Cancellations', color: '#e66767' },
+                { key: 'unattached', label: 'From store reports', color: '#c98500' },
+              ]}
+              rows={churnRows}
+              xLabel={xl}
+              format={$}
+              summary={`${$(m.s.churnedMrr)} of MRR`}
+            />
+          </Card>
+
+          <Card>
+            <BarChart title="Won back" series={wonRows} summary={$(m.s.wonBackMrr)} format={$} color="#5ac8fa" xLabel={xl} />
+            <Text style={s.note}>On the day they started paying again, not the day they left. {wonBackAll.length ? `${int(wonBackAll.length)} churn ${wonBackAll.length === 1 ? 'event has' : 'events have'} been won back in all.` : 'Nothing has been marked won back yet.'}</Text>
+          </Card>
+
+          <Card>
+            <BarChart title="Lost, running over the range" series={running(perDay(m.lost))} summary={$(m.s.churnedMrr)} format={$} color="#e66767" />
+          </Card>
+
+          <Card>
+            <BarChart title="MRR on each day" series={mrrSr} summary={$(m.book.mrr)} format={$} />
+            <Text style={s.note}>The book itself, for scale: churn only means something beside what there was to lose.</Text>
+          </Card>
+
+          <Card title="Where it was recorded">
+            <SplitBar
+              parts={[
+                { key: 'cancelled', label: 'Cancellations', value: m.s.cancelledMrr, color: '#e66767' },
+                { key: 'unattached', label: 'From store reports', value: m.s.unattachedMrr, color: '#c98500' },
+              ]}
+              format={$}
+            />
+            <Text style={s.note}>A cancellation is marked on a purchase and knows which one; a report row is MRR a store said stopped, with no purchase behind it.</Text>
+          </Card>
+
+          <Card title={`Every churn event · ${churnAll.length}`}>
+            {churnAll.length ? (
+              churnAll.slice(0, 120).map((x, i) => {
+                const inRange = x.date >= m.from && x.date <= dk;
+                return (
+                  <View key={`${x.kind}-${x.id}`}>
+                    {i ? <Divider /> : null}
+                    <Pressable onPress={() => setChurnEdit(x)} style={({ pressed }) => [s.row, pressed && { opacity: 0.6 }]}>
+                      <Dot color={x.winback ? '#199e70' : x.kind === 'cancellation' ? '#e66767' : '#c98500'} />
+                      <View style={{ flex: 1 }}>
+                        <Text style={s.rowTitle}>
+                          {x.kind === 'cancellation' ? `${PLANS.find((p) => p.key === x.plan)?.label} cancelled` : 'From a store report'}
+                          {x.units > 1 ? ` ×${x.units}` : ''}
+                        </Text>
+                        <Text style={s.rowSub}>
+                          {[
+                            shortDate(x.date),
+                            x.platform ? (x.platform === 'ios' ? 'iOS' : 'Android') : null,
+                            x.winback ? `back ${shortDate(x.winback)}` : null,
+                            !inRange ? 'outside the range' : null,
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </Text>
+                      </View>
+                      {x.winback ? <Pill label="WON BACK" color="#199e70" /> : null}
+                      <Text style={[s.rowValue, num]}>{$(x.mrr)}</Text>
+                    </Pressable>
+                  </View>
+                );
+              })
+            ) : (
+              <Empty>Nothing has churned.</Empty>
+            )}
+            <Text style={s.note}>
+              Every churn event on record, newest first, whatever the range: one is edited long after the month that lost it. Tap one to move it, mark it won
+              back, or take it off the books if it never happened.
+            </Text>
+          </Card>
+
+          {/* Inside the card, so the editor can rise over it. */}
+          <ChurnEditor item={churnEdit} onClose={() => setChurnEdit(null)} />
         </DeepDive>
 
         <DeepDive icon="cart" title="Purchases" sub={`${int(list.length)} in range · ${$(m.s.totalBookings)}`}>

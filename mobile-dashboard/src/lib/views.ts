@@ -3,7 +3,7 @@
    owns the other. */
 import { useSyncExternalStore } from 'react';
 
-export type ViewKey = 'glance' | 'usage' | 'sales' | 'forecast' | 'errors' | 'pings' | 'links' | 'codes';
+export type ViewKey = 'glance' | 'usage' | 'sales' | 'forecast' | 'errors' | 'pings' | 'links' | 'codes' | 'export';
 
 export const VIEWS: { key: ViewKey; label: string }[] = [
   { key: 'usage', label: 'App usage' },
@@ -14,6 +14,7 @@ export const VIEWS: { key: ViewKey; label: string }[] = [
   { key: 'pings', label: 'Raw pings' },
   { key: 'links', label: 'Links' },
   { key: 'codes', label: 'Access codes' },
+  { key: 'export', label: 'Export' },
 ];
 
 /* App usage is the home view: it is what gets opened to most often. */
@@ -26,11 +27,11 @@ export function setView(key: ViewKey) {
   listeners.forEach((fn) => fn());
 }
 
-/* Wide only. The board holds the views that are read all day; these four are
+/* Wide only. The board holds the views that are read all day; these are
    visited, so each opens as a side panel over the board, from a link in the
    top bar. Which one is open lives here because the links are in the bar and
    the panel is in the screen. */
-export const PANELS: ViewKey[] = ['forecast', 'links', 'codes', 'pings'];
+export const PANELS: ViewKey[] = ['forecast', 'links', 'codes', 'pings', 'export'];
 export const BOARD: ViewKey[] = ['usage', 'glance', 'sales', 'errors'];
 /* The board's columns of sections: each group starts a column of its own and
    its views run on from one another. Crashes and errors is short, so it rides

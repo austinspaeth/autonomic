@@ -8,6 +8,12 @@
  *        (a store report's "you lost $20 of MRR") subtracts from the book from
  *        its date on, and the book is floored at zero.
  *  FOUR  Days-to-buy only counts rows that carry an install date.
+ *  FIVE  A WINBACK undoes a cancellation forward, never backward. The loss
+ *        stays on the day it happened, so the period that lost the money keeps
+ *        reporting it; from the winback date on the subscription is live again
+ *        and the book, the churn rate and the lifetime read it as kept. Gross
+ *        churn is therefore what was lost, net churn is what stayed lost, and
+ *        the two are never folded into one number.
  *
  * A ledger row is a FIRST payment. Renewals are never typed in; they are
  * derived (every live subscription is charged again each term) and always
@@ -33,7 +39,11 @@ export function mrrOf(s: Sale) {
   if (s.refunded || !isRecurring(s.plan)) return 0;
   return (s.price * s.qty) / termOf(s.plan);
 }
-export const isLiveOn = (s: Sale, day: string) => !s.refunded && s.date <= day && !(s.cancelled && s.cancelled <= day);
+/** Rule FIVE: a cancellation is undone from the winback day on. */
+export const wonBackBy = (x: { winback?: string }, day: string) => !!x.winback && x.winback <= day;
+/** Churned AS OF `day`: cancelled by then and not won back by then. */
+export const churnedBy = (s: Sale, day: string) => !!s.cancelled && s.cancelled <= day && !wonBackBy(s, day);
+export const isLiveOn = (s: Sale, day: string) => !s.refunded && s.date <= day && !churnedBy(s, day);
 
 /** Calendar months later, clamped to the month's last day (Jan 31 + 1 = Feb 28). */
 export function addMonths(day: string, n: number): string {
@@ -75,6 +85,8 @@ export function bookOn(l: Ledger, day: string) {
   let spill = 0;
   l.churn.forEach((c) => {
     if (c.date > day) return;
+    // Rule FIVE: won back by this day, so it is not out of the book any more.
+    if (wonBackBy(c, day)) return;
     churned += c.mrr;
     churnedUnits += c.units || 0;
     const plan = (c.plan === 'monthly' || c.plan === 'annual' ? c.plan : 'monthly') as PlanKey;
@@ -120,15 +132,38 @@ export function summarize(l: Ledger, from: string, to: string) {
   });
   let cancelledMrr = 0;
   let cancelledUnits = 0;
+  /* Rule FIVE: a cancellation in this window still counts as churn even if it
+     was later won back, and is reported separately as `wonBackLater` so the
+     card can say so without re-writing the history of the period. */
+  let wonBackLaterMrr = 0;
   l.rows.forEach((r) => {
     if (r.cancelled && r.cancelled >= from && r.cancelled <= to && !r.refunded) {
       cancelledMrr += mrrOf(r);
       cancelledUnits += r.qty;
+      if (r.winback) wonBackLaterMrr += mrrOf(r);
     }
   });
   let unattachedMrr = 0;
   l.churn.forEach((c) => {
-    if (c.date >= from && c.date <= to) unattachedMrr += c.mrr;
+    if (c.date >= from && c.date <= to) {
+      unattachedMrr += c.mrr;
+      if (c.winback) wonBackLaterMrr += c.mrr;
+    }
+  });
+  /* Money that came BACK inside this window, whenever it was lost. */
+  let wonBackMrr = 0;
+  let wonBackUnits = 0;
+  l.rows.forEach((r) => {
+    if (r.winback && r.winback >= from && r.winback <= to && r.cancelled && !r.refunded) {
+      wonBackMrr += mrrOf(r);
+      wonBackUnits += r.qty;
+    }
+  });
+  l.churn.forEach((c) => {
+    if (c.winback && c.winback >= from && c.winback <= to) {
+      wonBackMrr += c.mrr;
+      wonBackUnits += c.units || 0;
+    }
   });
   const recurringUnits = units.monthly + units.annual;
   return {
@@ -140,9 +175,82 @@ export function summarize(l: Ledger, from: string, to: string) {
     cancelledMrr,
     cancelledUnits,
     unattachedMrr,
+    /** GROSS: everything lost in the window, winbacks included (rule FIVE). */
     churnedMrr: cancelledMrr + unattachedMrr,
+    /** Of that gross, how much has since been won back (on any later day). */
+    wonBackLaterMrr,
+    /** Money won back INSIDE this window, whenever it was lost. */
+    wonBackMrr,
+    wonBackUnits,
+    /** NET: what stayed lost once winbacks inside the window are allowed for. */
+    netChurnedMrr: cancelledMrr + unattachedMrr - wonBackMrr,
     annualUnitShare: recurringUnits ? (units.annual / recurringUnits) * 100 : null,
   };
+}
+
+/**
+ * Every churn event the ledger holds, as ONE list: a purchase marked cancelled
+ * and a churn row typed in off a store report are the same thing to a reader
+ * and are recorded in two different places. `kind` says which, because that is
+ * what decides how it can be edited — a cancellation is undone by clearing the
+ * cancellation, an unattached row by deleting it.
+ *
+ * `mrr` is what it took out of the book, `date` the day it did. A winback does
+ * not remove the item: the loss happened, and the row says what became of it
+ * (rule FIVE).
+ */
+export type ChurnItem = {
+  kind: 'cancellation' | 'report';
+  /** The id of the underlying sale or churn row. */
+  id: string;
+  date: string;
+  mrr: number;
+  units: number;
+  plan: PlanKey;
+  platform?: Platform;
+  note?: string;
+  winback?: string;
+  /** Present on a cancellation: the purchase it was marked on. */
+  sale?: Sale;
+  /** Present on a report row: the row itself. */
+  churn?: Churn;
+};
+
+/** Every churn event, newest first. A window keeps only the ones dated in it. */
+export function churnItems(l: Ledger, from?: string, to?: string): ChurnItem[] {
+  const inRange = (d: string) => (!from || d >= from) && (!to || d <= to);
+  const out: ChurnItem[] = [];
+  l.rows.forEach((r) => {
+    if (!r.cancelled || r.refunded || !isRecurring(r.plan) || !inRange(r.cancelled)) return;
+    out.push({
+      kind: 'cancellation',
+      id: r.id,
+      date: r.cancelled,
+      mrr: mrrOf(r),
+      units: r.qty,
+      plan: r.plan as PlanKey,
+      platform: r.platform,
+      note: r.note,
+      winback: r.winback,
+      sale: r,
+    });
+  });
+  l.churn.forEach((c) => {
+    if (!inRange(c.date)) return;
+    out.push({
+      kind: 'report',
+      id: c.id,
+      date: c.date,
+      mrr: c.mrr,
+      units: c.units || 0,
+      plan: (c.plan === 'monthly' || c.plan === 'annual' ? c.plan : 'unknown') as PlanKey,
+      platform: c.platform,
+      note: c.note,
+      winback: c.winback,
+      churn: c,
+    });
+  });
+  return out.sort((a, b) => (a.date === b.date ? a.id.localeCompare(b.id) : b.date.localeCompare(a.date)));
 }
 
 export type Renewal = { date: string; plan: PlanKey; amount: number; sale: Sale };
@@ -156,7 +264,9 @@ export function renewals(l: Ledger, from: string, to: string): Renewal[] {
     for (let k = 1; k < 600; k += 1) {
       const d = addMonths(r.date, term * k);
       if (d > to) break;
-      if (r.cancelled && d >= r.cancelled) break;
+      /* Rule FIVE: a lapse is a GAP in the schedule, not its end, so a won-back
+         subscription resumes charging on its original term dates. */
+      if (churnedBy(r, d)) continue;
       if (d >= from) out.push({ date: d, plan: r.plan as PlanKey, amount: r.price * r.qty, sale: r });
     }
   });
@@ -206,7 +316,10 @@ export function forecastBasis(l: Ledger, from: string, to: string) {
     covered += 1;
   }
   const meanBook = covered ? atRisk / covered : 0;
-  const churnPct = meanBook > 0 && s.churnedMrr > 0 ? Math.min(100, (s.churnedMrr / meanBook) * (30 / covered) * 100) : null;
+  /* Net of winbacks (rule FIVE): a subscriber who came back did not leave, so
+     forecasting the book forward on the gross rate would retire them twice. */
+  const churned = Math.max(0, s.netChurnedMrr);
+  const churnPct = meanBook > 0 && churned > 0 ? Math.min(100, (churned / meanBook) * (30 / covered) * 100) : null;
   return {
     monthlyPrice: s.units.monthly ? s.bookings.monthly / s.units.monthly : null,
     annualPrice: s.units.annual ? s.bookings.annual / s.units.annual : null,
@@ -239,13 +352,15 @@ export function ltv(l: Ledger, to: string, scope: 'monthly' | 'mixed') {
   const perMonth = units ? rows.reduce((t, r) => t + mrrOf(r), 0) / units : null;
   const from = l.rows.find((r) => isRecurring(r.plan))?.date ?? to;
 
+  /* Rule FIVE: a stay that was won back is not over, so a winback on or before
+     `to` takes the loss back out of the rate the lifetime is struck from. */
   let churned = 0;
   rows.forEach((r) => {
-    if (r.cancelled && r.cancelled <= to) churned += mrrOf(r);
+    if (churnedBy(r, to)) churned += mrrOf(r);
   });
   // Unattached churn with no plan lands on monthly, as it does in the book.
   l.churn.forEach((c) => {
-    if (c.date <= to && (scope === 'mixed' || c.plan !== 'annual')) churned += c.mrr;
+    if (c.date <= to && !wonBackBy(c, to) && (scope === 'mixed' || c.plan !== 'annual')) churned += c.mrr;
   });
 
   let atRisk = 0;
@@ -299,7 +414,8 @@ export function proRetention(l: Ledger, day: string, ages: number[] = [30, 60, 9
     ages.forEach((n) => {
       if (age < n) return;
       at[n].started += r.qty;
-      if (!(r.cancelled && r.cancelled <= addDays(r.date, n))) at[n].kept += r.qty;
+      // Won back inside its first n days means it was never lost by then.
+      if (!churnedBy(r, addDays(r.date, n))) at[n].kept += r.qty;
     });
   });
   ages.forEach((n) => (at[n].pct = at[n].started ? (at[n].kept / at[n].started) * 100 : null));

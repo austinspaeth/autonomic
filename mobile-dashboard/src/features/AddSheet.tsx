@@ -15,7 +15,7 @@ import { api } from '../lib/api';
 import { useData } from '../lib/data';
 import { addDays, easternDay, shortDate } from '../lib/dates';
 import type { Churn, Entry, Platform, Sale } from '../lib/types';
-import { mrrOf } from '../lib/sales';
+import { mrrOf, type ChurnItem } from '../lib/sales';
 import { PromptSheet } from './PromptExport';
 import { C } from '../theme';
 
@@ -373,6 +373,117 @@ function CancelSale({ sale, done }: { sale: Sale; done: () => void }) {
           done();
         }}
       />
+    </View>
+  );
+}
+
+/**
+ * One churn event, opened from the Churn card's list. Three things can be done
+ * to it and they are three different claims:
+ *
+ *  WON BACK   They came back. The loss STAYS on its own day, so the period that
+ *             lost the money keeps reporting it, and the subscription counts as
+ *             live again from the winback on (rule FIVE in lib/sales.ts). This
+ *             is what brings the churn RATE down without rewriting history.
+ *  NOT CHURN  It never happened: a cancellation marked by mistake, or a store
+ *             report entered twice. The record goes, because there is nothing
+ *             true left in it.
+ *  MOVE       The date was wrong.
+ *
+ * A winback is never a way to delete churn and a deletion is never a way to
+ * record one, so the two have their own buttons and their own words.
+ */
+export function ChurnEditor({ item, onClose }: { item: ChurnItem | null; onClose: () => void }) {
+  return (
+    <Sheet visible={!!item} onClose={onClose} title={item?.kind === 'report' ? 'Churn from a report' : 'Cancellation'}>
+      {(close) => (item ? <ChurnItemForm item={item} done={close} /> : null)}
+    </Sheet>
+  );
+}
+
+function ChurnItemForm({ item, done }: { item: ChurnItem; done: () => void }) {
+  const { refresh } = useData();
+  const [date, setDate] = useState(item.date);
+  const [won, setWon] = useState(!!item.winback);
+  const [winback, setWinback] = useState(item.winback ?? easternDay());
+  const [note, setNote] = useState(item.note ?? '');
+  /* A winback cannot predate the loss: before it, nothing had gone. */
+  const back = winback < date ? date : winback;
+
+  const save = async () => {
+    if (item.sale) {
+      const out: Sale = { ...item.sale, cancelled: date < item.sale.date ? item.sale.date : date };
+      if (won) out.winback = back;
+      else delete out.winback;
+      if (note.trim()) out.note = note.trim();
+      else delete out.note;
+      await api.sync({ saleUpserts: [out] });
+    } else if (item.churn) {
+      const out: Churn = { ...item.churn, date };
+      if (won) out.winback = back;
+      else delete out.winback;
+      if (note.trim()) out.note = note.trim();
+      else delete out.note;
+      await api.sync({ churnUpserts: [out] });
+    }
+    await refresh();
+    done();
+  };
+
+  const undo = () =>
+    Alert.alert(
+      item.kind === 'cancellation' ? 'This was not a cancellation?' : 'Remove this churn?',
+      item.kind === 'cancellation'
+        ? 'The purchase goes back to running, as if it was never cancelled. Use "won back" instead if they really did leave and then return.'
+        : 'The record is deleted for good. Use "won back" instead if the money really did stop and then come back.',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: item.kind === 'cancellation' ? 'Not churn' : 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            if (item.sale) {
+              const out: Sale = { ...item.sale };
+              delete out.cancelled;
+              delete out.winback;
+              await api.sync({ saleUpserts: [out] });
+            } else if (item.churn) {
+              await api.sync({ churnDeletes: [item.churn.id] });
+            }
+            await refresh();
+            done();
+          },
+        },
+      ],
+    );
+
+  return (
+    <View style={st.form}>
+      <View style={st.saleCard}>
+        <Text style={st.optTitle}>
+          ${item.mrr.toFixed(2)} of MRR
+          {item.units > 1 ? ` · ${item.units} subscriptions` : ''}
+        </Text>
+        <Text style={st.optSub}>
+          {item.kind === 'cancellation'
+            ? `${PLAN_LABEL[item.plan]} bought ${item.sale ? shortDate(item.sale.date) : '–'}${item.platform ? ` · ${item.platform === 'ios' ? 'iOS' : 'Android'}` : ''}`
+            : `Entered from a store report${item.platform ? ` · ${item.platform === 'ios' ? 'iOS' : 'Android'}` : ' · store not stated'}`}
+        </Text>
+      </View>
+
+      <DateField label={item.kind === 'cancellation' ? 'Cancelled on' : 'Stopped on'} value={date} onChange={setDate} />
+
+      <Toggle label="Won back" value={won} onChange={setWon} />
+      {won ? <DateField label="Paying again from" value={back} onChange={setWinback} /> : null}
+      <Text style={st.note}>
+        {won
+          ? 'The loss stays recorded on its own day, so the period that lost it still reports it. From the day they came back it counts toward MRR again, and the churn rate, the lifetime and retention all read it as kept.'
+          : 'Mark this won back if they started paying again. The loss stays on its own day either way: a winback lowers the churn rate from the day it happened, it never erases the month that lost the money.'}
+      </Text>
+
+      <Field label="Note" value={note} onChange={setNote} placeholder="Optional" />
+      <SaveButton label="Save changes" onPress={save} />
+      <DangerButton label={item.kind === 'cancellation' ? 'This was not a cancellation' : 'Delete this churn'} onPress={undo} />
     </View>
   );
 }

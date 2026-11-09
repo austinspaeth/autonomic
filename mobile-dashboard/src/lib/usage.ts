@@ -350,6 +350,77 @@ export function offerFunnel(ix: UsageIndex, days: string[], L?: string) {
   return { shown, dismissed, accepted, ignored: Math.max(0, shown - dismissed - accepted), acceptPct: shown ? (accepted / shown) * 100 : null };
 }
 
+/**
+ * Who was asked to review, and whether they moved.
+ *
+ * Two asks, and only one of them can report back. The OS prompt (`rvw`) is
+ * counted as REQUESTED, never as shown: neither store says whether the sheet
+ * appeared, and iOS silently swallows every ask past three a year, so it is a
+ * ceiling on prompts seen and has no outcome at all. The in-app review card
+ * (`rvc`) is the app's own, so it carries its own answers: `S` raised, `R` the
+ * store review tapped, `N` a note to Austin tapped, `X` dismissed.
+ *
+ * So INTENT is measured over the card alone, and `intentPct` is a share of
+ * cards raised, never of everyone offered. One install meets ONE of the two
+ * asks ever, which is why `offered` may be added up but `intent` may not be
+ * divided by it. Every count is install-days.
+ */
+export type ReviewAsks = {
+  /** Either route has reported at all: before that, nothing here is zero, it is unknown. */
+  known: boolean;
+  /** Days the in-app card's route has reported on, for the intent rate's denominator. */
+  cardKnown: boolean;
+  promptKnown: boolean;
+  /** `rvw`: the OS prompt was requested. No outcome exists for these. */
+  prompt: number;
+  /** `rvc S`: the in-app card was raised. */
+  card: number;
+  review: number;
+  note: number;
+  dismissed: number;
+  /** Raised either way. */
+  offered: number;
+  /** Tapped something that leads somewhere: a review or a note. */
+  intent: number;
+  /** Of the cards raised. Null while the card's route has not reported. */
+  intentPct: number | null;
+  /** Cards raised that were neither answered nor dismissed. */
+  ignored: number;
+};
+
+export function reviewAsks(ix: UsageIndex, days: string[]): ReviewAsks {
+  const L = (d: string, letter: string) => (known(ix, 'rvc', d) ? slotOn(ix, 'rvc', d, letter) : 0);
+  let prompt = 0;
+  let card = 0;
+  let review = 0;
+  let note = 0;
+  let dismissed = 0;
+  days.forEach((d) => {
+    prompt += known(ix, 'rvw', d) ? totalOn(ix, 'rvw', d) : 0;
+    card += L(d, 'S');
+    review += L(d, 'R');
+    note += L(d, 'N');
+    dismissed += L(d, 'X');
+  });
+  const cardKnown = days.some((d) => known(ix, 'rvc', d));
+  const promptKnown = days.some((d) => known(ix, 'rvw', d));
+  const intent = review + note;
+  return {
+    known: cardKnown || promptKnown,
+    cardKnown,
+    promptKnown,
+    prompt,
+    card,
+    review,
+    note,
+    dismissed,
+    offered: prompt + card,
+    intent,
+    intentPct: cardKnown && card ? (intent / card) * 100 : null,
+    ignored: Math.max(0, card - intent - dismissed),
+  };
+}
+
 /* ------------------------------------------------------- lifecycle */
 
 /** Actives on `d` still inside the trial (age <= 14) or past it (>= 15). */

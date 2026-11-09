@@ -1,10 +1,15 @@
-/* The AI prompt export, from the plus button: choose what goes in and how far
- * back, and get the whole dashboard for that period as one block of text to
- * paste into a chat. The words are lib/prompt.ts; this is the two cards.
+/* The AI prompt export: choose what goes in and how far back, and get the whole
+ * dashboard for that period as one block of text to paste into a chat. The
+ * words are lib/prompt.ts; this is the picker and the result.
  *
- * The result is a second card STACKED on the first (it is rendered inside the
- * first one's content, so its modal presents over it), which is why closing it
- * lands back on the choices with everything as it was left. */
+ * It is reached two ways and is the SAME picker both times (`PromptPicker`):
+ * the plus button's card (`PromptSheet`) and the Export view in the picker at
+ * the bottom (`ExportView`). One component, so the two cannot offer different
+ * sections or periods.
+ *
+ * The result is a card STACKED on whatever raised it (it is rendered inside
+ * that content, so its modal presents over it), which is why closing it lands
+ * back on the choices with everything as it was left. */
 import { useMemo, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -12,6 +17,7 @@ import { SymbolView, type SFSymbol } from 'expo-symbols';
 import * as Clipboard from 'expo-clipboard';
 import * as Haptics from 'expo-haptics';
 import { Sheet } from '../components/Sheet';
+import { Card } from '../components/ui';
 import { useData } from '../lib/data';
 import { easternDay, shortDate } from '../lib/dates';
 import { buildPrompt, PROMPT_PERIODS, PROMPT_SECTIONS, promptWindow, type PromptPeriod, type PromptSection } from '../lib/prompt';
@@ -30,6 +36,28 @@ const ICONS: Record<PromptSection, { icon: SFSymbol; color: string }> = {
 const ALL = PROMPT_SECTIONS.map((s) => s.key);
 
 export function PromptSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
+  return (
+    <Sheet visible={visible} onClose={onClose} title="AI prompt">
+      {() => <PromptPicker />}
+    </Sheet>
+  );
+}
+
+/**
+ * The same export as its own VIEW, from the picker at the bottom. A view is a
+ * run of cards, so the picker rides in one rather than in a sheet's body; what
+ * it generates still rises as its own card over it.
+ */
+export function ExportView() {
+  return (
+    <Card>
+      <PromptPicker />
+    </Card>
+  );
+}
+
+/** The choices, the period, and the button that writes the prompt. */
+function PromptPicker() {
   const { snap } = useData();
   const [on, setOn] = useState<PromptSection[]>(ALL);
   const [period, setPeriod] = useState<PromptPeriod>('30');
@@ -44,86 +72,82 @@ export function PromptSheet({ visible, onClose }: { visible: boolean; onClose: (
   const every = on.length === ALL.length;
 
   return (
-    <Sheet visible={visible} onClose={onClose} title="AI prompt">
-      {() => (
-        <View style={{ gap: 18 }}>
-          <View style={{ gap: 8 }}>
-            <View style={st.headRow}>
-              <Text style={st.section}>Include</Text>
-              <Pressable
-                hitSlop={10}
-                onPress={() => {
-                  Haptics.selectionAsync();
-                  setOn(every ? [] : ALL);
-                }}
-              >
-                <Text style={st.link}>{every ? 'Clear all' : 'Select all'}</Text>
-              </Pressable>
-            </View>
-            <View style={st.list}>
-              {PROMPT_SECTIONS.map((s, i) => {
-                const checked = on.includes(s.key);
-                const { icon, color } = ICONS[s.key];
-                return (
-                  <Pressable key={s.key} onPress={() => toggle(s.key)} style={({ pressed }) => [st.row, i > 0 && st.rowLine, pressed && { opacity: 0.6 }]}>
-                    <View style={[st.icon, { backgroundColor: `${color}26` }, !checked && { opacity: 0.4 }]}>
-                      <SymbolView name={icon} size={15} weight="bold" tintColor={color} />
-                    </View>
-                    <View style={[{ flex: 1 }, !checked && { opacity: 0.45 }]}>
-                      <Text style={st.rowTitle}>{s.label}</Text>
-                      <Text style={st.rowSub} numberOfLines={1}>
-                        {s.sub}
-                      </Text>
-                    </View>
-                    <SymbolView name={checked ? 'checkmark.circle.fill' : 'circle'} size={23} tintColor={checked ? C.series : C.muted} />
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
-          <View style={{ gap: 8 }}>
-            <View style={st.headRow}>
-              <Text style={st.section}>Time period</Text>
-              <Text style={[st.range, num]}>
-                {shortDate(w.from)} – {shortDate(w.to)} · {w.weekly ? 'weekly' : 'daily'} rows
-              </Text>
-            </View>
-            <View style={st.periods}>
-              {PROMPT_PERIODS.map((p) => {
-                const sel = p.key === period;
-                return (
-                  <Pressable
-                    key={p.key}
-                    onPress={() => {
-                      if (!sel) Haptics.selectionAsync();
-                      setPeriod(p.key);
-                    }}
-                    style={[st.period, sel && st.periodOn]}
-                  >
-                    <Text style={[st.periodText, sel && { color: C.text }]}>{p.label}</Text>
-                  </Pressable>
-                );
-              })}
-            </View>
-          </View>
-
+    <View style={{ gap: 18 }}>
+      <View style={{ gap: 8 }}>
+        <View style={st.headRow}>
+          <Text style={st.section}>Include</Text>
           <Pressable
-            disabled={!on.length}
+            hitSlop={10}
             onPress={() => {
-              Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
-              setPrompt(buildPrompt(snap, on, period, today));
+              Haptics.selectionAsync();
+              setOn(every ? [] : ALL);
             }}
-            style={({ pressed }) => [st.primary, (pressed || !on.length) && { opacity: 0.5 }]}
           >
-            <SymbolView name="sparkles" size={17} weight="semibold" tintColor="#fff" />
-            <Text style={st.primaryText}>{on.length ? 'Generate prompt' : 'Choose something to include'}</Text>
+            <Text style={st.link}>{every ? 'Clear all' : 'Select all'}</Text>
           </Pressable>
-
-          <PromptResult prompt={prompt} onClose={() => setPrompt(null)} />
         </View>
-      )}
-    </Sheet>
+        <View style={st.list}>
+          {PROMPT_SECTIONS.map((s, i) => {
+            const checked = on.includes(s.key);
+            const { icon, color } = ICONS[s.key];
+            return (
+              <Pressable key={s.key} onPress={() => toggle(s.key)} style={({ pressed }) => [st.row, i > 0 && st.rowLine, pressed && { opacity: 0.6 }]}>
+                <View style={[st.icon, { backgroundColor: `${color}26` }, !checked && { opacity: 0.4 }]}>
+                  <SymbolView name={icon} size={15} weight="bold" tintColor={color} />
+                </View>
+                <View style={[{ flex: 1 }, !checked && { opacity: 0.45 }]}>
+                  <Text style={st.rowTitle}>{s.label}</Text>
+                  <Text style={st.rowSub} numberOfLines={1}>
+                    {s.sub}
+                  </Text>
+                </View>
+                <SymbolView name={checked ? 'checkmark.circle.fill' : 'circle'} size={23} tintColor={checked ? C.series : C.muted} />
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <View style={{ gap: 8 }}>
+        <View style={st.headRow}>
+          <Text style={st.section}>Time period</Text>
+          <Text style={[st.range, num]}>
+            {shortDate(w.from)} – {shortDate(w.to)} · {w.weekly ? 'weekly' : 'daily'} rows
+          </Text>
+        </View>
+        <View style={st.periods}>
+          {PROMPT_PERIODS.map((p) => {
+            const sel = p.key === period;
+            return (
+              <Pressable
+                key={p.key}
+                onPress={() => {
+                  if (!sel) Haptics.selectionAsync();
+                  setPeriod(p.key);
+                }}
+                style={[st.period, sel && st.periodOn]}
+              >
+                <Text style={[st.periodText, sel && { color: C.text }]}>{p.label}</Text>
+              </Pressable>
+            );
+          })}
+        </View>
+      </View>
+
+      <Pressable
+        disabled={!on.length}
+        onPress={() => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
+          setPrompt(buildPrompt(snap, on, period, today));
+        }}
+        style={({ pressed }) => [st.primary, (pressed || !on.length) && { opacity: 0.5 }]}
+      >
+        <SymbolView name="sparkles" size={17} weight="semibold" tintColor="#fff" />
+        <Text style={st.primaryText}>{on.length ? 'Generate prompt' : 'Choose something to include'}</Text>
+      </Pressable>
+
+      <PromptResult prompt={prompt} onClose={() => setPrompt(null)} />
+    </View>
   );
 }
 

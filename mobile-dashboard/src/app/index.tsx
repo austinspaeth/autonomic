@@ -26,6 +26,7 @@ import { ErrorsView } from '../features/ErrorsView';
 import { PingsView } from '../features/PingsView';
 import { LinksView } from '../features/LinksView';
 import { CodesView } from '../features/CodesView';
+import { ExportView } from '../features/PromptExport';
 import { Glide, MetricTiles } from '../components/MetricTiles';
 import { useData } from '../lib/data';
 import { useZoom } from '../lib/zoom';
@@ -108,6 +109,8 @@ export default function Main() {
       <PingsView />
     ) : key === 'codes' ? (
       <CodesView />
+    ) : key === 'export' ? (
+      <ExportView />
     ) : (
       <LinksView />
     );
