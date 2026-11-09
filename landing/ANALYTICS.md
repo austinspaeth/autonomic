@@ -34,7 +34,7 @@ reports as an anonymous section. Rules:
 | `download_modal_open` | A download CTA on desktop opens the QR modal | `placement`, `cta` |
 | `cta_view` | A named CTA is half on screen (once per page load). Click-through = `cta_click` / `cta_view` | `cta`, `feature` |
 | `download_redirect` | Every pass through `/download` or a campaign link (QR codes land here); also fires `app_store_redirect` / `play_store_redirect` / `site_redirect` | `platform`, `destination` (`app_store` / `play_store` / `site`), `campaign` |
-| `blog_to_site` | **Key event.** A reader on a blog page clicks an EDITORIAL link through to a page that sells the app (home, `/features`, `/conditions`, `/compare`, `/pricing`, `/story`, `/press`). Once per page load. Never from the nav, the burger menu, the footer, the breadcrumb, the sticky bar or a giveaway promo, and never to the legal pages, `/download` or the giveaway. Downloads are not counted here; they are `download_click` | `target` (the page they went to), `cta` (what they clicked), `from_type` (`blog_article` / `blog_hub`) |
+| `blog_to_site` | **Key event.** A reader on a blog page leaves it for anywhere that is NOT the blog, by any route: a link in the prose, a mid-article pitch, the nav, the burger menu, the footer or the brand logo. The DESTINATION is the whole rule, so the only exclusions are the blog itself (`/insights`, `/blog`), an anchor on the page they are already on, and `/master`. Once per page load. Downloads are not counted here; they are `download_click` | `target` (the page they went to), `via` (`body` / `chrome`), `cta` (what they clicked), `from_type` (`blog_article` / `blog_hub`) |
 | `download_intent` | **Key event.** The visitor asked for the app: a store badge, a phone deep-link tap, or the desktop QR modal opening. **Once per session** | `how` (`store_link` / `store_badge_in_modal` / `download_modal`), `placement`, `cta`, `platform`, `plan`, `feature` |
 
 A store badge **inside the download modal** has `placement: download_modal`
@@ -142,6 +142,7 @@ parameters to the console; `?aj_debug=0` turns it off. Debug hits are still
 counted in reports, so it is safe to leave on while watching.
 
 `landing/tests/tracking.test.mjs` drives a built article in jsdom and pins all
-of it: that a page load fires no key event, that the chrome cannot fire
-`blog_to_site`, that the article body can and only once, and that two store
-badges are one `download_intent`.
+of it: that a page load fires no key event, that leaving the blog fires
+`blog_to_site` once from the prose AND once from the chrome (tagged `via`),
+that a link back into the blog fires nothing, and that two store badges are
+one `download_intent`.

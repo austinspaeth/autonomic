@@ -48,7 +48,7 @@ exactly; this works before any data has arrived.
 **Two, and only two:**
 
 - [ ] `download_intent`: the visitor asked for the app (a store badge, a phone deep-link tap, or the desktop QR modal opening). **Once per session**, so a day's count is people
-- [ ] `blog_to_site`: a blog reader clicked an editorial link through to a page that sells the app. **Once per page load**
+- [ ] `blog_to_site`: a blog reader left the blog for any other page of the site, by any route (prose link, pitch card, nav, footer, brand logo). **Once per page load**. Split it by `via` (`body` / `chrome`) and `target`
 
 **Un-mark these three if they are currently marked** (Admin → Data display →
 Key events → the row's ⋮ → *Unmark as key event*). They are all real events
@@ -121,7 +121,8 @@ Name it **Blog funnel**.
    - a store badge in the modal → `app_store_click` / `play_store_click` + `download_click` + `cta_click` (`cta_type: store`)
    - "How Insights works →" in the mid-article card → `app_pitch_click` + `cta_click` + `blog_to_site`
    - a related article → `article_click` (no `blog_to_site`, it stays on the blog)
-   - a **nav, footer or breadcrumb** link → `nav_click` / `link_click` only, never `blog_to_site`
+   - a **nav, footer or brand logo** link off the blog → `nav_click` / `link_click` **plus** `blog_to_site` with `via: chrome`
+   - the **breadcrumb**, or any link back into `/insights` → never `blog_to_site`
    - a second store badge → a second `download_click`, but **no** second `download_intent`
 
 Notes:

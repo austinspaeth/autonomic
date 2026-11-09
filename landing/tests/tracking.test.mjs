@@ -125,35 +125,43 @@ const countOf = (evs, n) => names(evs).filter((x) => x === n).length;
   );
 }
 
-/* ---- 2. blog_to_site: the chrome may not fire it ---------------------- */
+/* ---- 2. blog_to_site: the chrome DOES fire it, tagged `via` ---------- */
+/* The question is "who explores past the blog", and the nav and the footer are
+   the two commonest ways out of an article. Excluding them threw away most of
+   the answer; the destination is what decides, and `via` keeps the two routes
+   separable underneath the headcount. */
 {
-  const { window, events } = await load();
-  const doc = window.document;
   const chrome = [
-    ['the brand logo', '#nav a.nv-brand'],
-    ['a nav link', '#nav .nav-links a[href="/pricing/"]'],
-    ['a nav menu item', '#nav .nv-item[href^="/features/"]'],
-    ['a footer link', 'footer a[href^="/features/"]']
+    ['the brand logo', '#nav a.nv-brand', '/'],
+    ['a nav link', '#nav .nav-links a[href="/pricing/"]', '/pricing/'],
+    ['a nav menu item', '#nav .nv-item[href^="/features/"]', '/features/'],
+    ['a footer link', 'footer a[href^="/features/"]', '/features/']
   ];
-  for (const [label, sel] of chrome) {
-    const el = doc.querySelector(sel);
+  for (const [label, sel, prefix] of chrome) {
+    // One per page load, so each of these needs its own page.
+    const { window, events } = await load();
+    const el = window.document.querySelector(sel);
     if (!el) { check(`${label} is present to click (${sel})`, false, 'not found'); continue; }
-    const before = countOf(events(), 'blog_to_site');
     click(window, el);
+    const bts = events().filter((e) => e.name === 'blog_to_site');
+    check(`${label} fires blog_to_site`, bts.length === 1, `${bts.length}`);
     check(
-      `${label} does not fire blog_to_site`,
-      countOf(events(), 'blog_to_site') === before,
-      sel
+      `${label} is reported as via: chrome, with where it went`,
+      !!bts[0] && bts[0].params.via === 'chrome' &&
+        (bts[0].params.target || '').startsWith(prefix),
+      JSON.stringify(bts[0] && bts[0].params)
     );
   }
 }
 
-/* The breadcrumb only ever points back into the blog, so the whitelist covers
-   it; the chrome rule is what covers it if an article ever links out of one. */
+/* The breadcrumb points back into the blog, so the DESTINATION rule covers it
+   now -- it is no longer a named exclusion, and must not become one again. */
 {
   const html = fs.readFileSync(ART, 'utf8');
-  check('the breadcrumb is named in the chrome exclusion',
-    /var AJ_CHROME = '[^']*\.bl-crumb[^']*'/.test(html));
+  check('the blog is what a destination may not be',
+    /var AJ_BLOG_PAGE = \/\^\\\/\(insights\|blog\)/.test(html), 'AJ_BLOG_PAGE missing');
+  check('the chrome is a `via` split, not a gate',
+    /via: bl\.closest\(AJ_CHROME\) \? 'chrome' : 'body'/.test(html));
 }
 
 /* ---- 3. blog_to_site: the article body does fire it, once ------------- */
@@ -170,7 +178,8 @@ const countOf = (evs, n) => names(evs).filter((x) => x === n).length;
     check(
       'it names where it went and what was clicked',
       !!bts[0] && /^\/features\//.test(bts[0].params.target || '') &&
-        bts[0].params.from_type === 'blog_article' && !!bts[0].params.cta,
+        bts[0].params.from_type === 'blog_article' && !!bts[0].params.cta &&
+        bts[0].params.via === 'body',
       JSON.stringify(bts[0] && bts[0].params)
     );
     // A reader leaves for the site once. Clicking through, coming back and
@@ -181,13 +190,14 @@ const countOf = (evs, n) => names(evs).filter((x) => x === n).length;
   }
 }
 
-/* ---- 4. blog_to_site: only pages that sell the app ------------------- */
+/* ---- 4. blog_to_site: the blog itself is the only thing excluded ----- */
 {
   const { window, events } = await load();
   const doc = window.document;
   const off = [
     ['another article', '.article-prose a[href^="/insights/"]'],
-    ['a legal page', 'footer a[href^="/privacy-policy"]']
+    ['the breadcrumb, back into the blog', '.bl-crumb a[href^="/insights"]'],
+    ['the private dashboard', 'a[href^="/master"]']
   ];
   for (const [label, sel] of off) {
     const el = doc.querySelector(sel);
@@ -204,6 +214,22 @@ const countOf = (evs, n) => names(evs).filter((x) => x === n).length;
     click(window, anchor);
     check('an in-page jump does not fire blog_to_site',
       countOf(events(), 'blog_to_site') === before);
+  }
+  check('none of those fired it', countOf(events(), 'blog_to_site') === 0,
+    `${countOf(events(), 'blog_to_site')}`);
+}
+
+/* A legal page IS counted, and that is the deliberate consequence of asking
+   about the destination rather than about the link: somebody who leaves an
+   article for the privacy policy has left the blog. It is one event per
+   reader either way, and `target` is what tells it apart in the report. */
+{
+  const { window, events } = await load();
+  const el = window.document.querySelector('footer a[href^="/privacy-policy"]');
+  if (el) {
+    click(window, el);
+    check('a legal page is still leaving the blog', countOf(events(), 'blog_to_site') === 1,
+      `${countOf(events(), 'blog_to_site')}`);
   }
 }
 

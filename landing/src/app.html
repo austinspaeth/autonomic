@@ -990,14 +990,19 @@
           });
 
           // ---- Engagement tracking -------------------------------------
-          // Page chrome: present on every page, identical on all of them, and
-          // so never evidence of anything about the article it surrounds.
-          // `blog_to_site` may not be fired from inside any of it.
+          // Page chrome: present on every page and identical on all of them.
+          // It no longer gates `blog_to_site` (see below) -- it names the
+          // `via` split, so "left from the writing" and "left from the nav"
+          // stay separable underneath one headcount.
           var AJ_CHROME = '#nav, #aj-sticky-cta, #dlModal, footer, .bl-crumb, .awareness, .gva, .gvs, .gvm';
-          // The pages that sell the app, as a WHITELIST rather than a list of
-          // exclusions: a page added to the site later cannot start counting
-          // itself as a conversion by simply not being the blog.
-          var AJ_SITE_PAGE = /^\/(features|conditions|compare|pricing|story|press)(\/|$)/;
+          // The blog itself, under both of the shapes it is served as. The
+          // question is "did this reader go anywhere that is not the blog",
+          // so this is the ONE thing a destination may not be.
+          var AJ_BLOG_PAGE = /^\/(insights|blog)(\/|$)/;
+          // /master is the private analytics dashboard, not a page of the
+          // site. Nothing on the blog links to it and the tag does not load
+          // there at all, so it can never be somebody exploring the product.
+          var AJ_NOT_SITE_PAGE = /^\/master(\/|$)/;
           var blogToSiteSent = false;
           // One delegated listener maps every remaining interactive element
           // to a GA event (store badges/CTAs are wired individually above,
@@ -1008,39 +1013,54 @@
             // Store CTAs/badges are wired individually above (they resolve the
             // platform first); skip them here so nothing double-counts.
             if (t.closest('[data-dl-cta],[data-dl-store]')) return;
-            // Leaving the blog for the PRODUCT site: `blog_to_site`, a key
-            // event, and the thing the whole blog is for.
+            // Leaving the blog for ANYWHERE THAT IS NOT THE BLOG:
+            // `blog_to_site`, a key event, and the thing the whole blog is
+            // for. The question it answers is "who explores past my writing",
+            // and a reader who finishes an article and taps the brand logo has
+            // explored past it just as surely as one who follows a link in the
+            // prose -- so HOW they left is a split, not a condition.
             //
-            // THREE guards, all of them narrowing, because the first version
-            // had none of them: it fired on any same-origin link whose path was
-            // not under /insights, which is every link in the nav bar, the
-            // burger menu, the footer, the breadcrumb and the brand logo. Every
-            // article is wrapped in chrome full of such links, so the event did
-            // not measure a reader going deeper into the product -- it measured
-            // "clicked something that was not another article", and tracked the
-            // engaged-reader count instead.
+            // That is the one thing this has been wrong about twice, in both
+            // directions. The first version fired on any same-origin link off
+            // the blog and ALSO counted a reader who clicked a legal page, the
+            // breadcrumb, or an anchor on the page they were already on; the
+            // second excluded the chrome outright, which threw away the nav and
+            // the footer -- the two commonest ways out of an article, and the
+            // ones every page carries. The destination is what decides, and
+            // `via` says which route was taken.
             //
-            //  1. the link sits in the EDITORIAL part of the page, never the
-            //     chrome (`AJ_CHROME`);
-            //  2. the destination is a page that sells the app
-            //     (`AJ_SITE_PAGE`, a whitelist) -- not the legal pages, not
-            //     /download, not the giveaway, each of which has its own event;
-            //  3. once per page load. A reader leaves for the site once; one
-            //     who clicks through, comes back and clicks again is still one
+            // THREE guards:
+            //  1. the destination is not the blog (`AJ_BLOG_PAGE`, both of the
+            //     shapes it is served under) and is a page of the site at all
+            //     (`AJ_NOT_SITE_PAGE`);
+            //  2. it is a different page, same origin -- an anchor on the
+            //     current article is not leaving it;
+            //  3. once per page load. A reader leaves the blog once; one who
+            //     clicks through, comes back and clicks again is still one
             //     person doing one thing, and as a KEY event this has to be a
             //     headcount rather than a tap count.
+            //
+            // Scripted traffic is handled upstream: `navigator.webdriver` is
+            // folded into `_ajBlocked`, so a link checker clicking every anchor
+            // on the page never loads the tag at all. That guard is what makes
+            // counting the chrome safe.
             //
             // It fires ALONGSIDE whatever the link reports below. Downloads are
             // excluded above; they are download_click.
             var bl = !blogToSiteSent && (pageType === 'blog_article' || pageType === 'blog_hub')
               ? t.closest('a[href]') : null;
-            if (bl && !bl.closest(AJ_CHROME)) {
+            if (bl) {
               var bu = null;
               try { bu = new URL(bl.getAttribute('href'), window.location.href); } catch (e) { /* bad href */ }
               if (bu && bu.origin === window.location.origin && bu.pathname !== pagePath &&
-                  (bu.pathname === '/' || AJ_SITE_PAGE.test(bu.pathname))) {
+                  !AJ_BLOG_PAGE.test(bu.pathname) && !AJ_NOT_SITE_PAGE.test(bu.pathname)) {
                 blogToSiteSent = true;
-                ajEvent('blog_to_site', { target: bu.pathname, cta: ctaOf(bl) || placementOf(bl), from_type: pageType });
+                ajEvent('blog_to_site', {
+                  target: bu.pathname,
+                  cta: ctaOf(bl) || placementOf(bl),
+                  from_type: pageType,
+                  via: bl.closest(AJ_CHROME) ? 'chrome' : 'body'
+                });
               }
             }
             var el;
