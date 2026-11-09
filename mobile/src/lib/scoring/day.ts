@@ -36,7 +36,7 @@ export const SCORE_CATS: DayCat[] = [
   { min: 55, key: 'moderate', label: 'Moderate Autonomic Day', short: 'Moderate', color: '#eab308' },
   { min: 40, key: 'compromised', label: 'Compromised Day', short: 'Compromised', color: '#f97316' },
   { min: 25, key: 'bad', label: 'Bad Day', short: 'Bad', color: '#ef4444' },
-  { min: 0, key: 'severe', label: 'Crash Day', short: 'Crash', color: '#b91c1c' },
+  { min: 0, key: 'severe', label: 'Severe Day', short: 'Severe', color: '#b91c1c' },
 ];
 /** The worst band: what the budget suppresses on and the calibration calls a dip. */
 export const WORST_DAY_KEY: DayKey = 'severe';
@@ -53,7 +53,7 @@ export const OUTLOOK_GUIDE: Record<DayKey, string> = {
   moderate: 'Reduced reserves. Keep the day easy and stay with the basics of your protocol. Lean on hydration, pacing, and rest, and hold back on anything demanding.',
   compromised: 'Significantly reduced reserves. This is a recovery day: rest, hydration, and essentials only. Avoid added load and late meals.',
   bad: 'System is stressed. Rest and gentle breathing. Look at what’s driving it: sleep, food, illness, or accumulated load.',
-  severe: 'System in a crash state. Full rest and your protocol. Check for illness or stacked triggers; seek care if symptoms warrant.',
+  severe: 'Reserves are very low. A full rest day: fluids, quiet, and the basics of your protocol. Nothing demanding, and nothing to catch up on.',
 };
 export const TOMORROW: Record<DayKey, string> = {
   excellent: 'Tomorrow likely Good to Excellent.',
@@ -61,7 +61,7 @@ export const TOMORROW: Record<DayKey, string> = {
   moderate: 'Tomorrow likely Moderate, so plan a lighter day.',
   compromised: 'Tomorrow likely Compromised to Moderate, so keep it light.',
   bad: 'Tomorrow likely Bad. Plan a rest day.',
-  severe: 'Tomorrow Bad to Crash. Prepare for full rest.',
+  severe: 'Tomorrow likely Bad to Severe. Plan for full rest.',
 };
 
 export const SCORE_TIPS: Record<string, string> = {

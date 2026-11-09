@@ -102,7 +102,7 @@
     <div class="v2-arch"><Phone w={260}><div class="v2-ph-full"><JournalScreen time="7:06" /></div></Phone></div>
     <div>
       <h2 class="v2-h2">Is today a good day? One score out of 100.</h2>
-      <p class="v2-sub">Graded from Excellent to Crash, with a sentence that says what kind of day your body can handle. It is waiting for you before you stand up.</p>
+      <p class="v2-sub">Graded from Excellent to Severe, with a sentence that says what kind of day your body can handle. It is waiting for you before you stand up.</p>
       <ol class="v2-numbered">
         <li><i>1</i><span><b>Baseline HRV leads</b>The day’s first still reading carries the most weight of anything in the score.</span></li>
         <li><i>2</i><span><b>Sleep, resting heart rate and blood pressure</b>Last night and this morning, each graded against medical thresholds.</span></li>

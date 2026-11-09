@@ -244,7 +244,7 @@ export const TREND_METRICS: Record<TrendMetricId, TrendMetricDef> = {
     minDelta: 2,
     deltaKind: 'absolute',
     minPoints: 8,
-    // Bad and Crash days — the bottom two bands of SCORE_CATS.
+    // Bad and Severe days: the bottom two bands of SCORE_CATS.
     value: (d, dk, days, ctx) => {
       const s = dayScore(d, dk, days, ctx);
       if (s == null) return null;

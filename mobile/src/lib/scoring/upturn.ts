@@ -29,7 +29,7 @@ export interface Upturn {
 
 const WINDOW = 8;      // days examined, ending at dk
 const MIN_SCORED = 4;  // scored days required before a trend means anything
-/** Below this, today is a Bad or Crash day — never a moment to ask for a favour. */
+/** Below this, today is a Bad or Severe day, never a moment to ask for a favour. */
 export const MIN_TODAY = 40;
 
 const mean = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;

@@ -228,7 +228,7 @@ export function buildMilestoneGroups(md: MD, extras?: { protocolSetOn?: string |
       ['First Autonomic Score 90+', firstV('score', (d) => d.score != null && d.score >= 90)],
       ['First perfect Autonomic Score of 100', firstV('score', (d) => d.score != null && d.score >= 100)],
       ['7-day average score 70+', () => msRollAvg(md, (d) => d.score, 7, 70, 'up')],
-      ['Month without any Crash days', () => msNoneIn(md, 30, (d) => d.score != null && d.score < 25)],
+      ['Month without any Severe days', () => msNoneIn(md, 30, (d) => d.score != null && d.score < 25)],
     ]],
     ['Gut & symptoms', [
       ['7 consecutive days with a normal bowel movement', consec((d) => d.gutNormal, 7)],

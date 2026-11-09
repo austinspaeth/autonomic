@@ -11,14 +11,14 @@ import type { HelpContent } from '../help';
 
 // One unified grade scale shared with the day-score bands (SCORE_CATS in day.ts):
 // each ScoreCat maps to the day-scale level with the same color. The internal keys
-// are legacy (great/ok/crash) but the DISPLAYED vocabulary is Excellent → Crash.
+// are legacy (great/ok/crash) but the DISPLAYED vocabulary is Excellent → Severe.
 export const SCORE_COLORS: Record<ScoreCat, string> = {
   great: '#2ee06a',       // Excellent (bright luminous green — the peak tier pops)
   good: '#16a34a',        // Good (deep solid green)
   ok: '#eab308',          // Moderate
   bad: '#f97316',         // Compromised
   crash: '#ef4444',       // Bad
-  concerning: '#b91c1c',  // Crash
+  concerning: '#b91c1c',  // Severe
   warning: '#a78bfa',     // Warning (blue-zone / too-high flag) — kept violet
 };
 
@@ -27,7 +27,7 @@ export const SCORE_RANK: Record<ScoreCat, number> = {
 };
 
 export const GRADE_LABEL: Record<ScoreCat, string> = {
-  great: 'Excellent', good: 'Good', ok: 'Moderate', bad: 'Compromised', crash: 'Bad', concerning: 'Crash', warning: 'Warning',
+  great: 'Excellent', good: 'Good', ok: 'Moderate', bad: 'Compromised', crash: 'Bad', concerning: 'Severe', warning: 'Warning',
 };
 
 /** Grade -> 0-100 points (day composite). Great is a full 100 so an

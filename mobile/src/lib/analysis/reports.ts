@@ -245,7 +245,7 @@ THE BUDGET is a CEILING fitted from this person's own history, not a target, a g
 
 "NEXT 2 DAYS" is the verdict: whether the daily autonomic score held over the following two days, which is the delayed window post-exertional symptoms appear in. A verdict read off the next day alone would clear a Tuesday that put this person on the floor on Thursday. "held" means it did not fall more than 10 points and did not reach crash grade; "dipped" means it did.
 
-Crash-grade days publish no budget at all, by design. Days the app had no way to observe are omitted rather than reported as costing nothing, so an absent day is missing data, never a rest day.
+Severe-grade days publish no budget at all, by design. Days the app had no way to observe are omitted rather than reported as costing nothing, so an absent day is missing data, never a rest day.
 
 SUMMARY: ${summary}
 ${lines.join('\n')}`;

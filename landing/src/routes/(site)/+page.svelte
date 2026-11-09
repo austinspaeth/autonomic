@@ -286,7 +286,7 @@
       <div class="v2-board-stats">
         <div class="dark"><b>+16 pts</b><span>Better than day one</span><small>Your daily score, first fortnight to last</small></div>
         <div><b>9 days</b><span>Longest clean-day streak</span><small>Set in September</small></div>
-        <div><b>2</b><span>Crash days this month</span><small>Down from 6 in August</small></div>
+        <div><b>2</b><span>Bad days this month</span><small>Down from 6 in August</small></div>
         <div><b>−5 bpm</b><span>Resting heart rate</span><small>Since you started</small></div>
       </div>
     </div>
