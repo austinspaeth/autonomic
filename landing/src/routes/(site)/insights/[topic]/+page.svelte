@@ -100,9 +100,6 @@
   <title>{title}</title>
   <meta name="description" content={description} />
   <link rel="canonical" href={canonical} />
-  <!-- Marks the page as eligible for the mobile sticky download CTA and picks
-       its copy (see the sticky-CTA block in src/app.html). -->
-  <meta name="aj-cta-topic" content={slug} />
   {#if noindex}<meta name="robots" content="noindex, follow" />{/if}
   <meta property="og:type" content="website" />
   <meta property="og:url" content={canonical} />

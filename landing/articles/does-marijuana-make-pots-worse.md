@@ -9,8 +9,8 @@ date: 2026-11-10
 updated: 2026-11-10
 reviewed: 2026-11-10
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1706425461862-58beaf4b0ab6?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Happy & Spice / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1524653736724-8490ee06859d?q=80&w=1760&auto=format&fit=crop"
+photoAttribution: "Quinten de Graaf / Unsplash"
 tldr: "Marijuana can make POTS worse, because THC, its main active ingredient, reliably speeds up your heart and can lower your blood pressure when you stand, which are the two problems POTS is already built around. In controlled studies THC raises resting heart rate by about 8 beats per minute, and in trials of medical cannabinoids its use is linked to a roughly threefold higher chance of blood pressure dropping on standing. CBD is different and far less stimulating, but it also tends to lower blood pressure, which is the wrong direction for orthostatic symptoms. Some people still use cannabis for nausea, pain or sleep and feel better overall, so the honest move is to log it as a trigger and watch your morning HRV, resting heart rate and a stand test to see your own answer."
 question: "Does marijuana make my POTS worse?"
 app:
@@ -146,7 +146,7 @@ First, there are no clinical trials of cannabis as a treatment for POTS, in eith
 
 Second, a symptom improving does not mean your physiology improved. The same dose that settles your [nausea](/insights/pots/nausea-in-pots-dysautonomia/) tonight is also speeding your heart and widening your vessels, so you can feel better and stand worse at the same time. This matters most for the [hyperadrenergic subtype](/insights/pots/pots-subtypes-explained/), where the sympathetic nervous system is already overactive and THC adds more of the same signal. It is a reasonable thing to treat with extra caution and to raise with your specialist.
 
-<div class="callout callout-note"><strong>The hot-shower clue is worth knowing.</strong> Heavy, long-term cannabis use can cause cannabinoid hyperemesis syndrome, marked by cycles of severe nausea and vomiting, and relief from hot showers or baths ([Angulo, 2024](https://jamanetwork.com/journals/jama/fullarticle/2824833)). That hot-water relief is easy to mistake for ordinary POTS behavior, even though for POTS a [hot shower usually makes things worse](/insights/pots/hot-showers-pots/). If your nausea got worse the more you used, and only a scalding shower helps, that pattern is worth showing a doctor.</div>
+<div class="callout callout-note"><strong>The hot-shower clue is worth knowing.</strong> Heavy, long-term cannabis use can cause cannabinoid hyperemesis syndrome, marked by cycles of severe nausea and vomiting, and relief from hot showers or baths (<a href="https://jamanetwork.com/journals/jama/fullarticle/2824833">Angulo, 2024</a>). That hot-water relief is easy to mistake for ordinary POTS behavior, even though for POTS a <a href="/insights/pots/hot-showers-pots/">hot shower usually makes things worse</a>. If your nausea got worse the more you used, and only a scalding shower helps, that pattern is worth showing a doctor.</div>
 
 ## Chronic use, tolerance and why experiences differ
 
