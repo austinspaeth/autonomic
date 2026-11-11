@@ -204,6 +204,37 @@ export function faultSignature(tag: string, msg: string, fatal?: boolean): strin
   return `${safeTag(tag)}#${hash8(redactMessage(msg))}${fatal ? '!' : ''}`;
 }
 
+/** Coarse size of a journal, for a signature that groups rather than splits. */
+const sizeBand = (n: number): string =>
+  n >= 365 ? '365+' : n >= 180 ? '180+' : n >= 90 ? '90+' : n >= 30 ? '30+' : n >= 7 ? '7+' : String(Math.max(0, n));
+
+/**
+ * The message for `store.vanished`: launch found an EMPTY journal while daily
+ * snapshots sat on disk.
+ *
+ * That pair is the whole point. An empty journal on its own is also every
+ * genuinely fresh install, which is exactly why `loadIssue.kind === 'fresh'`
+ * has never been reported and why a journal evaporating in the field moves no
+ * counter at all. Snapshots BESIDE it cannot happen on a fresh install — they
+ * are written only from a journal that held days — so the pair means a journal
+ * that existed and is gone, and nothing else.
+ *
+ * Banded, because the message IS the signature: a raw day count would file
+ * every affected install as its own bug. `kind` separates a store that read
+ * empty from one that would not parse; `enc` says whether the Keychain key was
+ * in hand, which splits "the data is unreadable" from "the data is gone".
+ */
+export function vanishMessage(v: {
+  kind: 'fresh' | 'corrupt';
+  snapshots: number;
+  newestAgeDays: number;
+  days: number;
+  encrypted: boolean;
+}): string {
+  const age = v.newestAgeDays <= 0 ? '0d' : v.newestAgeDays >= 30 ? '30d+' : `${Math.round(v.newestAgeDays)}d`;
+  return `${v.kind} snaps${Math.min(99, Math.max(0, v.snapshots))} newest${age} had${sizeBand(v.days)} enc${v.encrypted ? 1 : 0}`;
+}
+
 /* ------------------------------------------------------------------- wire */
 
 /**

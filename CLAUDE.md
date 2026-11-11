@@ -685,6 +685,60 @@ old web app so old `export.json` files import directly.
   the whole journal plus every referenced waveform (RR traces, workout HR traces,
   overnight sleep series), and none of the flags store, which is why an export/import
   round trip carries all the health data and no device bookkeeping.
+- **A journal can VANISH, and until 1.40.1 nothing said so.** MMKV validates a
+  store against its `.crc` sibling on open and DISCARDS the contents on a
+  mismatch — silently, inside the native library: no exception, no rejected
+  promise, `getString` simply returns undefined and `loadIssue` reads `'fresh'`.
+  A file left inconsistent by a process that died mid-write (an iOS memory kill
+  is the likeliest, and the one termination that raises no signal) therefore
+  costs the whole journal on the NEXT launch, with the file still at its old
+  size, because MMKV's allocation is a high-water mark and never shrinks.
+  `_layout` reported only `'corrupt'`, so the case that actually happens
+  reported NOTHING — indistinguishable from a fresh install, which is also
+  `'fresh'`. **Snapshots on disk beside an empty journal is the signature**: a
+  fresh install cannot produce it, since a snapshot is only ever written from a
+  journal holding days. RestoreGate now reports it as `store.vanished`
+  (`vanishMessage` in `lib/errorReport.ts`, pure + tested — BANDED, or every
+  affected install files its own bug; `enc` splits "unreadable" from "gone",
+  `kind` splits an empty store from an unparseable one) and stamps
+  `lib/vanish.ts` (flags MMKV, so it survives the event it describes). Three
+  things hang off that flag and each closed a way the recovery path ate itself.
+  **`runDailyBackup` WRITES but never ROTATES while it is set** — `KEEP` is 5,
+  so a user who loses a journal, taps "Start fresh" and logs one thing a day
+  had every good snapshot rotated out inside five days, the app looking like it
+  worked throughout. **`pruneWaveforms` refuses to run against a journal with
+  no days**: reaching its success path empty means a journal that was emptied
+  and written back, and pruning on it deletes every RR trace, workout curve and
+  sleep series in the sidecar on the launch after the loss. And
+  **`migrateLegacyJournal` needs NOT-SMALLER as well as newer**: "newer wins"
+  was written for an interrupted migration, where it means better, and could
+  not tell that from a session that fell back to the plaintext store because
+  the Keychain was locked, started empty, and stamped it when the user typed
+  one entry — always newer than the real journal in `secure`. A journal with
+  fewer logged days now never overwrites one with more, whatever its timestamp.
+- **`fillWatchHrvBands` is on the LAUNCH path, so both its guards are answered
+  from the ENTRY.** It runs inside `loadState`, synchronously, before React
+  mounts, and the sidecar read it makes is an encrypted MMKV get plus a JSON
+  parse of a whole beat series — deliberately uncached (`readWaveformUncached`,
+  so the sweep cannot evict the curves the Journal is about to draw), so an
+  unguarded read is paid in full on every launch for every watch reading ever
+  taken. `couldGainABand` asks whether the reading can gain anything at ALL
+  before paying for `sec`. And a reading the repair CANNOT finish is marked
+  `bandsTried`: the "idempotent with no flag" claim only ever held for readings
+  it could complete, and one it could not re-ran a decrypt, a parse and a full
+  artifact-correction + FFT on every launch, for ever, writing nothing. Mark
+  ONLY where `missing` was non-empty and `add` came back empty — an empty
+  `missing` is a reading already complete, not a repair that failed.
+- **A memory kill is the one termination that leaves no trace, so MetricKit's
+  `MXAppExitMetric` is drained too** (`native.exit`, `CrashLog.swift`). It is
+  not an exception: no signal is raised, no handler runs, `crashDiagnostics`
+  never mentions it, and neither the Java nor the ObjC hook can see it — so an
+  app being jetsammed daily looks, in every other row of the error log, exactly
+  like an app that never fails. It is also the termination most likely to stop
+  a process mid-write and leave a storage file inconsistent, which is the whole
+  reason it is collected. NOT fatal (`isFatalNativeCrash`): the counts describe
+  a window already over and the app plainly relaunched to report them. Written
+  only when something abnormal is in the payload. Native build, not OTA.
 - **A spreadsheet export sits beside the JSON one, and JSON is ALWAYS the whole
   journal.** Import REPLACES everything on the device, so a partial JSON is a
   data-loss trap wearing a backup's name: the date range belongs to the two CSV

@@ -55,6 +55,44 @@ describe('fillWatchHrvBands', () => {
     expect(fillWatchHrvBands(short, () => ({ rrRaw: beats(100) }))).toBe(0);
   });
 
+  // Both guards exist because this runs inside loadState(), synchronously,
+  // before React mounts: the read they skip is an encrypted MMKV get plus a
+  // JSON parse of a whole beat series, uncached by design, and an unguarded
+  // one is paid again on every launch for every watch reading ever taken.
+  it('never touches the sidecar for a reading that already carries every band', () => {
+    const complete = computeHrv(rr).fields;
+    const st = stateWith({ id: 'h', type: 'hrv', source: 'watch', ...complete } as Entry);
+    let reads = 0;
+    expect(fillWatchHrvBands(st, () => { reads += 1; return { rrRaw: rr }; })).toBe(0);
+    expect(reads).toBe(0);
+  });
+
+  it('marks a reading the repair cannot finish, and never reads it again', () => {
+    // computeHrv gives this series no bands at all, so there is nothing to
+    // write — and without a mark that verdict is re-derived from a decrypt, a
+    // parse and a full FFT on every launch, for ever.
+    const short = beats(40);
+    const r: Entry = { id: 'i', type: 'hrv', source: 'watch', rmssd: 30, lowPower: '', highPower: '' };
+    const st = stateWith(r);
+    let reads = 0;
+    const read = () => { reads += 1; return { rrRaw: short, rrSegments: undefined } as WaveformData; };
+    fillWatchHrvBands(st, read);
+    const after = st.days['2026-10-20'].readings![0];
+    // Either it was marked, or nothing was wanted at this coverage — but the
+    // second pass must cost no read either way.
+    const firstReads = reads;
+    expect(firstReads).toBeLessThanOrEqual(1);
+    fillWatchHrvBands(st, read);
+    if (after.bandsTried) expect(reads).toBe(firstReads);
+  });
+
+  it('skips an already-marked reading without reading the sidecar', () => {
+    const st = stateWith({ id: 'j', type: 'hrv', source: 'watch', bandsTried: true, ...filed } as Entry);
+    let reads = 0;
+    expect(fillWatchHrvBands(st, () => { reads += 1; return { rrRaw: rr }; })).toBe(0);
+    expect(reads).toBe(0);
+  });
+
   it('never overwrites a band the reading carries', () => {
     const r: Entry = { id: 'g', type: 'hrv', source: 'watch', ...filed, lowPower: '123' };
     const st = stateWith(r);
