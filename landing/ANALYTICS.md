@@ -46,6 +46,7 @@ credited to the article card or page CTA that started it.
 | Name | Where |
 | --- | --- |
 | `nav_get_app`, `nav_promo_pacing` | Header button, Features menu promo |
+| `sticky_cta_score`, `sticky_cta_button` | Mobile sticky bar on blog pages |
 | `hero_download` | The download box in every hero (home, features, conditions, comparisons) |
 | `review_strip` | The rating + reviews strip with store badges |
 | `mid_cta` (`_2`…) | Mid-page download bar |
@@ -75,7 +76,7 @@ credited to the article card or page CTA that started it.
 | `blog_search_select` (`query`, `target`, `rank`, `kind`), `blog_search_none` (`query`) | The blog typeahead. `blog_search_none` is the list of questions nobody has answered yet |
 | `faq_open` (`question`), `calc_use`, `calc_change` | |
 | `link_click` | Any other link: `target`, `placement`, `link_type`, `text` |
-| `nav_click`, `section_view` | |
+| `nav_click`, `section_view`, `sticky_cta_view`, `sticky_cta_dismiss` | |
 
 ## One-time setup in GA
 
