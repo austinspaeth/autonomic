@@ -32,21 +32,16 @@ import { useToast } from '../components/Toast';
 import { radius, usePalette } from '../theme';
 import { hexA } from '../lib/color';
 import { todayKey } from '../lib/dates';
-import { resolveProtocol } from '../lib/scoring/day';
-import { profileCtx } from '../lib/scoring';
 import { useAppState } from '../store/store';
 import { NOTE_SUBJECT, reviewCardDue, reviewCardLive, reviewUrlFor } from '../lib/review/card';
 import {
   FORCE_REVIEW_CARD, beginFailureWatch, noteReviewCardAnswered, noteReviewCardShown,
   reviewCardMemory,
 } from '../lib/review/cardMemory';
+import { reviewCardInput } from '../lib/review/cardContext';
 import { paywallSeenThisSession, reviewMemory } from '../lib/review';
 import { pingReviewCard } from '../store/ping';
 import { SUPPORT_EMAIL, supportMailtoUrl } from '../lib/diagnostics/supportEmail';
-import { liveOffer } from '../lib/upsell/annual';
-import { holidayOwnsSlot } from '../lib/upsell/holidayMemory';
-import { annualMemory } from '../lib/upsell/annualMemory';
-import { founderMemory } from '../lib/upsell/founderMemory';
 
 /**
  * The design's gold, and deliberately NOT `CAUTION_GOLD` (#eab308), which is a
@@ -56,15 +51,6 @@ import { founderMemory } from '../lib/upsell/founderMemory';
  * ../theme because this card is the only thing entitled to use it.
  */
 const STAR_GOLD = '#e3a51c';
-
-/** Is one of the three proactive offer cards holding the slot under the
- *  Outlook? Read the same way FounderOffer reads the annual card's liveness. */
-function offerLive(dk: string): boolean {
-  if (liveOffer(annualMemory()) != null) return true;
-  if (holidayOwnsSlot()) return true;
-  const f = founderMemory();
-  return f.shownDk === dk && !f.dismissed;
-}
 
 export function ReviewRequestCard({ dk }: { dk: string }) {
   const p = usePalette();
@@ -90,22 +76,14 @@ export function ReviewRequestCard({ dk }: { dk: string }) {
   // seen, so a showing that is not recorded first is one that can repeat.
   useEffect(() => {
     if (live || answered || forced) return;
-    const due = reviewCardDue({
-      days: state.days,
+    // Built by the shared builder (../lib/review/cardContext), because the OS
+    // prompt asks the same gate the same way before spending this install's
+    // ask on itself, and two builders would be two different questions.
+    const due = reviewCardDue(reviewCardInput({
       dk,
-      today: todayKey(),
-      ctx: profileCtx(state.profile),
-      protocol: resolveProtocol(state.settings.protocol),
-      custom: state.customTypes,
-      memory: reviewCardMemory(),
-      nowMs: Date.now(),
-      source: state.settings.lastHrvSource,
-      platform: Platform.OS,
-      crashAlertFiredToday: state.settings.crashAlert?.lastFired === dk,
       paywallSeenThisSession: paywallSeenThisSession(),
-      offerLive: offerLive(dk),
-      osPromptAsked: reviewMemory().lastAskedAtMs != null,
-    });
+      osAskedAtMs: reviewMemory().lastAskedAtMs,
+    }));
     if (!due.ok) return;
     noteReviewCardShown();
     pingReviewCard('shown');

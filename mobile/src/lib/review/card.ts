@@ -129,11 +129,60 @@ export interface ReviewCardInput {
   paywallSeenThisSession?: boolean;
   /** An offer card already holds the slot under the Outlook. */
   offerLive?: boolean;
-  /** The OS review prompt has already been spent on this install. */
-  osPromptAsked?: boolean;
+  /**
+   * When the OS review prompt was last requested on this install, epoch ms
+   * (`ReviewMemory.lastAskedAtMs`). Null/absent = never. Read through
+   * `osAskSpent`, which is where the one forgiven case is decided.
+   */
+  osAskedAtMs?: number | null;
 }
 
 export type ReviewCardVerdict = { ok: true } | { ok: false; reason: string };
+
+/**
+ * Does a spent OS prompt still bar the card?
+ *
+ * Normally yes, permanently: the two asks share one budget and whichever got
+ * there first wins (../review/index reads this memory in the other direction).
+ * But for ONE window they were never racing at all.
+ *
+ * `WATCH_DAYS` means the card cannot be raised for the first week of an
+ * install's life on a build that carries it, while the OS prompt has no such
+ * wait. So between `watchingSince` and `watchingSince + WATCH_DAYS` the OS ask
+ * was not winning a race — it was walking into an empty room. Worse, the card
+ * shipped on a new version number, which is exactly what clears the OS
+ * prompt's own `asked-this-version` bar, so the engaged population was handed
+ * to the OS prompt on precisely the launch where the card was locked out. An
+ * ask that landed in there is not evidence this install was fairly asked, so
+ * it is forgiven.
+ *
+ * It is the bug's own signature and nothing else matches it, which is what
+ * makes forgiving it safe rather than a general loosening:
+ *
+ *  - An ask from BEFORE the watch began is a real spend. The card did not
+ *    exist on that build, and "an install the OS already asked never meets the
+ *    card" was a decision, not an accident — this must not quietly reverse it.
+ *  - An ask from AFTER the window closed is the honest race the design wants.
+ *  - An install that was never watched at all has no window to have been
+ *    robbed of.
+ *
+ * Forgiving it does not mean asking at once: the card goes on waiting
+ * `WATCH_DAYS` from THE ASK ITSELF, so nobody meets an OS sheet and this card
+ * in the same week. That reuses the window rather than inventing a second
+ * number for the same idea.
+ */
+export function osAskSpent(
+  input: Pick<ReviewCardInput, 'osAskedAtMs' | 'memory' | 'nowMs'>,
+): boolean {
+  const at = input.osAskedAtMs;
+  if (at == null || !Number.isFinite(at)) return false;          // never asked
+  const since = input.memory.watchingSince;
+  if (since == null || !Number.isFinite(since)) return true;     // asked while nobody was watching
+  const inRaceWindow = at >= since && at < since + WATCH_DAYS * DAY_MS;
+  if (!inRaceWindow) return true;
+  // Forgiven, but not yet: let the ask itself age out of the same window.
+  return input.nowMs - at < WATCH_DAYS * DAY_MS;
+}
 
 /**
  * Should the card be RAISED right now?
@@ -152,7 +201,7 @@ export function reviewCardDue(input: ReviewCardInput): ReviewCardVerdict {
   // ---- already answered, or already asked another way ----
   if (memory.answered) return { ok: false, reason: 'answered' };
   if (memory.standing) return { ok: false, reason: 'standing' };
-  if (input.osPromptAsked) return { ok: false, reason: 'os-prompt-spent' };
+  if (osAskSpent(input)) return { ok: false, reason: 'os-prompt-spent' };
 
   // ---- today only ----
   if (input.dk !== input.today) return { ok: false, reason: 'not-today' };
@@ -162,15 +211,23 @@ export function reviewCardDue(input: ReviewCardInput): ReviewCardVerdict {
     return { ok: false, reason: 'weak-sensor-ios' };
   }
 
-  // ---- a clean record, and long enough to mean it ----
+  // ---- a clean record ----
   if (memory.failures > 0) return { ok: false, reason: 'had-failures' };
+
+  // ---- has the app been used enough to have an opinion about? ----
+  // Deliberately ABOVE the watch window rather than below it. `watching` is
+  // not just one refusal among others any more: ../review/index reads it as
+  // "this install is on track for the card, so do not spend its ask on the OS
+  // prompt", and a reservation is only honest if everything else already
+  // holds. Asked below, a two-day-old install would report `watching` and hold
+  // an ask it had no claim to for a week.
+  if (engagedDayCount(input.days) < MIN_ENGAGED_DAYS) return { ok: false, reason: 'too-few-days' };
+
+  // ---- ...and long enough to mean it ----
   if (memory.watchingSince == null || !Number.isFinite(memory.watchingSince)) {
     return { ok: false, reason: 'not-watching' };
   }
   if (nowMs - memory.watchingSince < WATCH_DAYS * DAY_MS) return { ok: false, reason: 'watching' };
-
-  // ---- has the app been used enough to have an opinion about? ----
-  if (engagedDayCount(input.days) < MIN_ENGAGED_DAYS) return { ok: false, reason: 'too-few-days' };
 
   // ---- never on a bad day, and never beside an offer ----
   if (input.crashAlertFiredToday) return { ok: false, reason: 'crash-alert-today' };
@@ -181,6 +238,38 @@ export function reviewCardDue(input: ReviewCardInput): ReviewCardVerdict {
   if (detectStrain(days, dk, ctx)) return { ok: false, reason: 'strain' };
 
   return { ok: true };
+}
+
+/**
+ * The reason that means "do not spend this install's ask elsewhere".
+ *
+ * `watching` is the one refusal that is not a no — it is a not yet, and the
+ * wait is ours rather than the user's. Every other refusal is either permanent
+ * (`had-failures`, `weak-sensor-ios`, `answered`) or about today in particular
+ * (`downturn`, `offer-live`), and in both of those cases the OS prompt should
+ * go ahead.
+ */
+const RESERVE_REASON = 'watching';
+
+/**
+ * Is this install inside the window where the card cannot be raised yet, but
+ * would be once it closes?
+ *
+ * Read by ../review/index before it asks the OS prompt. Without it the watch
+ * window is a seven-day head start handed to the OS prompt on every install:
+ * the card blocks itself forever on a spent OS ask, while the OS prompt only
+ * ever yielded to a card that was already ANSWERED or STANDING — neither of
+ * which can be true while it is still being watched. So the ask that was meant
+ * to go to whichever got there first went to the OS prompt every time, and the
+ * card's own population was the one it drained first.
+ *
+ * Bounded by construction: after `WATCH_DAYS` the card either opens or is
+ * disqualified, and every disqualifying reason releases the reservation on the
+ * same pass. The OS ask is deferred at most a week, never lost.
+ */
+export function reviewCardReserves(input: ReviewCardInput): boolean {
+  const v = reviewCardDue(input);
+  return v.ok === false && v.reason === RESERVE_REASON;
 }
 
 /** Read a stored memory defensively; anything unreadable is a fresh install. */

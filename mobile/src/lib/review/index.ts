@@ -30,6 +30,8 @@ import { pingReviewAsked } from '../../store/ping';
 import { getInstalledAtMs, getTier } from '../../store/tier';
 import { shouldAskForReview, type ReviewMemory, type ReviewVerdict } from './eligibility';
 import { reviewCardAnswered, reviewCardStanding } from './cardMemory';
+import { reviewCardReserves } from './card';
+import { reviewCardInput } from './cardContext';
 import { profileCtx } from '../scoring';
 
 export {
@@ -105,6 +107,37 @@ export function reviewVerdict(): ReviewVerdict {
 }
 
 /**
+ * Does the request card (./card) hold this install's one ask?
+ *
+ * Three ways it can, and the third is the one that was missing. A card already
+ * ANSWERED is spent, and a card STANDING is a question in progress that the OS
+ * sheet would land on top of — both of those were here from the start. But a
+ * card still inside its WATCH WINDOW is also claimed: it cannot be raised yet,
+ * the wait is ours rather than the user's, and it WILL be raised when the week
+ * is up.
+ *
+ * Without that third case the window was a seven-day head start handed to this
+ * prompt on every install, and since the card bars itself permanently on a
+ * spent OS ask, every install the prompt took during it was taken for good —
+ * starting with the most engaged ones, which are exactly the card's own
+ * population. See `reviewCardReserves`.
+ *
+ * Defensive: a card that cannot answer must never be able to silence the
+ * prompt, so anything thrown here means "not held".
+ */
+function cardHoldsTheAsk(): boolean {
+  if (reviewCardAnswered() || reviewCardStanding()) return true;
+  try {
+    return reviewCardReserves(reviewCardInput({
+      paywallSeenThisSession: paywallSeen,
+      osAskedAtMs: reviewMemory().lastAskedAtMs,
+    }));
+  } catch {
+    return false;
+  }
+}
+
+/**
  * Ask, if this is a moment worth asking on. Returns true when the prompt was
  * requested (not when it was shown — the OS never tells us that). A request
  * is also counted on the anonymous `rvw` ping, as an ask.
@@ -112,12 +145,11 @@ export function reviewVerdict(): ReviewVerdict {
 export async function maybeAskForReview(): Promise<boolean> {
   try {
     // The request card (./card) is the other way this install can be asked,
-    // and one ask is the whole budget: a user who has already answered that
-    // card is not asked again by the OS, and neither is one still LOOKING at
-    // it — a standing card is a question in progress, and the OS sheet would
-    // land on top of it. The card reads this memory in the other direction, so
-    // whichever happens first wins.
-    if (!FORCE_REVIEW_PROMPT && (reviewCardAnswered() || reviewCardStanding())) return false;
+    // and one ask is the whole budget. The card reads this memory in the other
+    // direction, so whichever gets there first wins — which only works if this
+    // side yields while the card is still WAITING to be allowed to go, and not
+    // merely once it has gone (see `cardHoldsTheAsk`).
+    if (!FORCE_REVIEW_PROMPT && cardHoldsTheAsk()) return false;
     if (!FORCE_REVIEW_PROMPT && !reviewVerdict().ok) return false;
     // hasAction() covers the platform cases where a prompt can't lead anywhere
     // (no store client, unsupported OS version).
