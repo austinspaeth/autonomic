@@ -40,7 +40,7 @@ import { initPressureWatch } from '../src/store/pressure';
 import { initPacingAlertWatcher } from '../src/store/pacingAlerts';
 import { initPacingBackground } from '../src/store/pacingBackground';
 import { initInsightsBadge } from '../src/store/insightsBadge';
-import { loadIssue } from '../src/store/store';
+import { loadIssue, pruneOrphanWaveforms } from '../src/store/store';
 import { drainNativeCrashes, installErrorLogging, logError } from '../src/lib/diagnostics/errorLog';
 import { usePalette } from '../src/theme';
 
@@ -109,7 +109,19 @@ export default function RootLayout() {
     // stringify, and running it while the first screen is still mounting shows
     // up as a launch hitch (most visibly on mid-range Android). Nothing waits
     // on the snapshot, so let the UI settle first.
-    const backup = InteractionManager.runAfterInteractions(() => { void runDailyBackup(); });
+    // Sweeping orphaned waveform blobs rides the same deferral, and for a
+    // stronger reason than the snapshot's. It is a mark-and-sweep whose root
+    // set is the journal, so it is the most destructive thing the app does
+    // unprompted; it used to run inside `loadState`, which is MODULE LOAD, and
+    // index.js loads the bundle in headless background wake-ups that never
+    // mount the app. Here it can only run in a process that actually opened.
+    // It self-gates to once a week, and nothing may throw on this queue — one
+    // task that does stops it for every deferred build in the app — so it
+    // swallows its own failures (store.pruneOrphanWaveforms).
+    const backup = InteractionManager.runAfterInteractions(() => {
+      void runDailyBackup();
+      pruneOrphanWaveforms();
+    });
     // Reconcile the OS notification schedule with settings.reminder — covers a
     // reinstall, an imported journal, or permission revoked while we were away.
     syncReminder();
