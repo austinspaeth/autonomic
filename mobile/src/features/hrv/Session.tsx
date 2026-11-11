@@ -46,7 +46,7 @@ import { GarminIcon } from './GarminIcon';
 import { MindfulnessIcon } from './MindfulnessIcon';
 import {
   abandonSession, beginCollection, canMinimize, endSession, finishSession, minimizeSession,
-  setSessionHidden, startSession, useSession, type SessionConfig, type SessionSnapshot,
+  retryStrap, setSessionHidden, startSession, useSession, type SessionConfig, type SessionSnapshot,
 } from './sessionStore';
 import { troubleSourceFor } from '../../lib/ppg/tips';
 
@@ -392,7 +392,13 @@ function WatchNote() {
  * Nothing for the watch source: `WatchNote` already says the only thing there is
  * to say, and repeating it in the header would be the same sentence twice.
  */
-interface Hint { tone: string | null; icon: React.ComponentProps<typeof Icon>['name']; text: string }
+interface Hint {
+  tone: string | null;
+  icon: React.ComponentProps<typeof Icon>['name'];
+  text: string;
+  /** Makes the pill a button. Only the strap's "not answering" state has one. */
+  onPress?: () => void;
+}
 
 function statusHint(s: SessionSnapshot): Hint | null {
   const started = s.status === 'running' || s.status === 'finished';
@@ -418,6 +424,11 @@ function statusHint(s: SessionSnapshot): Hint | null {
   if (src === 'camera' && started && !s.signal.locked) {
     return { tone: GRADE_COLORS.bad, icon: 'triangle', text: 'Pulse lost, cover the lens' };
   }
+  // The card stopped retrying (see strapRetry.ts). Saying "Connecting…" for
+  // ever was the old behaviour; this says what is wrong and offers the retry.
+  if (src === 'polar' && !s.connected && s.strapGaveUp) {
+    return { tone: GRADE_COLORS.bad, icon: 'triangle', text: 'Strap not answering. Tap to retry', onPress: retryStrap };
+  }
   if (src === 'polar' && !s.connected) return { tone: GRADE_COLORS.ok, icon: 'triangle', text: 'Connecting to strap…' };
   if (src === 'polar' && !started && s.warming) return { tone: GRADE_COLORS.ok, icon: 'triangle', text: 'Warming up sensor…' };
   if (src === 'polar' && !started) return { tone: GRADE_COLORS.good, icon: 'check', text: 'Strap connected' };
@@ -427,10 +438,10 @@ function statusHint(s: SessionSnapshot): Hint | null {
 /** A tinted pill rather than loose coloured text: mid-reading these are the only
  *  words on the card that change, and a bare orange sentence read as an error to
  *  be decoded rather than a state to be glanced at. */
-function HintPill({ tone, icon, text, maxWidth }: Hint & { maxWidth: number }) {
+function HintPill({ tone, icon, text, maxWidth, onPress }: Hint & { maxWidth: number }) {
   const p = usePalette();
   const color = tone || p.textDim;
-  return (
+  const pill = (
     <View style={{
       flexDirection: 'row', alignItems: 'center', gap: 7, paddingLeft: 11, paddingRight: 14, height: 34, maxWidth,
       borderRadius: 999, borderWidth: 1, borderColor: color + '4d', backgroundColor: color + '1f',
@@ -438,5 +449,11 @@ function HintPill({ tone, icon, text, maxWidth }: Hint & { maxWidth: number }) {
       <Icon name={icon} size={14} color={color} strokeWidth={2.2} />
       <Text numberOfLines={1} style={{ color, fontSize: 13.5, fontWeight: '600' }}>{text}</Text>
     </View>
+  );
+  if (!onPress) return pill;
+  return (
+    <Pressable onPress={onPress} accessibilityRole="button" accessibilityLabel={text} hitSlop={8}>
+      {({ pressed }) => <View style={{ opacity: pressed ? 0.6 : 1 }}>{pill}</View>}
+    </Pressable>
   );
 }

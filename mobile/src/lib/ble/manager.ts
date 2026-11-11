@@ -63,6 +63,9 @@ const DIAGNOSTIC_SCAN_MS = 8000;
  *  Long enough for a cold CoreBluetooth/Android stack, short enough that a tap
  *  on Scan still feels like it did something. */
 const READY_TIMEOUT_MS = 4000;
+/** Longest a single connect may take before it fails and the caller's retry
+ *  policy decides what happens next. A strap in range connects in seconds. */
+const CONNECT_TIMEOUT_MS = 20000;
 
 export interface BleManagerApi {
   available: boolean;
@@ -367,7 +370,10 @@ export function createBle(): BleManagerApi {
         if (connectedId !== id) { try { await manager.cancelDeviceConnection(id); } catch { /* ignore */ } }
         return true;
       };
-      const device = await manager.connectToDevice(id, { requestMTU: 64 });
+      // Bounded: on iOS a connect to a strap that never answers waits for ever,
+      // which left the reading card on "Connecting to strap…" with no retry and
+      // no way to reach the give-up message (see `strapRetry.ts`).
+      const device = await manager.connectToDevice(id, { requestMTU: 64, timeout: CONNECT_TIMEOUT_MS });
       if (await cancelled()) throw new Error('Connection superseded');
       await device.discoverAllServicesAndCharacteristics();
       if (await cancelled()) throw new Error('Connection superseded');
