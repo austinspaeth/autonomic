@@ -15,8 +15,8 @@ app:
   feature: pacing-budget
   hook: "Pace by what your body actually handled."
   line: "Autonomic learns how many active minutes your body handled on good days and sets a daily budget, with alerts, so pacing stops being guesswork."
-photoLocation: "https://images.unsplash.com/photo-1787092419303-8fd21af848b2?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "James Forbes / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1720084026217-aa7e5bd2cdda?q=80&w=1760&auto=format&fit=crop"
+photoAttribution: "Lia Den / Unsplash"
 categories:
   - mecfs
   - postviral
@@ -157,6 +157,11 @@ Overlap is not identity. A few differences show up consistently.
 
 If one feature decides whether the ME/CFS framework fits you, it is PEM. The CDC calls it a hallmark of ME/CFS: symptoms that worsen after physical, mental or emotional effort ([CDC, 2024](https://www.cdc.gov/me-cfs/hcp/clinical-overview/index.html)). It is different from ordinary tiredness because the worsening is out of proportion to what you did and is delayed: symptoms typically worsen 12 to 48 hours after the activity and can last days or even weeks ([CDC, Strategies to Prevent Worsening of Symptoms](https://www.cdc.gov/me-cfs/hcp/clinical-care/treating-the-most-disruptive-symptoms-first-and-preventing-worsening-of-symptoms.html)). That lag makes the link easy to miss. Our guide to [post-exertional malaise](/insights/postviral/post-exertional-malaise-explained/) covers it in detail.
 
+<figure class="lc-photo lc-photo-tall">
+  <img src="https://images.unsplash.com/photo-1721784117176-33f2cf765849?q=80&w=1100&auto=format&fit=crop" alt="A young woman sitting on a curving park path in low evening sun, knees drawn up, her long shadow stretched across the pavement." loading="lazy" />
+  <figcaption>With PEM, the walk feels fine. The bill arrives a day or two later. Photo: <a href="https://unsplash.com/photos/a-woman-sitting-on-a-sidewalk-in-the-middle-of-a-park-i-lU4oCox9w" target="_blank" rel="noopener noreferrer">Shiona Das</a> / Unsplash</figcaption>
+</figure>
+
 There is now physical evidence that PEM is not just a feeling. In a 2024 study of people with long COVID, muscle tissue examined after exercise that triggered PEM showed worsening metabolic disturbances, exercise-induced muscle damage and amyloid-containing deposits in the muscle tissue ([Appelman et al., 2024](https://doi.org/10.1038/s41467-023-44432-3)). The CDC warns that standard exercise recommendations for healthy people can substantially harm people with ME/CFS, and that pacing, balancing rest and activity, is how PEM is reduced ([CDC, Strategies to Prevent Worsening of Symptoms](https://www.cdc.gov/me-cfs/hcp/clinical-care/treating-the-most-disruptive-symptoms-first-and-preventing-worsening-of-symptoms.html)). That is why the old advice to push through fatigue is risky for anyone with PEM, whichever label they carry.
 
 <div class="callout callout-note"><strong>Exertion is not only exercise.</strong> A long phone call, a stressful appointment, a shower or a few hours of screen time can all count. If you only watch your workouts, you can miss the triggers that matter most.</div>
@@ -177,6 +182,11 @@ The label can still help. It points to clinicians who understand PEM, to a body 
 ## How to tell which pattern fits you
 
 The most useful evidence is your own, gathered over weeks. Three things are worth watching:
+
+<figure class="lc-photo">
+  <img src="https://images.unsplash.com/photo-1517971129774-8a2b38fa128e?q=80&w=1600&auto=format&fit=crop" alt="A woman writing in a notebook at a dark wooden table beside a bright window lined with potted plants." loading="lazy" style="object-position:center 40%" />
+  <figcaption>A few lines a day, read back across weeks, show a pattern no single bad day can. Photo: <a href="https://unsplash.com/photos/woman-sitting-in-front-of-black-table-writing-on-white-book-near-window-NXiIVnzBwZ8" target="_blank" rel="noopener noreferrer">Hannah Olinger</a> / Unsplash</figcaption>
+</figure>
 
 1. **The delayed flare.** Note what you did on a given day and how you felt one and two days later. A repeating lag between effort and worsening is the pattern PEM leaves, and our guide to [HRV before, during and after a PEM crash](/insights/hrv/hrv-and-pem-crash/) shows what it can look like in the numbers.
 2. **Upright versus lying down.** If standing makes things worse and lying down helps, an at-home stand test can show whether your heart rate rise points toward POTS.
@@ -203,3 +213,11 @@ Is long COVID the same as ME/CFS? No. Long COVID is an umbrella for any lasting 
 - Centers for Disease Control and Prevention. [IOM 2015 diagnostic criteria for ME/CFS](https://www.cdc.gov/me-cfs/hcp/diagnosis/iom-2015-diagnostic-criteria-1.html). Accessed 2026.
 - Centers for Disease Control and Prevention. [Clinical overview of ME/CFS](https://www.cdc.gov/me-cfs/hcp/clinical-overview/index.html). Accessed 2026.
 - Centers for Disease Control and Prevention. [Strategies to prevent worsening of symptoms](https://www.cdc.gov/me-cfs/hcp/clinical-care/treating-the-most-disruptive-symptoms-first-and-preventing-worsening-of-symptoms.html). Accessed 2026.
+
+<style>
+  /* Photos */
+  .lc-photo { margin: 34px 0; }
+  .lc-photo img { width: 100%; height: auto; aspect-ratio: 16 / 9; object-fit: cover; border-radius: var(--r-lg); border: 1px solid var(--line); }
+  /* A portrait photo keeps a portrait frame so the path and her shadow stay in view. */
+  .lc-photo-tall img { max-width: 480px; margin-inline: auto; display: block; aspect-ratio: 4 / 5; object-position: center 70%; }
+</style>
