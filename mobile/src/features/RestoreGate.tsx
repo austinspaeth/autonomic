@@ -52,11 +52,15 @@ export function RestoreGate({ onDone }: { onDone: () => void }) {
       .then((s) => {
         if (!alive) return;
         if (!s.length) { finish(); return; }
-        // Snapshots beside an empty journal is the one signature a fresh
-        // install cannot produce. Freeze backup rotation and report it BEFORE
-        // rendering, since nothing downstream reports back that it was seen.
-        noteJournalVanished();
+        // The screen is committed FIRST. Everything below is bookkeeping, and a
+        // throw in any of it would otherwise reject this promise, land in the
+        // .catch, and walk the user past the backups that would have saved
+        // them and into onboarding. Nothing diagnostic is worth that trade.
+        setSnaps(s);
         try {
+          // Snapshots beside an empty journal is the one signature a fresh
+          // install cannot produce. Protect the snapshots, then report it.
+          noteJournalVanished();
           reportFault('store.vanished', vanishMessage({
             kind: loadIssue?.kind ?? 'fresh',
             snapshots: s.length,
@@ -65,7 +69,6 @@ export function RestoreGate({ onDone }: { onDone: () => void }) {
             encrypted: storageStats().encrypted,
           }));
         } catch { /* reporting must never cost the user their recovery screen */ }
-        setSnaps(s);
       })
       .catch(() => { if (alive) finish(); });
     return () => { alive = false; };

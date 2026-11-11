@@ -290,6 +290,26 @@ export { blankDay, migrate };
  *  checks this to offer the on-device backup snapshots before onboarding. */
 export let loadIssue: { kind: 'fresh' | 'corrupt'; raw?: string } | null = null;
 
+/**
+ * Run a load-time repair so that a bug inside it can never cost the journal.
+ *
+ * These all run inside `loadState`'s try, where a throw means `loadIssue =
+ * 'corrupt'` and the app starts on `defaultState()` — so an exception in an
+ * OPTIONAL repair would hand every install an empty journal and the recovery
+ * screen, and the first `save()` would write that over the real one. A repair
+ * is a nice-to-have over data that is already loaded and already correct;
+ * failing one must cost that repair and nothing else. The catch is what keeps
+ * `'corrupt'` meaning what it says: the stored blob could not be read.
+ */
+function repair<T>(fn: () => T, fallback: T): T {
+  try {
+    return fn();
+  } catch (e) {
+    logError('store.repair', e);
+    return fallback;
+  }
+}
+
 function loadState(): AppState {
   let raw: string | undefined;
   try {
@@ -312,7 +332,7 @@ function loadState(): AppState {
     // the sidecar (sidecar written first, journal persisted after — a crash in
     // between just re-runs the idempotent move next launch), then drop sidecar
     // blobs whose reading is gone.
-    const movedWaveforms = extractWaveforms(migrated, putWaveform);
+    const movedWaveforms = repair(() => extractWaveforms(migrated, putWaveform), 0);
     pruneWaveforms(migrated);
     // Older builds imported HRV without recording how much RR it covered, so
     // journals can hold short Apple/Health Connect samples that skew every
@@ -320,10 +340,10 @@ function loadState(): AppState {
     // had a beat series get 0 and stay excluded (see src/lib/hrvQuality.ts).
     // Uncached read: this walks the sidecar once and must not evict the entries
     // the Journal is about to render.
-    const stampedHrv = stampImportedHrvCoverage(migrated, (id) => readWaveformUncached(id)?.rrRaw);
+    const stampedHrv = repair(() => stampImportedHrvCoverage(migrated, (id) => readWaveformUncached(id)?.rrRaw), 0);
     // Apple Watch readings filed before their bands could be resolved across
     // the series' seams are missing them; the beats are still in the sidecar.
-    const filledBands = fillWatchHrvBands(migrated, readWaveformUncached);
+    const filledBands = repair(() => fillWatchHrvBands(migrated, readWaveformUncached), 0);
     // If a one-time migration (sleep reframing, waveform extraction, HRV
     // coverage) ran, persist immediately so it can't re-run next launch.
     if (movedWaveforms || stampedHrv || filledBands || !(parsed && parsed.meta && parsed.meta.sleepReframed)) {

@@ -28,6 +28,27 @@ const NAME_RE = /^autonomic-backup-\d{4}-\d{2}-\d{2}\.json$/;
 const backupDir = () =>
   FileSystem.documentDirectory ? `${FileSystem.documentDirectory}backups` : null;
 
+/** The snapshot holding the most bytes — the best proxy for "the most journal",
+ *  and a free one: a size read, never a parse. Parsing every snapshot to count
+ *  its days would mean tens of megabytes of JSON on the launch path, which is
+ *  exactly the memory spike this whole change exists to stop causing. */
+async function largestSnapshot(dir: string, names: string[]): Promise<string | null> {
+  let best: string | null = null;
+  let bestSize = -1;
+  for (const name of names) {
+    try {
+      const info = await FileSystem.getInfoAsync(`${dir}/${name}`);
+      const size = info.exists && typeof (info as { size?: number }).size === 'number'
+        ? (info as { size: number }).size
+        : 0;
+      if (size > bestSize) { bestSize = size; best = name; }
+    } catch {
+      // unreadable — not a candidate worth protecting
+    }
+  }
+  return best;
+}
+
 export async function runDailyBackup(): Promise<void> {
   try {
     const dir = backupDir();
@@ -42,17 +63,23 @@ export async function runDailyBackup(): Promise<void> {
 
     await FileSystem.writeAsStringAsync(`${dir}/${today}`, serializeState());
 
-    // While a vanish is unresolved, WRITE but never ROTATE. The snapshots are
-    // the only copy of a journal this device has already lost once, and five
-    // days of a one-entry journal would rotate every good one out while the app
-    // looked like it was working. Resolved by a restore, an import, or real
-    // data coming back (see lib/vanish.ts).
-    if (journalVanished()) return;
-
     // Date-stamped names sort chronologically; trim from the oldest end.
     const all = [...existing, today].sort();
+
+    // While a vanish is unresolved, PROTECT the biggest snapshot. It is the one
+    // holding the pre-loss history, and KEEP is 5 — so a user who lost a
+    // journal, tapped "Start fresh" and logged one thing a day had every good
+    // snapshot rotated out inside five days, the app looking like it worked
+    // throughout. Protect that one file rather than freezing rotation outright:
+    // a freeze grows the directory without bound, and these files run to tens
+    // of megabytes on a phone that may be short of space for the very reason
+    // the write failed in the first place.
+    const keepAlways = journalVanished() ? await largestSnapshot(dir, all) : null;
+
     while (all.length > KEEP) {
-      const oldest = all.shift()!;
+      const oldest = all.find((n) => n !== keepAlways);
+      if (!oldest) break; // unreachable while KEEP >= 1, but never spin
+      all.splice(all.indexOf(oldest), 1);
       await FileSystem.deleteAsync(`${dir}/${oldest}`, { idempotent: true }).catch(() => {});
     }
   } catch (e) {
