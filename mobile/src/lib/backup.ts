@@ -20,6 +20,7 @@ import * as FileSystem from 'expo-file-system';
 import { getState, replaceState, serializeState } from '../store/store';
 import { todayKey } from './dates';
 import { logError } from './diagnostics/errorLog';
+import { clearJournalVanished, journalVanished } from './vanish';
 
 const KEEP = 5;
 const NAME_RE = /^autonomic-backup-\d{4}-\d{2}-\d{2}\.json$/;
@@ -40,6 +41,13 @@ export async function runDailyBackup(): Promise<void> {
     if (existing.includes(today)) return; // already snapshotted today
 
     await FileSystem.writeAsStringAsync(`${dir}/${today}`, serializeState());
+
+    // While a vanish is unresolved, WRITE but never ROTATE. The snapshots are
+    // the only copy of a journal this device has already lost once, and five
+    // days of a one-entry journal would rotate every good one out while the app
+    // looked like it was working. Resolved by a restore, an import, or real
+    // data coming back (see lib/vanish.ts).
+    if (journalVanished()) return;
 
     // Date-stamped names sort chronologically; trim from the oldest end.
     const all = [...existing, today].sort();
@@ -98,5 +106,9 @@ export async function listBackups(): Promise<BackupSnapshot[]> {
 export async function restoreBackup(snap: BackupSnapshot): Promise<number> {
   const parsed = JSON.parse(await FileSystem.readAsStringAsync(snap.uri));
   replaceState(parsed, snap.name);
-  return Object.keys(getState().days).length;
+  const days = Object.keys(getState().days).length;
+  // The journal is back, so rotation may resume. Only on a restore that landed
+  // something — replaceState throws before touching the store on a bad file.
+  if (days) clearJournalVanished();
+  return days;
 }

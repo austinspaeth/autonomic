@@ -16,8 +16,22 @@ import { useToast } from '../components/Toast';
 import { Button } from '../components/ui';
 import { listBackups, restoreBackup, type BackupSnapshot } from '../lib/backup';
 import { fmtDateFull } from '../lib/dates';
-import { loadIssue } from '../store/store';
+import { vanishMessage } from '../lib/errorReport';
+import { noteJournalVanished } from '../lib/vanish';
+import { loadIssue, storageStats } from '../store/store';
+import { reportFault } from '../store/errorReport';
 import { usePalette, radius } from '../theme';
+
+const DAY_MS = 86_400_000;
+
+/** Whole days between a snapshot's day key and today, 0 when it is today's. */
+function ageInDays(dayKey: string): number {
+  const t = Date.parse(`${dayKey}T00:00:00`);
+  if (!Number.isFinite(t)) return 0;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  return Math.max(0, Math.round((today.getTime() - t) / DAY_MS));
+}
 
 export function RestoreGate({ onDone }: { onDone: () => void }) {
   const p = usePalette();
@@ -35,7 +49,24 @@ export function RestoreGate({ onDone }: { onDone: () => void }) {
   useEffect(() => {
     let alive = true;
     listBackups()
-      .then((s) => { if (!alive) return; if (s.length) setSnaps(s); else finish(); })
+      .then((s) => {
+        if (!alive) return;
+        if (!s.length) { finish(); return; }
+        // Snapshots beside an empty journal is the one signature a fresh
+        // install cannot produce. Freeze backup rotation and report it BEFORE
+        // rendering, since nothing downstream reports back that it was seen.
+        noteJournalVanished();
+        try {
+          reportFault('store.vanished', vanishMessage({
+            kind: loadIssue?.kind ?? 'fresh',
+            snapshots: s.length,
+            newestAgeDays: ageInDays(s[0].date),
+            days: s[0].days,
+            encrypted: storageStats().encrypted,
+          }));
+        } catch { /* reporting must never cost the user their recovery screen */ }
+        setSnaps(s);
+      })
       .catch(() => { if (alive) finish(); });
     return () => { alive = false; };
     // eslint-disable-next-line react-hooks/exhaustive-deps

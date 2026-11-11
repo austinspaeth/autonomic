@@ -21,7 +21,7 @@ import { initBreadcrumbs, liveTrail, previousTrail } from './breadcrumbs';
 import { type CrumbTrail, formatWhere } from './crumbs';
 import { describeError } from './env';
 import { MAX_ERRORS, parseErrorLog, pushError, type LoggedError } from './errorBuffer';
-import { describeNativeCrash, parseNativeCrashes, tagForNativeCrash } from './nativeCrash';
+import { describeNativeCrash, isFatalNativeCrash, parseNativeCrashes, tagForNativeCrash } from './nativeCrash';
 import { formatStack } from './stack';
 
 export type { LoggedError };
@@ -225,11 +225,11 @@ export function drainNativeCrashes(): void {
     const raw = appEnv.takeNativeCrashLog();
     const described: string[] = [];
     for (const crash of parseNativeCrashes(raw)) {
-      const hang = crash.kind === 'hang';
+      const fatal = isFatalNativeCrash(crash);
       const where = previousTrail(crash.source === 'metrickit' ? undefined : crash.at);
       const msg = describeNativeCrash(crash);
       described.push(msg);
-      logError(tagForNativeCrash(crash), new Error(msg), hang ? undefined : { fatal: true, where });
+      logError(tagForNativeCrash(crash), new Error(msg), fatal ? { fatal: true, where } : undefined);
     }
     // One crash signature is also an INSTRUCTION, not just a record: Health
     // Connect kills the process from inside its own read callback when it

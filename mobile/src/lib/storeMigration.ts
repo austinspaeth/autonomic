@@ -22,6 +22,17 @@ function lastUpdatedOf(raw: string | undefined): string {
   }
 }
 
+/** Logged days in a serialized journal, 0 when absent/unparseable. */
+function dayCountOf(raw: string | undefined): number {
+  if (!raw) return 0;
+  try {
+    const days = (JSON.parse(raw) || {}).days;
+    return days && typeof days === 'object' ? Object.keys(days).length : 0;
+  } catch {
+    return 0;
+  }
+}
+
 /**
  * Copy the journal out of `legacy` into `secure`, then wipe `legacy`.
  *
@@ -32,6 +43,15 @@ function lastUpdatedOf(raw: string | undefined): string {
  * Keychain was unavailable), the journal with the newer meta.lastUpdated wins —
  * ISO timestamps compare lexicographically.
  *
+ * NEWER IS NOT ENOUGH, and that was a real data-loss path. "Newer" was written
+ * for an interrupted migration, where it genuinely means better. It cannot tell
+ * that case apart from a session that fell back to the plaintext store because
+ * the Keychain was locked, started on an empty journal, and stamped it with the
+ * time the user typed their first entry into it — which is always newer than
+ * the real journal sitting in `secure`. So a copy may only win if it is also no
+ * SMALLER: a journal with fewer logged days never overwrites one with more,
+ * whatever its timestamp says.
+ *
  * Returns whether the legacy store is now disposable (it held nothing, or its
  * journal verifiably landed in `secure`) — only then may the caller delete the
  * legacy files. clearAll() alone is not enough: it resets the logical store but
@@ -41,7 +61,9 @@ export function migrateLegacyJournal(legacy: KVStore, secure: KVStore, storageKe
   const old = legacy.getString(storageKey);
   if (!old) return true;
   const current = secure.getString(storageKey);
-  if (!current || lastUpdatedOf(old) > lastUpdatedOf(current)) {
+  const newer = lastUpdatedOf(old) > lastUpdatedOf(current);
+  const notSmaller = dayCountOf(old) >= dayCountOf(current);
+  if (!current || (newer && notSmaller)) {
     secure.set(storageKey, old);
   }
   if (!secure.getString(storageKey)) return false;

@@ -264,6 +264,14 @@ export const getSleepSeries = (dk: string): WaveformData | null => getWaveform(s
  *  journal write raced a crash, or left behind by an older build). */
 function pruneWaveforms(s: AppState) {
   try {
+    // NEVER prune against a journal holding no days. Reaching this line with an
+    // empty journal does not mean the user deleted everything — `clearAllData`
+    // writes its blank state back and the next launch parses it, and so does a
+    // journal that VANISHED and was written over (see `loadIssue`). Pruning on
+    // one deletes every RR trace, workout curve and sleep series in the sidecar
+    // on the launch AFTER the loss, which is the one copy the backup snapshots
+    // cannot always replace. Strays cost bytes; this costs the measurements.
+    if (!Object.keys(s.days).length) return;
     const ids = waveformIds(s);
     for (const k of wkv().getAllKeys()) {
       if (!ids.has(k)) { wkv().delete(k); waveCache.delete(k); }

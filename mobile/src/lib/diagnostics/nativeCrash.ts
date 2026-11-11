@@ -40,10 +40,11 @@ export interface NativeCrash {
   causeType?: string;
   causeMessage?: string;
   frame?: string;
-  /** `crash` (the default) or `hang`: MetricKit also reports a main thread
-   *  stuck for seconds, which is what a JavaScript infinite loop looks like
-   *  from outside the process. */
-  kind?: 'crash' | 'hang';
+  /** `crash` (the default), `hang` or `exit`. MetricKit also reports a main
+   *  thread stuck for seconds, which is what a JavaScript infinite loop looks
+   *  like from outside the process; and a daily tally of how the process was
+   *  ENDED, which is the only place a memory kill is ever reported. */
+  kind?: 'crash' | 'hang' | 'exit';
   /** The build that CRASHED. The fault report stamps the build that SENDS,
    *  and on iOS the two can differ (a crash from before an update is delivered
    *  after it), so it rides in the message. */
@@ -68,7 +69,28 @@ export const NATIVE_CRASH_TAG = 'native.crash';
  *  crash: the app came back. Not fatal on the dashboard for the same reason. */
 export const NATIVE_HANG_TAG = 'native.hang';
 
-export const tagForNativeCrash = (c: NativeCrash): string => (c.kind === 'hang' ? NATIVE_HANG_TAG : NATIVE_CRASH_TAG);
+/**
+ * How the process was ENDED, as MetricKit's daily tally (iOS, MXAppExitMetric).
+ *
+ * Its own tag, and the reason is the whole point of collecting it: a process
+ * killed for memory is not an exception. No signal is raised, no handler runs,
+ * `MXCrashDiagnostic` never mentions it, and the Java/ObjC hooks cannot see it
+ * either — so an app being jetsammed every day looks, from every other row in
+ * this log, exactly like an app that never fails. It is the one termination
+ * that leaves no trace, and it is also the one most likely to kill a process
+ * mid-write and leave a storage file inconsistent behind it.
+ *
+ * NOT fatal: these are counts for a window that has already passed, not an
+ * event, and the app plainly relaunched to report them.
+ */
+export const NATIVE_EXIT_TAG = 'native.exit';
+
+export const tagForNativeCrash = (c: NativeCrash): string =>
+  c.kind === 'hang' ? NATIVE_HANG_TAG : c.kind === 'exit' ? NATIVE_EXIT_TAG : NATIVE_CRASH_TAG;
+
+/** Did the process actually die from this? A hang recovered and an exit tally
+ *  describes a window already over, so neither spends the fatal marking. */
+export const isFatalNativeCrash = (c: NativeCrash): boolean => c.kind !== 'hang' && c.kind !== 'exit';
 
 /** Longest composed message worth carrying. `redactMessage` truncates to its
  *  own limit afterwards; this only stops a pathological native string from

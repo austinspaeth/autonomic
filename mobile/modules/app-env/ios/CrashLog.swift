@@ -80,8 +80,55 @@ final class CrashLog: NSObject, MXMetricManagerSubscriber {
     onWrite?()
   }
 
-  // Metric payloads (daily aggregates) are not wanted; the protocol's method is
-  // optional and left unimplemented on purpose.
+  /**
+   * Daily aggregates. Only ONE of them is wanted: how the process was ENDED.
+   *
+   * A kill for memory is not an exception. No signal is raised, no handler
+   * runs, `crashDiagnostics` never mentions it, and the Java and ObjC hooks
+   * cannot see it — so an app being jetsammed repeatedly looks identical, in
+   * every other row this file writes, to an app that never fails. It is also
+   * the termination most likely to stop a process mid-write and leave a
+   * storage file inconsistent behind it, which is the failure this was added
+   * for. MXAppExitMetric is the only place iOS reports it.
+   *
+   * Counts for a window already over, so the row is not fatal, and it is
+   * written only when something ABNORMAL is in it — a payload of nothing but
+   * normal exits is the usual case and is not news.
+   */
+  func didReceive(_ payloads: [MXMetricPayload]) {
+    guard #available(iOS 14.0, *) else { return }
+    var rows: [[String: Any]] = []
+    for payload in payloads {
+      guard let exits = payload.applicationExitMetrics else { continue }
+      let fg = exits.foregroundExitData
+      let bg = exits.backgroundExitData
+      // Ordered by what a fix needs: memory first, since that is the one this
+      // row exists to surface, then the other silent killers.
+      var parts: [String] = []
+      func add(_ label: String, _ n: Int) { if n > 0 { parts.append("\(label)\(n)") } }
+      add("fgMem", fg.cumulativeMemoryResourceLimitExitCount)
+      add("bgMem", bg.cumulativeMemoryResourceLimitExitCount)
+      add("bgMemPressure", bg.cumulativeMemoryPressureExitCount)
+      add("fgWatchdog", fg.cumulativeAppWatchdogExitCount)
+      add("bgWatchdog", bg.cumulativeAppWatchdogExitCount)
+      add("fgCpu", fg.cumulativeCPUResourceLimitExitCount)
+      add("bgTaskTimeout", bg.cumulativeBackgroundTaskAssertionTimeoutExitCount)
+      add("bgLockedFile", bg.cumulativeSuspendedWithLockedFileExitCount)
+      if parts.isEmpty { continue }
+      var row: [String: Any] = [
+        "at": Int(payload.timeStampEnd.timeIntervalSince1970 * 1000),
+        "kind": "exit",
+        "source": "metrickit",
+        "type": "AppExit",
+      ]
+      row["message"] = parts.joined(separator: " ")
+      row["version"] = clip(payload.latestApplicationVersion)
+      rows.append(row)
+    }
+    if rows.isEmpty { return }
+    Self.queue.sync { Self.append(rows) }
+    onWrite?()
+  }
 
   // MARK: - rows
 
