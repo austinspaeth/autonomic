@@ -9,6 +9,16 @@ crosses to a new `x.x` (a unit test fails if the shipping minor has no entry).
 
 ## Unreleased
 
+- **Period logged before noon never reached Health Connect** (Android, new in 1.40.0;
+  `hc.write.menstruationflow` / `hc.write.intermenstrualbleeding` "Record time must not
+  be in the future" on the Failures tab). `writeCycleDay` stamps a day's flow at noon so
+  a time-zone shift cannot move it onto a neighbouring day, but Health Connect refuses
+  any record timed after the phone's clock, so TODAY's flow logged in the morning was
+  rejected (logged, nothing written). `cycleRecordTime` (pure + tested) keeps noon for
+  every day except today before noon, which is stamped a second ago instead, never
+  before the day's start. iOS is untouched: HealthKit takes a future-dated sample.
+  **JS only**, so it can go out as an OTA update.
+
 - **"Choose which medications to import" did nothing, and said nothing about it**
   (found on a real phone running 1.39.2 build 94). `requestPerObjectReadAuthorization`
   reports `success` both when the picker was shown and answered AND when HealthKit had

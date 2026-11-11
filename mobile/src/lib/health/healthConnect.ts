@@ -135,6 +135,23 @@ function dateAt(dk: string, time?: string): Date {
 
 const isOwnRecord = (meta?: Metadata): boolean => meta?.dataOrigin === OWN_PACKAGE;
 
+/**
+ * When a cycle record for day `dk` is stamped: noon, so a time-zone shift can
+ * never move it onto a neighbouring day, EXCEPT on the day itself before noon.
+ * Health Connect refuses any record whose time is after the phone's clock
+ * ("Record time must not be in the future"), so today's period logged at
+ * 9 AM was rejected and never reached Health Connect. Until noon, today's
+ * record is stamped a second ago instead, which is still on the right day.
+ * A day that has not started yet keeps noon; there is no honest time for it.
+ */
+export function cycleRecordTime(dk: string, nowMs: number): Date {
+  const noon = dateAt(dk, '12:00');
+  if (noon.getTime() <= nowMs) return noon;
+  const start = dateAt(dk, '00:00');
+  if (start.getTime() > nowMs) return noon;
+  return new Date(Math.max(start.getTime(), nowMs - 1000));
+}
+
 
 export function makeHealthConnect(mod: HcModule): HealthApi {
   let initialized = false;
@@ -776,8 +793,8 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
         } catch (e) { logError('hc.write.cycleDelete', e); return false; }
       }
       if (!flow) return true;
-      // Noon, so a time-zone shift can never move the record onto a neighbour.
-      const when = dateAt(dk, '12:00').toISOString();
+      // Noon, or just now when today is not yet at noon (see cycleRecordTime).
+      const when = cycleRecordTime(dk, Date.now()).toISOString();
       return insert([flow === 'spotting'
         ? { recordType: 'IntermenstrualBleeding', time: when }
         : { recordType: 'MenstruationFlow', time: when, flow: HC_FLOW_VALUE[flow] }]);

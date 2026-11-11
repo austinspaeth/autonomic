@@ -3,7 +3,7 @@
  * so a mixed batch is rejected outright. The HRV session write is RMSSD +
  * HeartRate, and shipped as one batch that never landed on any Android phone.
  */
-import { makeHealthConnect } from '../healthConnect';
+import { cycleRecordTime, makeHealthConnect } from '../healthConnect';
 
 // jest.mock is hoisted above the import, so these still apply to it.
 jest.mock('../../diagnostics/errorLog', () => ({ logError: jest.fn() }));
@@ -36,4 +36,37 @@ test('an HRV session writes its RMSSD and its heart rate, one type per call', as
   });
   expect(batches.map((b) => b[0].recordType).sort()).toEqual(['HeartRate', 'HeartRateVariabilityRmssd']);
   expect(batches.every((b) => b.length === 1)).toBe(true);
+});
+
+describe('cycle records are never stamped in the future', () => {
+  // Health Connect rejects a record whose time is after the phone's clock, so
+  // a period logged for today before noon was refused when it was stamped noon.
+  const at = (y: number, m: number, d: number, h: number, min = 0) => new Date(y, m - 1, d, h, min).getTime();
+
+  test('today before noon is stamped just before now, on the same day', () => {
+    const now = at(2026, 11, 11, 9, 30);
+    const when = cycleRecordTime('2026-11-11', now);
+    expect(when.getTime()).toBeLessThanOrEqual(now);
+    expect(when.getDate()).toBe(11);
+  });
+
+  test('today after noon, and past days, keep noon', () => {
+    expect(cycleRecordTime('2026-11-11', at(2026, 11, 11, 15)).getTime()).toBe(at(2026, 11, 11, 12));
+    expect(cycleRecordTime('2026-11-09', at(2026, 11, 11, 9)).getTime()).toBe(at(2026, 11, 9, 12));
+  });
+
+  test('the first second of the day does not slip onto yesterday', () => {
+    const when = cycleRecordTime('2026-11-11', at(2026, 11, 11, 0));
+    expect(when.getTime()).toBe(at(2026, 11, 11, 0));
+  });
+
+  test('writing today\'s flow sends a time that is not in the future', async () => {
+    const { mod, batches } = fakeModule();
+    const before = Date.now();
+    const today = new Date();
+    const dk = `${today.getFullYear()}-${String(today.getMonth() + 1).padStart(2, '0')}-${String(today.getDate()).padStart(2, '0')}`;
+    await makeHealthConnect(mod).writeCycleDay(dk, 'light', { periodStart: true, replace: false });
+    const sent = new Date(batches[0][0].time as string).getTime();
+    expect(sent).toBeLessThanOrEqual(Math.max(before, Date.now()));
+  });
 });
