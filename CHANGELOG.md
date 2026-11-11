@@ -70,6 +70,20 @@ crosses to a new `x.x` (a unit test fails if the shipping minor has no entry).
   is deliberately untouched: it imports no historical symptoms (23 queries × a year is a
   different cost question) and no historical doses (there is no dose query to sweep).
 
+- **A Play billing connection that fails to set up now gets one torn-down retry, and the
+  paywall says so if it still fails.** `iap.init` "init-connection: Failed to initialize
+  connection" was on 10 Android install-days in a week (half on 1.40.0), and the same
+  phones then failed `iap.retryProducts` and `iap.entitlement` 5 to 6 times each. The
+  connect in `withBilling` sat OUTSIDE its reconnect-and-retry, so a BillingClient that
+  did not finish setup threw on the first try; it now gets the same one `reconnect()`
+  (endConnection, then connect) every store call already had. When the paywall's
+  `ensureIapReady` still cannot connect after that, it sets `error` to the store message
+  so the card says "Google Play isn't available on this device right now. Make sure
+  you're signed in to Google Play, then try again." before the tap rather than after it;
+  `init-connection` joins that message's group (it used to fall through to "Purchase
+  couldn't start: Failed to initialize connection"). Other `ensureIapReady` failures stay
+  silent as before. `src/lib/__tests__/iapReconnect.test.ts`. **JS only.**
+
 - **The two "what you log in Health" reads are now throttled, and only those two.**
   `lib/health/logsSweep.ts` (pure + tested) plus a flags-MMKV shell: at most once an
   hour per day key, always on the first check of a new day key, always on an explicit
