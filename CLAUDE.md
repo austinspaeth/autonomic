@@ -716,6 +716,28 @@ old web app so old `export.json` files import directly.
   the Keychain was locked, started empty, and stamped it when the user typed
   one entry — always newer than the real journal in `secure`. A journal with
   fewer logged days now never overwrites one with more, whatever its timestamp.
+- **The orphan sweep is the most destructive thing the app does unprompted, so
+  it is gated three ways.** `pruneWaveforms` is a mark-and-sweep whose ROOT SET
+  is the journal (`waveformIds`): anything in the sidecar the journal does not
+  reference is deleted, so a journal that is empty, truncated or mid-repair
+  condemns every RR trace, workout curve and sleep series on the device. It used
+  to run on every launch inside `loadState` — which is MODULE LOAD, and
+  `index.js` loads the bundle in headless background wake-ups that never mount
+  the app, so it could sweep in a process with no screen and nobody watching.
+  Now: the empty-journal check inside `pruneWaveforms`; the weekly clock
+  (`lib/waveformPrune.ts` pure + `waveformPruneMemory.ts` the flags-MMKV shell,
+  stamped BEFORE the sweep so one that throws is not retried every launch, and
+  an unreadable or FUTURE stamp reads as DUE, since a clock moved backwards must
+  not park it for a week); and `pruneOrphanWaveforms` in `store/store.ts`,
+  called from the ROOT LAYOUT behind `InteractionManager.runAfterInteractions`
+  beside `runDailyBackup`, so it can only run in a process that actually opened
+  the app. **The deferral and the clock answer different questions** — one is
+  WHEN within a launch, the other HOW OFTEN across launches — and only the
+  second cuts blast radius. Nothing on that queue may throw (one task that does
+  stops every deferred build in the app), so it swallows its own failures.
+  Reclaiming bytes may never be the reason anything else fails: the sweep's own
+  catch says it, "strays cost bytes, not correctness", and the support dump's
+  `orphan waveforms` row is almost always 0.
 - **`fillWatchHrvBands` is on the LAUNCH path, so both its guards are answered
   from the ENTRY.** It runs inside `loadState`, synchronously, before React
   mounts, and the sidecar read it makes is an encrypted MMKV get plus a JSON

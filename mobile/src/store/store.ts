@@ -22,6 +22,8 @@ import { createDebouncedWriter } from '../lib/persist';
 import { logError } from '../lib/diagnostics/errorLog';
 import { migrateLegacyJournal } from '../lib/storeMigration';
 import { stampImportedHrvCoverage } from '../lib/hrvQuality';
+import { pruneDue } from '../lib/waveformPrune';
+import { lastPruneAt, noteWaveformPrune } from '../lib/waveformPruneMemory';
 import { fillWatchHrvBands } from '../lib/hrvBands';
 import { markDeclinedKeys } from '../lib/health/declined';
 import { resetFindingMemory } from '../lib/insights/findingMemory';
@@ -264,13 +266,13 @@ export const getSleepSeries = (dk: string): WaveformData | null => getWaveform(s
  *  journal write raced a crash, or left behind by an older build). */
 function pruneWaveforms(s: AppState) {
   try {
-    // NEVER prune against a journal holding no days. Reaching this line with an
-    // empty journal does not mean the user deleted everything — `clearAllData`
-    // writes its blank state back and the next launch parses it, and so does a
-    // journal that VANISHED and was written over (see `loadIssue`). Pruning on
-    // one deletes every RR trace, workout curve and sleep series in the sidecar
-    // on the launch AFTER the loss, which is the one copy the backup snapshots
-    // cannot always replace. Strays cost bytes; this costs the measurements.
+    // NEVER prune against a journal holding no days. An empty journal here does
+    // not mean the user deleted everything — `clearAllData` writes its blank
+    // state back and the next launch parses it, and so does a journal that
+    // VANISHED and was written over (see `loadIssue`). Pruning on one deletes
+    // every RR trace, workout curve and sleep series in the sidecar on the
+    // launch AFTER the loss, which is the one copy the backup snapshots cannot
+    // always replace. Strays cost bytes; this costs the measurements.
     if (!Object.keys(s.days).length) return;
     const ids = waveformIds(s);
     for (const k of wkv().getAllKeys()) {
@@ -278,6 +280,32 @@ function pruneWaveforms(s: AppState) {
     }
   } catch {
     // best effort — strays cost bytes, not correctness
+  }
+}
+
+/**
+ * Sweep orphaned sidecar blobs, at most once a week, from the root layout.
+ *
+ * It is a mark-and-sweep whose ROOT SET is the journal (`waveformIds`), so it
+ * is the most destructive thing the app does on its own initiative: a journal
+ * that is empty, truncated or mid-repair condemns every curve on the device.
+ * Three guards, and each one removes a different way of being wrong — the
+ * empty-journal check inside `pruneWaveforms`, the weekly clock, and the call
+ * site, which is the root layout rather than `loadState` so it can only ever
+ * run in a process that actually opened the app.
+ *
+ * Stamped BEFORE the sweep: one that throws, or takes the process with it, must
+ * not be retried on every launch. Returns whether it ran.
+ */
+export function pruneOrphanWaveforms(): boolean {
+  try {
+    if (!pruneDue(lastPruneAt(), Date.now())) return false;
+    noteWaveformPrune();
+    pruneWaveforms(state);
+    return true;
+  } catch {
+    // Reclaiming bytes may never be the reason anything else fails.
+    return false;
   }
 }
 
@@ -330,10 +358,15 @@ function loadState(): AppState {
     const migrated = migrate(parsed);
     // Waveform arrays historically lived inline on HRV readings. Move them to
     // the sidecar (sidecar written first, journal persisted after — a crash in
-    // between just re-runs the idempotent move next launch), then drop sidecar
-    // blobs whose reading is gone.
+    // between just re-runs the idempotent move next launch).
+    //
+    // Dropping ORPHANED blobs used to happen here too and no longer does — see
+    // `pruneOrphanWaveforms`, which the root layout runs after the first screen
+    // has painted, at most weekly. This function runs at MODULE LOAD, and
+    // `index.js` loads the bundle in headless background wake-ups that never
+    // mount the app, so a destructive sweep here could run in a process with no
+    // screen and nobody watching.
     const movedWaveforms = repair(() => extractWaveforms(migrated, putWaveform), 0);
-    pruneWaveforms(migrated);
     // Older builds imported HRV without recording how much RR it covered, so
     // journals can hold short Apple/Health Connect samples that skew every
     // average. Stamp their real coverage from the sidecar — readings that never
