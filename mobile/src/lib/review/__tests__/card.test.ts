@@ -10,7 +10,7 @@
 import type { DayRecord, Entry } from '../../types';
 import {
   EMPTY_CARD_MEMORY, MIN_ENGAGED_DAYS, WATCH_DAYS, parseCardMemory, reviewCardDue,
-  reviewCardLive, reviewUrlFor, type ReviewCardMemory,
+  reviewCardLive, reviewCardReserves, reviewUrlFor, type ReviewCardMemory,
 } from '../card';
 
 const day = (over: Partial<DayRecord> = {}): DayRecord => ({
@@ -85,7 +85,45 @@ describe('reviewCardDue', () => {
   });
 
   it('never follows the OS prompt', () => {
-    expect(due({ osPromptAsked: true })).toEqual({ ok: false, reason: 'os-prompt-spent' });
+    // Asked long before this install was ever watched: the card did not exist
+    // on that build, and an install the OS already asked is one the product
+    // decided not to ask again.
+    expect(due({ osAskedAtMs: NOW - 30 * DAY_MS }))
+      .toEqual({ ok: false, reason: 'os-prompt-spent' });
+  });
+
+  // The two asks are meant to race, and for one window they could not: the
+  // card is barred for its first WATCH_DAYS while the OS prompt has no such
+  // wait, so an ask landing in there beat nobody. That ask is forgiven — and
+  // only that one.
+  describe('an OS ask from inside the watch window', () => {
+    /** Watched for 10 days, so the window ran from NOW-10d to NOW-3d. */
+    const watched = { ...clean, watchingSince: NOW - 10 * DAY_MS };
+
+    it('is forgiven once the ask itself has aged out of the window', () => {
+      expect(due({ memory: watched, osAskedAtMs: NOW - 9 * DAY_MS })).toEqual({ ok: true });
+    });
+
+    it('still waits, so no one meets a sheet and this card in the same week', () => {
+      // Inside the window (which closed at NOW-3d), but only 5 days ago.
+      expect(due({ memory: watched, osAskedAtMs: NOW - 5 * DAY_MS }))
+        .toEqual({ ok: false, reason: 'os-prompt-spent' });
+    });
+
+    it('forgives nothing once the window has closed — that race was honest', () => {
+      expect(due({ memory: { ...clean, watchingSince: NOW - 20 * DAY_MS }, osAskedAtMs: NOW - 2 * DAY_MS }))
+        .toEqual({ ok: false, reason: 'os-prompt-spent' });
+    });
+
+    it('forgives nothing when there was no window to be robbed of', () => {
+      expect(due({ memory: { ...clean, watchingSince: null }, osAskedAtMs: NOW - 9 * DAY_MS }))
+        .toEqual({ ok: false, reason: 'os-prompt-spent' });
+    });
+
+    it('is not needed by an install the OS never asked', () => {
+      expect(due({ osAskedAtMs: null })).toEqual({ ok: true });
+      expect(due({ osAskedAtMs: undefined })).toEqual({ ok: true });
+    });
   });
 
   it('is today only', () => {
@@ -171,6 +209,52 @@ describe('reviewCardDue', () => {
       expect(v.ok).toBe(false);
       expect((v as { reason: string }).reason).toBe('downturn');
     });
+  });
+});
+
+/**
+ * The reservation the OS prompt reads before spending this install's ask.
+ *
+ * It must be true for exactly one state — on track, just not allowed to go yet
+ * — because a reservation that is too generous silences the OS prompt for
+ * somebody the card will never open for, and one that is too mean hands the
+ * ask back to the prompt and loses the card its whole population.
+ */
+describe('reviewCardReserves', () => {
+  const midWatch = { ...clean, watchingSince: NOW - 2 * DAY_MS };
+  const reserves = (over: Partial<Parameters<typeof reviewCardDue>[0]> = {}) =>
+    reviewCardReserves({
+      days: steady(), dk: DK, today: DK, memory: midWatch, nowMs: NOW,
+      platform: 'android', ...over,
+    });
+
+  it('holds the ask while a qualifying install waits out the window', () => {
+    expect(reserves()).toBe(true);
+  });
+
+  // The reason this check sits above the watch window in reviewCardDue: a
+  // two-day-old install reports `watching` too, and has no claim to the ask.
+  it('holds nothing for an install with too few days of its own', () => {
+    const days = steady();
+    for (let n = MIN_ENGAGED_DAYS; n <= 10; n++) delete days[K(n)];
+    expect(reserves({ days })).toBe(false);
+  });
+
+  // Every disqualifying reason must release it on the same pass, or the OS
+  // prompt is silenced for a card that can never open.
+  it('releases it the moment the card is disqualified', () => {
+    expect(reserves({ memory: { ...midWatch, failures: 1 } })).toBe(false);
+    expect(reserves({ platform: 'ios', source: 'camera' })).toBe(false);
+    expect(reserves({ platform: 'ios', source: 'garmin' })).toBe(false);
+    expect(reserves({ memory: { ...midWatch, answered: true } })).toBe(false);
+    expect(reserves({ memory: { ...midWatch, watchingSince: null } })).toBe(false);
+  });
+
+  // A card that is already up, or already due, is not WAITING for anything —
+  // the OS prompt has its own reasons to stand down there (`standing`).
+  it('holds nothing once the card can actually go', () => {
+    expect(reserves({ memory: clean })).toBe(false);
+    expect(reserves({ memory: { ...midWatch, standing: true } })).toBe(false);
   });
 });
 

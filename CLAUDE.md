@@ -968,7 +968,29 @@ old web app so old `export.json` files import directly.
   `SUPPORT_EMAIL` — and the ✕ and both buttons are the SAME answer: asked once,
   never again. `reviewCardAnswered()` silences `maybeAskForReview`, and an
   install the OS prompt already spent never meets the card, so one install is
-  asked once by one of them. The bar is a week of the user's OWN entries
+  asked once by one of them. **That race only works if the OS prompt yields
+  while the card is still WAITING to be allowed to go, and for 1.39-1.40 it did
+  not** — `maybeAskForReview` stood down only for a card already ANSWERED or
+  STANDING, neither of which can be true inside `WATCH_DAYS`, while the card
+  bars itself PERMANENTLY on a spent OS ask. So the watch window was a
+  seven-day head start handed to the OS prompt on every install, and the card
+  shipped on a new version number, which is exactly what clears the prompt's
+  own `asked-this-version` bar — the engaged population was handed to it on the
+  one launch where the card was locked out, and the card was raised zero times
+  in its first week alive. Two halves, both JS: `reviewCardReserves` makes
+  `watching` a RESERVATION the prompt reads (it is the one refusal that is a
+  not-yet rather than a no, and it is bounded — after `WATCH_DAYS` the card
+  either opens or is disqualified, and every disqualifying reason releases it
+  on the same pass), and `osAskSpent` FORGIVES an ask that landed between
+  `watchingSince` and `watchingSince + WATCH_DAYS`, which is the bug's own
+  signature and nothing else: an ask from before the watch began is a real
+  spend (the card did not exist on that build), one from after the window
+  closed is the honest race, and an install never watched has no window to have
+  been robbed of. A forgiven ask still waits `WATCH_DAYS` from ITSELF, so
+  nobody meets a sheet and this card in the same week. Both call sites build
+  the input through one builder (`review/cardContext.ts`), because a
+  reservation computed from a different journal than the raise is the same race
+  with extra steps. The bar is a week of the user's OWN entries
   (`engagedDayCount`, the OS prompt's own `ENGAGED_DOOR_DAYS`) **and a clean
   capture record**, and the two are different kinds of claim: the first is read
   off the journal, the second CANNOT be — a refused or abandoned reading leaves
