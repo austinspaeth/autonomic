@@ -15,8 +15,8 @@ app:
   feature: pacing-budget
   hook: "Pace by what your body actually handled."
   line: "Autonomic learns how many active minutes your body handled on good days and sets a daily budget, with alerts, so pacing stops being guesswork."
-photoLocation: "https://images.unsplash.com/photo-1720084026217-aa7e5bd2cdda?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Lia Den / Unsplash"
+photoLocation: "https://images.unsplash.com/photo-1586294310477-243d2beb0be1?q=80&w=1760&auto=format&fit=crop"
+photoAttribution: "Tatiana Rodriguez / Unsplash"
 categories:
   - mecfs
   - postviral
