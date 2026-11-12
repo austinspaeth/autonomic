@@ -162,7 +162,7 @@ The single most common confusion is treating the water bolus and the daily [salt
 | Best use | Acute rescue before standing | Baseline foundation |
 | Needs salt? | No, plain water is the trigger | Yes, sodium holds the fluid |
 
-Think of the daily regimen as raising the floor you live on, and the water bolus as a short boost you step onto when you need to be upright. One does not replace the other. If your blood volume is chronically low, the bolus will still help, but it works best on top of a solid baseline. For the volume side of the story, see [low blood volume in POTS](/insights/pots/low-blood-volume-pots-hypovolemia/).
+Think of the daily regimen as raising the floor you live on, and the water bolus as a short boost you step onto when you need to be upright. One does not replace the other, and for most people the daily side lives in what they eat, which is what [the POTS diet guide](/insights/food/pots-diet-what-to-eat/) is about. If your blood volume is chronically low, the bolus will still help, but it works best on top of a solid baseline. For the volume side of the story, see [low blood volume in POTS](/insights/pots/low-blood-volume-pots-hypovolemia/).
 
 ## When a water bolus helps most
 

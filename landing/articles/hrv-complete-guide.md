@@ -6,7 +6,7 @@ summary: "Heart rate variability is the single clearest at-home window into your
 description: "The complete guide to heart rate variability (HRV) for POTS, dysautonomia and long COVID recovery: RMSSD vs SDNN, HF and LF power, normal ranges, how to measure, what raises HRV, and how to read the trend."
 keywords: "HRV, heart rate variability, RMSSD, SDNN, HF power, LF power, vagal tone, parasympathetic, how to improve HRV, HRV normal range, POTS, long COVID"
 date: 2026-07-09
-updated: 2026-11-04
+updated: 2026-11-12
 reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1719550371336-7bb64b5cacfa?q=80&w=1760&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
@@ -115,9 +115,11 @@ That means population "normal range" charts are close to useless for you. What's
 - **Your own baseline**: where your HRV typically sits.
 - **Your own trend**: which direction it's moving over 7 to 14 days.
 
-<div class="callout callout-note">
-  In POTS, HRV tends to run <em>lower</em> than in healthy people, because the system is biased toward sympathetic activation. In long COVID the research is mixed, with only a small difference on average, so a low number is possible but not a given. Either way, recovery isn't hitting a universal target; it's watching <em>your</em> baseline slowly climb back toward where it used to be.
-</div>
+## Why HRV runs low in POTS and long COVID
+
+In POTS and other forms of dysautonomia, the nervous system tends to sit biased toward the sympathetic, "always on" side, even at rest. Pooled studies find POTS patients have lower HRV than healthy people on average ([Swai et al., 2019](https://doi.org/10.1186/s12872-019-01298-y)). In long COVID the picture is more mixed: some studies find lower HRV, and pooled results so far show only a small difference ([Schoene et al., 2026](https://doi.org/10.1111/ene.70561)), so a low number is possible but not a given.
+
+Two things follow. A number a fitness app labels "poor" can still be a normal day for you, and it is not a personal failing: it is the condition showing up in the data. And recovery is not about reaching a universal target. It is your own baseline slowly climbing back toward where it used to be. If yours is low and you want the full list of reasons, [why is my HRV low](/insights/hrv/why-is-my-hrv-low/) goes through them one by one.
 
 ## How to measure HRV well
 

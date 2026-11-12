@@ -140,7 +140,7 @@ This article gives you the realistic ranges anyway, because a sanity check is us
 
 The age effect is real and well documented. As we get older, the parasympathetic ("rest and digest") influence on the heart tends to weaken, the heart's pacemaker cells become a little less responsive, and overall beat-to-beat variability shrinks. Most of the decline is steepest through the twenties, thirties and forties, then flattens out later in life.
 
-That means a 25-year-old and a 65-year-old with identical health can have very different HRV, and neither is doing anything wrong. If [HRV is the tug-of-war between your sympathetic and parasympathetic branches](/insights/hrv/what-is-hrv-and-why-it-matters-for-pots-recovery/), age gradually turns down the volume on the parasympathetic side for everyone.
+That means a 25-year-old and a 65-year-old with identical health can have very different HRV, and neither is doing anything wrong. If [HRV is the tug-of-war between your sympathetic and parasympathetic branches](/insights/hrv/hrv-complete-guide/), age gradually turns down the volume on the parasympathetic side for everyone.
 
 <figure class="prose-figure">
   <svg class="fig-d" viewBox="0 0 720 260" role="img" aria-label="A chart of HRV against age from 20 to 80. A shaded band declines gently from left to right, and a median line falls within it, showing HRV drops with age while the band stays wide at every age.">

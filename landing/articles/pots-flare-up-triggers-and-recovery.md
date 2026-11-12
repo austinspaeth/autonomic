@@ -134,6 +134,7 @@ Here are the usual suspects, grouped by how they hit your system.
 | Hormonal shifts (menstrual cycle) | Estrogen and progesterone swings change vascular tone and volume | Track the pattern; pre-empt known bad days |
 | Poor or short sleep | Leaves the autonomic system under-recovered | Protect sleep; see the recovery note below |
 | Alcohol | Dilates vessels and dehydrates you | Limit, hydrate alongside, expect next-day cost |
+| Cannabis, especially THC | Raises heart rate and can drop standing blood pressure ([more](/insights/pots/does-marijuana-make-pots-worse/)) | Log it as a trigger; compare weeks with and without |
 | Large, high-carb meals | Pulls blood to the gut, drops standing tolerance | Smaller, salt-containing, lower-glycemic meals |
 | Prolonged standing or heat plus standing | Maximal orthostatic load | Sit, move, use compression and counter-maneuvers |
 | Emotional stress | Raises sympathetic tone on an already sensitized system | Downshift stimulation; slow breathing |

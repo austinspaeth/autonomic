@@ -122,7 +122,7 @@ social:
 
 ## Two problems that feel the same
 
-Stand up, and the room tilts. Your vision greys at the edges, your legs feel unreliable, and you have to grab something or sit back down. That single experience, orthostatic intolerance, has two very different explanations, and **orthostatic hypotension vs POTS** is one of the most confused comparisons in all of dysautonomia. They share the same headline symptom, they are triggered by the same act of standing, and they are often lumped together in casual conversation as "the standing thing."
+Stand up, and the room tilts. Your vision greys at the edges, your legs feel unreliable, and you have to grab something or sit back down. That single experience, orthostatic intolerance, has two very different explanations, and **orthostatic hypotension vs POTS** is one of the most confused comparisons in all of [dysautonomia](/insights/basics/autonomic-nervous-system-and-dysautonomia-guide/). They share the same headline symptom, they are triggered by the same act of standing, and they are often lumped together in casual conversation as "the standing thing."
 
 But on a monitor they are near-mirror images. Orthostatic hypotension (OH) is a **blood-pressure** problem: your pressure falls when you stand. POTS is a **heart-rate** problem: your heart races while your pressure holds. The POTS definition actually requires that a large sustained blood-pressure drop is *not* present, so these are not two names for one condition. They are close to opposites, and telling them apart at home comes down to one habit: measuring both numbers across the same lie-to-stand test.
 

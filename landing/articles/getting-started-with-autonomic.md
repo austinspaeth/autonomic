@@ -42,7 +42,7 @@ First, set up your **profile** in Settings: sex, height and weight. These aren't
 
 Then take two baseline measurements while you're fresh:
 
-1. **A morning reading.** Sit quietly for a minute, then log your resting heart rate and, if you have a heart-rate strap, a short HRV capture. This is your anchor point. If you want the background on what that number means, see [what HRV actually is](/insights/hrv/what-is-hrv-and-why-it-matters-for-pots-recovery/).
+1. **A morning reading.** Sit quietly for a minute, then log your resting heart rate and, if you have a heart-rate strap, a short HRV capture. This is your anchor point. If you want the background on what that number means, see [what HRV actually is](/insights/hrv/hrv-complete-guide/).
 2. **An orthostatic stand test.** Lie down for a few minutes, record your resting heart rate, then stand and record again after standing. The rise in heart rate is one of the most useful signals in POTS. Our [step-by-step stand-test guide](/insights/pots/the-orthostatic-stand-test-at-home/) walks through the timing.
 
 Write one honest sentence about where you're starting: how you feel, what a normal day looks like right now. In a month, that note is the most motivating thing in the app.

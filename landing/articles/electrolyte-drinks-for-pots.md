@@ -147,6 +147,8 @@ Here is the problem with most electrolyte drinks: they were designed for healthy
 
 This is where you need a clinician, not an article. Sodium targets for POTS are genuinely individual, and published management guidance tends to land in the range of several grams of *extra* sodium per day on top of a normal diet, paired with generous fluids (often a couple of liters or more). Some people do well toward the lower end; some protocols go higher. Our [POTS treatment overview](/insights/pots/pots-treatment-salt-fluids-compression-medication/) walks through where salt-loading fits alongside compression and exercise.
 
+Drinks are only one way to get there; salted meals and snacks count too, and [what to eat with POTS](/insights/food/pots-diet-what-to-eat/) covers how to build a day of food around salt and fluids.
+
 The practical point for choosing a drink: once you have a daily sodium target, you can work backward to how many servings of which product get you there without drowning yourself in fluid or sugar. A target met with two high-sodium servings is easier on your stomach than the same target spread across eight weak ones.
 
 <div class="callout callout-warn">

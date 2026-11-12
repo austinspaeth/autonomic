@@ -131,6 +131,7 @@ Most nausea in POTS and dysautonomia is miserable but not dangerous. It waxes an
 | Vomiting blood, or material like coffee grounds | Suggests bleeding; this is an emergency |
 | Black, tarry or bloody stools | Points to gastrointestinal bleeding; needs urgent evaluation |
 | Persistent vomiting with signs of dehydration | Risks electrolyte and volume problems; get care |
+| Repeated bouts of severe vomiting with heavy, long-term cannabis use | Can be cannabinoid hyperemesis syndrome ([more](/insights/pots/does-marijuana-make-pots-worse/)); raise it with a clinician |
 | Unintentional weight loss | Warrants a workup beyond dysautonomia |
 | Nausea with high fever or severe new headache | Can indicate infection or a neurological cause |
 

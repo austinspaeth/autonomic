@@ -120,7 +120,7 @@ Those rolling waves have a cause, and it's a good one. As you breathe in, your h
 
 As the researchers behind much of the modern HRV literature put it, <a href="https://www.frontiersin.org/articles/10.3389/fpsyg.2014.01040/full" target="_blank" rel="noopener">a healthy heart is not a metronome</a>: its "irregularity" is a sign that the [autonomic nervous system](/insights/basics/autonomic-nervous-system-and-dysautonomia-guide/) is flexible enough to adjust the heart beat by beat. A trace with big, easy waves reflects a responsive, well-regulated system. A trace that goes flat and metronomic, every interval nearly identical, reflects the opposite: a rhythm locked in place, low in variability.
 
-This is exactly why HRV matters in POTS, long COVID and post-viral illness. When the system is biased toward "fight or flight," the waves shrink and the tachogram flattens. You can read more about that pattern in [what HRV is and why it matters for POTS recovery](/insights/hrv/what-is-hrv-and-why-it-matters-for-pots-recovery/) and in the [POTS, long COVID and MCAS overlap](/insights/postviral/pots-long-covid-and-mcas-overlap/).
+This is exactly why HRV matters in POTS, long COVID and post-viral illness. When the system is biased toward "fight or flight," the waves shrink and the tachogram flattens. You can read more about that pattern in [what HRV is and why it matters for POTS recovery](/insights/hrv/hrv-complete-guide/) and in the [POTS, long COVID and MCAS overlap](/insights/postviral/pots-long-covid-and-mcas-overlap/).
 
 ## Artifacts, ectopic beats, and why your app "drops" beats
 

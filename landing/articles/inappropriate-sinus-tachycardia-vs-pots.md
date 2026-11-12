@@ -121,7 +121,7 @@ social:
 
 ## Two ways for a heart to race
 
-A racing heart is one of the most alarming symptoms a body can throw at you, and it is also one of the least specific. Two people can describe the exact same thing, a heart that pounds, flutters, or gallops for no obvious reason, and be dealing with two different problems. **Inappropriate sinus tachycardia vs POTS** is one of the most confused pairs in all of dysautonomia, partly because they overlap, partly because they feel identical from the inside, and partly because a wrist wearable shows the same scary number for both.
+A racing heart is one of the most alarming symptoms a body can throw at you, and it is also one of the least specific. Two people can describe the exact same thing, a heart that pounds, flutters, or gallops for no obvious reason, and be dealing with two different problems. **Inappropriate sinus tachycardia vs POTS** is one of the most confused pairs in all of [dysautonomia](/insights/basics/autonomic-nervous-system-and-dysautonomia-guide/), partly because they overlap, partly because they feel identical from the inside, and partly because a wrist wearable shows the same scary number for both.
 
 The good news is that the difference usually comes down to one simple question: **when** is your heart rate high? Inappropriate sinus tachycardia (IST) runs fast even when you are resting, whether you are lying down, sitting or standing. [POTS](/insights/pots/how-pots-is-diagnosed/) is roughly normal at rest and surges specifically when you stand up. Once you know to watch the timing rather than the peak, the two patterns start to separate, and you can gather the evidence at home before you ever get to the clinic.
 

@@ -187,7 +187,7 @@ Even short of those, if early fullness, nausea, and bloating are a regular part 
 
 ## Track your own pattern
 
-Because gut symptoms and cardiovascular symptoms run off the same nervous system, they tend to move together, and that is genuinely useful. On a good stretch, digestion often eases as your standing heart rate settles and your morning [HRV](/insights/hrv/what-is-hrv-and-why-it-matters-for-pots-recovery/) improves; on a rough stretch, both slide. Watching those lines together, over weeks rather than judging one bad meal, is how you tell a flare from a trend.
+Because gut symptoms and cardiovascular symptoms run off the same nervous system, they tend to move together, and that is genuinely useful. On a good stretch, digestion often eases as your standing heart rate settles and your morning [HRV](/insights/hrv/hrv-complete-guide/) improves; on a rough stretch, both slide. Watching those lines together, over weeks rather than judging one bad meal, is how you tell a flare from a trend.
 
 The practical move is to log what you ate, how you felt afterward, and a same-time reading, so a pattern (fatty dinners always sit heavy, mornings are worse than evenings, the gut worsens the week your HRV dips) becomes visible instead of remembered wrong. Keeping a simple record of triggers is a skill in itself, covered in [find your triggers with a symptom journal](/insights/recovery/find-your-triggers-symptom-journal/).
 

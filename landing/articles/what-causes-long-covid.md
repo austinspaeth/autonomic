@@ -96,7 +96,7 @@ A broad review of the evidence describes long COVID as arising from [several int
 
 In many people, the immune system does not fully "stand down" after the acute infection clears. Signalling molecules such as **IL-6** and **TNF-α** can stay elevated, keeping the body in a low-grade inflammatory state for months.
 
-Chronic inflammation is exhausting in a very literal sense. It is associated with the deep fatigue, unrefreshing sleep and cognitive slowing that so many people describe, and it can prime the nervous system to overreact to ordinary demands.
+Chronic inflammation is exhausting in a very literal sense. It is associated with the deep fatigue, unrefreshing sleep and cognitive slowing that so many people describe, and it can prime the nervous system to overreact to ordinary demands. Food is one of the few levers here in your own hands, and the early evidence on an [anti-inflammatory, Mediterranean-style diet for long COVID](/insights/food/mediterranean-diet-long-covid/) is encouraging, if still young.
 
 <div class="callout callout-note">
 Inflammation in the brain and its lining, sometimes called <strong>neuroinflammation</strong>, is one proposed reason for brain fog, headaches and heightened sensitivity to light, sound and effort. It may also irritate the nerves that regulate heart rate and blood pressure.

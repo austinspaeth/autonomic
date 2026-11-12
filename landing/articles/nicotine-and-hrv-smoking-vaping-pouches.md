@@ -61,7 +61,7 @@ social:
     #HRV #POTS #Dysautonomia
 ---
 
-If you track your heart rate variability, nicotine is one of the few inputs where the science does not hedge. Caffeine's effect on HRV is genuinely mixed, alcohol's depends on dose and timing, but **nicotine and HRV** move in a predictable direction: nicotine is a stimulant that raises your heart rate and lowers your HRV by pushing your autonomic balance toward fight-or-flight. This article covers the physiology, how cigarettes, vapes, pouches, and patches differ, why it lands harder if you have POTS or dysautonomia, and the encouraging part: what happens to your numbers when you cut down.
+If you track your heart rate variability, nicotine is one of the few inputs where the science does not hedge. Caffeine's effect on HRV is genuinely mixed, alcohol's depends on dose and timing, but **nicotine and HRV** move in a predictable direction: nicotine is a stimulant that raises your heart rate and lowers your HRV by pushing your autonomic balance toward fight-or-flight. This article covers the physiology, how cigarettes, vapes, pouches, and patches differ, why it lands harder if you have POTS or dysautonomia, and the encouraging part: what happens to your numbers when you cut down. If cannabis is the question instead, that has its own write-up: [does marijuana make POTS worse](/insights/pots/does-marijuana-make-pots-worse/).
 
 These are educational field notes, not medical advice. Nothing here diagnoses or treats anything, and any change to nicotine use, especially if you take heart-rate or blood-pressure medication, is worth planning with your clinician.
 

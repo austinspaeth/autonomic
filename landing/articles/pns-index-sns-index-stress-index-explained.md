@@ -4,9 +4,9 @@ slug: pns-index-sns-index-stress-index-explained
 published: true
 summary: "Three numbers the app shows side by side to describe autonomic balance: the PNS index (your rest-and-recover side), the SNS index (your fight-or-flight side), and the Baevsky stress index. Here's what each one means and how they move together."
 description: "PNS index, SNS index and the Baevsky stress index explained: what each measures, why they see-saw, good target ranges, and how to read them together in POTS and long COVID recovery."
-keywords: "PNS index, SNS index, stress index, Baevsky stress index, autonomic balance, parasympathetic index, sympathetic index, Kubios, HRV, POTS, long COVID"
+keywords: "PNS index, SNS index, stress index, Baevsky stress index, AMo50, MxDMn, Mode HRV, coefficient of variation HRV, autonomic balance, parasympathetic index, sympathetic index, Kubios, HRV, POTS, long COVID"
 date: 2026-07-09
-updated: 2026-11-04
+updated: 2026-11-12
 reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1516739063901-94072f684dfc?q=80&w=1760&auto=format&fit=crop"
@@ -127,7 +127,7 @@ That reversal trips people up at first. A *low* SNS index is the desirable one. 
 
 The **stress index** is different in kind from the other two. It is the **Baevsky strain index**, and it is **not centred on zero**: it is **always a positive number** that climbs steeply as the rhythm becomes rigid and concentrated under sympathetic load. Low and stable is the goal.
 
-Where the PNS and SNS indices come from beat-to-beat variation, the stress index comes from the **shape of the interval histogram**: the most common interval length (**Mode**), how tall and narrow that peak is (**AMo50**), and the total spread (**MxDMn**). When your rhythm is healthy and varied, the histogram is broad and the stress index is small. When the rhythm collapses toward one dominant interval, the peak spikes and the index shoots up. The full mechanics live in the [histogram metrics explainer](/insights/basics/hrv-histogram-mode-amo50-mxdmn-cv/).
+Where the PNS and SNS indices come from beat-to-beat variation, the stress index comes from the **shape of the interval histogram**: the most common interval length (**Mode**), how tall and narrow that peak is (**AMo50**), and the total spread (**MxDMn**). When your rhythm is healthy and varied, the histogram is broad and the stress index is small. When the rhythm collapses toward one dominant interval, the peak spikes and the index shoots up. Each of those inputs is explained in its own section below.
 
 Because it responds sharply, the stress index is an early-warning number. A spike often **leads your symptoms by a day or two**, flagging stress, illness or overreaching before you consciously feel it.
 
@@ -164,6 +164,83 @@ Try a stress-index number against the same bands the app uses:
 </div>
 
 {@html siScript}
+
+## What the stress index is built from
+
+The stress index belongs to the **geometric** family of HRV measures. Most HRV numbers are statistics on a list of [RR intervals](/insights/basics/rr-intervals-and-the-tachogram-explained/). The geometric ones treat those intervals as a **histogram**, a bar chart of how often each interval length shows up, and measure the shape of it. Pile up a few minutes of beats and they form a hump: one interval length is most common and the rest fan out on either side. This way of reading the rhythm traces back to the physiologist R.M. Baevsky ([Baevsky & Chernikova, 2017](https://doi.org/10.12710/cardiometry.2017.10.6676)).
+
+<figure class="prose-figure">
+  <svg class="fig-d" viewBox="0 0 720 280" role="img" aria-label="An RR-interval histogram with bars forming a hump, labeling the Mode as the center peak, AMo50 as the peak height, and MxDMn as the full width from the shortest to longest interval">
+    <line x1="60" y1="230" x2="700" y2="230" stroke="var(--line-2)" stroke-width="1.5" />
+    <line x1="60" y1="40" x2="60" y2="230" stroke="var(--line-2)" stroke-width="1.5" />
+    <g fill="#58c4f2" opacity="0.85">
+      <rect x="150" y="200" width="34" height="30"/>
+      <rect x="188" y="170" width="34" height="60"/>
+      <rect x="226" y="120" width="34" height="110"/>
+      <rect x="264" y="70" width="34" height="160"/>
+      <rect x="302" y="120" width="34" height="110"/>
+      <rect x="340" y="150" width="34" height="80"/>
+      <rect x="378" y="185" width="34" height="45"/>
+      <rect x="416" y="205" width="34" height="25"/>
+    </g>
+    <line x1="281" y1="60" x2="281" y2="230" stroke="#e03127" stroke-width="2" stroke-dasharray="4 4"/>
+    <text x="281" y="52" text-anchor="middle" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Mode</text>
+    <text x="281" y="70" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="9">center</text>
+    <line x1="470" y1="70" x2="470" y2="230" stroke="var(--dim-2)" stroke-width="1"/>
+    <text x="486" y="150" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">AMo50 = peak height</text>
+    <line x1="150" y1="248" x2="450" y2="248" stroke="var(--dim-2)" stroke-width="1"/>
+    <text x="300" y="266" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">MxDMn = full width (max − min)</text>
+    <text x="380" y="223" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-size="12">RR interval length →</text>
+  </svg>
+  <svg class="fig-m" viewBox="0 0 360 262" role="img" aria-label="An RR-interval histogram with bars forming a hump, labeling the Mode as the center peak, AMo50 as the peak height, and MxDMn as the full width from the shortest to longest interval">
+    <line x1="44" y1="214" x2="344" y2="214" stroke="var(--line-2)" stroke-width="1.5" />
+    <line x1="44" y1="40" x2="44" y2="214" stroke="var(--line-2)" stroke-width="1.5" />
+    <g fill="#58c4f2" opacity="0.85">
+      <rect x="70" y="187" width="28" height="27"/>
+      <rect x="102" y="159" width="28" height="55"/>
+      <rect x="134" y="113" width="28" height="101"/>
+      <rect x="166" y="67" width="28" height="147"/>
+      <rect x="198" y="113" width="28" height="101"/>
+      <rect x="230" y="141" width="28" height="73"/>
+      <rect x="262" y="173" width="28" height="41"/>
+      <rect x="294" y="191" width="28" height="23"/>
+    </g>
+    <line x1="180" y1="57" x2="180" y2="214" stroke="#e03127" stroke-width="2" stroke-dasharray="4 4"/>
+    <text x="180" y="24" text-anchor="middle" fill="#e03127" font-family="Space Grotesk, sans-serif" font-weight="600" font-size="13">Mode</text>
+    <text x="180" y="38" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="9.5">center</text>
+    <line x1="194" y1="67" x2="344" y2="67" stroke="var(--dim-2)" stroke-width="1" stroke-dasharray="3 3"/>
+    <text x="344" y="60" text-anchor="end" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">AMo50 = peak height</text>
+    <line x1="70" y1="226" x2="322" y2="226" stroke="var(--dim-2)" stroke-width="1"/>
+    <text x="196" y="242" text-anchor="middle" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10">MxDMn = full width (max − min)</text>
+    <text x="196" y="260" text-anchor="middle" fill="var(--text)" font-family="Space Grotesk, sans-serif" font-size="11">RR interval length →</text>
+  </svg>
+  <figcaption>The same reading as a histogram. Mode is where the peak sits, AMo50 is how tall that peak is, and MxDMn is how wide the whole distribution spreads.</figcaption>
+</figure>
+
+### Mode: where the peak sits
+
+**Mode** is the most common interval length in the reading. Because it is the interval your heart returned to most often, it tracks your resting rate closely, on the same scale as [mean RR and resting heart rate](/insights/basics/resting-heart-rate-and-mean-rr/): a Mode of 950 ms is roughly 63 beats a minute. A Mode drifting toward shorter intervals is the geometric echo of a rising resting heart rate.
+
+### AMo50: how tall the peak is
+
+**AMo50** (amplitude of the mode) is the percentage of all intervals that land in the single most common 50 ms bin. When the rhythm is varied, beats spread across many bins and the peak stays low. Under sympathetic strain the rhythm concentrates onto one interval and the peak spikes. So with AMo50, **lower is better**.
+
+### MxDMn: how wide the spread is
+
+**MxDMn** is the longest interval minus the shortest one, the histogram's full width. Wide means your intervals ranged freely; narrow means the rhythm was penned into a small range. Because it depends on the two most extreme beats, a single stray or mis-detected beat can stretch it, so read MxDMn as a trend, never from one noisy recording.
+
+### CV: variability relative to your heart rate
+
+**CV**, the coefficient of variation, is [SDNN](/insights/basics/what-is-sdnn-in-hrv/) divided by the mean interval, times 100. Raw variability partly depends on how fast the heart is beating, and CV divides that out, so readings taken at different heart rates become comparable. An SDNN of 45 ms on a mean interval of 850 ms gives a CV of about 5.3%; the same 45 ms on a faster 700 ms rhythm gives about 6.4%.
+
+| Metric | What it measures | Better when |
+| --- | --- | --- |
+| Mode | The most common interval (ms) | Longer, at rest |
+| AMo50 | Share of beats in the peak 50 ms bin (%) | Lower |
+| MxDMn | Longest minus shortest interval | Wider |
+| CV | SDNN relative to mean interval (%) | Higher |
+
+The stress index combines the first three. It climbs when the histogram is **tall and narrow** (high AMo50, small MxDMn, a short Mode) and falls when it is **low and wide**. Researchers are still working out reference values: one 2025 study of 73 healthy adults measured lying down and after standing proposed ranges for normal function, autonomic stress and dysfunction, and called it a first step ([Huizinga et al., 2025](https://doi.org/10.1152/ajpregu.00243.2024)).
 
 ## The see-saw: how the trio moves together
 
@@ -245,4 +322,5 @@ The PNS index, SNS index and stress index are three views of one balancing act: 
 - Baevsky RM, Chernikova AG. [Heart rate variability analysis: physiological foundations and main methods](https://doi.org/10.12710/cardiometry.2017.10.6676). *Cardiometry*, 2017.
 - Shaffer F, Ginsberg JP. [An overview of heart rate variability metrics and norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.
 - Task Force of the European Society of Cardiology and the North American Society of Pacing and Electrophysiology. [Heart rate variability: standards of measurement, physiological interpretation and clinical use](https://doi.org/10.1161/01.CIR.93.5.1043). *Circulation*, 1996.
+- Huizinga JD, Chen JH, Hussain A, et al. [Determining autonomic sympathetic tone and reactivity using Baevsky's stress index](https://doi.org/10.1152/ajpregu.00243.2024). *American Journal of Physiology: Regulatory, Integrative and Comparative Physiology*, 2025.
 - Brisinda D, Picerni M, Fenici P, et al. [Rapid assessment of cardiac autonomic modulation and adaptive stress responses: automatic calculation of time-varying parasympathetic, sympathetic, and Baevsky stress indexes](https://doi.org/10.36922/bh.3503). *Brain & Heart*, 2024.

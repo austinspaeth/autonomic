@@ -128,7 +128,7 @@ Here is the piece worth holding onto. For some people, objective measures improv
 
 That lag is not cruel: it is useful. It means that if you are tracking the right signals, you can catch an early upward trend and let it carry your motivation through the stretch where you still feel bad. Seeing the climb, even a small one, is often what keeps people doing the unglamorous work long enough for the feeling to catch up.
 
-<div class="callout callout-tip"><strong>What to actually watch.</strong> Four multi-week trends carry most of the signal: resting <a href="/insights/hrv/what-is-hrv-and-why-it-matters-for-pots-recovery/">HRV</a> (slowly rising), resting heart rate (slowly falling), your <a href="/insights/pots/the-orthostatic-stand-test-at-home/">stand-test heart-rate rise</a> (shrinking), and overall symptom load (easing). Any one day means little; the four-week slope means everything.</div>
+<div class="callout callout-tip"><strong>What to actually watch.</strong> Four multi-week trends carry most of the signal: resting <a href="/insights/hrv/hrv-complete-guide/">HRV</a> (slowly rising), resting heart rate (slowly falling), your <a href="/insights/pots/the-orthostatic-stand-test-at-home/">stand-test heart-rate rise</a> (shrinking), and overall symptom load (easing). Any one day means little; the four-week slope means everything.</div>
 
 ## How Autonomic helps you see the trend
 

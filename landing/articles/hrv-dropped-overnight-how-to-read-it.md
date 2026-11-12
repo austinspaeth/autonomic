@@ -113,7 +113,7 @@ This is exactly the problem Autonomic is designed to solve. Instead of showing y
 
 <div class="callout callout-tip"><strong>See the trend, not the noise.</strong> Autonomic keeps a private, on-device rolling baseline of your HRV and resting heart rate, so you can stop reacting to single mornings and <a href="/">see your nervous system recover</a> over weeks.</div>
 
-If you want to go deeper on the mechanics, start with [what HRV actually is](/insights/hrv/what-is-hrv-and-why-it-matters-for-pots-recovery/), how it fits into [recovery from post-viral dysautonomia](/insights/recovery/recovery-from-post-viral-dysautonomia/), and why [sleep is so tightly coupled to autonomic recovery](/insights/recovery/sleep-and-autonomic-recovery/), the single biggest lever on your morning number. If you also track orthostatic symptoms, the [at-home stand test](/insights/pots/the-orthostatic-stand-test-at-home/) is a useful companion signal.
+If you want to go deeper on the mechanics, start with [what HRV actually is](/insights/hrv/hrv-complete-guide/), how it fits into [recovery from post-viral dysautonomia](/insights/recovery/recovery-from-post-viral-dysautonomia/), and why [sleep is so tightly coupled to autonomic recovery](/insights/recovery/sleep-and-autonomic-recovery/), the single biggest lever on your morning number. If you also track orthostatic symptoms, the [at-home stand test](/insights/pots/the-orthostatic-stand-test-at-home/) is a useful companion signal.
 
 ## The bottom line
 

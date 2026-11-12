@@ -43,7 +43,7 @@ Nearly every consumer HRV device falls into one of three families, and each read
 
 **Phone-camera apps** ask you to hold a fingertip over the camera lens and flash, turning your phone into a crude PPG sensor. They can work at rest, but they are the most fragile of the bunch.
 
-If you want the deeper background on what HRV actually is and why it matters, start with our [complete guide to HRV](/insights/hrv/hrv-complete-guide/) and the primer on [what HRV means for POTS recovery](/insights/hrv/what-is-hrv-and-why-it-matters-for-pots-recovery/).
+If you want the deeper background on what HRV actually is and why it matters, start with our [complete guide to HRV](/insights/hrv/hrv-complete-guide/) and, if your number runs low, [why HRV drops in POTS](/insights/hrv/why-is-my-hrv-low/).
 
 ## What the accuracy research actually shows
 

@@ -112,7 +112,7 @@ These are educational field notes, not medical advice. Nothing here diagnoses or
 
 Short answer first, because that is what most people came for: yes. Controlled sleep studies have shown for years that alcohol suppresses parasympathetic (vagal) activity through the night in a dose-related way, and the consumer wearable era has made the same pattern visible to millions of people on their own wrists. A single reading is always noisy, but the alcohol signal is strong enough to see even through that noise.
 
-The reason it stands out is that alcohol does not push one lever, it pushes several at once, and they all point the same direction: lower [HRV](/insights/hrv/hrv-complete-guide/) and higher resting heart rate overnight. That is different from caffeine, where the direct effect is small and the two opposing pushes (sympathetic bump versus a baroreflex response) can partly cancel out. Alcohol has no such balancing act.
+The reason it stands out is that alcohol does not push one lever, it pushes several at once, and they all point the same direction: lower [HRV](/insights/hrv/hrv-complete-guide/) and higher resting heart rate overnight. That is different from caffeine, where the direct effect is small and the two opposing pushes (sympathetic bump versus a baroreflex response) can partly cancel out. Alcohol has no such balancing act. Cannabis is different again, with its own effects on standing heart rate and blood pressure, covered in [does marijuana make POTS worse](/insights/pots/does-marijuana-make-pots-worse/).
 
 ## Why alcohol hits HRV harder than caffeine
 

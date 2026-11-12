@@ -1,4 +1,5 @@
 import { error, redirect } from '@sveltejs/kit';
+import { MERGED } from '$lib/mergedArticles';
 
 // The raw markdown, read at prerender only, for what the structured data says
 // about the article that its frontmatter does not: how long it is and which
@@ -18,7 +19,7 @@ export const entries = () =>
   Object.entries(metas).flatMap(([path, m]) => {
     const slug = path.split('/').pop()!.replace(/\.md$/, '');
     return m?.published === false ? [] : [...new Set(m?.categories ?? [])].map((topic) => ({ topic, slug }));
-  });
+  }).concat(Object.entries(MERGED).flatMap(([slug, m]) => m.topics.map((topic) => ({ topic, slug }))));
 
 // Research and clinical hosts: when an article has no Sources section, links to
 // these anywhere in its body are what it cites.
@@ -54,6 +55,8 @@ function wordsIn(raw: string): number {
 }
 
 export async function load({ params }) {
+  const merged = MERGED[params.slug];
+  if (merged) throw redirect(308, merged.to);
   let post;
   try {
     post = await import(`../../../../../../articles/${params.slug}.md`);

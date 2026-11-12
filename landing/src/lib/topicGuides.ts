@@ -184,7 +184,7 @@ export const TOPIC_GUIDES: Record<string, TopicGuide> = {
         title: 'Tracking it',
         blurb: 'What to measure at home, and how to read it.',
         slugs: [
-          'what-is-hrv-and-why-it-matters-for-pots-recovery',
+          'hrv-complete-guide',
           'best-tools-for-tracking-pots',
           'hrv-standing-vs-lying-down-posture',
           'non-dipping-blood-pressure-nocturnal-dip',
@@ -479,7 +479,7 @@ export const TOPIC_GUIDES: Record<string, TopicGuide> = {
         blurb: 'What to measure, how recovery goes, and how to bring it to a doctor.',
         slugs: [
           'the-orthostatic-stand-test-at-home',
-          'what-is-hrv-and-why-it-matters-for-pots-recovery',
+          'hrv-complete-guide',
           'heart-rate-zones-explained',
           'sleep-and-autonomic-recovery',
           'recovery-from-post-viral-dysautonomia',
@@ -522,7 +522,6 @@ export const TOPIC_GUIDES: Record<string, TopicGuide> = {
         blurb: 'What it is, what a good number looks like, and why yours is low.',
         slugs: [
           'hrv-complete-guide',
-          'what-is-hrv-and-why-it-matters-for-pots-recovery',
           'hrv-vs-resting-heart-rate',
           'hrv-normal-range-by-age',
           'why-is-my-hrv-low',
@@ -572,7 +571,6 @@ export const TOPIC_GUIDES: Record<string, TopicGuide> = {
           'hrv-frequency-domain-vlf-lf-hf-power',
           'lf-peak-hf-peak-coherence-resonance',
           'pns-index-sns-index-stress-index-explained',
-          'hrv-histogram-mode-amo50-mxdmn-cv',
           'poincare-plot-hrv-sd1-sd2'
         ]
       },
@@ -862,7 +860,7 @@ export const TOPIC_GUIDES: Record<string, TopicGuide> = {
     groupsTitle: 'The basics, by subject',
     start: [
       { slug: 'autonomic-nervous-system-and-dysautonomia-guide', why: 'The system everything else is about.' },
-      { slug: 'what-is-hrv-and-why-it-matters-for-pots-recovery', why: 'The measurement at the heart of it.' },
+      { slug: 'hrv-complete-guide', why: 'The measurement at the heart of it.' },
       { slug: 'the-orthostatic-stand-test-at-home', why: 'The simplest test you can do yourself.' },
       { slug: 'hrv-baseline-how-to-build-and-use-it', why: 'How to read any number against your own normal.' },
       { slug: 'blood-pressure-basics-systolic-diastolic-pulse', why: 'What the two numbers actually mean.' }
@@ -877,7 +875,7 @@ export const TOPIC_GUIDES: Record<string, TopicGuide> = {
           'nervous-system-dysregulation-signs-and-recovery',
           'baroreflex-sensitivity-orthostatic-intolerance',
           'respiratory-sinus-arrhythmia-breathing-hrv',
-          'what-is-hrv-and-why-it-matters-for-pots-recovery'
+          'hrv-complete-guide'
         ]
       },
       {
@@ -935,7 +933,6 @@ export const TOPIC_GUIDES: Record<string, TopicGuide> = {
           'hrv-frequency-domain-vlf-lf-hf-power',
           'lf-peak-hf-peak-coherence-resonance',
           'pns-index-sns-index-stress-index-explained',
-          'hrv-histogram-mode-amo50-mxdmn-cv',
           'poincare-plot-hrv-sd1-sd2'
         ]
       },

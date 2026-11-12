@@ -1,4 +1,5 @@
 import { redirect, error } from '@sveltejs/kit';
+import { MERGED } from '$lib/mergedArticles';
 
 // Old flat article URLs (/blog/<slug>/) now 308-redirect to the topic-nested
 // /insights/<topic>/<slug>/. entries() lists every slug so each old URL is
@@ -6,6 +7,7 @@ import { redirect, error } from '@sveltejs/kit';
 export const prerender = true;
 
 export async function load({ params }) {
+  if (MERGED[params.slug]) throw redirect(308, MERGED[params.slug].to);
   let topic = 'basics';
   try {
     const post = await import(`../../../../../articles/${params.slug}.md`);
@@ -18,7 +20,7 @@ export async function load({ params }) {
 
 export function entries() {
   const paths = import.meta.glob('../../../../../articles/*.md');
-  return Object.keys(paths).map((path) => ({
-    slug: path.split('/').at(-1)!.replace('.md', '')
-  }));
+  return Object.keys(paths)
+    .map((path) => ({ slug: path.split('/').at(-1)!.replace('.md', '') }))
+    .concat(Object.keys(MERGED).map((slug) => ({ slug })));
 }
