@@ -1,17 +1,17 @@
 ---
-title: "Why Does HRV Drop When You're Getting Sick? Reading the Early Warning"
+title: "Why Does HRV Drop When You're Sick, Even Before Symptoms?"
 slug: hrv-drops-when-sick-early-warning
 published: true
 summary: "A day or two before the sore throat or the fatigue, your heart rate variability often dips and your resting heart rate creeps up. Here is why an infection pulls HRV down, how to tell an illness dip from an ordinary bad night, and how to use the signal to rest instead of push."
-description: "Why HRV drops when you are getting sick: the immune and autonomic physiology, why the dip can precede symptoms, how to tell it from other causes, and how to read it as a cue to rest."
+description: "HRV often drops a day or two before you feel sick, as your immune system kicks in. Why it happens, how to tell it from a bad night, and when to rest."
 keywords: "HRV when sick, does HRV drop when sick, HRV early warning illness, HRV drop before symptoms, resting heart rate when sick, HRV infection, low HRV illness, HRV recovery after illness, HRV long covid relapse, RMSSD when sick"
 date: 2026-07-30
-updated: 2026-11-04
+updated: 2026-11-12
 reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1552858725-2758b5fb1286?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Jp Valery / Unsplash"
-tldr: "When your body starts fighting an infection, it shifts toward a sympathetic, inflammatory state: resting heart rate rises and heart rate variability (especially RMSSD and HF power) falls, often a day or two before you feel any symptoms. That dip is your nervous system responding to the immune signal, not a sign that something is wrong with your heart. Read it as a cue to rest, hydrate and pace, not to push through, and expect HRV to climb back toward your baseline as you recover. For people with POTS or long COVID, an illness dip is worth extra caution, because infections can trigger a flare. HRV is not a diagnostic test for any infection, so use the trend to inform rest and discuss anything concerning with your clinician."
+tldr: "HRV drops when you're getting sick because fighting an infection shifts your nervous system toward a sympathetic, inflammatory state, so heart rate variability falls and resting heart rate rises. The dip often shows up a day or two before you feel any symptoms, and it's a cue to rest, not a sign that something is wrong with your heart. Expect HRV to climb back toward your baseline as you recover, and take extra care with POTS or long COVID, where infections can trigger a flare. HRV can't diagnose an infection, so use the trend to guide rest and discuss anything concerning with your clinician."
 question: "Why does my HRV drop when I'm getting sick?"
 app:
   feature: hrv-readings

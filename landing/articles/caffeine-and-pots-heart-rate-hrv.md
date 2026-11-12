@@ -1,17 +1,17 @@
 ---
-title: "Caffeine and POTS: How Coffee Affects Your Heart Rate, HRV, and Standing Symptoms"
+title: "Can You Drink Coffee With POTS? Caffeine, Heart Rate and HRV"
 slug: caffeine-and-pots-heart-rate-hrv
 published: true
 summary: "Does coffee make POTS worse? Caffeine is a stimulant that raises heart rate and sympathetic drive, but it can also nudge blood pressure up and its effect on HRV is genuinely individual. Here is the physiology, honestly, plus how to test your own response."
-description: "How caffeine affects POTS, heart rate, HRV, and orthostatic symptoms: the real physiology, why the HRV evidence is mixed, the sleep pathway that reliably lowers next-day HRV, and how to test your own tolerance."
+description: "Can you drink coffee with POTS? How caffeine changes heart rate, HRV and standing symptoms, why it varies so much, and how to test your own tolerance."
 keywords: "caffeine and POTS, does caffeine affect HRV, coffee POTS, caffeine heart rate variability, caffeine orthostatic intolerance, caffeine dysautonomia, caffeine tachycardia, how much caffeine POTS, caffeine before bed HRV"
 date: 2026-07-18
-updated: 2026-11-04
+updated: 2026-11-12
 reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1521868212215-fb62189f1889?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Nathan Dumlao / Unsplash"
-tldr: "Caffeine blocks adenosine and mildly raises sympathetic drive, so it can lift heart rate and worsen palpitations and jitter in POTS, while also nudging blood pressure up (which a few people find steadies standing symptoms). Its direct effect on HRV is inconsistent across studies and highly individual, but its indirect effect through disrupted sleep reliably lowers the next morning's reading. Because the response varies so much person to person, the useful move is to test your own: hold your dose and timing steady, and watch your resting heart rate, HRV, and stand test against your baseline."
+tldr: "Coffee can make POTS worse for some people, because caffeine raises heart rate and can worsen palpitations, but others find its small lift in blood pressure steadies standing symptoms. The response is individual, so test your own rather than follow a blanket rule. Its direct effect on HRV is inconsistent across studies, but caffeine that disrupts your sleep reliably lowers the next morning's reading. Hold your dose and timing steady, and watch your resting heart rate, HRV and a stand test against your baseline."
 question: "Does coffee make POTS worse?"
 app:
   feature: insights

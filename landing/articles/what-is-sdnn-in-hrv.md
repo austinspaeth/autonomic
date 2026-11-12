@@ -1,17 +1,17 @@
 ---
-title: "What Is SDNN in HRV? Your Total Variability, Explained"
+title: "What Is SDNN in HRV, and What Is a Normal SDNN?"
 slug: what-is-sdnn-in-hrv
 published: true
 summary: "SDNN is the broadest single HRV number: the standard deviation of the gaps between your heartbeats. Here's what it measures, why short readings run lower than the figures you see quoted, and how to read it as a recovery signal."
-description: "What SDNN means in heart rate variability: how it's calculated, normal ranges for short readings, why it differs from 24-hour SDNN, and how to track it in POTS and long COVID recovery."
+description: "SDNN is the standard deviation of the gaps between heartbeats, your broadest HRV number. What it means, normal ranges for short readings, and how to track it."
 keywords: "SDNN, what is SDNN, SDNN normal range, HRV SDNN, standard deviation NN, heart rate variability, RMSSD vs SDNN, SDNN meaning, POTS, long COVID"
 date: 2026-07-09
-updated: 2026-11-04
+updated: 2026-11-12
 reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1524863479829-916d8e77f114?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Eneko Uruñuela / Unsplash"
-tldr: "SDNN is the standard deviation of all the intervals between your heartbeats in a reading, the single broadest measure of heart rate variability. Higher generally means a more adaptable, better-regulated nervous system. It blends every rhythm in the recording, so it's a capacity number rather than a pure vagal one. Short at-home readings run far lower than the 24-hour SDNN values you'll see quoted, so compare yourself only to your own baseline and watch the multi-week trend."
+tldr: "SDNN is the standard deviation of all the intervals between your heartbeats in a reading, the broadest single measure of heart rate variability, and higher generally means a more adaptable nervous system. What counts as normal depends on the reading length: short at-home readings run far lower than the 24-hour SDNN values often quoted, so compare yourself to your own baseline. It blends every rhythm in the recording, which makes it a capacity number rather than a pure vagal one, so watch the multi-week trend rather than any single reading."
 question: "What is SDNN in HRV, and why does mine look low?"
 app:
   feature: hrv-readings
