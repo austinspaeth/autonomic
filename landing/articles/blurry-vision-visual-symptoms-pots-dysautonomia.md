@@ -1,17 +1,17 @@
 ---
-title: "Blurry Vision and Visual Symptoms in POTS and Dysautonomia: Why Your Sight Changes When You Stand"
+title: "Why Does My Vision Go Blurry When I Stand Up With POTS?"
 slug: blurry-vision-visual-symptoms-pots-dysautonomia
 published: true
 summary: "Blurry vision, graying out, tunnel vision, light sensitivity and dry eyes are common in POTS and dysautonomia, and most of the time they come from your eyes briefly getting less blood when you are upright, not from an eye disease. Here is why vision fades first when you stand, what the different visual symptoms mean, and what to track."
-description: "Why blurry vision and visual symptoms happen in POTS and dysautonomia: graying out and tunnel vision from retinal hypoperfusion, light sensitivity, dry eyes, what to track, and the red flags worth an eye exam."
+description: "Blurry or gray vision on standing in POTS usually means your eyes briefly get less blood. Why it happens, what to track, and the red flags worth an eye exam."
 keywords: "blurry vision POTS, visual symptoms dysautonomia, graying out when standing, tunnel vision POTS, light sensitivity POTS, photophobia long covid, dry eyes dysautonomia, vision goes dark when I stand up, orthostatic visual symptoms"
 date: 2026-10-14
-updated: 2026-11-04
+updated: 2026-11-12
 reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: https://images.unsplash.com/photo-1551184451-76b762941ad6?q=80&w=1760&auto=format&fit=crop
 photoAttribution: "Kamila Maciejewska / Unsplash"
-tldr: "Visual symptoms in POTS and dysautonomia are usually orthostatic: your eyes briefly getting less blood when you are upright. Because the eye sits above the heart and the retina burns oxygen faster than almost any tissue, vision often fades before you actually feel faint, showing up as blurring, graying, or tunneling that clears when you sit or lie down. Light sensitivity and dry eyes are also common. Track visual symptoms beside a stand test so you can read the pattern, and get sudden, one-eyed, or persistent vision changes checked by a clinician."
+tldr: "Blurry vision when you stand up with POTS usually comes from your eyes briefly getting less blood while you're upright, not from an eye disease. It typically clears when you sit or lie down, and because the retina burns oxygen faster than almost any tissue, vision can fade before you feel faint. Light sensitivity and dry eyes are common too. Track visual symptoms beside a stand test to read the pattern, and get sudden, one-eyed or persistent vision changes checked by a clinician."
 question: "Why does my vision go blurry when I stand up?"
 app:
   feature: pots-stand-test

@@ -1,17 +1,17 @@
 ---
-title: "Nicotine and HRV: How Smoking, Vaping, and Pouches Affect Heart Rate Variability"
+title: "Does Nicotine Lower HRV? Smoking, Vaping and Pouches Compared"
 slug: nicotine-and-hrv-smoking-vaping-pouches
 published: true
 summary: "Nicotine is a stimulant that reliably raises heart rate and lowers HRV by shifting your autonomic balance toward fight-or-flight. Here is the physiology, how cigarettes, vapes, pouches, and patches differ, what it means for POTS, and what happens to your numbers when you cut down."
-description: "How nicotine affects HRV and heart rate: the sympathetic physiology, how smoking, vaping, and pouches compare, why it matters for POTS, and how HRV recovers after you quit."
+description: "Yes, nicotine raises heart rate and lowers HRV. How smoking, vaping and pouches compare, what it means for POTS, and how fast HRV recovers after you quit."
 keywords: "nicotine and HRV, does nicotine lower HRV, vaping HRV, nicotine heart rate variability, nicotine pouches heart rate, smoking and HRV, nicotine POTS, quitting smoking HRV recovery, vaping heart rate variability, nicotine sympathetic nervous system"
 date: 2026-09-21
-updated: 2026-11-04
+updated: 2026-11-12
 reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1580691179247-aa36daf766c9?q=80&w=928&auto=format&fit=crop"
 photoAttribution: "Unsplash"
-tldr: "Nicotine is a sympathomimetic stimulant, so it reliably raises heart rate and lowers HRV by tilting your autonomic balance toward fight-or-flight. Unlike caffeine, that direction is consistent across the research. The size of each hit depends on delivery (a cigarette's fast bolus is sharper than a patch's steady release), and for POTS it pushes an already-fast, adrenaline-heavy system harder. The reassuring part: HRV starts climbing within days of quitting, with clear gains over the following weeks. Track your resting heart rate, HRV, and a stand test against your own baseline."
+tldr: "Yes, nicotine lowers HRV and raises heart rate, because it tilts your nervous system toward fight-or-flight, and unlike caffeine that direction is consistent across the research. The good news is that HRV starts climbing within days of quitting, with clear gains over the following weeks. How hard each hit lands depends on delivery: a cigarette's fast bolus is sharper than a patch's steady release, and with POTS it pushes an already fast, adrenaline-heavy system harder. Track your resting heart rate, HRV and a stand test against your own baseline."
 question: "Does nicotine lower my HRV?"
 app:
   feature: insights

@@ -1,17 +1,17 @@
 ---
-title: "Cold Hands and Feet in POTS and Long COVID: Why It Happens and What Helps"
+title: "Why Are My Hands and Feet Always Cold With POTS or Long COVID?"
 slug: cold-hands-and-feet-pots-dysautonomia
 published: true
 summary: "Cold, pale hands and feet are one of the most common and least talked about parts of dysautonomia. Here is the physiology behind it, how to tell plain cold extremities from Raynaud's and acrocyanosis, and the practical steps that actually warm you up."
-description: "Why POTS, dysautonomia and long COVID cause cold hands and feet: sympathetic vasoconstriction, Raynaud's vs acrocyanosis, red flags to check, and what helps you warm up and track the pattern."
+description: "Cold hands and feet in POTS and long COVID come from tightened blood vessels in the skin. Why it happens, Raynaud's vs acrocyanosis, red flags, and what helps."
 keywords: "cold hands and feet POTS, cold extremities dysautonomia, Raynaud's long COVID, acrocyanosis POTS, peripheral vasoconstriction, cold feet POTS, poor circulation dysautonomia, why are my hands always cold, long COVID cold hands"
 date: 2026-10-11
-updated: 2026-11-04
+updated: 2026-11-12
 reviewed: 2026-11-04
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1484627147104-f5197bcd6651?q=80&w=1760&auto=format&fit=crop"
 photoAttribution: "Unsplash"
-tldr: "Cold, pale hands and feet in POTS, dysautonomia and long COVID are usually driven by your sympathetic nervous system tightening the small blood vessels in your skin and shunting blood toward your core, not by a weak heart or clogged arteries. It overlaps with Raynaud's (episodic white-blue-red colour changes) and acrocyanosis (the dusky purple feet of standing). Warming your whole body, moving to run the circulation, steadying stress, and checking iron and thyroid help most. New one-sided coldness, fingertip sores or sudden severe pain need prompt medical review."
+tldr: "Your hands and feet stay cold with POTS or long COVID because your sympathetic nervous system tightens the small blood vessels in your skin and shunts blood toward your core, not because of a weak heart or clogged arteries. Warming your whole body, moving to keep blood circulating, steadying stress, and checking iron and thyroid help most. It overlaps with Raynaud's (episodic white, blue and red colour changes) and acrocyanosis (the dusky purple feet of standing). New one-sided coldness, fingertip sores or sudden severe pain need prompt medical review."
 question: "Why are my hands and feet always cold with POTS?"
 app:
   feature: hrv-readings
