@@ -2,9 +2,9 @@
 title: "Is Long COVID the Same as ME/CFS?"
 slug: is-long-covid-the-same-as-me-cfs
 published: true
-date: 2026-11-11
-updated: 2026-11-11
-reviewed: 2026-11-11
+date: 2026-11-12
+updated: 2026-11-12
+reviewed: 2026-11-12
 author: "Austin Spaeth"
 question: "Is my long COVID the same as ME/CFS?"
 summary: "Long COVID and ME/CFS are not the same diagnosis, but they overlap heavily, and a share of people with long COVID meet the full ME/CFS criteria. Here is how the two are defined, how many people cross over, and why post-exertional malaise is the line that matters."
