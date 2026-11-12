@@ -49,6 +49,7 @@ import { pingActivation, pingCaptureCompleted, pingCaptureStarted, pingReadingKi
 import { isFirstBaseline } from '../../lib/ping';
 import { todayKey } from '../../lib/dates';
 import { armGarminIntent, armWatchIntent } from '../../lib/garmin/intent';
+import { strapRetryDelay } from '../../lib/ble/strapRetry';
 
 export interface SessionConfig {
   kind: 'breath' | 'unstructured';
@@ -133,6 +134,11 @@ export interface SessionSnapshot {
   beats: number;
   connected: boolean;
   /**
+   * The saved strap failed to connect `STRAP_MAX_ATTEMPTS` times in a row and
+   * the card stopped trying. Cleared by {@link retryStrap} and by a new session.
+   */
+  strapGaveUp: boolean;
+  /**
    * Whether the connected BLE device sends beat intervals at all. Only the strap
    * path ever feeds this, so it stays 'unknown' for the camera, watch and Garmin
    * sources — none of them is a device we discover a capability of.
@@ -178,7 +184,7 @@ export interface SessionSnapshot {
 
 const IDLE: SessionSnapshot = {
   status: 'idle', config: null, pattern: parsePattern('4/6'), durationSec: 300,
-  breathStartMs: 0, startedAtMs: 0, elapsed: 0, hr: null, sdnn: null, beats: 0, connected: false,
+  breathStartMs: 0, startedAtMs: 0, elapsed: 0, hr: null, sdnn: null, beats: 0, connected: false, strapGaveUp: false,
   rrSupport: 'unknown', warming: false, ppiStalled: false,
   artifact: false, signal: { locked: false, quality: 'none' }, usableSec: 0, stopReason: null, phase: 'in',
   minimized: false, hidden: false, hrTrace: [], sdnnTrace: [], rrTrace: [], result: null,
@@ -212,6 +218,8 @@ let breathTimer: ReturnType<typeof setTimeout> | null = null;
 let appSub: NativeEventSubscription | null = null;
 let bleAlive = false;
 let bleRetry: ReturnType<typeof setTimeout> | null = null;
+/** Failed strap connects in a row since the last one that worked (`strapRetryDelay`). */
+let strapFailures = 0;
 /** Gives up on a PPI stream that never delivers (`PPI_GIVE_UP_MS`). */
 let ppiGiveUp: ReturnType<typeof setTimeout> | null = null;
 /** One fault-route report per session per outcome: a reconnect loop would otherwise repeat it. */
@@ -499,6 +507,9 @@ function connectStrap() {
   const mgr = ble();
   if (!saved || !mgr.available) return;
   bleAlive = true;
+  strapFailures = 0;
+  if (bleRetry) { clearTimeout(bleRetry); bleRetry = null; }
+  if (snap.strapGaveUp) bump({ strapGaveUp: false });
   const attempt = async () => {
     if (!bleAlive || statusNow() === 'finished') return;
     try {
@@ -534,6 +545,7 @@ function connectStrap() {
         },
         { beats: true, onLink: noteStrapLink },
       );
+      strapFailures = 0;
     } catch (e) {
       // A strap that will not pair is the single most common way a reading
       // never happens, and this loop retried every three seconds forever
@@ -543,11 +555,27 @@ function connectStrap() {
       // buffers occurrences, so a phone that never connects reports the
       // failure once and then its true volume rather than one line or forty.
       logError('hrv.strap.connect', e);
+      strapFailures += 1;
+      // Backs off from 3 s to 30 s, then stops and says so (see strapRetry.ts):
+      // retrying every 3 s for ever was ~95 attempts per install on the
+      // Failures tab, behind a card that only ever said "Connecting to strap…".
+      const wait = strapRetryDelay(strapFailures);
+      if (wait == null) { bump({ connected: false, strapGaveUp: true }); return; }
       bump({ connected: false });
-      if (bleAlive && snap.status !== 'finished') bleRetry = setTimeout(attempt, 3000);
+      if (bleAlive && snap.status !== 'finished') bleRetry = setTimeout(attempt, wait);
     }
   };
   void attempt();
+}
+
+/**
+ * Try the saved strap again after the card gave up on it (`strapGaveUp`).
+ * Starts a fresh run of attempts; does nothing on any other source or state.
+ */
+export function retryStrap() {
+  if (snap.config?.source !== 'polar' || !snap.strapGaveUp) return;
+  if (snap.status !== 'armed' && snap.status !== 'running') return;
+  connectStrap();
 }
 
 /**

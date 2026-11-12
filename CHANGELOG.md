@@ -46,6 +46,19 @@ crosses to a new `x.x` (a unit test fails if the shipping minor has no entry).
   cannot be timed is left alone rather than given an invented verdict. **JS only**, and
   iOS only: the row does not exist on Android.
 
+- **A strap that will not connect no longer retries every 3 seconds for ever.**
+  `hrv.strap.connect` ("code 2: Operation was cancelled") was the top row on the Failures
+  tab: 2,378 occurrences over 25 install-days in a week, ~95 per install, mostly Android,
+  while the card said "Connecting to strap…" the whole time. `connectStrap` now backs off
+  3 → 6 → 12 → 24 → 30 s (`strapRetryDelay`, `lib/ble/strapRetry.ts`, pure + tested) and
+  after `STRAP_MAX_ATTEMPTS` (10, about three minutes) stops and sets `strapGaveUp`; the
+  status pill then reads "Strap not answering. Tap to retry" and is a button
+  (`retryStrap`). A successful connect resets the count; a drop after a working link
+  still reconnects after 2 s as before. `connectToDevice` now has a 20 s `timeout`, since
+  on iOS a connect to a strap that never answers otherwise waits for ever and the give-up
+  could never be reached (this also bounds the POTS test's strap connect). The cause of
+  code 2 itself is not established; this bounds its cost and tells the user. **JS only.**
+
 - **Symptoms now import automatically; medications are chosen in Apple Health's own
   picker.** One change in two halves, because the two halves were never the same kind
   of object. A SYMPTOM is an ordinary HealthKit read permission, so it belongs in the
