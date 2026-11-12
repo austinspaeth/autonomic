@@ -486,9 +486,22 @@ async function reconnect() {
   await connect();
 }
 
-/** Run a store call, re-establishing a dropped connection once and retrying. */
+/** Run a store call, re-establishing a dropped connection once and retrying.
+ *
+ *  The CONNECT itself gets the same one retry. It used to sit outside the
+ *  `try`, so an `init-connection` failure ("Failed to initialize connection",
+ *  Play's BillingClient never finishing setup) threw straight out on the first
+ *  try. On the Failures tab that was `iap.init` on 10 Android install-days in a
+ *  week, half of them on 1.40.0, with the same phones then failing
+ *  `iap.retryProducts` and `iap.entitlement` 5 to 6 times each: phones that
+ *  saw a paywall with fallback prices and a button that could not work. */
 async function withBilling<T>(fn: () => Promise<T>): Promise<T> {
-  await connect();
+  try {
+    await connect();
+  } catch (e) {
+    if (!isDisconnected(e)) throw e;
+    await reconnect();
+  }
   try {
     return await fn();
   } catch (e) {
@@ -615,7 +628,18 @@ const delay = (ms: number) => new Promise((r) => setTimeout(r, ms));
  *  working button. Silent: the card shows fallback prices either way. */
 export async function ensureIapReady() {
   if (storeUnavailable() || state.products.length || state.blocked) return;
-  try { await loadProducts(); } catch (e) { if (!noteBlocked(e)) logError('iap.retryProducts', iapDetail(e)); }
+  try {
+    await loadProducts();
+  } catch (e) {
+    if (noteBlocked(e)) return;
+    logError('iap.retryProducts', iapDetail(e));
+    // The store still could not be reached after a torn-down reconnect, so a
+    // tap on the button would fail the same way. Say so on the card now,
+    // naming what the user can do, rather than after the tap. Only for a
+    // connection that will not come up: other failures keep the card silent,
+    // as before. Cleared when the paywall reopens or a purchase starts.
+    if (isDisconnected(e)) set({ error: purchaseMessage(e) });
+  }
 }
 
 /** Active entitlements only — StoreKit 2 currentEntitlements on iOS, the
@@ -698,6 +722,7 @@ function purchaseMessage(e: unknown): string {
     case 'billing-unavailable':
     case 'service-disconnected':
     case 'service-error':
+    case 'init-connection':
       return `${store} isn’t available on this device right now. Make sure you’re signed in to ${store}, then try again.`;
     case 'item-unavailable':
     case 'sku-not-found':
