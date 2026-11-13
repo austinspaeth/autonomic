@@ -57,6 +57,17 @@ for (const file of fs.readdirSync(DIR).filter((f) => f.endsWith('.md')).sort()) 
   for (const key of ['question']) if (/[—–]/.test(field(fm, key) ?? '')) fail(`em or en dash in \`${key}\``);
   for (const key of ['hook', 'line']) if (/[—–]/.test(nested(fm, 'app', key) ?? '')) fail(`em or en dash in \`app.${key}\``);
 
+  // Markdown is not parsed inside an HTML block (from a line opening with <div
+  // to the next blank line), so a [text](url) link there shows as raw text,
+  // and its long URL can push the page wider than a phone screen.
+  const body = md.slice(md.indexOf('---', 3) + 3);
+  let inHtml = false;
+  for (const line of body.split('\n')) {
+    if (!line.trim()) { inHtml = false; continue; }
+    if (/^<div\b/.test(line)) inHtml = true;
+    if (inHtml && /\[[^\]]+\]\((https?:\/\/|\/)[^)\s]*\)/.test(line)) fail(`markdown link inside an HTML block, use <a href>: ${line.trim().slice(0, 70)}`);
+  }
+
   const date = field(fm, 'date') ?? '';
   if (date >= QUESTION_RULE_FROM) {
     const title = field(fm, 'title') ?? '';
