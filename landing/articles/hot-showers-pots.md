@@ -195,7 +195,7 @@ Warning signs usually arrive before a faint: lightheadedness, tunnel or graying 
 The trap with triggers like showers is that symptoms are easy to misremember. One rough morning can feel like proof that nothing helps, while a steady improvement over weeks goes unnoticed. The honest way to tell whether cooler water, a shower chair, or pre-loading fluids is actually helping is to measure it rather than guess.
 
 <div class="callout callout-tip">
-  <strong>Let Autonomic turn "showers wreck me" into a pattern you can see.</strong> Log a shower as a trigger, and log your heart rate, HRV, or a quick [stand test](/insights/pots/the-orthostatic-stand-test-at-home/) around it. The app scores each reading against both the recovery thresholds and your own rolling baseline, then charts the trend, so a change like switching to a seated cool shower shows up as a real before-and-after instead of a hunch. It brings your own devices into one timeline and stays completely private and offline on your phone. <a href="/">See how it works →</a>
+  <strong>Let Autonomic turn "showers wreck me" into a pattern you can see.</strong> Log a shower as a trigger, and log your heart rate, HRV, or a quick <a href="/insights/pots/the-orthostatic-stand-test-at-home/">stand test</a> around it. The app scores each reading against both the recovery thresholds and your own rolling baseline, then charts the trend, so a change like switching to a seated cool shower shows up as a real before-and-after instead of a hunch. It brings your own devices into one timeline and stays completely private and offline on your phone. <a href="/">See how it works →</a>
 </div>
 
 ## Frequently asked questions

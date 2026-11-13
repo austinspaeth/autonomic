@@ -61,7 +61,7 @@ Before comparing apps, it helps to know what is worth tracking. Most of the usef
 
 No app does all four equally well, which is why the "best" one depends on you.
 
-<div class="callout callout-note"><strong>Pacing is the guideline, not a feature.</strong> The UK's NICE guideline on ME/CFS recommends energy management, staying within your energy limits, and advises against programmes built on fixed increases in exercise ([NICE NG206](https://www.nice.org.uk/guidance/ng206)). An app that helps you find and respect your limit is doing what the guideline asks.</div>
+<div class="callout callout-note"><strong>Pacing is the guideline, not a feature.</strong> The UK's NICE guideline on ME/CFS recommends energy management, staying within your energy limits, and advises against programmes built on fixed increases in exercise (<a href="https://www.nice.org.uk/guidance/ng206" target="_blank" rel="noopener">NICE NG206</a>). An app that helps you find and respect your limit is doing what the guideline asks.</div>
 
 ## How do the main apps compare?
 

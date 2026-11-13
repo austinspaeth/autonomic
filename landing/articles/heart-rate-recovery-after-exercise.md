@@ -266,7 +266,7 @@ In [POTS, long COVID and post-viral dysautonomia](/insights/recovery/recovery-fr
 The genuinely hopeful part is that heart rate recovery is trainable. Careful, graded aerobic reconditioning, of the kind used in the [Levine protocol for POTS](/insights/pots/exercise-for-pots-levine-protocol/), tends to speed the drop over months, often before symptoms fully settle. Watching that number improve can be quietly motivating when progress otherwise feels invisible.
 
 <div class="callout callout-warn">
-  <strong>If you live with post-exertional malaise, be careful here.</strong> For people with ME/CFS or long COVID who crash after exertion, deliberately raising your heart rate to test recovery can trigger [post-exertional malaise](/insights/postviral/post-exertional-malaise-explained/) and set you back for days. Do not push into a test. Pace to your energy envelope, use only the everyday movement you already tolerate, and let your clinician guide any exercise plan. Recovery is not a number to chase at the cost of a crash.
+  <strong>If you live with post-exertional malaise, be careful here.</strong> For people with ME/CFS or long COVID who crash after exertion, deliberately raising your heart rate to test recovery can trigger <a href="/insights/postviral/post-exertional-malaise-explained/">post-exertional malaise</a> and set you back for days. Do not push into a test. Pace to your energy envelope, use only the everyday movement you already tolerate, and let your clinician guide any exercise plan. Recovery is not a number to chase at the cost of a crash.
 </div>
 
 ## How to improve your heart rate recovery
