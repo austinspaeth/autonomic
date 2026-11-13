@@ -12,7 +12,10 @@
   $: topic = getTopic(slug);
   $: longName = topic?.longName ?? topicLabel(slug);
   $: articles = topicArticles(data.articles ?? [], slug);
-  $: canonical = `https://autonomic.care/insights/articles/${slug}/`;
+  // The topic hub at /insights/<topic>/ links every article this list does, so
+  // Google treats the two as duplicates and was leaving this one crawled but not
+  // indexed. Point it at the hub so the hub collects the signal.
+  $: canonical = `https://autonomic.care/insights/${slug}/`;
 </script>
 
 <svelte:head>
