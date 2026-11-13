@@ -118,7 +118,7 @@ A chest strap does not look at blood at all. Two electrode strips sit against yo
 </figure>
 
 <div class="callout callout-note">
-<strong>Why the error compounds.</strong> RMSSD, the core HRV metric, is calculated from the differences between consecutive beat intervals ([Shaffer and Ginsberg, 2017](https://doi.org/10.3389/fpubh.2017.00258)). A timing wobble of 10 or 15 milliseconds is invisible in your heart rate, but it is the same size as the real signal you are trying to see. Small timing noise becomes large HRV noise.
+<strong>Why the error compounds.</strong> RMSSD, the core HRV metric, is calculated from the differences between consecutive beat intervals (<a href="https://doi.org/10.3389/fpubh.2017.00258" target="_blank" rel="noopener">Shaffer and Ginsberg, 2017</a>). A timing wobble of 10 or 15 milliseconds is invisible in your heart rate, but it is the same size as the real signal you are trying to see. Small timing noise becomes large HRV noise.
 </div>
 
 This is why validation research keeps reaching for the same reference device, and why the gap between strap and wrist shows up so clearly in the numbers. We go through that evidence in [how accurate HRV wearables really are](/insights/research/how-accurate-are-hrv-wearables/) and compare device classes in [the best way to measure HRV at home](/insights/hrv/how-to-measure-hrv-at-home-devices/). When researchers checked recent Apple Watches against a Polar H10, single HRV readings were off by about 20 ms on average, far outside the 10 ms margin they had set as acceptable ([O'Grady et al., 2024](https://doi.org/10.3390/s24196220)).

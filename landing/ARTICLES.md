@@ -285,6 +285,16 @@ invent new ones.
 Do **not** write a sales callout: the page adds the app card itself. One
 natural sentence pointing at the app inside the text is fine.
 
+**Every link inside an HTML block is an `<a href>`, never `[text](url)`.**
+mdsvex passes raw HTML through without parsing markdown inside it, so a
+markdown link in a callout, a `table-wrap` or a `figure` renders as literal
+`[text](url)` on the page, brackets and all. On a phone the bare URL is one
+unbreakable string and pushes the whole page wider than the screen. The rule
+starts at a line opening with `<div` and runs to the next blank line, so it
+covers a callout written across several lines; external links take
+`target="_blank" rel="noopener"`, internal ones do not. `tests/articles.test.mjs`
+fails the build on any markdown link in that span.
+
 **Tables.** Plain markdown tables, at least one per article (normal ranges, a
 comparison, a "what to try" list). Keep to 4 columns or fewer so they read on
 a phone; wrap a wider one in `<div class="table-wrap">` so it scrolls.
@@ -361,6 +371,7 @@ Do not repeat these in the markdown:
 - [ ] Every claim about a study is cited and listed under `## Sources`
 - [ ] Not-medical-advice callout at the end; no sales callout
 - [ ] No em dashes; 3 to 6 internal links
+- [ ] Links inside callouts and other HTML blocks are `<a href>`, not `[text](url)`
 - [ ] `reviewed` is today's date (you checked every claim against its source)
 - [ ] `npm run build` passes
 
