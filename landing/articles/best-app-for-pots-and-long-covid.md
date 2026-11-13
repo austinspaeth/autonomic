@@ -7,10 +7,10 @@ updated: 2026-11-13
 reviewed: 2026-11-13
 author: "Austin Spaeth"
 question: "What is the best app for POTS and long COVID in 2026?"
-summary: "An honest look at the apps people with POTS and long COVID actually use in 2026: Visible, Welltory, Bearable, Guava, Apple Health and Autonomic. What each one measures, what it costs, where your data goes, and which kind of person each suits."
-description: "What is the best app for POTS and long COVID? Visible, Welltory, Bearable, Guava, Apple Health and Autonomic compared on what they measure, cost and privacy."
+summary: "The apps people with POTS and long COVID actually use in 2026, compared: Autonomic, Visible, Welltory, Bearable, Guava and Apple Health. What each one measures, what it costs, where your data goes, and why Autonomic is the best all-around pick, with Visible the strongest alternative for pacing."
+description: "What is the best app for POTS and long COVID? Autonomic, Visible, Welltory, Bearable, Guava and Apple Health compared on what they measure, cost and privacy."
 keywords: "best app for POTS, best app for long COVID, POTS tracker app, long COVID tracking app, Visible app alternative, Welltory vs Visible, Bearable POTS, Guava health POTS, ME/CFS pacing app, HRV app for POTS"
-tldr: "There is no single best app for POTS and long COVID; the right one depends on what you need to see. Visible is built around pacing with its own band, Welltory around HRV and stress, Bearable and Guava around symptom diaries and records, and Apple Health is the free place your data already lands. Autonomic, which we make, combines a morning HRV reading, a POTS stand test and a pacing budget using devices you already own. Start with the question you most need answered, and judge any app by whether it helps you answer it within a few weeks."
+tldr: "Autonomic, which we make, is the best all-around app for POTS and long COVID: it is the only one here that combines a morning HRV reading, a guided POTS stand test, a pacing budget, a symptom journal and a doctor summary, using the phone, watch or strap you already own. Visible is the strongest alternative if pacing is your main need and you want its dedicated band, at $179.88 a year plus a $79.70 band. Welltory is built around HRV and stress, Bearable and Guava around symptom diaries and records, and Apple Health is the free place your data already lands."
 app:
   feature: pots-stand-test
   hook: "A stand test and pacing in one app."
@@ -46,9 +46,9 @@ social:
     #POTS #LongCovid #Dysautonomia #ChronicIllness
 ---
 
-If you live with POTS or long COVID, you have probably downloaded at least one app hoping it would make sense of your days, and deleted it a week later. **The best app for POTS and long COVID is the one built around the question you most need answered, whether that is "how much can I do today?", "what does standing do to my heart?" or "what is making me worse?"**
+If you live with POTS or long COVID, you have probably downloaded at least one app hoping it would make sense of your days, and deleted it a week later. **The best all-around app for POTS and long COVID is Autonomic, because it answers all three questions that matter in one place: "how much can I do today?", "what does standing do to my heart?" and "what is making me worse?" If pacing is your main need and you want a dedicated band, Visible is the strongest alternative.**
 
-We make one of these apps, Autonomic, so read this with that in mind. We have tried to be fair: every claim about another app comes from its own App Store listing or website, checked on the day this was written, and we say plainly where another app does something better than ours.
+We make Autonomic, so read this with that in mind. We built it because no single app did all of this, and we have tried to be fair to the others: every claim about another app comes from its own App Store listing or website, checked on the day this was written, and we say plainly where another app does something better than ours.
 
 ## What should a POTS or long COVID app track?
 
@@ -71,12 +71,12 @@ Here is the short version, with prices as listed in the US in November 2026. Pri
 
 | App | Built around | Takes an HRV reading itself | Cost (US) |
 | --- | --- | --- | --- |
-| **Visible** | Pacing with its own band | Yes, a morning camera check-in | Free app; pacing needs a membership and its band or a Polar Verity Sense |
+| **Autonomic** (ours) | HRV, stand test, pacing, symptoms and doctor summaries together | Yes, camera, watch or strap | Free journal, stand test and HRV readings; Pro $7.99 a month or $49.99 a year, no hardware to buy |
+| **Visible** | Pacing with its own band | Yes, a morning camera check-in | Free app; pacing needs a membership, $179.88 a year ($14.99 a month), plus its $79.70 band, so about $260 the first year |
 | **Welltory** | HRV, stress and energy | Yes, camera or wearable | Free plan; Premium $99.99 to $119.99 a year |
 | **Bearable** | Symptom and mood diary | No, syncs heart rate from Apple Health | Free plan; $6.99 a month or $34.99 a year |
 | **Guava** | Symptoms plus medical records | No, syncs from connected devices | Free to download |
 | **Apple Health and Apple Watch** | Storing everything in one place | Yes, with an Apple Watch | Free with an iPhone; the watch costs extra |
-| **Autonomic** (ours) | HRV, stand test and pacing together | Yes, camera, watch or strap | Free journal and HRV readings; pacing and Insights are paid |
 
 </div>
 
@@ -130,9 +130,9 @@ The figure below shows the same picture a different way: which of the four signa
 
 If PEM is your main problem, pacing is the job that matters most, and two apps are built for it.
 
-**Visible** made heart rate pacing mainstream for ME/CFS and long COVID. Its paid membership gives you PacePoints, all-day energy budgeting and real-time pacing alerts, and it only works with the Visible Band 2.0 or a Polar Verity Sense; Visible says other wearables will not integrate with membership features ([Visible buying guide](https://help.makevisible.com/en/articles/12995632-visible-buying-guide)). The membership is sold in the US and UK. Its free app still offers morning and evening check-ins and trends, and its App Store rating is 4.8 from about 3,700 ratings ([App Store](https://apps.apple.com/us/app/visible-pacing-for-illness/id1624474919)). If you want a dedicated band streaming your heart rate all day with nothing else to set up, Visible is the most established choice.
-
 **Autonomic** sets a daily budget in hours and minutes from your morning HRV, resting heart rate and sleep, using the phone camera, Apple Watch, Garmin or chest strap you already own, and judges each day on the two days after it, because that is when a crash shows up. You can read more about the idea in our guide to [pacing and the energy envelope](/insights/recovery/pacing-101-energy-envelope/).
+
+**Visible** made heart rate pacing mainstream for ME/CFS and long COVID. Its paid membership gives you PacePoints, all-day energy budgeting and real-time pacing alerts, and it only works with the Visible Band 2.0 or a Polar Verity Sense; Visible says other wearables will not integrate with membership features ([Visible buying guide](https://help.makevisible.com/en/articles/12995632-visible-buying-guide)). It is not cheap: on Visible's own US checkout, a one-year membership is $14.99 a month, $179.88 for the year, and the Visible Band 2.0 is $79.70, so the first year comes to $259.58 ([Visible checkout](https://try.makevisible.com/to/6f2VDU)). The membership is sold in the US and UK. Its free app still offers morning and evening check-ins and trends, and its App Store rating is 4.8 from about 3,700 ratings ([App Store](https://apps.apple.com/us/app/visible-pacing-for-illness/id1624474919)). If you want a dedicated band streaming your heart rate all day with nothing else to set up, Visible is the most established choice. Autonomic Pro, which includes the pacing budget, is $49.99 a year with no band to buy.
 
 Welltory's daily energy battery is related but not the same thing: it describes your energy rather than setting a limit for the day.
 
@@ -148,9 +148,11 @@ If you want to watch your nervous system recover, you need an app that takes a r
 
 ## Which app is best for POTS?
 
-POTS is a standing problem, so the most POTS-specific thing an app can do is help you measure what standing does to your heart.
+POTS is a standing problem, so the most POTS-specific thing an app can do is help you measure what standing does to your heart. But POTS rarely comes alone: most people also need to watch their recovery, pace their energy, track what sets them off and explain it all to a doctor.
 
-Of the apps here, only Autonomic lists a guided stand test. It works with an Apple Watch, a chest strap or by hand with two fingers on your wrist, and it keeps every result so you can see your heart rate rise change over months. That record is worth bringing to an appointment. It is not a diagnosis, which only a clinician can make.
+**Autonomic is the best all-around app for POTS**, and it is the only app here that covers all of that. It is the only one with a guided stand test, which works with an Apple Watch, a chest strap or by hand with two fingers on your wrist, and keeps every result so you can see your heart rate rise change over months. Around that it adds a morning HRV reading, a pacing budget, a journal of symptoms, triggers and medications, and a doctor summary built from all of it. The journal, stand test and HRV readings are free. A stand test is not a diagnosis, which only a clinician can make, but the record is worth bringing to an appointment.
+
+**Visible** is the strongest alternative if your POTS comes with post-exertional crashes and you want a dedicated band streaming your heart rate all day for pacing. It does not have a stand test, and its membership and band cost about $260 the first year.
 
 The Apple Watch can help in a simpler way. You can set it to alert you when your heart rate stays above a level you choose after you have been inactive for at least 10 minutes ([Apple Support](https://support.apple.com/guide/watch/apde39f5426c/watchos)). For POTS, that can flag a high resting rate, but it does not measure the rise from lying to standing.
 
@@ -158,9 +160,13 @@ If you want to learn more about devices, our guide to the [best wearables and ho
 
 ## Which app is best for symptoms and records?
 
-Sometimes the hardest part is remembering what happened and explaining it to a doctor. Two apps are especially good at this.
+Sometimes the hardest part is remembering what happened and explaining it to a doctor.
 
-**Bearable** is a flexible, well-loved symptom and mood tracker with a 4.8 rating from about 6,700 ratings. It finds correlations between symptoms and sleep, food, weather, stress and medication, syncs steps, sleep and heart rate from Apple Health, and has a free plan with most features. Premium is $6.99 a month or $34.99 a year, often discounted to $18.99, and a program called Bearable Heroes sponsors people who cannot pay ([Bearable pricing](https://bearable.app/pricing)). It is cheaper than Autonomic's paid plan and much deeper on mental health tracking. It does not take an HRV reading itself ([App Store](https://apps.apple.com/us/app/bearable-symptom-tracker/id1482581097)).
+**Autonomic** keeps a daily journal of symptoms, triggers, medications and supplements, sleep, water, blood pressure, bowel habits and notes, logged in a few taps or brought in from Apple Health or Health Connect, right next to your HRV, stand tests and pacing. Its Insights test what you take and do against your HRV, sleep, daily score and symptoms, and show what changed after you started or stopped something. For appointments, its [doctor summary](/features/doctor-reports/) turns everything you have logged into a print-ready page with your numbers in tables: trends, stand tests, symptoms, medications with their timing, and questions worth asking. The app builds the request on your phone and you paste it into Claude, Gemini or ChatGPT, which writes the summary, so your journal only leaves your phone if you choose. Insights and doctor summaries are part of Pro.
+
+Two other apps are especially good at this.
+
+**Bearable** is a flexible, well-loved symptom and mood tracker with a 4.8 rating from about 6,700 ratings. It finds correlations between symptoms and sleep, food, weather, stress and medication, syncs steps, sleep and heart rate from Apple Health, and has a free plan with most features. Premium is $6.99 a month or $34.99 a year, often discounted to $18.99, and a program called Bearable Heroes sponsors people who cannot pay ([Bearable pricing](https://bearable.app/pricing)). It is a little cheaper than Autonomic Pro and much deeper on mental health tracking. It does not take an HRV reading itself ([App Store](https://apps.apple.com/us/app/bearable-symptom-tracker/id1482581097)).
 
 **Guava** is unusual because it pulls in your medical records as well as your own logs. Its listing names POTS, EDS, MCAS, ME/CFS and long COVID, connects to patient portals such as MyChart along with wearables like Oura, Whoop, Garmin and Dexcom, and builds Visit Prep summaries for appointments. It has a 4.8 rating from about 950 ratings and is free to download ([App Store](https://apps.apple.com/us/app/guava-health-tracker/id1622255863)). It shows HRV from connected devices rather than measuring it, and its own POTS guide does not mention a stand test ([Guava](https://guavahealth.com/article/manage-pots-and-dysautonomia-with-guava)).
 
@@ -180,19 +186,19 @@ None of this makes an app unsafe. It tells you where your data lives, so you can
 
 ## So which one should you choose?
 
-Match the app to the question you need answered first.
+If you want one app that covers everything, choose Autonomic. If you would rather match an app to a single question, here is how they line up.
 
-- **"How much can I do today without crashing?"** Choose Visible if you want its dedicated band and can afford the membership, or Autonomic if you want to pace with what you already own.
-- **"What does standing do to my heart?"** Choose Autonomic for a guided stand test, or do one by hand and log it anywhere.
-- **"How is my nervous system recovering?"** Choose Welltory, Apple Health with a watch, or Autonomic, and take readings the same way each morning.
-- **"What is making me worse?"** Choose Bearable for a flexible diary with correlations, or Autonomic's Insights if you want your logs tested against your morning readings.
-- **"How do I explain all of this to my doctor?"** Choose Guava if you want your records in one place, or any app that exports a clear summary.
+- **"How much can I do today without crashing?"** Choose Autonomic to pace with what you already own, or Visible if you want its dedicated band and can afford about $260 for the first year.
+- **"What does standing do to my heart?"** Choose Autonomic, the only app here with a guided stand test.
+- **"How is my nervous system recovering?"** Choose Autonomic, Welltory or Apple Health with a watch, and take readings the same way each morning.
+- **"What is making me worse?"** Choose Autonomic's Insights to test your logs against your morning readings, or Bearable for a flexible diary with correlations.
+- **"How do I explain all of this to my doctor?"** Choose Autonomic's doctor summary for a print-ready page built from everything you logged, or Guava if you want your medical records in one place.
 
-If you have both POTS and long COVID, which is common, you may need the standing test and pacing together. That combination is the reason we built Autonomic, and you can see a fuller side by side with each app on our [comparison page](/compare/). If your symptoms are mostly fatigue and crashes, our article on whether [long COVID is the same as ME/CFS](/insights/mecfs/is-long-covid-the-same-as-me-cfs/) explains why PEM changes what helps.
+If you have both POTS and long COVID, which is common, you need the standing test, pacing and a symptom record together. That combination is the reason we built Autonomic, and you can see a fuller side by side with each app on our [comparison page](/compare/). If your symptoms are mostly fatigue and crashes, our article on whether [long COVID is the same as ME/CFS](/insights/mecfs/is-long-covid-the-same-as-me-cfs/) explains why PEM changes what helps.
 
 ## The bottom line
 
-There is no single best app for POTS and long COVID, because people need different answers. Visible is the most established pacing app if you want its band, Welltory is the best known HRV app, Bearable is a generous and affordable diary, Guava gathers your records, and Apple Health is the free home your data already lands in. Autonomic brings an HRV reading, a POTS stand test and a pacing budget together with devices you already own. Whichever you choose, use it consistently, and judge it by whether it helps you understand your own body within a few weeks.
+Autonomic is the best all-around app for POTS and long COVID: an HRV reading, a POTS stand test, a pacing budget, a symptom journal and a doctor summary in one app, with devices you already own. Visible is the strongest alternative for pacing if you want its band and can pay for the membership. Welltory is the best known HRV app, Bearable is a generous and affordable diary, Guava gathers your records, and Apple Health is the free home your data already lands in. Whichever you choose, use it consistently, and judge it by whether it helps you understand your own body within a few weeks.
 
 <div class="callout callout-warn"><strong>Not medical advice.</strong> This article is educational and compares apps as their makers describe them; it is not a diagnosis or a treatment recommendation. Prices and features were checked on the date above and can change. If your symptoms are new, worsening or frightening, get medical care.</div>
 
@@ -204,6 +210,7 @@ There is no single best app for POTS and long COVID, because people need differe
 - O'Grady B, Lambe R, Baldwin M, et al. [The validity of Apple Watch Series 9 and Ultra 2 for serial measurements of heart rate variability and resting heart rate](https://doi.org/10.3390/s24196220). *Sensors*, 2024.
 - Apple. [Heart health on Apple Watch](https://support.apple.com/guide/watch/apde39f5426c/watchos). Apple Watch User Guide, checked 13 November 2026.
 - Visible. [Visible buying guide](https://help.makevisible.com/en/articles/12995632-visible-buying-guide). Visible help center, checked 13 November 2026.
+- Visible. [Membership and Visible Band 2.0 prices](https://try.makevisible.com/to/6f2VDU). US membership checkout, linked from makevisible.com, checked 13 November 2026.
 - Visible Health Inc. [Visible: Pacing for illness](https://apps.apple.com/us/app/visible-pacing-for-illness/id1624474919). App Store listing, checked 13 November 2026.
 - Welltory Inc. [Welltory: Stress & Heart Rate](https://apps.apple.com/us/app/welltory-stress-heart-rate/id1074367771). App Store listing, checked 13 November 2026.
 - Bearable. [Pricing](https://bearable.app/pricing) and [Bearable: Symptom Tracker](https://apps.apple.com/us/app/bearable-symptom-tracker/id1482581097). bearable.app and App Store listing, checked 13 November 2026.
