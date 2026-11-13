@@ -9,9 +9,10 @@
 # — and a screenshot that contradicts itself is the one thing a viewer notices.
 #
 # The app must already be installed on that simulator and able to reach Metro,
-# running the build from the `claude/marketing-screenshots-v2` branch, which is
-# where the shot registry and its fixtures live (they are deliberately not on
-# `main`: a push there touching `mobile/**` publishes a production OTA).
+# running a build that carries the dev-only shot registry. That harness is NOT
+# committed (it needs changes under `mobile/`, and a push to `main` touching
+# `mobile/**` publishes a production OTA), so this script does nothing on its
+# own against a stock build.
 set -e
 SIM="${SHOT_SIM:-$(xcrun simctl list devices | grep "Autonomic Shots" | grep -o '[0-9A-F-]\{36\}' | head -1)}"
 ID="$1"; SETTLE="${2:-8000}"
