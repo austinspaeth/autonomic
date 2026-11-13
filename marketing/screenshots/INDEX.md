@@ -46,7 +46,7 @@ truth, so add a shot there and update this index.
 | --- | --- | --- |
 | `pacing-ahead.png` | Gold strip: "6m left of 3h 35m", "At this pace the budget runs out around 8:32pm". | The frame that makes pacing click in one sentence. Probably the single most explanatory still in the library. |
 | `pacing-over.png` | Red strip: "Over by 2h 31m", "Resting now brings this back down". | PEM and post-exertional crash content. "It tells you before you pay for it." |
-| `pacing-sheet.png` | The envelope: 3h 35m budget, what the day has spent, the pace marker explained, high confidence, built from 4 activities + steps + heart rate. | Explaining how the budget is arrived at. **Note:** leads with a "turn on pacing alerts" ask, because notification permission cannot be granted from the CLI — see README. |
+| `pacing-sheet.png` | The envelope: 3h 35m budget, what the day has spent, the pace marker explained, high confidence, built from 4 activities + steps + heart rate. | Explaining how the budget is arrived at. The hero shot for pacing. |
 | `pacing-spend.png` | "Minutes HR above 96 bpm — 4h 06m charged of 6h 06m spent", split by band, longest stretch, highest reading. | "Your own exertion line, not a fitness zone." The receipt behind the bar. |
 
 ## Readings

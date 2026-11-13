@@ -61,11 +61,19 @@ Then, with Metro running (`npm start` in `mobile/`):
   the next foreground and raises the HealthKit permission sheet, a system modal
   nothing here can dismiss, and it lands on top of every shot until the app is
   terminated.
-- **Notification permission cannot be granted from the CLI.** `simctl privacy
-  grant notifications` answers "Operation not permitted" on iOS 26.5 and
-  `grant all` does not cover it. That is why `pacing-sheet` leads with the "turn
-  on pacing alerts" ask. **Tap Allow once by hand on the shots simulator** and
-  every later run of that shot leads with the budget instead.
+- **Notification permission cannot be granted at all on a shots simulator, and
+  there is no human fallback.** `simctl privacy grant notifications` answers
+  "Operation not permitted" on iOS 26.5 and `grant all` does not cover it; and
+  there is no Simulator.app on this machine (Xcode 27.2 ships without one here),
+  so the sims are headless and no system alert can ever be tapped. Without the
+  grant, every card that asks for notifications stands permanently on top of the
+  feature being photographed — `pacing-sheet` led with the "turn on pacing
+  alerts" ask instead of the budget. The driver therefore pins what the UI
+  READS, via `setDevNotificationPermission('granted')` in `src/lib/reminders.ts`:
+  no notification is scheduled and no OS state is touched, so the shot shows the
+  screen a user who granted notifications genuinely sees. Same pattern as
+  `setDevTier` / `setDevPreviewPaywall` — a runtime pin beside the real answer,
+  never an edit to the real answer.
 - **A stuck system alert belongs to SpringBoard**, not the app, so it survives
   relaunching. Clear it with
   `xcrun simctl spawn <udid> launchctl stop com.apple.SpringBoard` (back in ~10s).

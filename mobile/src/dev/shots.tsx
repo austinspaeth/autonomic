@@ -47,6 +47,7 @@ import { HrvSetup } from '../features/hrv/Setup';
 import { SourcePicker } from '../features/hrv/SourcePicker';
 import { AiReportsSheet } from '../features/insights/AskAi';
 import { Calendar } from '../features/Calendar';
+import { setDevNotificationPermission } from '../lib/reminders';
 
 type Open = ReturnType<typeof useSheets>['openSheet'];
 interface Ctx { openSheet: Open; closeAll: () => void }
@@ -189,15 +190,6 @@ export const SHOTS: Shot[] = [
     settle: 3400,
     run: async ({ openSheet }) => {
       router.replace('/');
-      // NOTE: this sheet leads with a "turn on pacing alerts" ask whenever
-      // notification permission is missing, which on a fresh simulator it
-      // always is. It cannot be granted from the CLI — `simctl privacy grant
-      // notifications` answers "Operation not permitted" on iOS 26.5, and
-      // `grant all` does not cover it — and requesting it from here raises a
-      // system alert that nothing in this harness can tap, which then sits on
-      // top of the shot. So the ask is left standing. To lose it, tap Allow
-      // once by hand on the shots simulator; the grant sticks and every later
-      // run of this shot leads with the budget instead.
       await wait(1600);
       const dk = todayKey();
       openBudgetSheet(openSheet, dk, budgetOf(dk));
@@ -490,6 +482,12 @@ export function ShotDriver() {
         // itself on that, so a free-tier shot needs both switches.
         setDevPreviewPaywall(shot.tier === 'free');
         setDevTier(shot.tier || 'pro');
+        // The persona grants notifications, as most users do. On a headless
+        // simulator the OS can never be asked, so without this every card that
+        // asks for them stands on top of the feature being photographed —
+        // worst of all on the pacing sheet, which led with the ask instead of
+        // the budget. See `setDevNotificationPermission`.
+        setDevNotificationPermission('granted');
         applyFixture(shot.fixture);
         // AFTER the import, and again on the next tick. A claim is pinned for
         // the rest of its journal day and renders from its own memory alone,
