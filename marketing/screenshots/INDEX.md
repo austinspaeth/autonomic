@@ -32,9 +32,13 @@ that starts in crash days and settles green, with a magnesium glycinate onset in
 the middle. Age and sex are not decoration — they recenter the baseline RMSSD
 ladder, so the grades shown are the grades this person would really see.
 
-**To re-shoot or add one:** see `README.md`. The purposes below are copied from
-the shot registry in `mobile/src/dev/shots.tsx`; that file is the source of
-truth, so add a shot there and update this index.
+**To re-shoot or add one:** the dev-only harness that takes these is on the
+branch `claude/marketing-screenshots-v2`, not on `main` — a push to `main`
+touching `mobile/**` publishes an OTA to the production channel, and a
+screenshot harness is not a reason to ship JS to anybody's phone. The purposes
+below are copied from the shot registry in `mobile/src/dev/shots.tsx` on that
+branch; that file is the source of truth, so add a shot there and update this
+index.
 
 ---
 
