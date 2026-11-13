@@ -221,7 +221,7 @@ function softTint(hex: string): string {
  *  neutral grey. HRV kinds are live-capture only, so the manual list starts at
  *  Blood Pressure. On a past day the live-only captures (HRV, stand test)
  *  disappear — a live reading can only belong to the day it happens. */
-export function ReadingPicker({ isToday, onLive, onBaseline, onPick }: {
+function ReadingPicker({ isToday, onLive, onBaseline, onPick }: {
   isToday: boolean;
   onLive: () => void; onBaseline: () => void; onPick: (type: string) => void;
 }) {

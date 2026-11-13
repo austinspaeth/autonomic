@@ -29,18 +29,6 @@ export type { Tier };
  *  builds `isPro`, i.e. always 'pro'. Leave null in committed code. */
 const FORCE_TIER: Tier | null = null;
 
-/** Runtime tier pin for the dev-only marketing screenshot driver (src/dev).
- *  Separate from FORCE_TIER above because that one is a source constant: a
- *  committed edit to it reaches every dev build on the same Metro, including a
- *  simulator somebody is actually using. This is set from a deep link, on one
- *  device, and is null everywhere else. */
-let devTier: Tier | null = null;
-export function setDevTier(t: Tier | null) {
-  if (!__DEV__) return;
-  devTier = t;
-  recheck();
-}
-
 const FLAGS_ID = 'autonomic.flags';
 const KEY_TRIAL_STARTED = 'trialStartedAt';   // ISO timestamp
 const KEY_WAS_PRO = 'wasPro';                 // '1' | '0' — last store answer
@@ -125,7 +113,7 @@ function recheck(): Tier {
   // FORCE_TIER pins the tier outright. The only configuration in which the
   // annual offer card appears at all is FORCE_TIER = 'free' — the dev bypass
   // otherwise reports 'pro'.
-  const next = (__DEV__ && (devTier || FORCE_TIER)) || deriveTier(now, trialStartedAtMs(), effectiveIsPro(), grantUntilMs());
+  const next = (__DEV__ && FORCE_TIER) || deriveTier(now, trialStartedAtMs(), effectiveIsPro(), grantUntilMs());
   armExpiryTimer(next);
   if (next !== current) { current = next; emit(); }
   return current;

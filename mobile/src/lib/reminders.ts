@@ -180,31 +180,8 @@ export async function canAskForReminders(): Promise<boolean> {
 
 export type NotificationPermission = 'granted' | 'ask' | 'blocked';
 
-/**
- * DEV ONLY, and only for the marketing screenshot harness (src/dev/shots.tsx).
- *
- * The shots run on a HEADLESS simulator — there is no Simulator window on this
- * machine, so no system alert can ever be tapped — and the permission cannot be
- * granted from the CLI either: `simctl privacy grant notifications` answers
- * "Operation not permitted" on iOS 26.5, and `grant all` does not cover it. So
- * every card that asks for notifications stands permanently on a shots device,
- * on top of the feature being photographed.
- *
- * This pins what the UI READS, nothing else: no notification is scheduled, no
- * OS state is touched, and `requestReminderPermission` is untouched. It is the
- * `setDevTier` / `setDevPreviewPaywall` pattern — a runtime pin beside the real
- * answer, never an edit to the real answer — so a shot shows the screen a user
- * who granted notifications actually sees.
- */
-let devPermission: NotificationPermission | null = null;
-export function setDevNotificationPermission(p: NotificationPermission | null) {
-  if (!__DEV__) return;
-  devPermission = p;
-}
-
 /** The permission as a UI needs it: on, askable, or only fixable in settings. */
 export async function readNotificationPermission(): Promise<NotificationPermission> {
-  if (__DEV__ && devPermission) return devPermission;
   try {
     const p = await Notifications.getPermissionsAsync();
     return p.granted ? 'granted' : p.canAskAgain ? 'ask' : 'blocked';
@@ -531,13 +508,8 @@ export async function syncReminder(): Promise<void> {
     }
     // Permission revoked in system settings while we were away: the journal
     // still says "on", so flip it off rather than show a lie in the UI.
-    //
-    // Asked through `readNotificationPermission` rather than the OS directly,
-    // so there is ONE place that answers "what is the permission" — identical
-    // in production (`granted` is exactly `perm.granted`), and the only way the
-    // screenshot harness's pin can hold: reading the OS here flipped the
-    // fixture's reminder off on every launch.
-    if ((await readNotificationPermission()) !== 'granted') {
+    const perm = await Notifications.getPermissionsAsync();
+    if (!perm.granted) {
       await disableReminder();
       return;
     }

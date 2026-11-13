@@ -236,24 +236,6 @@ export const paywallBypassed = () => shouldBypassPaywall();
  *  rebuild. Leave false in committed code. */
 const PREVIEW_PAYWALL = false;
 
-/** Runtime paywall preview for the dev-only marketing screenshot driver
- *  (src/dev). Separate from PREVIEW_PAYWALL above for the reason `setDevTier`
- *  is separate from FORCE_TIER: that one is a committed source constant and
- *  reaches every dev build sharing this Metro, including a simulator somebody
- *  is using. This is set from a deep link, on one device.
- *
- *  It has to exist at all because the dev bypass makes every dev build `isPro`,
- *  and PaywallCard closes itself the moment that is true — so the paywall
- *  cannot be photographed in a dev build without it. */
-let devPreviewPaywall = false;
-export function setDevPreviewPaywall(on: boolean) {
-  if (!__DEV__) return;
-  if (devPreviewPaywall === on) return;
-  devPreviewPaywall = on;
-  set({ ready: true, isPro: !on && shouldBypassPaywall(), products: [] });
-}
-const previewingPaywall = () => __DEV__ && (PREVIEW_PAYWALL || devPreviewPaywall);
-
 type IapState = {
   ready: boolean;
   isPro: boolean;
@@ -295,7 +277,7 @@ let started = false;
 let connected = false;
 
 const storeUnavailable = () =>
-  (Platform.OS !== 'ios' && Platform.OS !== 'android') || shouldBypassPaywall() || previewingPaywall();
+  (Platform.OS !== 'ios' && Platform.OS !== 'android') || shouldBypassPaywall() || (__DEV__ && PREVIEW_PAYWALL);
 
 /** Play's billing service is a BOUND SERVICE, and the binding does not survive
  *  the Play Store updating itself, the process being backgrounded for a while,
@@ -597,7 +579,7 @@ async function loadProducts(): Promise<IapProduct[]> {
 export async function initIap() {
   if (started) return;
   started = true;
-  if (previewingPaywall()) { set({ ready: true, isPro: false, products: [] }); return; }
+  if (__DEV__ && PREVIEW_PAYWALL) { set({ ready: true, isPro: false, products: [] }); return; }
   if ((Platform.OS !== 'ios' && Platform.OS !== 'android') || shouldBypassPaywall()) {
     set({ ready: true, isPro: true });
     return;
@@ -664,7 +646,7 @@ export async function ensureIapReady() {
  *  owned-purchase query on Android — so presence of either SKU (not pending)
  *  == an active entitlement (paid or in the free-trial window). */
 export async function refreshEntitlement(): Promise<boolean> {
-  if (previewingPaywall()) return false;   // preview: never call the store
+  if (__DEV__ && PREVIEW_PAYWALL) return false;   // preview: never call the store
   if ((Platform.OS !== 'ios' && Platform.OS !== 'android') || shouldBypassPaywall()) return state.isPro;
   try {
     const active = await withBilling(() => getAvailablePurchases(

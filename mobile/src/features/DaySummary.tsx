@@ -1009,7 +1009,7 @@ function DownturnCycleChart() {
   return <View style={{ marginBottom: 12 }}><ScoreByCycleDay model={model} value={value} /></View>;
 }
 
-export function DownturnExplain({ w, dk }: { w: Downturn; dk: string }) {
+function DownturnExplain({ w, dk }: { w: Downturn; dk: string }) {
   const p = usePalette();
   const color = w.severity === 'alert' ? SCORE_COLORS.crash : SCORE_COLORS.bad;
   return (
@@ -1048,7 +1048,7 @@ export function DownturnExplain({ w, dk }: { w: Downturn; dk: string }) {
  *  baseline and why that marker matters. There is no "possibilities" fallback
  *  here — a strain warning cannot fire without at least two findings, so the
  *  empty case does not exist. */
-export function StrainExplain({ w, dk }: { w: Strain; dk: string }) {
+function StrainExplain({ w, dk }: { w: Strain; dk: string }) {
   const p = usePalette();
   const color = w.severity === 'alert' ? SCORE_COLORS.crash : SCORE_COLORS.bad;
   return (
@@ -1215,7 +1215,7 @@ function zoneAdvice(raw: number | null, bands: Band[] | null, unit?: string) {
   return { cur, ideal, done: false, dir };
 }
 
-export function ScoreExplain({ all, dk }: { all: ScoreSetResult; dk: string }) {
+function ScoreExplain({ all, dk }: { all: ScoreSetResult; dk: string }) {
   const p = usePalette();
   const cat = scoreCat(all.score!);
   const ptsToCat = catFromPts;

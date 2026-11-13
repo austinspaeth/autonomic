@@ -54,13 +54,6 @@ function Themed({ children }: { children: React.ReactNode }) {
   );
 }
 
-/* Dev-only marketing screenshot driver. `require` behind __DEV__ rather than a
- * static import so the registry, its fixtures and the feature sheets it pulls
- * in never reach a production bundle. */
-const ShotDriver: React.ComponentType = __DEV__
-  ? require('../src/dev/shots').ShotDriver
-  : () => null;
-
 export default function RootLayout() {
   // When launch found no journal (or an unreadable one), hold onboarding back
   // and let RestoreGate offer the on-device snapshots first. Restoring fills
@@ -229,11 +222,6 @@ export default function RootLayout() {
                   then fades to black and reveals the app beneath. Deferred
                   until any launch-time restore offer is resolved. */}
               {restoreResolved ? <OnboardingGate /> : <RestoreGate onDone={() => setRestoreResolved(true)} />}
-              {/* Dev-only: the marketing screenshot driver (src/dev/shots).
-                  Renders nothing and does nothing until a `?shot=` deep link
-                  arrives, and the require is behind __DEV__ so it is dropped
-                  from a release bundle entirely. */}
-              <ShotDriver />
             </SheetProvider>
           </ToastProvider>
         </Themed>
