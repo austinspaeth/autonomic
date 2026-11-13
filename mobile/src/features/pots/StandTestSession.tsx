@@ -67,7 +67,19 @@ function SettleCard({ conn, onStart }: { conn: ConnBus; onStart: () => void }) {
   );
 }
 
-export function StandTestSession({ controls }: { controls: SheetControls }) {
+export function StandTestSession({ controls, devAutoStart }: {
+  controls: SheetControls;
+  /**
+   * DEV ONLY (marketing screenshot harness, src/dev/shots.tsx). The test opens
+   * on an intro and then a settle card, and both are advanced by a tap; the
+   * shots simulator is headless, so neither can be made. This walks the SAME
+   * two transitions in the same order, and still waits for the strap exactly as
+   * the settle card's own Start does — a fifteen minute test must not begin
+   * before the sensor answers, and that rule is the one worth not bypassing.
+   * Ignored outside __DEV__.
+   */
+  devAutoStart?: boolean;
+}) {
   const p = usePalette();
   const { openSheet } = useSheets();
   useKeepAwake();
@@ -263,6 +275,21 @@ export function StandTestSession({ controls }: { controls: SheetControls }) {
   act.current = { begin, standing: enterStanding };
 
   const toSetup = () => { setStageBoth('setup'); raise('settle'); };
+
+  // See `devAutoStart`. Runs once, after the strap is connected.
+  const autoRan = useRef(false);
+  useEffect(() => {
+    if (!__DEV__ || !devAutoStart || autoRan.current) return;
+    if (!strap.connected) return;
+    autoRan.current = true;
+    toSetup();
+    // The settle card is a sheet of its own, raised by `toSetup`; `begin`
+    // refuses until the stage is 'setup', so it goes on the next tick.
+    setTimeout(() => { closeCard.current?.(); begin(); }, 60);
+    // `begin` and `toSetup` are rebuilt every render and this must run exactly
+    // once; the guard above is what makes that true, not the dep list.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [devAutoStart, strap.connected]);
 
   // The arc's catch-up after a rest ended early.
   useEffect(() => {

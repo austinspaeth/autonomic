@@ -230,7 +230,19 @@ export function buildFixture(name: FixtureName): AppState {
   // permission sheet — a system modal nothing in this harness can dismiss, and
   // it lands on top of every shot. The pacing load these fixtures need is
   // written into the journal directly instead.
-  base.settings = { ...base.settings, theme: 'dark', units: 'imperial', healthEnabled: false };
+  // A saved strap. The live-capture shots stand a replay manager behind
+  // `ble()` (src/dev/replayStrap.ts), and both the HRV session and the stand
+  // test refuse to dial anything without `lastBleDeviceId` — the real rule,
+  // which is why this is set rather than worked around.
+  base.settings = {
+    ...base.settings, theme: 'dark', units: 'imperial', healthEnabled: false,
+    lastBleDeviceId: 'shots-replay-strap',
+    // The persona has taken a reading every morning for two months, so the
+    // daily reminder is on. It is also what retires the "One reading a day,
+    // same time" offer at the top of the reading-complete card, which
+    // otherwise pushes the metrics that card exists to show below the fold.
+    reminder: { enabled: true, time: '08:00' },
+  };
   base.meta = { ...base.meta, onboarded: now, lastUpdated: now, lastImport: null };
   base.bodyTemp = base.bodyTemp || {};
 

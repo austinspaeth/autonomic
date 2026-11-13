@@ -48,6 +48,12 @@ import { SourcePicker } from '../features/hrv/SourcePicker';
 import { AiReportsSheet } from '../features/insights/AskAi';
 import { Calendar } from '../features/Calendar';
 import { setDevNotificationPermission } from '../lib/reminders';
+import { setDevBleManager } from '../lib/ble/manager';
+import { replayStrap, stopReplay } from './replayStrap';
+import { baselineRate, pacedRate, standProfile } from './beats';
+import { HrvSession } from '../features/hrv/Session';
+import { StandTestSession } from '../features/pots/StandTestSession';
+import { endSession, minimizeSession, setSessionHidden, type SessionConfig } from '../features/hrv/sessionStore';
 
 type Open = ReturnType<typeof useSheets>['openSheet'];
 interface Ctx { openSheet: Open; closeAll: () => void }
@@ -69,6 +75,14 @@ export interface Shot {
 }
 
 const wait = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
+
+const TRAINING: SessionConfig = { kind: 'breath', style: '4/6', source: 'polar', period: 'Morning' };
+const BASELINE: SessionConfig = { kind: 'unstructured', source: 'polar', period: 'Morning' };
+
+/** Stand a replay strap behind `ble()` for the live-capture shots. */
+function liveStrap(rate: Parameters<typeof replayStrap>[0], seconds: number, seed: number) {
+  setDevBleManager(replayStrap(rate, seconds, seed));
+}
 
 /* ---------- helpers the shots share ---------- */
 
@@ -444,6 +458,104 @@ export const SHOTS: Shot[] = [
       openSheet((c: SheetControls) => <PaywallCard controls={c} />);
     },
   },
+
+  /* ===== Live capture =====
+   *
+   * The only shots in the library whose sensor is synthetic. A simulator has
+   * no camera pulse and no Bluetooth, so these four screens could not be
+   * photographed at all; `src/dev/replayStrap.ts` stands a strap behind
+   * `ble()` and streams the beat series from `src/dev/beats.ts`, which models
+   * the physiology and is pinned by a test against the real HRV engine.
+   *
+   * ONLY the intervals are invented. The session clock is the real wall clock,
+   * so these run for as long as the reading says it is running — a five-minute
+   * reading takes five minutes, and the settle times below say so. Everything
+   * on screen is computed by the app from the beats it was given.
+   */
+  {
+    id: 'hrv-live',
+    group: 'Live capture',
+    title: 'Paced HRV reading, mid-session',
+    purpose: 'The single most recognisable screen in the app. Breathing rings on the 4/6 pattern, the timer, and the live heart rate, rolling SDNN and beat-to-beat trace underneath, all moving.',
+    fixture: 'arc',
+    settle: 158000,
+    run: async ({ openSheet }) => {
+      router.replace('/');
+      liveStrap(pacedRate(), 330, 7);
+      await wait(300);
+      openSheet((c) => <HrvSession config={TRAINING} controls={c} autoStart />, { hideClose: true, grow: true });
+    },
+  },
+  {
+    id: 'hrv-focus',
+    group: 'Live capture',
+    title: 'Paced reading, focus mode',
+    purpose: 'The eye button: rings, phase word and a dimmed timer on black, nothing else moving. The calmest frame the app has, and the one that reads best full-bleed on TikTok.',
+    fixture: 'arc',
+    settle: 150000,
+    run: async ({ openSheet }) => {
+      router.replace('/');
+      liveStrap(pacedRate(), 330, 7);
+      await wait(300);
+      openSheet((c) => <HrvSession config={TRAINING} controls={c} autoStart />, { hideClose: true, grow: true });
+      // Into focus once the reading has a trace behind it — the point of the
+      // shot is the calm, not an empty card.
+      setTimeout(() => setSessionHidden(true), 138000);
+    },
+  },
+  {
+    id: 'hrv-pill',
+    group: 'Live capture',
+    title: 'Reading minimized to the pill',
+    purpose: 'Proof that a reading outlives the card showing it: the session folds into a floating pill over the Journal and keeps collecting. Good for "it does not interrupt you".',
+    fixture: 'arc',
+    settle: 80000,
+    run: async ({ openSheet }) => {
+      router.replace('/');
+      liveStrap(baselineRate(), 330, 11);
+      await wait(300);
+      openSheet((c) => <HrvSession config={BASELINE} controls={c} autoStart />, { hideClose: true, grow: true });
+      setTimeout(() => {
+        minimizeSession();
+        // The pill floats at a FIXED height just above the tab bar, so the
+        // only way to choose what sits under it is to choose the scroll. At
+        // the top of the Journal it lands across the Trend card's one sentence
+        // and clips it mid-word, which reads as a rendering fault rather than
+        // as a pill over a page. This puts a gap between two cards under it.
+        scrollJournalTo(100);
+      }, 62000);
+    },
+  },
+  {
+    id: 'hrv-results',
+    group: 'Live capture',
+    title: 'The reading, just finished',
+    purpose: 'The receipt a completed reading writes: RMSSD, SDNN and the rest, the capture-quality stamp, and the entry already saved. The pay-off shot at the end of a capture sequence.',
+    fixture: 'arc',
+    // The reading runs its full five minutes and the results card replaces it.
+    settle: 312000,
+    run: async ({ openSheet }) => {
+      router.replace('/');
+      liveStrap(pacedRate(), 320, 7);
+      await wait(300);
+      openSheet((c) => <HrvSession config={TRAINING} controls={c} autoStart />, { hideClose: true, grow: true });
+    },
+  },
+  {
+    id: 'stand-test',
+    group: 'Live capture',
+    title: 'POTS stand test, standing phase',
+    purpose: 'The heart rate climbing live on the dial, with the rise against the lying baseline. This is the "like hr changes during a stand test" shot — the rise is modelled on the real orthostatic response, not drawn.',
+    fixture: 'arc',
+    // 5:00 lying + 15s stand prompt + ~3:00 standing.
+    settle: 500000,
+    run: async ({ openSheet }) => {
+      router.replace('/');
+      liveStrap(standProfile(), 920, 3);
+      await wait(300);
+      openSheet((c) => <StandTestSession controls={c} devAutoStart />);
+    },
+  },
 ];
 
 export const SHOT_IDS = SHOTS.map((s) => s.id);
@@ -468,6 +580,12 @@ export function ShotDriver() {
       try {
         setErr(null);
         closeAll();
+        // A previous live-capture shot may still be streaming into a running
+        // reading. Stop the strap first, then the session: endSession() while
+        // samples are still arriving would collect into a torn-down snapshot.
+        stopReplay();
+        setDevBleManager(null);
+        endSession();
         // Everything below is a CLAIM about the journal that is about to be
         // replaced, held in the flags MMKV, which a fixture import does not
         // touch. Leaving them is how a crash-day shot came to carry the

@@ -1,9 +1,23 @@
 # Screenshot library
 
-Twenty-eight stills of the real app, for TikTok and marketing. Every one is a
+Thirty-three stills of the real app, for TikTok and marketing. Every one is a
 screenshot of the product rendering a real journal — nothing here is mocked up,
 composited or retouched, so the numbers on screen are the numbers the app
 computed from the data behind them.
+
+**The one caveat, stated plainly.** The five shots under **Live capture** are of
+screens that only exist while a sensor is streaming, and a simulator has neither
+a camera pulse nor Bluetooth. For those, the beat-to-beat intervals are
+synthesized (`mobile/src/dev/beats.ts`) and fed to the app through the ordinary
+Bluetooth seam. The intervals are the ONLY synthetic thing: the app runs its
+real capture engine over them, so the heart rate, the rolling SDNN, the artifact
+verdict, the beat count, the stand test's baseline and rise, and the entry that
+gets saved are all genuinely computed. The series models the physiology it is
+standing in for — respiratory sinus arrhythmia at the paced breathing rate, a
+Mayer wave under spontaneous breathing, and the real shape of an orthostatic
+response — and is pinned by a test that measures it through the same engine
+(`mobile/src/dev/__tests__/beatcheck.test.ts`). Nothing in those shots shows a
+number the app did not work out for itself.
 
 **Shot on:** iPhone 17 Pro simulator, iOS 26.5, 1206 × 2622, dark theme, Pro tier
 unless noted. Status bar is full signal / full battery / the real clock at
@@ -87,16 +101,33 @@ truth, so add a shot there and update this index.
 
 ---
 
+## Live capture
+
+The sensor-driven screens. Beat intervals are synthesized and everything
+computed from them is the app's own — see the caveat at the top.
+
+| Shot | What it shows | Reach for it when |
+| --- | --- | --- |
+| `hrv-live.png` | A paced 4/6 training reading at 2:23, breathing rings mid-exhale, 61 bpm, rolling SDNN 77 ms, and the beat-to-beat trace rising and falling with the breath. "Clean · 157 beats". | The most recognisable screen in the app, and the best single answer to "what does it actually do". Lead shot for anything about HRV training or breathwork. |
+| `hrv-focus.png` | The same reading in focus mode at 2:31: rings, "Breathe out" and a dimmed timer on black, nothing else. | Full-bleed TikTok. The calmest frame the app has, and the one that survives being cropped to a vertical. |
+| `hrv-pill.png` | The reading folded into the floating pill over the Journal — 3:42 elapsed, 58 bpm, 44 ms — still collecting while the day's 91 sits above it. | "It does not hold your phone hostage." Pair with any claim about the app fitting around a life rather than interrupting it. |
+| `hrv-results.png` | "5:00 captured · 298 beats · 0% artifacts", "Saved to your journal", high confidence, HRV grading Excellent, the full RR trace and SDNN at 79 ms against the last ten readings. | The pay-off at the end of a capture sequence. Also the shot for "a reading is saved, not offered" — there is no Save button to find. |
+| `stand-test.png` | The guided POTS stand test, 6:58 of standing left: HR 95, rise +37 and peak +44 against the lying baseline, the dial red past the stand mark. | The dysautonomia shot. This is the one that proves the app speaks the condition's own language, and the rise on it is the real orthostatic shape. |
+
+---
+
 ## What is NOT in here yet
 
 Honest gaps, so nobody goes looking:
 
-- **Live capture.** A running HRV session, the breathing rings, the live RR
-  trace, and a live stand test with the heart rate actually climbing. These need
-  a real sensor: a simulator has no camera pulse and no Bluetooth, and faking
-  the trace would break the one rule this library is built on. They need either a
-  recorded RR series replayed through the capture engine, or shooting on a real
-  phone with a strap.
+- **A camera (finger-on-lens) capture.** The Live capture shots are all strap
+  readings. The camera path has its own setup card, its own placement squircle
+  and its own trouble advice, and none of it can be reached on a simulator —
+  there is no pulse to lock onto, and the stream is served by a camera view the
+  harness cannot stand in for. That one needs a real phone.
+- **The POTS result card.** The stand test shot is the live capture; the card it
+  writes is a separate screen, and it is a Pro-gated one, so it also wants a
+  free-tier twin showing the lock.
 - **Widgets, notifications and the Apple Watch.** All three live outside the app
   and are shot differently: the home screen, the lock screen, and the watch
   simulator.

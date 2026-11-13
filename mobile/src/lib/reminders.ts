@@ -531,8 +531,13 @@ export async function syncReminder(): Promise<void> {
     }
     // Permission revoked in system settings while we were away: the journal
     // still says "on", so flip it off rather than show a lie in the UI.
-    const perm = await Notifications.getPermissionsAsync();
-    if (!perm.granted) {
+    //
+    // Asked through `readNotificationPermission` rather than the OS directly,
+    // so there is ONE place that answers "what is the permission" — identical
+    // in production (`granted` is exactly `perm.granted`), and the only way the
+    // screenshot harness's pin can hold: reading the OS here flipped the
+    // fixture's reminder off on every launch.
+    if ((await readNotificationPermission()) !== 'granted') {
       await disableReminder();
       return;
     }

@@ -532,7 +532,27 @@ export function createBle(): BleManagerApi {
 
 /** Singleton so scanning/connection survive sheet navigation. */
 let singleton: BleManagerApi | null = null;
+
+/**
+ * DEV ONLY, and only for the marketing screenshot harness (`src/dev/`).
+ *
+ * A simulator has no Bluetooth, so the two screens that only exist while a
+ * sensor is streaming — the live HRV session and the POTS stand test — could
+ * not be photographed at all. Both reach their sensor through `ble()` and
+ * nothing else, so a replay manager standing here drives both down their own
+ * real code paths rather than having each view poked from outside.
+ *
+ * It is a pin beside the real answer, never an edit to it: `createBle` is
+ * untouched, and clearing the override restores the singleton.
+ */
+let devManager: BleManagerApi | null = null;
+export function setDevBleManager(m: BleManagerApi | null) {
+  if (!__DEV__) return;
+  devManager = m;
+}
+
 export function ble(): BleManagerApi {
+  if (__DEV__ && devManager) return devManager;
   if (!singleton) singleton = createBle();
   return singleton;
 }

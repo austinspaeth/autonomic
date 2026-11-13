@@ -54,6 +54,20 @@ Then, with Metro running (`npm start` in `mobile/`):
 - **Settle times matter.** Progress and Insights build behind a skeleton on a
   deferred queue. Under-wait and you photograph the skeleton. Insights wants
   ~15-18s on a cold fixture, Progress ~16s, a plain Journal ~9s.
+- **The live-capture shots run in REAL TIME, because the session clock is the
+  real wall clock.** `hrv-results` takes five minutes and `stand-test` takes
+  eight and a half (5:00 lying, a 15 s stand prompt, then standing). The settle
+  values in the registry are sized for that; do not shorten them expecting the
+  app to catch up. Run them in the background and leave them alone.
+- **The live-capture sensor is a replay strap behind `ble()`**
+  (`src/dev/replayStrap.ts`, installed by `setDevBleManager`). It emits the same
+  `HrSample` a real strap does, about once a second, so the HRV session and the
+  stand test both run their own real code. The intervals come from
+  `src/dev/beats.ts` and are the only synthetic thing in the library — see the
+  caveat at the top of INDEX.md. `beats.ts` is pinned by
+  `src/dev/__tests__/beatcheck.test.ts`, which measures the series through the
+  real `computeHrv`: if you retune it, that test is the thing that says whether
+  it is still a person.
 - **There is no tap tooling.** idb and axe will not build, and Apple events are
   blocked from here, which is the whole reason the driver exists. Anything that
   can only be reached by a thumb needs a registry entry that opens it directly.
