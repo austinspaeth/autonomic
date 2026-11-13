@@ -15,8 +15,8 @@ app:
   feature: pots-stand-test
   hook: "A stand test and pacing in one app."
   line: "Run a guided stand test with a watch, a strap or by hand, take a morning HRV reading, and pace your day from your own numbers."
-photoLocation: "https://images.unsplash.com/photo-1582142582231-bf8e5e15ce46?q=80&w=1760&auto=format&fit=crop"
-photoAttribution: "Lensabl / Unsplash"
+photoLocation: "/articles/best-app-for-pots-and-long-covid/cover.webp"
+photoAttribution: "Autonomic"
 categories:
   - pots
   - postviral
