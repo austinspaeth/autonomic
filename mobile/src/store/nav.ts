@@ -60,6 +60,12 @@ export function scrollJournalToSection(section: string) {
   const y = sectionYs[section];
   if (journalScroller && y != null) journalScroller(y);
 }
+/** Scroll the Journal to an absolute offset. Exists for the dev-only marketing
+ *  screenshot driver (src/dev), which has to frame a card the rest of the app
+ *  only ever reaches by the reader's own thumb. Nothing in the product calls
+ *  it, and nothing in the product should: a view that scrolls itself takes a
+ *  position the reader chose. */
+export function scrollJournalTo(y: number) { journalScroller?.(y); }
 
 /* NOTE: the clean-day streak card cannot be opened from anywhere but its own
  * header. A `requestExpandProtocol` signal used to live here so the Protocol

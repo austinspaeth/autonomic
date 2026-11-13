@@ -22,7 +22,7 @@ import { radius, usePalette } from '../theme';
 import { useAppState } from '../store/store';
 import { resolveProtocol } from '../lib/scoring/day';
 import { findTrend, trendGate, type TrendMetricId } from '../lib/trends';
-import { noteTrendShown, trendMemory } from '../lib/trends/memory';
+import { noteTrendShown, subscribeTrendReset, trendMemory } from '../lib/trends/memory';
 import { profileCtx } from '../lib/scoring';
 
 /** Which Progress section each metric was computed from (category ids in
@@ -98,6 +98,10 @@ export function TrendCard({ dk }: { dk: string }) {
   // has to re-render this card onto the pinned branch, or it would keep
   // recomputing (and re-wording) the very claim it just froze.
   const [memory, setMemory] = useState(trendMemory);
+  // "Clear all data" (and an import, which is also a different journal) wipes
+  // the pinned claim on disk; without this the card would keep rendering it
+  // from state until something remounted it.
+  useEffect(() => subscribeTrendReset(() => setMemory(trendMemory())), []);
   const gate = useMemo(() => trendGate(memory, dk, Date.now()), [memory, dk]);
 
   // One pass over the two 30-day windows, memoized on the same `days` identity

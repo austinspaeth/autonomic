@@ -1,0 +1,86 @@
+{
+  "name": "You can't fake a heart rate",
+  "created": "2026-11-09",
+  "numberFrom": 22,
+  "notes": "One creative for November 9: the \"every test says I'm fine\" hook, a real POTS Test result as the proof, and the download.",
+  "account": {
+    "handle": "POTSDad",
+    "sound": "original sound - POTSDad"
+  },
+  "style": {
+    "type": "bold",
+    "signature": "POTSDad"
+  },
+  "creatives": [
+    {
+      "id": "c1",
+      "name": "You can't fake a heart rate",
+      "title": "Every test says I'm fine. So why can't I stand up without my heart racing?",
+      "goal": "Three slides. The question every undiagnosed person lives with, the measurement that answers it, and the download.",
+      "caption": "Every test came back normal, so I measured it myself 🩵 A stand test takes 15 minutes and the numbers don't argue. Autonomic is free on iOS & Android (link in bio), your phone's camera is enough to start, and your data never leaves your phone. Not medical advice. #pots #dysautonomia #longcovid #mecfs #chronicillness #hrv",
+      "slides": [
+        {
+          "layout": "hook",
+          "copyAt": "top",
+          "text": [
+            "Every test says *I'm fine.*",
+            "So why can't I stand up without my heart racing?"
+          ],
+          "img": {
+            "src": "img/c1s1.jpg",
+            "pos": "39% 65%",
+            "source": "mine",
+            "shows": "You sitting on the edge of the bed or a chair, hand on the wall, about to stand. Tired, not staged. No face needed.",
+            "frame": "Subject in the lower two thirds; the hook sits across the top."
+          },
+          "overlay": 40
+        },
+        {
+          "layout": "phone",
+          "text": [
+            "So *I measured it myself.*"
+          ],
+          "img": {
+            "src": "img/c1s2.png",
+            "pos": "center top",
+            "source": "app",
+            "shows": "A POTS Test result: sustained HR rise +38 bpm (Compromised), the heart rate trace jumping at the stand, baseline 76, peak 122.",
+            "frame": "Raw full-height screenshot from the top; the +38 and the trace level with the copy."
+          },
+          "phoneX": -86,
+          "phoneSize": 0.82,
+          "phoneY": -420
+        },
+        {
+          "layout": "photo",
+          "cta": true,
+          "text": [
+            "*You can't fake a heart rate, prove them wrong.*",
+            "Download the app free."
+          ],
+          "img": {
+            "src": "img/c1s3.jpg",
+            "pos": "76% 100%",
+            "source": "mine",
+            "shows": "You standing with your phone, mid stand test, or a phone on the arm of a chair with the capture running.",
+            "frame": "Subject in the top half; the copy sits under the lockup over the darkened lower half.",
+            "zoom": 1.25
+          },
+          "textY": -400,
+          "overlay": 38,
+          "textSize": 0.8
+        }
+      ],
+      "music": {
+        "mood": "Quiet, serious, then lift",
+        "notes": "Starts restrained under the question, opens up when the result lands. Sincere, never dramatic.",
+        "bpm": "85-100",
+        "search": [
+          "emotional piano build",
+          "hopeful minimal cinematic",
+          "soft inspiring"
+        ]
+      }
+    }
+  ]
+}

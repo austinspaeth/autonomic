@@ -71,4 +71,20 @@ export function noteTrendShown(claim: Omit<TrendClaim, 'v'>): TrendMemory {
 export function resetTrendMemory(): void {
   memValue = undefined;
   try { store()?.delete(KEY); } catch { /* in-memory only this session */ }
+  // The card holds its memory in component state, so deleting the key is not
+  // enough on its own: a mounted TrendCard would go on rendering the pinned
+  // claim until something else remounted it, which is exactly the "a wiped app
+  // keeps congratulating the user on numbers it no longer holds" case this
+  // reset exists to prevent. Only the RESET notifies — `noteTrendShown`
+  // returns its memory to its one caller, which already re-renders on it.
+  resetListeners.forEach((cb) => { try { cb(); } catch { /* a bad listener is not this module's problem */ } });
+}
+
+const resetListeners = new Set<() => void>();
+
+/** Called when `resetTrendMemory` runs, so a mounted card can drop a claim
+ *  about a journal that no longer exists. */
+export function subscribeTrendReset(cb: () => void): () => void {
+  resetListeners.add(cb);
+  return () => { resetListeners.delete(cb); };
 }
