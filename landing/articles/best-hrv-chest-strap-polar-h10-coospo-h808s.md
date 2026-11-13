@@ -9,7 +9,8 @@ date: 2026-07-25
 updated: 2026-11-13
 reviewed: 2026-11-13
 author: "Austin Spaeth"
-photoLocation: "https://images.unsplash.com/photo-1571019613454-1cb2f99b2d8b?q=80&w=1760&auto=format&fit=crop"
+photoLocation: "/articles/best-hrv-chest-strap-polar-h10-coospo-h808s/cover.webp"
+photoAttribution: "Polar H10 photo by Eamonn Leaver (thehomefitfreak.com), CC BY 2.0, cropped. COOSPO H808S image: COOSPO"
 tldr: "Both straps measure HRV well: the Polar H10 is the research-validated, more comfortable choice, and the COOSPO H808S gave us nearly the same morning readings for well under half the price. A chest strap reads your heartbeat electrically, so the beat-to-beat timing HRV is built from is measured rather than guessed. Pick the Polar if you want the benchmark, onboard memory or all-day comfort; pick the COOSPO if price decides whether you buy a strap at all. Both work with the Autonomic app."
 question: "Is the COOSPO H808S as good as the Polar H10 for measuring HRV?"
 app:
@@ -237,3 +238,5 @@ A chest strap is the highest-leverage purchase in home HRV tracking, because it 
 - Shaffer F, Ginsberg JP. [An overview of heart rate variability metrics and norms](https://doi.org/10.3389/fpubh.2017.00258). *Frontiers in Public Health*, 2017.
 - Polar. [H10 heart rate sensor: product page and specifications](https://www.polar.com/us-en/products/accessories/h10_heart_rate_sensor). Accessed November 13, 2026.
 - COOSPO. [H808S user manual](https://cdn.shopify.com/s/files/1/0636/7749/7600/files/COOSPO-H808S-User-Manual.pdf). Accessed November 13, 2026.
+
+*Cover image: Polar H10 photo by [Eamonn Leaver](https://www.flickr.com/photos/191869756@N03/50864874338/) ([thehomefitfreak.com](https://thehomefitfreak.com)), licensed [CC BY 2.0](https://creativecommons.org/licenses/by/2.0/), cropped and combined. COOSPO H808S product image from COOSPO.*
