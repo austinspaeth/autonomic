@@ -151,7 +151,7 @@ You don't have to skip these mornings: a low reading after a hard night is real 
 
 For at-home HRV, the sensor's job is to time each beat precisely, and devices differ in how well they do that:
 
-- **Chest straps** are the most accurate for beat-to-beat timing, because they read the heart's electrical signal directly, the closest consumer option to an ECG.
+- **Chest straps** are the most accurate for beat-to-beat timing, because they read the heart's electrical signal directly, the closest consumer option to an ECG. If you are choosing one, see [Polar H10 vs COOSPO H808S](/insights/hrv/best-hrv-chest-strap-polar-h10-coospo-h808s/).
 - **Rings** are a strong middle ground: comfortable to sleep in and generally solid at rest.
 - **Wrist optical sensors** are the most convenient but the least reliable for HRV, because they infer beats from blood-flow changes and struggle with even small movements.
 
