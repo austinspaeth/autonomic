@@ -1,11 +1,12 @@
 # Screenshot library
 
-Thirty-three stills of the real app, for TikTok and marketing. Every one is a
+Thirty-six stills of the real app, for TikTok and marketing. Every one is a
 screenshot of the product rendering a real journal — nothing here is mocked up,
 composited or retouched, so the numbers on screen are the numbers the app
 computed from the data behind them.
 
-**The one caveat, stated plainly.** The five shots under **Live capture** are of
+**The one caveat, stated plainly.** The first five shots under **Live capture**
+— `hrv-live`, `hrv-focus`, `hrv-pill`, `hrv-results` and `stand-test` — are of
 screens that only exist while a sensor is streaming, and a simulator has neither
 a camera pulse nor Bluetooth. For those, the beat-to-beat intervals are
 synthesized (`mobile/src/dev/beats.ts`) and fed to the app through the ordinary
@@ -17,7 +18,8 @@ standing in for — respiratory sinus arrhythmia at the paced breathing rate, a
 Mayer wave under spontaneous breathing, and the real shape of an orthostatic
 response — and is pinned by a test that measures it through the same engine
 (`mobile/src/dev/__tests__/beatcheck.test.ts`). Nothing in those shots shows a
-number the app did not work out for itself.
+number the app did not work out for itself. The three `pots-*` result cards
+below them carry none of this: they are ordinary saved journal entries.
 
 **Shot on:** iPhone 17 Pro simulator, iOS 26.5, 1206 × 2622, dark theme, Pro tier
 unless noted. Status bar is full signal / full battery / the real clock at
@@ -103,8 +105,11 @@ truth, so add a shot there and update this index.
 
 ## Live capture
 
-The sensor-driven screens. Beat intervals are synthesized and everything
-computed from them is the app's own — see the caveat at the top.
+The sensor-driven screens, and the cards a capture writes. In the first five,
+beat intervals are synthesized and everything computed from them is the app's
+own — see the caveat at the top. The three `pots-*` cards are not captures at
+all: they are saved readings out of the fixture journal, opened the way a tap on
+a journal row opens them.
 
 | Shot | What it shows | Reach for it when |
 | --- | --- | --- |
@@ -113,6 +118,9 @@ computed from them is the app's own — see the caveat at the top.
 | `hrv-pill.png` | The reading folded into the floating pill over the Journal — 3:42 elapsed, 58 bpm, 44 ms — still collecting while the day's 91 sits above it. | "It does not hold your phone hostage." Pair with any claim about the app fitting around a life rather than interrupting it. |
 | `hrv-results.png` | "5:00 captured · 298 beats · 0% artifacts", "Saved to your journal", high confidence, HRV grading Excellent, the full RR trace and SDNN at 79 ms against the last ten readings. | The pay-off at the end of a capture sequence. Also the shot for "a reading is saved, not offered" — there is no Save button to find. |
 | `stand-test.png` | The guided POTS stand test, 6:58 of standing left: HR 95, rise +37 and peak +44 against the lying baseline, the dial red past the stand mark. | The dysautonomia shot. This is the one that proves the app speaks the condition's own language, and the rise on it is the real orthostatic shape. |
+| `pots-positive.png` | The stand test's RESULT on a crash-era morning: +42 bpm sustained, graded Bad, 79 supine to a 134 peak, "Sustained rise ≥30 bpm — Yes", over the app's own "not a diagnosis, and this cannot detect a BP drop" note. | THE dysautonomia shot. The app speaking the condition's language and naming its own limits in the same frame. |
+| `pots-result.png` | The same card at the recovered end of the arc: +15, Good, "No" to the threshold — with the ten-test sparkline showing the sustained rise falling from 43 to 14 bpm. | Pair it with `pots-positive` for a before/after of one measurement. That sparkline is the single clearest "this is getting better" image in the library. |
+| `pots-locked.png` | The free tier meeting the same result: "POTS results are locked", "Your reading was captured and saved to your journal, and it stays there". | The honest freemium frame. The capture is free on every tier because a stand test happens at a moment that cannot be rescheduled around a subscription; only reading it is Pro. |
 
 ---
 
@@ -125,13 +133,10 @@ Honest gaps, so nobody goes looking:
   and its own trouble advice, and none of it can be reached on a simulator —
   there is no pulse to lock onto, and the stream is served by a camera view the
   harness cannot stand in for. That one needs a real phone.
-- **The POTS result card.** The stand test shot is the live capture; the card it
-  writes is a separate screen, and it is a Pro-gated one, so it also wants a
-  free-tier twin showing the lock.
 - **Widgets, notifications and the Apple Watch.** All three live outside the app
   and are shot differently: the home screen, the lock screen, and the watch
   simulator.
 - **Android.** Its own simulator, its own widgets, Health Connect instead of
   Apple Health.
 - **Light theme.** Every shot here is dark.
-- **Cycle tracking**, the POTS result cards, the export sheet and Settings.
+- **Cycle tracking**, the export sheet and Settings.

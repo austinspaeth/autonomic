@@ -55,10 +55,21 @@ Then, with Metro running (`npm start` in `mobile/`):
   deferred queue. Under-wait and you photograph the skeleton. Insights wants
   ~15-18s on a cold fixture, Progress ~16s, a plain Journal ~9s.
 - **The live-capture shots run in REAL TIME, because the session clock is the
-  real wall clock.** `hrv-results` takes five minutes and `stand-test` takes
-  eight and a half (5:00 lying, a 15 s stand prompt, then standing). The settle
-  values in the registry are sized for that; do not shorten them expecting the
-  app to catch up. Run them in the background and leave them alone.
+  real wall clock.** `hrv-results` takes five minutes, and `stand-test` is
+  deliberately stopped partway: a WHOLE guided stand test is 15:15 (300 s lying,
+  a 15 s stand prompt, 600 s standing), and that shot wants the standing phase,
+  so its settle stops the clock at 8:20 with the dial live. The settle values in
+  the registry are sized for all of this; do not shorten them expecting the app
+  to catch up. Run them in the background and leave them alone.
+- **A card a capture WRITES does not need the capture.** The stand test's result
+  was filed as a gap on the assumption that photographing it meant sitting
+  through the full 15:15 live. It does not: `demo.ts` already writes `standTest`
+  readings into the fixture journal, and `openReadingReport` is the single choke
+  point every journal row goes through — so `pots-result`, `pots-positive` and
+  `pots-locked` are each one call on an entry that already exists, and the last
+  of them gets the lock card for free, since `openPotsLockIfNeeded` sits at the
+  top of that same function. Before deciding a screen needs a live run, check
+  whether the fixture journal already holds the entry behind it.
 - **The live-capture sensor is a replay strap behind `ble()`**
   (`src/dev/replayStrap.ts`, installed by `setDevBleManager`). It emits the same
   `HrSample` a real strap does, about once a second, so the HRV session and the

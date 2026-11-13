@@ -109,6 +109,45 @@ function firstReading(dk: string) {
   return (getState().days[dk]?.readings || []).find((r) => r.type === 'hrv' || r.type === 'breathHrv');
 }
 
+/**
+ * The most recent guided stand test in the journal, newest first.
+ *
+ * Searched rather than taken from today: `demo.ts` runs the test every fifth
+ * day, so today holds one only one morning in five, and a shot that depends on
+ * which day it is taken on is a shot that fails silently four times out of
+ * five. The result card takes its own `dk`, so nothing has to navigate there.
+ */
+function latestStandTest(): { r: NonNullable<ReturnType<typeof firstReading>>; dk: string } | null {
+  const days = getState().days;
+  for (const dk of Object.keys(days).sort().reverse()) {
+    const r = (days[dk]?.readings || []).find((x) => x.type === 'standTest');
+    if (r) return { r, dk };
+  }
+  return null;
+}
+
+/**
+ * The stand test with the LARGEST sustained rise — the one that met the
+ * threshold.
+ *
+ * The newest test in this journal sits at the recovered end of the arc and
+ * answers "No" to the sustained-rise question, which is the recovery story
+ * rather than the dysautonomia one. This is the same journal on one of its own
+ * crash-era mornings; the grade, the wording and the verdict are all the app's.
+ */
+function worstStandTest(): { r: NonNullable<ReturnType<typeof firstReading>>; dk: string } | null {
+  let best: { r: NonNullable<ReturnType<typeof firstReading>>; dk: string } | null = null;
+  const days = getState().days;
+  for (const dk of Object.keys(days).sort()) {
+    for (const r of days[dk]?.readings || []) {
+      if (r.type !== 'standTest') continue;
+      const d = Number(r.sustainedDelta);
+      if (!best || d > Number(best.r.sustainedDelta)) best = { r, dk };
+    }
+  }
+  return best;
+}
+
 /* ---------- the registry ---------- */
 
 export const SHOTS: Shot[] = [
@@ -554,6 +593,55 @@ export const SHOTS: Shot[] = [
       liveStrap(standProfile(), 920, 3);
       await wait(300);
       openSheet((c) => <StandTestSession controls={c} devAutoStart />);
+    },
+  },
+  {
+    id: 'pots-result',
+    group: 'Live capture',
+    title: 'POTS stand test result',
+    purpose: 'What the stand test is FOR: the lying baseline, the peak rise and the sustained rise, with the app saying in its own words whether the sustained rise met the threshold for this person\'s age. The shot for any dysautonomia piece that needs a diagnosis-literate number rather than a live dial.',
+    fixture: 'arc',
+    settle: 2400,
+    run: async ({ openSheet }) => {
+      router.replace('/');
+      await wait(1400);
+      const found = latestStandTest();
+      if (!found) throw new Error('no standTest reading in the fixture journal');
+      setCurrentKey(found.dk);
+      openReadingReport(openSheet, found.r, found.dk);
+    },
+  },
+  {
+    id: 'pots-locked',
+    group: 'Live capture',
+    title: 'POTS result — the free-tier lock',
+    purpose: 'The one gate in the app that is a card rather than a mask: the capture ran and saved on the free tier, and reading the result is the Pro half. Pair with any explainer about where the freemium line actually falls.',
+    fixture: 'arc',
+    tier: 'free',
+    settle: 2400,
+    run: async ({ openSheet }) => {
+      router.replace('/');
+      await wait(1400);
+      const found = latestStandTest();
+      if (!found) throw new Error('no standTest reading in the fixture journal');
+      setCurrentKey(found.dk);
+      openReadingReport(openSheet, found.r, found.dk);
+    },
+  },
+  {
+    id: 'pots-positive',
+    group: 'Live capture',
+    title: 'POTS stand test result — threshold met',
+    purpose: 'The same card on one of this journal\'s crash-era mornings, where the sustained rise clears the POTS threshold and the app says so in the condition\'s own terms. THE dysautonomia shot: pair it with `pots-result` to show the same measurement before and after a recovery.',
+    fixture: 'arc',
+    settle: 2400,
+    run: async ({ openSheet }) => {
+      router.replace('/');
+      await wait(1400);
+      const found = worstStandTest();
+      if (!found) throw new Error('no standTest reading in the fixture journal');
+      setCurrentKey(found.dk);
+      openReadingReport(openSheet, found.r, found.dk);
     },
   },
 ];
