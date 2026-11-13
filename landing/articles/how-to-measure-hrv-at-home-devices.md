@@ -126,7 +126,7 @@ This is also why HRV is a trend metric, not a daily verdict. A single number is 
 
 ## Choosing the right device for you
 
-If you want the cleanest possible reading, especially for [orthostatic stand tests](/insights/pots/the-orthostatic-stand-test-at-home/) where beat timing during position changes really counts, a chest strap is worth it. If you want zero-effort overnight tracking and will never remember to strap something on, a ring is the more honest choice. If you already own a watch, use it, just treat its numbers as a personal trend line rather than an absolute.
+If you want the cleanest possible reading, especially for [orthostatic stand tests](/insights/pots/the-orthostatic-stand-test-at-home/) where beat timing during position changes really counts, a chest strap is worth it; our [Polar H10 vs COOSPO H808S comparison](/insights/hrv/best-hrv-chest-strap-polar-h10-coospo-h808s/) covers which one to buy. If you want zero-effort overnight tracking and will never remember to strap something on, a ring is the more honest choice. If you already own a watch, use it, just treat its numbers as a personal trend line rather than an absolute.
 
 For people managing POTS and dysautonomia, our roundup of the [best tools for tracking POTS](/insights/pots/best-tools-for-tracking-pots/) walks through how these devices fit alongside blood pressure and symptom tracking.
 

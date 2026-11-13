@@ -69,7 +69,7 @@ The most POTS-specific measurement, the orthostatic rise, needs no gadget. Rest 
 
 ### A chest strap: best fidelity
 
-If you want *one* accurate signal, a chest strap is the value champion. It reads the electrical R-R intervals of each heartbeat directly, which makes it the closest consumer approximation to clinical-grade heart rate and HRV. That precision matters most for stand tests and morning HRV readings, where a wrist sensor's noise can swamp the signal. The catch: you have to strap it on, so it is a deliberate-measurement tool, not an all-day one.
+If you want *one* accurate signal, a chest strap is the value champion. It reads the electrical R-R intervals of each heartbeat directly, which makes it the closest consumer approximation to clinical-grade heart rate and HRV. That precision matters most for stand tests and morning HRV readings, where a wrist sensor's noise can swamp the signal. The catch: you have to strap it on, so it is a deliberate-measurement tool, not an all-day one. For two good options at different prices, see [Polar H10 vs COOSPO H808S](/insights/hrv/best-hrv-chest-strap-polar-h10-coospo-h808s/).
 
 ### A ring or watch: effortless trends
 

@@ -37,7 +37,7 @@ If you have ever worn two HRV devices at once and gotten two different numbers, 
 
 To say a wearable is accurate, you need something to compare it against. The gold standard is a clinical **electrocardiogram (ECG)**, which reads the heart's electrical signal directly. Every millisecond of variation a validation study reports is measured against that signal.
 
-Here is the twist that shapes this whole topic: the best consumer chest straps are so close to ECG that researchers often use them *as* the reference. The **Polar H10** correlates around 0.99 with ECG for beat-to-beat intervals, which is why it shows up in study after study not as the thing being tested, but as the yardstick everything else is tested against.
+Here is the twist that shapes this whole topic: the best consumer chest straps are so close to ECG that researchers often use them *as* the reference. The **Polar H10** correlates around 0.99 with ECG for beat-to-beat intervals, which is why it shows up in study after study not as the thing being tested, but as the yardstick everything else is tested against. If you want one for yourself, we compare it with a cheaper strap in [Polar H10 vs COOSPO H808S](/insights/hrv/best-hrv-chest-strap-polar-h10-coospo-h808s/).
 
 That gives us a clean way to rank the three device types most people actually own.
 
