@@ -530,22 +530,22 @@ export const HRV_HELP: Record<string, HelpContent> = {
   mxdmn: {
     what: 'The difference between the longest and shortest RR interval in the reading. It describes the full range of the variation rather than its average, which also makes it sensitive to a single stray beat.',
     why: 'A wide spread generally reflects a rhythm free to move; a narrow one a rigid rhythm, which is what tends to accompany bad stretches. Because one artifact can inflate it, read the trend across readings rather than any single value.',
-    learnMore: '/insights/basics/hrv-histogram-mode-amo50-mxdmn-cv/',
+    learnMore: '/insights/basics/pns-index-sns-index-stress-index-explained/',
   },
   mode: {
     what: 'The most frequently occurring RR interval, the centre of your beat-interval distribution. With AMo50 it describes that distribution\'s shape: the mode is where it sits, AMo50 is how tightly it clusters.',
     why: 'Shifts in the mode track shifts in your underlying resting rate, so it drifts longer as you recover and shorter as load builds. It holds up better than mean RR against odd beats, which makes it a quieter way to watch the same slow change.',
-    learnMore: '/insights/basics/hrv-histogram-mode-amo50-mxdmn-cv/',
+    learnMore: '/insights/basics/pns-index-sns-index-stress-index-explained/',
   },
   amo50: {
     what: 'The share of beats falling in the busiest 50 ms bin of the distribution. It climbs as the rhythm concentrates around one interval and falls as the distribution spreads out. It also feeds the stress index.',
     why: 'A rising AMo50 means your rhythm is locking into a narrow band, which is what strain looks like before it becomes a symptom. Relaxed, well-recovered readings spread out and pull it down, so a falling trend is good news even if heart rate has not moved.',
-    learnMore: '/insights/basics/hrv-histogram-mode-amo50-mxdmn-cv/',
+    learnMore: '/insights/basics/pns-index-sns-index-stress-index-explained/',
   },
   cv: {
     what: 'Coefficient of variation: SDNN divided by the mean RR, as a percentage. Normalizing by heart rate strips out most of the effect the rate itself has on the raw variability figure.',
     why: 'It makes readings taken at different heart rates comparable, which matters when your rate swings between days. If SDNN falls but CV holds, the drop was mostly a faster heart; if both fall, the variability itself really did shrink.',
-    learnMore: '/insights/basics/hrv-histogram-mode-amo50-mxdmn-cv/',
+    learnMore: '/insights/basics/pns-index-sns-index-stress-index-explained/',
   },
   lfPeak: {
     what: 'The frequency carrying the most power between 0.04 and 0.15 Hz. Under paced breathing it generally mirrors your breathing pace: a 4/6 pattern is one breath every ten seconds, or 0.1 Hz, near the resonance frequency for most people.',
