@@ -2,8 +2,8 @@ module.exports = function (api) {
   api.cache(true);
   return {
     presets: ['babel-preset-expo'],
-    // worklets-core powers vision-camera frame processors (camera PPG); the
-    // reanimated plugin must stay last per its docs.
-    plugins: ['react-native-worklets-core/plugin', 'react-native-reanimated/plugin'],
+    // One worklet runtime: Reanimated 4 and VisionCamera 5's frame processors
+    // both run on react-native-worklets. Its plugin must stay last.
+    plugins: ['react-native-worklets/plugin'],
   };
 };

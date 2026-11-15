@@ -1,6 +1,8 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Dimensions, Platform, Pressable, RefreshControl, ScrollView, Text, View } from 'react-native';
-import Animated, { Easing, Extrapolation, interpolate, runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { AppState, Platform, Pressable, RefreshControl, ScrollView, Text, useWindowDimensions, View } from 'react-native';
+import type { ScrollViewInstance } from 'react-native';
+import Animated, { Easing, Extrapolation, interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen, headerHeight } from '../../src/components/Header';
 import { BrandMark, brandMarkWidth } from '../../src/components/Icon';
@@ -25,7 +27,10 @@ import { useFocusEffect } from 'expo-router';
 // does the content swap; and the new day slides in from the opposite side
 // only after its tree has mounted and laid out (so the slide-in is never
 // fighting a heavy render).
-const SHIFT = Math.round(Dimensions.get('window').width * 0.32);
+// How far a day slides, as a share of the window. Derived from the LIVE width
+// inside the component, never cached at module load: a folding iPhone resizes
+// the app between its two displays mid-session.
+const SHIFT_SHARE = 0.32;
 const TIMING = { duration: 190, easing: Easing.out(Easing.cubic) };
 
 // Pull-to-check: dragging this far past the top asks the health-update pill
@@ -89,7 +94,7 @@ export default function JournalScreen() {
 
   // Content renders `shownDk`, which trails `dk` by one out-animation.
   const [shownDk, setShownDk] = useState(dk);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
 
   // ---- pull-to-check (health updates) ----
   // iOS: ride the native bounce — the brand mark fades/scales in under the
@@ -105,7 +110,7 @@ export default function JournalScreen() {
   const pullScroll = useAnimatedScrollHandler({
     onScroll: (e) => { pullY.value = e.contentOffset.y; },
     onEndDrag: (e) => {
-      if (e.contentOffset.y <= -PULL_TRIGGER) { runOnJS(requestHealthUpdateCheck)(); runOnJS(pullBudget)(); }
+      if (e.contentOffset.y <= -PULL_TRIGGER) { scheduleOnRN(requestHealthUpdateCheck); scheduleOnRN(pullBudget); }
     },
   });
   // The graphic is anchored at the header's bottom edge and counter-translated
@@ -137,6 +142,7 @@ export default function JournalScreen() {
     // The spinner only acknowledges the gesture — the pill shows real progress.
     setTimeout(() => setRefreshing(false), 700);
   };
+  const SHIFT = Math.round(useWindowDimensions().width * SHIFT_SHARE);
   const tx = useSharedValue(0);
   const fade = useSharedValue(1);
   // True between the swap commit and the new day's first layout; the
@@ -159,7 +165,7 @@ export default function JournalScreen() {
     pendingIn.current = true;
     setShownDk(next);
     scrollRef.current?.scrollTo({ y: 0, animated: false });
-  }, [tx, fade]);
+  }, [tx, fade, SHIFT]);
 
   // Phase 3 — the swapped-in day's first layout (keyed by dk, so it always
   // remounts): the new tree is rendered and sized, slide it in now.
@@ -196,9 +202,9 @@ export default function JournalScreen() {
     // A restart mid-flight cancels this callback (finished=false), so only
     // the final out-animation performs the swap.
     fade.value = withTiming(0, TIMING, (finished) => {
-      if (finished) runOnJS(swap)(dk, dir);
+      if (finished) scheduleOnRN(swap, dk, dir);
     });
-  }, [dk, shownDk, swap, tx, fade]);
+  }, [dk, shownDk, swap, tx, fade, SHIFT]);
 
   const slideStyle = useAnimatedStyle(() => ({
     opacity: fade.value,

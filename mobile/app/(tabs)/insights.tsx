@@ -50,8 +50,10 @@
  * a locked view is a dead end, not an upsell.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { InteractionManager, Pressable, Text, View, type LayoutChangeEvent, type ScrollView } from 'react-native';
-import { useIsFocused } from '@react-navigation/native';
+import { Pressable, Text, View, type LayoutChangeEvent, type ScrollView } from 'react-native';
+import type { ScrollViewInstance } from 'react-native';
+import { useIsFocused } from 'expo-router';
+import { runAfterInteractions } from '@/lib/defer';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen, headerHeight } from '../../src/components/Header';
 import { Icon } from '../../src/components/Icon';
@@ -217,7 +219,7 @@ export default function InsightsScreen() {
    */
   useEffect(() => {
     if (builtFor.current) return;
-    const task = InteractionManager.runAfterInteractions(() => {
+    const task = runAfterInteractions(() => {
       const args = argsRef.current;
       if (builtFor.current === args) return;
       builtFor.current = args;
@@ -238,7 +240,7 @@ export default function InsightsScreen() {
   useEffect(() => {
     if (!focused || builtFor.current === buildArgs) return;
     let cancelled = false;
-    const task = InteractionManager.runAfterInteractions(() => {
+    const task = runAfterInteractions(() => {
       if (cancelled) return;
       builtFor.current = buildArgs;
       const built = build(buildArgs);
@@ -277,7 +279,7 @@ export default function InsightsScreen() {
   useEffect(() => {
     if (!focused || settled) return;
     let timer: ReturnType<typeof setTimeout> | null = null;
-    const task = InteractionManager.runAfterInteractions(() => {
+    const task = runAfterInteractions(() => {
       timer = setTimeout(() => setSettled(true), TAB_SETTLE_MS);
     });
     return () => { task.cancel(); if (timer) clearTimeout(timer); };
@@ -372,7 +374,7 @@ export default function InsightsScreen() {
    * view. The request waits (peek, not take) until the card has actually laid out,
    * since the warning is usually tapped before this screen has built anything.
    */
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const pressureY = useRef<number | null>(null);
   const cardSignal = useInsightsCardSignal();
   const scrollToCard = useCallback(() => {

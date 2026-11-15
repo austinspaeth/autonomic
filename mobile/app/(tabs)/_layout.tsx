@@ -1,12 +1,11 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated as RNAnimated, AppState, Dimensions, Easing, Platform, Pressable, Text, useWindowDimensions, View } from 'react-native';
-import { Tabs } from 'expo-router';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused } from 'expo-router';
+import { Tabs, type BottomTabBarProps } from 'expo-router/js-tabs';
 import { BlurView } from 'expo-blur';
 import Svg, { Path } from 'react-native-svg';
 import Animated, { Easing as REasing, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import type { BottomTabBarProps } from '@react-navigation/bottom-tabs';
 import { BrandMark, brandMarkWidth, Icon, IconName } from '../../src/components/Icon';
 import { TurkeyMark } from '../../src/components/TurkeyMark';
 import { PUMPKIN } from '../../src/lib/seasonal';
@@ -48,7 +47,12 @@ const SPRING = { damping: 19, stiffness: 210, mass: 1 };
 // toward the tab you left; the incoming view fades in from the opposite side.
 // react-navigation feeds each scene a signed `progress` (0 = focused; +1 / -1
 // for tabs after / before the active one), so the sign already encodes direction.
-const SHIFT = Math.round(Dimensions.get('window').width * 0.32);
+// Read at the moment of use, never cached at module load: the window is not a
+// constant any more (a folding iPhone resizes the app between its two displays
+// mid-session), and a width captured at launch would slide scenes by the wrong
+// distance for the rest of the process.
+const shiftFor = (width: number) => Math.round(width * 0.32);
+const windowShift = () => shiftFor(Dimensions.get('window').width);
 const TAB_TRANSITION = {
   animation: 'shift' as const,
   transitionSpec: {
@@ -59,7 +63,7 @@ const TAB_TRANSITION = {
     sceneStyle: {
       opacity: current.progress.interpolate({ inputRange: [-1, 0, 1], outputRange: [0, 1, 0] }),
       transform: [{
-        translateX: current.progress.interpolate({ inputRange: [-1, 0, 1], outputRange: [-SHIFT, 0, SHIFT] }),
+        translateX: current.progress.interpolate({ inputRange: [-1, 0, 1], outputRange: [-windowShift(), 0, windowShift()] }),
       }],
     },
   }),
@@ -96,10 +100,10 @@ function AndroidSceneFx({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const onFx = (dir: number) => {
       if (focusedRef.current) {
-        tx.value = withTiming(dir === 0 ? 0 : -dir * SHIFT, SCENE_TIMING);
+        tx.value = withTiming(dir === 0 ? 0 : -dir * windowShift(), SCENE_TIMING);
         fade.value = withTiming(dir === 0 ? 1 : 0, SCENE_TIMING);
       } else if (dir !== 0) {
-        tx.value = dir * SHIFT;
+        tx.value = dir * windowShift();
         fade.value = 0;
       }
     };
@@ -137,7 +141,7 @@ function SolidCog({ size = 22, color = '#000' }: { size?: number; color?: string
   );
 }
 
-function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
+function FloatingTabBar({ state, navigateToTab }: BottomTabBarProps) {
   const p = usePalette();
   const insets = useSafeAreaInsets();
   const { openSheet } = useSheets();
@@ -182,8 +186,8 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
     if (optimistic != null && optimistic === activeIndex) setOptimistic(null);
   }, [optimistic, activeIndex]);
 
-  const pressTab = (name: string, i: number) => {
-    if (Platform.OS !== 'android') { navigation.navigate(name); return; }
+  const pressTab = (routeKey: string, i: number) => {
+    if (Platform.OS !== 'android') { navigateToTab(routeKey); return; }
     if (i === shownIndex) return;            // already there (or already heading there)
     const dir = i > shownIndex ? 1 : -1;
     setOptimistic(i);
@@ -199,7 +203,7 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
     sceneFx.forEach((l) => l(dir));
     // Navigate once the outgoing scene is fully off; the incoming scene's
     // focus effect (AndroidSceneFx) runs the slide-in.
-    sceneNavTimer = setTimeout(() => { sceneNavTimer = null; navigation.navigate(name); }, SCENE_TIMING.duration + 20);
+    sceneNavTimer = setTimeout(() => { sceneNavTimer = null; navigateToTab(routeKey); }, SCENE_TIMING.duration + 20);
   };
 
   // Measured per-tab geometry drives the sliding highlight pill.
@@ -270,7 +274,7 @@ function FloatingTabBar({ state, navigation }: BottomTabBarProps) {
           return (
             <Pressable
               key={route.key}
-              onPress={() => pressTab(route.name, i)}
+              onPress={() => pressTab(route.key, i)}
               onLayout={(e) => {
                 const { x, width } = e.nativeEvent.layout;
                 setLayouts((prev) => {

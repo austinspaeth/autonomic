@@ -36,6 +36,7 @@ import { health, healthAppName, medicationsSupported } from '../health';
 import { hrPoisonDump } from '../health/hrPoisonMemory';
 import { medPickerLast } from '../health/medPickerMemory';
 import { bleIfStarted } from '../ble/manager';
+import { cameraPermissionStatus, loadPpgModules } from '../ppg/modules';
 import { garminLinkIntact } from '../garmin/receiver';
 import { isSideloadedAndroidBuild, isTestFlightBuild } from '../../../modules/app-env';
 import { watchBridge } from '../../../modules/watch-bridge';
@@ -54,19 +55,6 @@ async function safeText(fn: () => unknown | Promise<unknown>): Promise<string> {
   try { return String(await fn()); } catch (e) { return `unreadable (${describeError(e)})`; }
 }
 
-/** VisionCamera, or null when it isn't in this build — a missing module is a
- *  fact to print, not an error to report. */
-function visionCamera(): { Camera?: {
-  getCameraPermissionStatus(): string;
-  getAvailableCameraDevices(): { hasTorch: boolean }[];
-}; getCameraDevice?: (list: unknown, pos: string) => { hasTorch: boolean } | undefined } | null {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('react-native-vision-camera');
-  } catch {
-    return null;
-  }
-}
 
 /** expo-notifications reports the iOS grant as a raw enum; name it. */
 const IOS_AUTH_STATUS = ['not determined', 'denied', 'authorized', 'provisional', 'ephemeral'];
@@ -286,10 +274,7 @@ async function permissionRows(): Promise<Rows> {
   const rows: Rows = {};
 
   // Camera: VisionCamera's own view, which is the one the reading flow gates on.
-  rows['camera'] = await safeText(() => {
-    const vc = visionCamera();
-    return vc?.Camera ? vc.Camera.getCameraPermissionStatus() : 'no native module';
-  });
+  rows['camera'] = await safeText(cameraPermissionStatus);
 
   if (Platform.OS === 'android') {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -327,18 +312,17 @@ async function capabilityRows(): Promise<Rows> {
     try { rows[name] = probe() ? 'loaded' : 'MISSING'; } catch (e) { rows[name] = `MISSING (${describeError(e)})`; }
   };
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  mod('vision-camera', () => !!require('react-native-vision-camera')?.Camera);
+  mod('vision-camera', () => !!loadPpgModules().vc);
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  mod('worklets-core', () => !!require('react-native-worklets-core')?.useRunOnJS);
+  mod('camera-worklets', () => !!require('react-native-vision-camera-worklets')?.provider);
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   mod('ble-plx', () => !!require('react-native-ble-plx')?.BleManager);
 
-  rows['rear camera'] = await safeText(() => {
-    const vc = visionCamera();
-    if (!vc?.Camera) return 'no native module';
-    const list = vc.Camera.getAvailableCameraDevices();
-    const back = vc.getCameraDevice?.(list, 'back');
-    if (!back) return `none (${list.length} camera(s) listed)`;
+  rows['rear camera'] = await safeText(async () => {
+    const { vc } = loadPpgModules();
+    if (!vc) return 'no native module';
+    const back = await vc.getDefaultCameraDevice('back');
+    if (!back) return `none (${vc.getAllCameraDevices().length} camera(s) listed)`;
     return `present, torch ${back.hasTorch ? 'yes' : 'no'}`;
   });
 
@@ -505,7 +489,7 @@ function buildNotes(d: Omit<AppDiagnostics, 'notes'>): string[] {
   if (String(d.permissions['camera']) === 'denied' || String(d.permissions['camera']) === 'restricted') {
     notes.push('Camera permission is refused, so finger (PPG) readings can never start. On Android the prompt will not reappear — it needs system Settings.');
   }
-  if (d.capabilities['worklets-core'] !== 'loaded' || d.capabilities['vision-camera'] !== 'loaded') {
+  if (d.capabilities['camera-worklets'] !== 'loaded' || d.capabilities['vision-camera'] !== 'loaded') {
     notes.push('A camera native module is missing from this build, so camera readings cannot work here at all.');
   }
   if (typeof d.capabilities['garmin link'] === 'string' && String(d.capabilities['garmin link']).startsWith('BROKEN')) {

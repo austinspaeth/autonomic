@@ -16,6 +16,7 @@
  */
 import { assessPulse, detectBeats, fingerPresent, type PulseQuality } from './detect';
 import { ppgTrace } from './diagnostics';
+import { cameraPermissionStatus, loadPpgModules, requestCameraPermission } from './modules';
 import { createPermissionGate } from './permission';
 import { logError } from '../diagnostics/errorLog';
 import { mean } from '../hrv';
@@ -238,22 +239,14 @@ const stub: PpgManagerApi = {
 };
 
 export function createPpg(): PpgManagerApi {
-  let CameraModule: typeof import('react-native-vision-camera');
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    CameraModule = require('react-native-vision-camera');
-  } catch {
-    return stub;
-  }
-  const { Camera } = CameraModule;
-  if (!Camera) return stub;
+  if (!loadPpgModules().vc) return stub;
 
   // Self-gating: never prompt for a permission we already hold, and never let
   // two callers prompt at once — Android drops the second request and leaves
   // both promises unsettled. See permission.ts for the full story.
   const ensurePermission = createPermissionGate({
-    status: () => String(Camera.getCameraPermissionStatus()),
-    request: () => Camera.requestCameraPermission().then(String),
+    status: cameraPermissionStatus,
+    request: requestCameraPermission,
     onResult: (status, prompted) => {
       ppgTrace.set({ permissionRequested: status }, 'permission-request', prompted ? status : `${status} (already held, not prompted)`);
       if (status === 'granted') ppgTrace.mark('permission-granted');

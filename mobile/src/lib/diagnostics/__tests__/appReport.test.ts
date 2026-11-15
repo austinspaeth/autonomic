@@ -7,7 +7,7 @@ const base = (over: Partial<AppDiagnostics> = {}): AppDiagnostics => ({
   distribution: { 'ios sandbox receipt': false },
   subscription: { tier: 'pro', entitled: true, 'active plan': 'com.autonomic.journal.yearly' },
   permissions: { camera: 'granted', 'apple health read': 'unknown' },
-  capabilities: { 'vision-camera': 'loaded', 'worklets-core': 'loaded' },
+  capabilities: { 'vision-camera': 'loaded', 'camera-worklets': 'loaded' },
   health: { app: 'Apple Health', available: true, 'connected in settings': true },
   watch: { paired: true, 'watch app installed': true, reachable: false },
   bluetooth: { 'native module': true, 'adapter state': 'PoweredOn', 'can scan now': true },

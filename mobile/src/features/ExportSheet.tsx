@@ -23,7 +23,7 @@
  */
 import React, { useMemo, useState } from 'react';
 import { Alert, Pressable, Text, View } from 'react-native';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import * as Sharing from 'expo-sharing';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { Button, Segmented } from '../components/ui';

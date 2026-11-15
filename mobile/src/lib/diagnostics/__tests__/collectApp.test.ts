@@ -35,7 +35,7 @@ jest.mock('react-native-mmkv', () => ({
   MMKV: class { constructor() { throw new Error('no native MMKV in this build'); } },
 }), { virtual: true });
 jest.mock('react-native-vision-camera', () => { throw new Error('not in this build'); }, { virtual: true });
-jest.mock('react-native-worklets-core', () => ({ useRunOnJS: () => {} }), { virtual: true });
+jest.mock('react-native-vision-camera-worklets', () => ({ provider: {} }), { virtual: true });
 jest.mock('react-native-ble-plx', () => ({ BleManager: class {} }), { virtual: true });
 jest.mock('expo-store-review', () => ({ isAvailableAsync: async () => true, hasAction: async () => true }), { virtual: true });
 jest.mock('expo-sharing', () => ({ isAvailableAsync: async () => true }), { virtual: true });

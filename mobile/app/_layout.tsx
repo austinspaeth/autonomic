@@ -4,7 +4,8 @@ import { StatusBar } from 'expo-status-bar';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { Slot } from 'expo-router';
-import { InteractionManager, Platform, View } from 'react-native';
+import { Platform, View } from 'react-native';
+import { runAfterInteractions } from '@/lib/defer';
 import * as Updates from 'expo-updates';
 import { useFonts } from 'expo-font';
 import { Manrope_600SemiBold, Manrope_700Bold, Manrope_800ExtraBold } from '@expo-google-fonts/manrope';
@@ -118,7 +119,7 @@ export default function RootLayout() {
     // It self-gates to once a week, and nothing may throw on this queue — one
     // task that does stops it for every deferred build in the app — so it
     // swallows its own failures (store.pruneOrphanWaveforms).
-    const backup = InteractionManager.runAfterInteractions(() => {
+    const backup = runAfterInteractions(() => {
       void runDailyBackup();
       pruneOrphanWaveforms();
     });

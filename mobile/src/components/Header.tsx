@@ -9,6 +9,7 @@
  * renders in its own layer above every screen. */
 import React, { useCallback, useRef, useState } from 'react';
 import { Platform, ScrollView, View } from 'react-native';
+import type { ScrollViewInstance } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { useFocusEffect } from 'expo-router';
@@ -106,7 +107,7 @@ export function Screen({
   children: React.ReactNode;
   contentPadding?: number;
   bottomPad?: number;
-  scrollRef?: React.Ref<ScrollView>;
+  scrollRef?: React.Ref<ScrollViewInstance>;
   // Accepts either a plain JS handler or a Reanimated useAnimatedScrollHandler
   // worklet — the scroll view is Animated.ScrollView, which takes both.
   onScroll?: React.ComponentProps<typeof Animated.ScrollView>['onScroll'];
@@ -135,11 +136,11 @@ export function Screen({
   // Tab scenes stay mounted, so keep our own handle on the scroll view (merged
   // with any caller-provided ref) and snap back to the top whenever the screen
   // regains focus — switching tabs always starts you at the top.
-  const innerRef = useRef<ScrollView | null>(null);
-  const setScrollRef = useCallback((node: ScrollView | null) => {
+  const innerRef = useRef<ScrollViewInstance | null>(null);
+  const setScrollRef = useCallback((node: ScrollViewInstance | null) => {
     innerRef.current = node;
     if (typeof scrollRef === 'function') scrollRef(node);
-    else if (scrollRef) (scrollRef as React.MutableRefObject<ScrollView | null>).current = node;
+    else if (scrollRef) (scrollRef as React.MutableRefObject<ScrollViewInstance | null>).current = node;
   }, [scrollRef]);
   useFocusEffect(useCallback(() => {
     innerRef.current?.scrollTo({ y: 0, animated: false });

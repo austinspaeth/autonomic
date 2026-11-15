@@ -36,8 +36,9 @@ import { ActivityIndicator, Linking, Platform, Pressable, ScrollView, StyleSheet
 import { readNotificationPermission, requestReminderPermission, type NotificationPermission } from '../lib/reminders';
 import Animated, {
   Easing, FadeIn, FadeInLeft, FadeInRight, FadeOut, FadeOutLeft, FadeOutRight,
-  interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withDelay, withTiming,
+  interpolateColor, useAnimatedStyle, useSharedValue, withDelay, withTiming,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import Svg, { Circle, Path, Rect } from 'react-native-svg';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandMark, Icon } from '../components/Icon';
@@ -446,13 +447,13 @@ function Onboarding({ onDone }: { onDone: () => void }) {
   const reveal = () => {
     mutate((s) => { s.meta.onboarded = new Date().toISOString(); });
     root.value = withDelay(140, withTiming(0, { duration: 640, easing: Easing.inOut(Easing.quad) }, (fin) => {
-      if (fin) runOnJS(revealed)();
+      if (fin) scheduleOnRN(revealed);
     }));
   };
   const finish = () => {
     setFinishing(true);
     cover.value = withTiming(1, { duration: 400, easing: Easing.in(Easing.cubic) }, (fin) => {
-      if (fin) runOnJS(reveal)();
+      if (fin) scheduleOnRN(reveal);
     });
   };
 

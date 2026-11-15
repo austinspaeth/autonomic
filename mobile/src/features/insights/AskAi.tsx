@@ -331,7 +331,7 @@ function ReportRow({ icon, title, sub, onPress, chevStyle, bare }: {
   sub: string;
   onPress: () => void;
   /** When present, the chevron points DOWN and rotates via `useAccordion`. */
-  chevStyle?: StyleProp<ViewStyle>;
+  chevStyle?: React.ComponentProps<typeof Animated.View>['style'];
   /** Rendered inside a container that already draws the card chrome. */
   bare?: boolean;
 }) {

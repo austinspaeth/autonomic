@@ -16,7 +16,7 @@
  * covered by iOS file protection / whole-disk encryption and, in iCloud
  * backups, by Apple's backup encryption. The privacy policy discloses this.
  */
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import { getState, replaceState, serializeState } from '../store/store';
 import { todayKey } from './dates';
 import { logError } from './diagnostics/errorLog';

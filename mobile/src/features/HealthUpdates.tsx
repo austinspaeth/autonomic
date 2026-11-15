@@ -500,7 +500,7 @@ const styles = StyleSheet.create({
   // animated width on the pill itself, which the children stretch to).
   stack: { backgroundColor: 'rgba(6,6,9,0.82)' },
   // Contents are centered inside the animated width so they stay put mid-tween.
-  layer: { ...StyleSheet.absoluteFillObject, justifyContent: 'center' },
+  layer: { ...StyleSheet.absoluteFill, justifyContent: 'center' },
   measure: { position: 'absolute', bottom: 0, left: 0, width: 2000, opacity: 0 },
   measured: { alignSelf: 'flex-start' },
   row: { flexDirection: 'row', alignItems: 'center', gap: 9, height: PILL_H - BORDER * 2, paddingHorizontal: 16, justifyContent: 'center' },

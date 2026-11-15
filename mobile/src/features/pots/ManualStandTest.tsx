@@ -13,6 +13,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
+import type { TextInputInstance } from 'react-native';
 import { useKeepAwake } from 'expo-keep-awake';
 import { SheetControls, SheetFooter, useSheets } from '../../components/Sheet';
 import { Button } from '../../components/ui';
@@ -43,7 +44,7 @@ interface Typed { hr: string; sys: string; dia: string }
 const BLANK: Typed = { hr: '', sys: '', dia: '' };
 
 /** One heart rate, with an optional blood pressure beside it when asked for. */
-function ReadingFields({ value, onChange, bp, hrRef }: { value: Typed; onChange: (v: Typed) => void; bp?: boolean; hrRef?: React.Ref<TextInput> }) {
+function ReadingFields({ value, onChange, bp, hrRef }: { value: Typed; onChange: (v: Typed) => void; bp?: boolean; hrRef?: React.Ref<TextInputInstance> }) {
   const p = usePalette();
   return (
     <View>
@@ -90,7 +91,7 @@ function SettleCard({ onStart }: { onStart: () => void }) {
 function ReadingCard({ mark, last, onSave }: { mark: number | null; last: boolean; onSave: (t: Typed) => void }) {
   const p = usePalette();
   const [value, setValue] = useState<Typed>(BLANK);
-  const hrRef = useRef<TextInput>(null);
+  const hrRef = useRef<TextInputInstance>(null);
   // Once the card has landed, so the keyboard does not fight its rise.
   useEffect(() => {
     const id = setTimeout(() => hrRef.current?.focus(), 500);

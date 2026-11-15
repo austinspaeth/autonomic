@@ -28,8 +28,9 @@
 import React from 'react';
 import { Animated as RNAnimated, Easing as RNEasing, View } from 'react-native';
 import Reanimated, {
-  Easing, interpolateColor, runOnJS, useAnimatedStyle, useSharedValue, withTiming,
+  Easing, interpolateColor, useAnimatedStyle, useSharedValue, withTiming,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import type { SharedValue } from 'react-native-reanimated';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import { hexA } from '../../lib/color';
@@ -267,7 +268,7 @@ export function BudgetBar({ state, fill, expected, still, skeleton, pulse, heigh
       return;
     }
     emberO.value = withTiming(0, { duration: PULSE_TINT_MS, easing: Easing.inOut(Easing.quad) }, (done) => {
-      if (done) runOnJS(setEmberOn)(false);
+      if (done) scheduleOnRN(setEmberOn, false);
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [hot, color]);
