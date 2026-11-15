@@ -55,6 +55,7 @@ jest.mock('../../ble/manager', () => ({ bleIfStarted: () => null }));
 // bridges above are: the real module pulls in the Connect IQ native link, which
 // jest cannot load. (This suite runs as iOS, where that row reads "n/a".)
 jest.mock('../../garmin/receiver', () => ({ garminLinkIntact: () => true }));
+jest.mock('../../../../modules/background-launch', () => ({ backgroundLaunchStatus: () => 'a scene started React Native' }));
 jest.mock('../../../../modules/app-env', () => ({ isTestFlightBuild: () => true, isSideloadedAndroidBuild: () => false }));
 jest.mock('../../../../modules/watch-bridge', () => ({
   watchBridge: () => ({ getState: async () => ({ supported: true, activated: true, paired: true, watchAppInstalled: false, reachable: false }), pendingUserInfo: async () => [{}, {}] }),

@@ -5,7 +5,7 @@ Pod::Spec.new do |s|
   s.description    = 'Local Expo module wrapping the Connect IQ Companion SDK so a Garmin watch app can deliver readings straight to Autonomic over BLE.'
   s.author         = 'Autonomic'
   s.homepage       = 'https://autonomic.app'
-  s.platforms      = { :ios => '15.1' }
+  s.platforms      = { :ios => '16.4' }
   s.source         = { git: '' }
   s.static_framework = true
 

@@ -26,6 +26,7 @@ import {
   type GarminMessage,
 } from '../../../modules/garmin-link';
 import { missingClasses } from '../../../modules/app-env';
+import { sceneLaunchURL } from '../../../modules/background-launch';
 import * as ExpoLinking from 'expo-linking';
 import { flushSave, getState, save, storeWaveform, upsertEntry } from '../../store/store';
 import { pingReadingKind, pingWristReading } from '../../store/ping';
@@ -367,7 +368,12 @@ export function initGarminReceiver() {
   // THE CALLBACK. Garmin Connect returns the chosen devices by opening our URL
   // scheme; without this listener the selection is simply discarded and the
   // picker looks like it did nothing at all.
-  void ExpoLinking.getInitialURL().then((url) => { if (url) void handleGarminUrl(url); });
+  void ExpoLinking.getInitialURL().then((url) => {
+    // A background-launched process has no launch URL of its own
+    // (modules/background-launch); the scene's link is collected from there.
+    const link = url ?? sceneLaunchURL();
+    if (link) void handleGarminUrl(link);
+  });
   ExpoLinking.addEventListener('url', (e) => { void handleGarminUrl(e.url); });
 
   native

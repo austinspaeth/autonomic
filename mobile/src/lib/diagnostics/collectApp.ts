@@ -40,6 +40,7 @@ import { cameraPermissionStatus, loadPpgModules } from '../ppg/modules';
 import { garminLinkIntact } from '../garmin/receiver';
 import { isSideloadedAndroidBuild, isTestFlightBuild } from '../../../modules/app-env';
 import { watchBridge } from '../../../modules/watch-bridge';
+import { backgroundLaunchStatus } from '../../../modules/background-launch';
 import { trustedReadings } from '../hrvQuality';
 import { dateFromKey } from '../dates';
 import type { AppState } from '../types';
@@ -311,7 +312,6 @@ async function capabilityRows(): Promise<Rows> {
   const mod = (name: string, probe: () => boolean) => {
     try { rows[name] = probe() ? 'loaded' : 'MISSING'; } catch (e) { rows[name] = `MISSING (${describeError(e)})`; }
   };
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
   mod('vision-camera', () => !!loadPpgModules().vc);
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   mod('camera-worklets', () => !!require('react-native-vision-camera-worklets')?.provider);
@@ -331,6 +331,10 @@ async function capabilityRows(): Promise<Rows> {
   // there. A broken link hides every Garmin surface on purpose (the reply from
   // Garmin Connect would kill the process), and without this row that looks
   // identical to the feature never having shipped.
+  // How React Native was started this launch. Under the scene life cycle a
+  // background launch only runs JavaScript because modules/background-launch
+  // starts it, and that failing is silent: alerts and widgets just stop.
+  if (Platform.OS === 'ios') rows['launch'] = backgroundLaunchStatus();
   rows['garmin link'] = Platform.OS === 'android'
     ? (garminLinkIntact() ? 'ok' : 'BROKEN — Connect IQ classes renamed by R8, keep rules missing')
     : 'n/a';

@@ -8,8 +8,7 @@
  * black) over the content — z-index below the nav bar, which the Tabs navigator
  * renders in its own layer above every screen. */
 import React, { useCallback, useRef, useState } from 'react';
-import { Platform, ScrollView, View } from 'react-native';
-import type { ScrollViewInstance } from 'react-native';
+import { Platform, type ScrollViewInstance, View } from 'react-native';
 import Animated from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { useFocusEffect } from 'expo-router';

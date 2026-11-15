@@ -4,6 +4,7 @@
  * a picker opens a form on top; Save closes the whole stack and refreshes.
  */
 import React, { useState } from 'react';
+import { sceneLaunchURL } from '../../modules/background-launch';
 import { CyclePhaseNote, CyclePhaseTable } from './cycle/PhaseNote';
 import type { CycleRowId } from '../lib/insights/cycle';
 import { ActivityIndicator, Platform, Pressable, ScrollView, Text, TextInput, View } from 'react-native';
@@ -384,7 +385,9 @@ export function useCaptureDeepLink() {
       // this user did. It was landing the reader on a Journal with the Protocol
       // card already open before they had logged anything.
       if (!getState().meta.onboarded && !getState().meta.lastUpdated) return;
-      void ExpoLinking.getInitialURL().then(handle);
+      // `?? sceneLaunchURL()`: a process iOS launched in the background has no
+      // launch URL of its own (modules/background-launch).
+      void ExpoLinking.getInitialURL().then((url) => handle(url ?? sceneLaunchURL()));
     }
     const sub = ExpoLinking.addEventListener('url', (e) => handle(e.url));
     return () => sub.remove();

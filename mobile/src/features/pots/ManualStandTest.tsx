@@ -12,8 +12,7 @@
  * a clock, and its centre only ever shows time until the numbers are typed in.
  */
 import React, { useEffect, useRef, useState } from 'react';
-import { Pressable, Text, TextInput, View } from 'react-native';
-import type { TextInputInstance } from 'react-native';
+import { Pressable, Text, type TextInputInstance, View } from 'react-native';
 import { useKeepAwake } from 'expo-keep-awake';
 import { SheetControls, SheetFooter, useSheets } from '../../components/Sheet';
 import { Button } from '../../components/ui';

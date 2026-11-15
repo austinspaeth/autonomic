@@ -5,7 +5,7 @@ Pod::Spec.new do |s|
   s.description    = 'Local Expo module that stores the widget JSON payload in the shared app group and asks WidgetKit to reload the Autonomic home-screen widgets.'
   s.author         = 'Autonomic'
   s.homepage       = 'https://autonomic.app'
-  s.platforms      = { :ios => '15.1' }
+  s.platforms      = { :ios => '16.4' }
   s.source         = { git: '' }
   s.static_framework = true
 

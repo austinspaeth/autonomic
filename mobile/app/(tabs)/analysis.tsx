@@ -1,6 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated as RNAnimated, Easing, type LayoutChangeEvent, Platform, Pressable, ScrollView, Text, View, type ViewStyle } from 'react-native';
-import type { ScrollViewInstance } from 'react-native';
+import { Animated as RNAnimated, Easing, type LayoutChangeEvent, Platform, Pressable, type ScrollViewInstance, Text, View, type ViewStyle } from 'react-native';
 import Animated, { Easing as REasing, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
 import { BlurView } from 'expo-blur';

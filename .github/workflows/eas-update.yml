@@ -8,9 +8,13 @@ name: EAS Update (OTA)
 # native module, changing permissions, or bumping the Expo SDK requires a new
 # native build (see eas-build.yml) submitted to the stores.
 
+# Two runtimes are live at once after a native release. `main` publishes for
+# the binaries built from it; `release/**` branches keep the PREVIOUS store
+# version patchable (a JS fix cherry-picked there reaches phones that have not
+# updated yet, since their runtime fingerprint only matches that branch).
 on:
   push:
-    branches: [main]
+    branches: [main, "release/**"]
     paths:
       - "mobile/**"
       - ".github/workflows/eas-update.yml"
@@ -46,7 +50,7 @@ jobs:
       - name: Set up Node
         uses: actions/setup-node@v4
         with:
-          node-version: 20
+          node-version: 22
           cache: npm
           cache-dependency-path: mobile/package-lock.json
 
@@ -96,8 +100,12 @@ jobs:
           # Inlined into the bundle by Metro (EXPO_PUBLIC_*).
           EXPO_PUBLIC_OTA_REVISION: ${{ steps.ota.outputs.revision }}
         run: |
+          # --environment is REQUIRED since SDK 55: it names the EAS environment
+          # whose variables the bundle is built with, and the command fails
+          # outright without it.
           eas update \
             --branch "$UPDATE_BRANCH" \
+            --environment production \
             --message "${COMMIT_MESSAGE:-Manual update ${{ github.sha }}}" \
             --non-interactive
 

@@ -149,7 +149,7 @@
       "expo-asset",
       "expo-font",
       "./plugins/withR8Memory",
-      "./plugins/withFmtConstevalFix",
+      "./plugins/withPodDeploymentFloor",
       "react-native-health-connect",
       [
         "expo-build-properties",

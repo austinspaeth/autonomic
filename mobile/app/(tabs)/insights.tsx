@@ -50,8 +50,7 @@
  * a locked view is a dead end, not an upsell.
  */
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Pressable, Text, View, type LayoutChangeEvent, type ScrollView } from 'react-native';
-import type { ScrollViewInstance } from 'react-native';
+import { Pressable, Text, View, type LayoutChangeEvent, type ScrollViewInstance } from 'react-native';
 import { useIsFocused } from 'expo-router';
 import { runAfterInteractions } from '@/lib/defer';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
