@@ -408,13 +408,28 @@ old web app so old `export.json` files import directly.
   with no samples (the APK-based Health Connect on Android 13 validated
   nothing, so one could be written then and read now) takes down any app that
   reads heart rate over the window holding it. **No `catch` of ours can see
-  it**: the conversion runs inside the platform's own AIDL callback
-  (`HealthConnectManager.getReadCallback().onResult()`, on a binder thread,
-  under a `catch (ClassCastException)` and nothing else), so it never reaches
-  the library's coroutine, never becomes a rejected promise, never reaches
-  `readAll`'s catch, and the awaiting promise simply never settles. We learn of
-  it only from the Java uncaught handler's `native.crash` row on the NEXT
-  launch, which is why the signature matched is the platform's SENTENCE and not
+  it**: the conversion runs in the platform's read callback
+  (`HealthConnectManager$ReadRecordsResponseCallback`), in a lambda posted to
+  the executor Jetpack handed it — a `Dispatchers.Default` worker per Play
+  Console's trace, NOT a binder thread — so it never reaches the library's
+  coroutine, never becomes a rejected promise, never reaches `readAll`'s
+  catch, and the awaiting promise simply never settles. **Since the build
+  after 2.0 the process SURVIVES it**: that worker's `runSafely` hands the
+  throw to the uncaught handler and keeps running, so the Android handler
+  (`HrSampleCrash.kt` in `modules/app-env`) swallows this ONE exception —
+  exact sentence, `IllegalArgumentException`, a `HealthConnectManager` frame
+  in its stack, never on the main thread — records it as `kind: swallowed`
+  (`native.swallowed`, NOT fatal), and does not chain. `readHr` bounds every
+  read with `HR_READ_TIMEOUT_MS` (15 s) and, on a timeout, asks native
+  (`takeSwallowedHrRead`) whether a throw was swallowed since the read began:
+  yes poisons that read's own days (`poisonHrRead`, `hc.hrPoison`), no is a
+  slow read (`hc.hrTimeout`, poisons nothing); either way the read returns
+  null and the caller falls back. `REHEARSE_HR_POISON` in `hrPoisonMemory.ts`
+  rehearses it in a debug build (native throws a simulated copy on a
+  background thread; nobody can create the real record any more). A binary
+  without the native half, or a process killed before its read timed out,
+  still lands as a `native.crash` row on the NEXT launch, which is why the
+  signature matched there is the platform's SENTENCE and not
   `IllegalArgumentException` (half of Android throws that). Every HeartRate
   read therefore goes through `readHr`, which returns NULL — never `[]`, or a
   poisoned day would read as a day the user's heart was never measured — for a

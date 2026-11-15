@@ -17,13 +17,22 @@
  * the window holding it.
  *
  * It takes US down in a place no `try` of ours can see. The conversion runs
- * inside the platform's own AIDL callback —
- * `HealthConnectManager.getReadCallback().onResult()`, on a binder thread,
- * under a `catch (ClassCastException)` and nothing else — so the exception is
- * never handed to the library's coroutine, never becomes a rejected promise,
- * and never reaches `readAll`'s catch. The process is killed and the awaiting
- * promise simply never settles. We learn of it only from the Java
- * uncaught-exception handler's crash row on the NEXT launch.
+ * in the platform's read callback (`HealthConnectManager$ReadRecordsResponseCallback`),
+ * in a lambda posted to the executor Jetpack handed it — a
+ * `Dispatchers.Default` worker, per Play Console's trace, not a binder thread
+ * and not any coroutine of ours — so the exception is never handed to the
+ * library's coroutine, never becomes a rejected promise, and never reaches
+ * `readAll`'s catch. Left alone, the default handler kills the process.
+ *
+ * SINCE THE NEXT PLAY BUILD AFTER 2.0 IT IS SURVIVED. The worker's
+ * `runSafely` hands the throw to the uncaught handler and keeps running, so
+ * the Android handler (`HrSampleCrash.kt` in modules/app-env) swallows this
+ * one exception, off the main thread only, and records it. The read's callback
+ * never fires, so `readHr` bounds every read with `HR_READ_TIMEOUT_MS`, asks
+ * native whether a throw was swallowed since the read began, and poisons that
+ * read's own days if so (`poisonHrRead`). The next-launch path below is still
+ * the answer for a binary without the native half, and for a process killed
+ * before its read timed out.
  *
  * WHY THE BREAKER IS PER WINDOW AND NOT PER INSTALL. The poison is one record
  * at one instant, written by one app. Turning raw heart-rate reads off for the
@@ -124,6 +133,40 @@ export function poisonFromCrashes(
   if (!messages.some(isHrSampleCrash)) return null;
   const next = nextPoisonDays(poisoned, inFlight, max);
   return next === poisoned ? null : next;
+}
+
+/**
+ * How long a heart-rate read may take before it is treated as one that will
+ * never finish. A swallowed empty-samples throw (see the top of this file)
+ * leaves the read's callback unfired, so its promise never settles; without a
+ * bound, the night, workout or day it was reading would wait for ever. A
+ * healthy read of a day's records is a page or two and returns in well under a
+ * second, so this only ever catches a read that is not coming back.
+ */
+export const HR_READ_TIMEOUT_MS = 15000;
+
+export type Raced<T> = { ok: true; value: T } | { ok: false };
+
+/**
+ * `p`, or `{ ok: false }` if it has not settled within `ms`. A rejection is
+ * passed through as a rejection. The timer is always cleared, so a read that
+ * returns promptly leaves nothing pending, and a late settlement after the
+ * timeout is ignored (its rejection is caught so it cannot surface as
+ * unhandled).
+ */
+export function raceTimeout<T>(p: Promise<T>, ms: number): Promise<Raced<T>> {
+  return new Promise((resolve, reject) => {
+    let done = false;
+    const timer = setTimeout(() => {
+      if (done) return;
+      done = true;
+      resolve({ ok: false });
+    }, ms);
+    p.then(
+      (value) => { if (done) return; done = true; clearTimeout(timer); resolve({ ok: true, value }); },
+      (e) => { if (done) return; done = true; clearTimeout(timer); reject(e); },
+    );
+  });
 }
 
 /** True when any day of this window is known to kill the process. */

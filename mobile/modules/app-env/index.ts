@@ -14,6 +14,11 @@ interface AppEnvNative {
   installCrashHandler?: () => boolean;
   /** Crashes recorded since the last call, as raw JSON, clearing them. */
   takeCrashLog?: () => string;
+  /** Android: was Health Connect's empty-heart-rate-record throw swallowed
+   *  at or after this epoch ms? Consumes the one it reports. */
+  takeSwallowedHrRead?: (sinceMs: number) => boolean;
+  /** Android, debug builds only: rehearse that throw on a background thread. */
+  simulateHrSampleCrash?: () => boolean;
   /** iOS: MetricKit handed over diagnostics and they were written to the log. */
   addListener?: (event: 'onCrashLog', cb: () => void) => { remove(): void };
   /** iOS: UIApplication.beginBackgroundTask, resolving its identifier. */
@@ -148,5 +153,32 @@ export function takeNativeCrashLog(): string {
     return appEnvNative()?.takeCrashLog?.() ?? '';
   } catch {
     return '';
+  }
+}
+
+/**
+ * Did the native handler swallow Health Connect's empty-heart-rate-record
+ * throw at or after `sinceMs`? Asked by a heart-rate read that timed out,
+ * because a swallowed throw is exactly what leaves a read hanging. False on
+ * iOS, on a binary without the native half, and on any failure: the answer
+ * decides whether to stop reading a day for good, so "don't know" must be no.
+ */
+export function takeSwallowedHrRead(sinceMs: number): boolean {
+  if (Platform.OS !== 'android') return false;
+  try {
+    return appEnvNative()?.takeSwallowedHrRead?.(sinceMs) === true;
+  } catch {
+    return false;
+  }
+}
+
+/** Debug builds only (the native side refuses in release): throw the
+ *  empty-record exception on a background thread. True when it was thrown. */
+export function simulateHrSampleCrash(): boolean {
+  if (Platform.OS !== 'android') return false;
+  try {
+    return appEnvNative()?.simulateHrSampleCrash?.() === true;
+  } catch {
+    return false;
   }
 }

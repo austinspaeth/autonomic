@@ -1,6 +1,8 @@
 package com.autonomic.appenv
 
+import android.content.pm.ApplicationInfo
 import android.os.Build
+import android.os.Looper
 import android.os.Process
 import expo.modules.kotlin.modules.Module
 import expo.modules.kotlin.modules.ModuleDefinition
@@ -33,6 +35,11 @@ import kotlin.system.exitProcess
  *     exception on the main thread killed the process leaving the on-device
  *     error log completely empty. That is not a gap in what we recorded, it is
  *     a gap in what we could record.
+ *
+ *     It also SURVIVES one exception, and only one: Health Connect's
+ *     empty-heart-rate-record throw on a background worker (see
+ *     `HrSampleCrash`). `takeSwallowedHrRead` tells the JS read that timed out
+ *     waiting for it what happened.
  */
 class AppEnvModule : Module() {
   override fun definition() = ModuleDefinition {
@@ -84,6 +91,29 @@ class AppEnvModule : Module() {
       val context = appContext.reactContext ?: return@Function ""
       takeLog(File(context.applicationContext.filesDir, CRASH_FILE))
     }
+
+    /**
+     * Was an empty-heart-rate-record throw swallowed at or after `sinceMs`?
+     * Consumes the one it reports, so two reads that both hung on two bad
+     * records each find their own. JS asks this only from a read that timed
+     * out, which is the one way such a read ends.
+     */
+    Function("takeSwallowedHrRead") { sinceMs: Double ->
+      takeSwallowed(sinceMs.toLong())
+    }
+
+    /**
+     * DEBUG BUILDS ONLY: throw `HrSampleCrash.simulated()` on a background
+     * thread, to rehearse the swallow. Nobody can create the real record any
+     * more, so this is the only way to exercise the handler. Returns false (and
+     * throws nothing) in a release build.
+     */
+    Function("simulateHrSampleCrash") {
+      val context = appContext.reactContext ?: return@Function false
+      if ((context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE) == 0) return@Function false
+      Thread({ throw HrSampleCrash.simulated() }, "hr-sample-sim").start()
+      true
+    }
   }
 
   companion object {
@@ -103,6 +133,11 @@ class AppEnvModule : Module() {
 
     private var installed = false
 
+    /** When each swallowed empty-record throw happened, oldest first. In memory
+     *  only: the process survived, so the read that hung is still waiting. */
+    private val swallowedAt = ArrayDeque<Long>()
+    private const val MAX_SWALLOWED = 16
+
     /**
      * Install the handler, once.
      *
@@ -112,6 +147,10 @@ class AppEnvModule : Module() {
      * allocation worth speaking of. And it must not change whether a crash is a
      * crash: the previous handler is always called, so the process still dies
      * exactly as it would have. This observes, it does not rescue.
+     *
+     * With ONE exception, `HrSampleCrash`: Health Connect's empty-record throw
+     * on a background worker is recorded (as `kind: swallowed`, which JS files
+     * as non-fatal) and then NOT chained, so the process lives.
      *
      * The report is picked up on the NEXT launch, which is also what makes it
      * safe: `reportFault` already buffers to disk and drains at startup, so a
@@ -123,11 +162,20 @@ class AppEnvModule : Module() {
       if (installed) return true
       val previous = Thread.getDefaultUncaughtExceptionHandler()
       Thread.setDefaultUncaughtExceptionHandler { thread, error ->
+        val swallow = try {
+          HrSampleCrash.matches(error, thread === Looper.getMainLooper().thread)
+        } catch (t: Throwable) {
+          false
+        }
         try {
-          record(file, thread, error)
+          record(file, thread, error, if (swallow) "swallowed" else null)
         } catch (t: Throwable) {
           // A handler that throws while handling turns one crash into a worse
           // one. There is nowhere left to report this to; drop it.
+        }
+        if (swallow) {
+          noteSwallowed()
+          return@setDefaultUncaughtExceptionHandler
         }
         if (previous != null) {
           previous.uncaughtException(thread, error)
@@ -142,7 +190,25 @@ class AppEnvModule : Module() {
       return true
     }
 
-    private fun record(file: File, thread: Thread, error: Throwable) {
+    @Synchronized
+    private fun noteSwallowed() {
+      swallowedAt.addLast(System.currentTimeMillis())
+      while (swallowedAt.size > MAX_SWALLOWED) swallowedAt.removeFirst()
+    }
+
+    @Synchronized
+    private fun takeSwallowed(sinceMs: Long): Boolean {
+      val it = swallowedAt.iterator()
+      while (it.hasNext()) {
+        if (it.next() >= sinceMs) {
+          it.remove()
+          return true
+        }
+      }
+      return false
+    }
+
+    private fun record(file: File, thread: Thread, error: Throwable, kind: String?) {
       // The ROOT cause is the diagnosis. A BadParcelableException's message
       // names the wrapper; its cause names the class that could not be found,
       // which is the fact a fix needs.
@@ -156,6 +222,7 @@ class AppEnvModule : Module() {
       val row = JSONObject()
       row.put("at", System.currentTimeMillis())
       row.put("thread", thread.name ?: "")
+      if (kind != null) row.put("kind", kind)
       row.put("type", error.javaClass.name)
       row.put("message", clip(error.message))
       if (root !== error) {

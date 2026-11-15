@@ -20,7 +20,10 @@ import {
   hasAskedAuth, markAskedAuth, markPromptedThisLaunch, markUngrantable, promptedThisLaunch,
   shareAuthRequest, ungrantable, ungrantableScope,
 } from './askedAuth';
-import { hrWindowBlocked, markHrReadDone, markHrReadStart } from './hrPoisonMemory';
+import { HR_READ_TIMEOUT_MS, raceTimeout } from './hrPoison';
+import {
+  hrWindowBlocked, markHrReadDone, markHrReadStart, noteHrReadTimeout, takeHrPoisonRehearsal,
+} from './hrPoisonMemory';
 import { NIGHT_END_HOUR, NIGHT_START_HOUR, nightKeyOf, summarizeHcSessions, type SleepSummary } from './sleepSummary';
 import { thinSeries, type HrPoint, type RespPoint } from '../sleep/night';
 import { activityTypeFromHc, workoutHrSeries } from './workoutMap';
@@ -225,8 +228,19 @@ export function makeHealthConnect(mod: HcModule): HealthApi {
   async function readHr(from: Date, to: Date): Promise<HrRecord[] | null> {
     if (hrWindowBlocked(from, to)) return null;
     const token = markHrReadStart(from, to);
+    const startedAt = Date.now();
     try {
-      return await readAll<HrRecord>('HeartRate', from, to);
+      // Bounded: since the native handler survives the empty-samples throw
+      // instead of dying of it, a read over a poisoned window no longer ends
+      // the process, it just never settles. Null sends the caller to the
+      // aggregate, as a window already known to be poisoned does.
+      const read = takeHrPoisonRehearsal()
+        ? new Promise<HrRecord[]>(() => {})
+        : readAll<HrRecord>('HeartRate', from, to);
+      const res = await raceTimeout(read, HR_READ_TIMEOUT_MS);
+      if (res.ok) return res.value;
+      noteHrReadTimeout(token, startedAt);
+      return null;
     } finally {
       markHrReadDone(token);
     }

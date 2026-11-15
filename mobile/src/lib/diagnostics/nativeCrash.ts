@@ -43,8 +43,10 @@ export interface NativeCrash {
   /** `crash` (the default), `hang` or `exit`. MetricKit also reports a main
    *  thread stuck for seconds, which is what a JavaScript infinite loop looks
    *  like from outside the process; and a daily tally of how the process was
-   *  ENDED, which is the only place a memory kill is ever reported. */
-  kind?: 'crash' | 'hang' | 'exit';
+   *  ENDED, which is the only place a memory kill is ever reported. And
+   *  `swallowed`: the one Java exception the Android handler survives
+   *  (Health Connect's empty heart-rate record, `HrSampleCrash.kt`). */
+  kind?: 'crash' | 'hang' | 'exit' | 'swallowed';
   /** The build that CRASHED. The fault report stamps the build that SENDS,
    *  and on iOS the two can differ (a crash from before an update is delivered
    *  after it), so it rides in the message. */
@@ -85,12 +87,27 @@ export const NATIVE_HANG_TAG = 'native.hang';
  */
 export const NATIVE_EXIT_TAG = 'native.exit';
 
-export const tagForNativeCrash = (c: NativeCrash): string =>
-  c.kind === 'hang' ? NATIVE_HANG_TAG : c.kind === 'exit' ? NATIVE_EXIT_TAG : NATIVE_CRASH_TAG;
+/**
+ * An exception the Android handler caught and deliberately did NOT pass on,
+ * so the process lived (Health Connect's empty heart-rate record; see
+ * `HrSampleCrash.kt` and lib/health/hrPoison). Its own tag, and not fatal: a
+ * `native.crash` row would put a CRASH pill on the dashboard and push a "hard
+ * crash" to the phone for an app that carried on. Still a row, because how
+ * many phones hold a health store that would have killed us is worth seeing.
+ */
+export const NATIVE_SWALLOWED_TAG = 'native.swallowed';
 
-/** Did the process actually die from this? A hang recovered and an exit tally
- *  describes a window already over, so neither spends the fatal marking. */
-export const isFatalNativeCrash = (c: NativeCrash): boolean => c.kind !== 'hang' && c.kind !== 'exit';
+export const tagForNativeCrash = (c: NativeCrash): string =>
+  c.kind === 'hang' ? NATIVE_HANG_TAG
+    : c.kind === 'exit' ? NATIVE_EXIT_TAG
+      : c.kind === 'swallowed' ? NATIVE_SWALLOWED_TAG
+        : NATIVE_CRASH_TAG;
+
+/** Did the process actually die from this? A hang recovered, an exit tally
+ *  describes a window already over, and a swallowed exception is one the
+ *  process survived, so none of them spends the fatal marking. */
+export const isFatalNativeCrash = (c: NativeCrash): boolean =>
+  c.kind !== 'hang' && c.kind !== 'exit' && c.kind !== 'swallowed';
 
 /** Longest composed message worth carrying. `redactMessage` truncates to its
  *  own limit afterwards; this only stops a pathological native string from
@@ -159,7 +176,7 @@ export function parseNativeCrashes(raw: string | null | undefined): NativeCrash[
       causeType: str(r.causeType),
       causeMessage: str(r.causeMessage),
       frame: str(r.frame),
-      kind: r.kind === 'hang' ? 'hang' : 'crash',
+      kind: r.kind === 'hang' ? 'hang' : r.kind === 'swallowed' ? 'swallowed' : 'crash',
       version: str(r.version),
       source: r.source === 'metrickit' ? 'metrickit' : 'java',
     };

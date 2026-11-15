@@ -1,6 +1,6 @@
 import {
   HR_EMPTY_SAMPLES_SIG, MAX_POISON_DAYS, dayKeyOf, hrPoisonRow, hrWindowDays,
-  isHrSampleCrash, nextPoisonDays, poisonFromCrashes, windowPoisoned,
+  isHrSampleCrash, nextPoisonDays, poisonFromCrashes, raceTimeout, windowPoisoned,
 } from '../hrPoison';
 
 const at = (y: number, m: number, d: number, hh = 0, mm = 0) => new Date(y, m - 1, d, hh, mm, 0);
@@ -144,5 +144,44 @@ describe('poisonFromCrashes', () => {
     const out = poisonFromCrashes(full, ['2026-11-09'], [CRASH]);
     expect(out).toHaveLength(MAX_POISON_DAYS);
     expect(out?.[out.length - 1]).toBe('2026-11-09');
+  });
+});
+
+// A read over a poisoned window never settles once the native handler
+// survives the throw, so `readHr` races it against a timeout.
+describe('raceTimeout', () => {
+  beforeEach(() => jest.useFakeTimers());
+  afterEach(() => jest.useRealTimers());
+
+  it('passes a prompt result through and leaves no timer behind', async () => {
+    const r = raceTimeout(Promise.resolve([1, 2]), 15000);
+    await expect(r).resolves.toEqual({ ok: true, value: [1, 2] });
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('gives up on a promise that never settles', async () => {
+    const r = raceTimeout(new Promise<number[]>(() => {}), 15000);
+    jest.advanceTimersByTime(14999);
+    let settled = false;
+    void r.then(() => { settled = true; });
+    await Promise.resolve();
+    expect(settled).toBe(false);
+    jest.advanceTimersByTime(1);
+    await expect(r).resolves.toEqual({ ok: false });
+  });
+
+  it('passes a rejection through as a rejection', async () => {
+    await expect(raceTimeout(Promise.reject(new Error('nope')), 15000)).rejects.toThrow('nope');
+    expect(jest.getTimerCount()).toBe(0);
+  });
+
+  it('ignores a settlement that arrives after the timeout', async () => {
+    let fail!: (e: Error) => void;
+    const late = new Promise<number[]>((_, rej) => { fail = rej; });
+    const r = raceTimeout(late, 100);
+    jest.advanceTimersByTime(100);
+    await expect(r).resolves.toEqual({ ok: false });
+    fail(new Error('late')); // must not surface as an unhandled rejection
+    await Promise.resolve();
   });
 });

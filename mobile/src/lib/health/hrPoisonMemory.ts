@@ -26,7 +26,7 @@
  * nights is the right direction to be wrong in — the alternative is a backfill
  * that crashes, restarts, and crashes again on the same night for ever.
  */
-import { hrPoisonRow, hrWindowDays, poisonFromCrashes, windowPoisoned } from './hrPoison';
+import { hrPoisonRow, hrWindowDays, nextPoisonDays, poisonFromCrashes, windowPoisoned } from './hrPoison';
 
 const FLAGS_ID = 'autonomic.flags';
 const KEY_INFLIGHT = 'hrReadInFlight';
@@ -166,6 +166,75 @@ export function noteNativeCrashes(messages: (string | null | undefined)[]): void
   } catch { /* the drain must never throw */ }
 }
 
+/**
+ * A read that hung because the native handler SWALLOWED the empty-samples
+ * throw (see ./hrPoison): the process lived, so there is no next-launch crash
+ * to pair with a marker, and the read's own window is the evidence. Poisons
+ * exactly the days that read covered, which is narrower than the next-launch
+ * path can be (that one only knows the union of everything in flight).
+ */
+export function poisonHrRead(days: string[]): void {
+  try {
+    const next = nextPoisonDays(poisoned(), days);
+    if (next === poisoned()) return;
+    mem = next;
+    try { store()?.set(KEY_POISON, JSON.stringify(mem)); } catch { /* in-memory only this session */ }
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    try { require('../../store/errorReport').reportFault(HR_POISON_TAG, `empty heart rate samples on ${days.length} day(s), survived`, false); } catch { /* not wired up yet */ }
+  } catch { /* best effort: without it the window is simply read again */ }
+}
+
+/** A heart-rate read that hit `HR_READ_TIMEOUT_MS` without a swallowed throw
+ *  behind it: slow rather than poisoned. Counted, never acted on. */
+export const HR_TIMEOUT_TAG = 'hc.hrTimeout';
+
+/**
+ * A heart-rate read that never came back. Two different things look alike
+ * here, and only one of them may cost a day its curve: if native swallowed the
+ * empty-samples throw since the read began, the read is dead and its days are
+ * poisoned; otherwise it was merely slow, and the caller falls back for this
+ * one read and tries again next time.
+ */
+export function noteHrReadTimeout(days: string[], startedAtMs: number): void {
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    const appEnv = require('../../../modules/app-env') as typeof import('../../../modules/app-env');
+    if (appEnv.takeSwallowedHrRead(startedAtMs)) {
+      poisonHrRead(days);
+      // File the swallowed row NOW rather than on the next launch (as
+      // `native.swallowed`, non-fatal). Nothing in the drain routes back here.
+      // eslint-disable-next-line @typescript-eslint/no-require-imports
+      try { require('../diagnostics/errorLog').drainNativeCrashes(); } catch { /* next launch, then */ }
+      return;
+    }
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    try { require('../../store/errorReport').reportFault(HR_TIMEOUT_TAG, 'heart rate read timed out', false); } catch { /* not wired up yet */ }
+  } catch { /* best effort */ }
+}
+
+/**
+ * DEV ONLY: make the next heart-rate read rehearse the empty-samples crash —
+ * native throws `HrSampleCrash.simulated()` on a background thread (the real
+ * record cannot be created any more) and the read itself never settles, which
+ * is exactly what a swallowed throw leaves behind. Expect, about 15 s later:
+ * the read falls back to the aggregate, its day(s) appear in the support
+ * dump's `heart rate reads blocked` row, and `native.swallowed` +
+ * `hc.hrPoison` land in the error log. Undo with `hrPoisonDays` in the flags
+ * MMKV (or reinstall). A release build ignores it.
+ */
+const REHEARSE_HR_POISON = false;
+let rehearsed = false;
+
+/** Called by `readHr` once per read: true when THIS read should rehearse. */
+export function takeHrPoisonRehearsal(): boolean {
+  if (!REHEARSE_HR_POISON || rehearsed || !__DEV__) return false;
+  rehearsed = true;
+  try {
+    // eslint-disable-next-line @typescript-eslint/no-require-imports
+    return (require('../../../modules/app-env') as typeof import('../../../modules/app-env')).simulateHrSampleCrash();
+  } catch { return false; }
+}
+
 /** The support dump's row. */
 export function hrPoisonDump(): string {
   try { return hrPoisonRow(poisoned()); } catch { return 'unreadable'; }
@@ -173,5 +242,5 @@ export function hrPoisonDump(): string {
 
 /** Test seam. */
 export function resetHrPoisonCache(): void {
-  mem = null; previous = undefined; active = [];
+  mem = null; previous = undefined; active = []; rehearsed = false;
 }

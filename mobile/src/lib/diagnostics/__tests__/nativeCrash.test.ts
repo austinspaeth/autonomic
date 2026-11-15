@@ -1,5 +1,5 @@
 import {
-  NATIVE_CRASH_TAG, NATIVE_HANG_TAG, type NativeCrash, describeNativeCrash, parseNativeCrashes, tagForNativeCrash,
+  NATIVE_CRASH_TAG, NATIVE_HANG_TAG, NATIVE_SWALLOWED_TAG, isFatalNativeCrash, type NativeCrash, describeNativeCrash, parseNativeCrashes, tagForNativeCrash,
 } from '../nativeCrash';
 import { redactMessage } from '../../errorReport';
 
@@ -156,5 +156,32 @@ describe('describeNativeCrash', () => {
     const line = describeNativeCrash({ type: 'a.B', message: 'x'.repeat(5000) });
     expect(line.length).toBeLessThanOrEqual(220);
     expect(line.endsWith('…')).toBe(true);
+  });
+});
+
+// The one Java exception the Android handler survives (HrSampleCrash.kt). It
+// must not file as a fatal native.crash: the app carried on.
+describe('a swallowed exception', () => {
+  const raw = JSON.stringify([{
+    at: 1, thread: 'DefaultDispatcher-worker-3', kind: 'swallowed', source: 'java',
+    type: 'java.lang.IllegalArgumentException', message: 'record samples should not be empty',
+  }]);
+
+  it('parses as swallowed, under its own non-fatal tag', () => {
+    const [c] = parseNativeCrashes(raw);
+    expect(c.kind).toBe('swallowed');
+    expect(tagForNativeCrash(c)).toBe(NATIVE_SWALLOWED_TAG);
+    expect(isFatalNativeCrash(c)).toBe(false);
+  });
+
+  it('still describes the signature the heart-rate breaker matches on', () => {
+    const [c] = parseNativeCrashes(raw);
+    expect(describeNativeCrash(c)).toContain('record samples should not be empty');
+  });
+
+  it('leaves an ordinary crash fatal', () => {
+    const [c] = parseNativeCrashes(JSON.stringify([{ type: 'java.lang.NullPointerException', message: 'x' }]));
+    expect(isFatalNativeCrash(c)).toBe(true);
+    expect(tagForNativeCrash(c)).toBe(NATIVE_CRASH_TAG);
   });
 });
