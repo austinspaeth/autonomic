@@ -72,10 +72,10 @@ try {
   // native modules unavailable — encryption off, same behavior as before
 }
 // Guarded separately: file scrubbing is optional even when encryption works.
-let FSNext: typeof import('expo-file-system/next') | null = null;
+let FSNext: typeof import('expo-file-system') | null = null;
 try {
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  FSNext = require('expo-file-system/next');
+  FSNext = require('expo-file-system');
 } catch {
   // sync file API unavailable — migration still runs, remnants stay until it is
 }

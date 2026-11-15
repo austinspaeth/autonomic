@@ -5,7 +5,7 @@
 import React, { useState } from 'react';
 import { Alert, Linking, Pressable, Text, View } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
+import * as FileSystem from 'expo-file-system/legacy';
 import Constants from 'expo-constants';
 import * as Haptics from 'expo-haptics';
 import { SheetControls, useSheets } from '../components/Sheet';

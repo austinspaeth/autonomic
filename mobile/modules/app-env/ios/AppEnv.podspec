@@ -5,7 +5,7 @@ Pod::Spec.new do |s|
   s.description    = 'Local Expo module exposing whether the build runs with a sandbox receipt (used to relax the paywall in TestFlight), the MetricKit crash diagnostics written for the JS crash drain, and UIApplication background tasks.'
   s.author         = 'Autonomic'
   s.homepage       = 'https://autonomic.app'
-  s.platforms      = { :ios => '15.1' }
+  s.platforms      = { :ios => '16.4' }
   s.source         = { git: '' }
   s.static_framework = true
 

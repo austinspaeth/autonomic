@@ -14,7 +14,7 @@
  * InteractionManager queue for every screen (the Progress-stuck-on-skeletons
  * incident), and a missing dot is the full cost of failing quietly.
  */
-import { InteractionManager } from 'react-native';
+import { runAfterInteractions } from '@/lib/defer';
 import { useSyncExternalStore } from 'react';
 import { hasOwnData } from '../lib/demo';
 import { logError } from '../lib/diagnostics/errorLog';
@@ -72,7 +72,7 @@ let armed = false;
 const DEBOUNCE_MS = 5000;
 
 function refresh(): void {
-  InteractionManager.runAfterInteractions(() => {
+  runAfterInteractions(() => {
     try {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { getState } = require('./store') as typeof import('./store');

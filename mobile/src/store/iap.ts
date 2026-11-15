@@ -25,7 +25,7 @@ import {
   initConnection, endConnection, fetchProducts, getAvailablePurchases,
   requestPurchase, finishTransaction, deepLinkToSubscriptions,
   purchaseUpdatedListener, purchaseErrorListener,
-  type ProductSubscription, type ProductSubscriptionAndroidOfferDetails,
+  type ProductSubscription, type SubscriptionOffer,
   type ExpoPurchaseError, type Purchase,
 } from 'expo-iap';
 import { isSideloadedAndroidBuild, isTestFlightBuild } from '../../modules/app-env';
@@ -129,17 +129,28 @@ export type IapProduct = {
   raw: ProductSubscription;
 };
 
-const androidOffers = (p: ProductSubscription): ProductSubscriptionAndroidOfferDetails[] =>
-  (p.platform === 'android' ? p.subscriptionOfferDetailsAndroid : []) || [];
+/**
+ * A Play offer we can actually buy. expo-iap 6 (openiap 4) folded Play's
+ * `subscriptionOfferDetailsAndroid` into the cross-platform
+ * `subscriptionOffers` list, with the Play-only fields suffixed: the token is
+ * `offerTokenAndroid` and the phases are `pricingPhasesAndroid`. Both are
+ * nullable in that shape, so an entry without a token is not an offer to us —
+ * Play Billing cannot start a subscription purchase without one.
+ */
+type AndroidOffer = SubscriptionOffer & { offerTokenAndroid: string };
+const androidOffers = (p: ProductSubscription): AndroidOffer[] =>
+  ((p.platform === 'android' ? p.subscriptionOffers : []) || [])
+    .filter((o): o is AndroidOffer => !!o.offerTokenAndroid);
+const phasesOf = (o: SubscriptionOffer | undefined) => o?.pricingPhasesAndroid?.pricingPhaseList || [];
 
 /** Play Billing marks a free-trial pricing phase with a zero price. */
-const offerHasTrial = (o: ProductSubscriptionAndroidOfferDetails) =>
-  o.pricingPhases.pricingPhaseList.some((ph) => Number(ph.priceAmountMicros) === 0);
+const offerHasTrial = (o: SubscriptionOffer) =>
+  phasesOf(o).some((ph) => Number(ph.priceAmountMicros) === 0);
 
 /** The offer to buy on Android: the free-trial offer when Play says this user
  *  is eligible (ineligible offers are filtered out of the product details),
  *  otherwise the base plan. */
-const bestAndroidOffer = (p: ProductSubscription | undefined): ProductSubscriptionAndroidOfferDetails | undefined => {
+const bestAndroidOffer = (p: ProductSubscription | undefined): AndroidOffer | undefined => {
   if (!p) return undefined;
   const offers = androidOffers(p);
   return offers.find(offerHasTrial) ?? offers[0];
@@ -148,7 +159,7 @@ const bestAndroidOffer = (p: ProductSubscription | undefined): ProductSubscripti
 /** Localized recurring price of a plan, from whichever store returned it. */
 const recurringPrice = (p: ProductSubscription, sku: string): string => {
   if (p.platform === 'ios') return p.displayPrice || FALLBACK_PRICE[sku];
-  const phases = bestAndroidOffer(p)?.pricingPhases.pricingPhaseList || [];
+  const phases = phasesOf(bestAndroidOffer(p));
   const paid = phases.find((ph) => Number(ph.priceAmountMicros) > 0);
   return paid?.formattedPrice || p.displayPrice || FALLBACK_PRICE[sku];
 };
@@ -194,7 +205,7 @@ export const trialDaysOf = (product: IapProduct | undefined): number | null => {
     return unit && Number.isFinite(n) && n > 0 ? unit * n : null;
   }
   // Play states the free phase as an ISO-8601 duration ("P1W", "P14D").
-  const free = bestAndroidOffer(raw)?.pricingPhases.pricingPhaseList
+  const free = phasesOf(bestAndroidOffer(raw))
     .find((ph) => Number(ph.priceAmountMicros) === 0);
   const m = free?.billingPeriod?.match(/^P(?:(\d+)W)?(?:(\d+)D)?$/);
   if (!m) return null;
@@ -955,7 +966,7 @@ export async function subscribe(sku: string = YEARLY_SKU, origin?: PurchaseOrigi
       reached = true;
       await withBilling(() => requestPurchase({
         type: 'subs',
-        request: { google: { skus: [sku], subscriptionOffers: [{ sku, offerToken: offer.offerToken }] } },
+        request: { google: { skus: [sku], subscriptionOffers: [{ sku, offerToken: offer.offerTokenAndroid }] } },
       }));
     } else {
       reached = true;

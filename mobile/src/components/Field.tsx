@@ -6,6 +6,7 @@
  */
 import React, { useRef, useState } from 'react';
 import { Platform, Pressable, StyleProp, Text, TextInput, View, ViewStyle } from 'react-native';
+import type { TextInputInstance } from 'react-native';
 import DateTimePicker from '@react-native-community/datetimepicker';
 import Reanimated, { Easing, interpolate, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
 import { radius, usePalette } from '../theme';
@@ -138,7 +139,7 @@ export function TextField({ label, value, onChange, onBlur, keyboardType, placeh
   /** Omit for a self-explanatory field: the value then sits vertically centred. */
   label?: string; value: string; onChange: (v: string) => void; onBlur?: () => void;
   keyboardType?: 'default' | 'numeric' | 'decimal-pad'; placeholder?: string; multiline?: boolean;
-  signed?: boolean; onToggleSign?: () => void; inputRef?: React.Ref<TextInput>;
+  signed?: boolean; onToggleSign?: () => void; inputRef?: React.Ref<TextInputInstance>;
   /** Shown right-aligned on the value's line ("lb", "bpm"). Never part of the label. */
   unit?: string; style?: StyleProp<ViewStyle>;
   /** `FieldButton`s that act on this field, inside it, right of the unit. */
@@ -453,7 +454,7 @@ export function FieldInputs({ fields, form, set }: { fields: FieldDef[]; form: F
   const p = usePalette();
   // Auto-advance plumbing: number-field inputs register here by key so a field
   // whose `autoNext` fires can focus the next number field in the form.
-  const numInputs = useRef<Record<string, TextInput | null>>({});
+  const numInputs = useRef<Record<string, TextInputInstance | null>>({});
   const numKeys = fields.filter(isNumberField).map((f) => f.key!);
   const advanceFrom = (key: string) => {
     const next = numKeys[numKeys.indexOf(key) + 1];
@@ -505,7 +506,7 @@ export function FieldInputs({ fields, form, set }: { fields: FieldDef[]; form: F
 
 function NumField({ f, form, set, numInputs, advanceFrom }: {
   f: FieldDef; form: FormState; set: (k: string, v: string | boolean) => void;
-  numInputs: React.MutableRefObject<Record<string, TextInput | null>>; advanceFrom: (key: string) => void;
+  numInputs: React.MutableRefObject<Record<string, TextInputInstance | null>>; advanceFrom: (key: string) => void;
 }) {
   const v = form[f.key!] as string;
   // A med/supplement dose is a number PLUS its unit ("400mg", "1 scoop"), so it

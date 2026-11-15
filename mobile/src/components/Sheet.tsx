@@ -15,9 +15,11 @@ import {
   BackHandler, Keyboard, Modal, Platform, Pressable, ScrollView, StyleProp, StyleSheet, TextInput,
   View, ViewStyle,
 } from 'react-native';
+import type { ScrollViewInstance } from 'react-native';
 import Animated, {
-  Easing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming,
+  Easing, useAnimatedStyle, useSharedValue, withSpring, withTiming,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaFrame, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { radius, usePalette } from '../theme';
@@ -256,7 +258,7 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
   // Measured footer height so scroll content clears it exactly — footers can be
   // taller than one row (e.g. the results card's stacked button cluster).
   const [footerH, setFooterH] = useState(0);
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   const scrollY = useRef(0);
   // A sheet whose content fits should not scroll. The bounce on a card that has
   // nowhere to go reads as looseness, and on a live HRV reading it means the
@@ -351,7 +353,7 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
     if (closing && !exiting.current) {
       exiting.current = true;
       translateY.value = withTiming(SCREEN_H, { duration: 280, easing: Easing.in(Easing.cubic) }, (fin) => {
-        if (fin) runOnJS(onExited)();
+        if (fin) scheduleOnRN(onExited);
       });
     }
   }, [closing, onExited, translateY, SCREEN_H]);
@@ -597,7 +599,7 @@ export function SheetFooter({ children }: { children: React.ReactNode }) {
 }
 
 const styles = StyleSheet.create({
-  backdrop: { ...StyleSheet.absoluteFillObject },
+  backdrop: { ...StyleSheet.absoluteFill },
   sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, borderWidth: StyleSheet.hairlineWidth, overflow: 'hidden' },
   // Pill chrome (shared with SheetPill) and its fixed top-right placement, kept
   // apart so content can reuse the chrome without the positioning.

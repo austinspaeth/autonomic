@@ -20,6 +20,7 @@
  */
 import React, { useState } from 'react';
 import { Pressable, Text, TextInput, View } from 'react-native';
+import type { TextInputInstance } from 'react-native';
 import Animated, { FadeIn, FadeInDown, FadeOut, LinearTransition } from 'react-native-reanimated';
 import { SheetControls, SheetFooter, useSheets } from '../components/Sheet';
 import { TextField } from '../components/Field';
@@ -81,7 +82,7 @@ const COPY: Record<LogKind, {
 /** Orange caution tint (GRADE_COLORS.bad) for the "already logged" note. */
 const CAUTION = '#f97316';
 
-const SPRING = LinearTransition.springify().damping(24).stiffness(260);
+const SPRING = LinearTransition.springify().mass(1).damping(24).stiffness(260);
 
 /** Height of the log-mode search bar. */
 const BAR_H = 46;
@@ -143,7 +144,7 @@ export function LogPickerSheet({ kind, dk, controls }: { kind: LogKind; dk: stri
   const copy = COPY[kind];
   const [mode, setMode] = useState<'log' | 'edit'>('log');
   const [query, setQuery] = useState('');
-  const searchRef = React.useRef<TextInput>(null);
+  const searchRef = React.useRef<TextInputInstance>(null);
   const [sel, setSel] = useState<Record<string, boolean>>({});
   const [confirmKey, setConfirmKey] = useState<string | null>(null);
 

@@ -8,9 +8,10 @@ import {
   type LayoutChangeEvent, Linking, Platform, Pressable, StyleProp, StyleSheet, Text, TextStyle, View, ViewProps, ViewStyle,
 } from 'react-native';
 import Reanimated, {
-  Easing as REasing, Extrapolation, interpolate, interpolateColor, runOnJS, useAnimatedStyle,
+  Easing as REasing, Extrapolation, interpolate, interpolateColor, useAnimatedStyle,
   useSharedValue, withSpring, withTiming, type SharedValue,
 } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import Svg, { Defs, Line, Pattern, Rect } from 'react-native-svg';
 import { CAUTION_GOLD, CAUTION_GOLD_SOFT, CAUTION_INK, GRADE_COLORS, radius, space, type as T, usePalette } from '../theme';
 import { fmtDateLong, isPastDay } from '../lib/dates';
@@ -152,7 +153,7 @@ export function Segmented<T extends string>({ options, value, onChange, onLocked
   const notifySettled = React.useCallback(() => { settledRef.current?.(); }, []);
   const springTo = React.useCallback((i: number) => {
     target.current = i;
-    sel.value = withSpring(i, PILL_SPRING, (fin) => { if (fin) runOnJS(notifySettled)(); });
+    sel.value = withSpring(i, PILL_SPRING, (fin) => { if (fin) scheduleOnRN(notifySettled); });
   }, [sel, notifySettled]);
   React.useEffect(() => {
     if (target.current !== idx) springTo(idx);

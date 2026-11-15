@@ -36,9 +36,11 @@ import { health, healthAppName, medicationsSupported } from '../health';
 import { hrPoisonDump } from '../health/hrPoisonMemory';
 import { medPickerLast } from '../health/medPickerMemory';
 import { bleIfStarted } from '../ble/manager';
+import { cameraPermissionStatus, loadPpgModules } from '../ppg/modules';
 import { garminLinkIntact } from '../garmin/receiver';
 import { isSideloadedAndroidBuild, isTestFlightBuild } from '../../../modules/app-env';
 import { watchBridge } from '../../../modules/watch-bridge';
+import { backgroundLaunchStatus } from '../../../modules/background-launch';
 import { trustedReadings } from '../hrvQuality';
 import { dateFromKey } from '../dates';
 import type { AppState } from '../types';
@@ -54,19 +56,6 @@ async function safeText(fn: () => unknown | Promise<unknown>): Promise<string> {
   try { return String(await fn()); } catch (e) { return `unreadable (${describeError(e)})`; }
 }
 
-/** VisionCamera, or null when it isn't in this build — a missing module is a
- *  fact to print, not an error to report. */
-function visionCamera(): { Camera?: {
-  getCameraPermissionStatus(): string;
-  getAvailableCameraDevices(): { hasTorch: boolean }[];
-}; getCameraDevice?: (list: unknown, pos: string) => { hasTorch: boolean } | undefined } | null {
-  try {
-    // eslint-disable-next-line @typescript-eslint/no-require-imports
-    return require('react-native-vision-camera');
-  } catch {
-    return null;
-  }
-}
 
 /** expo-notifications reports the iOS grant as a raw enum; name it. */
 const IOS_AUTH_STATUS = ['not determined', 'denied', 'authorized', 'provisional', 'ephemeral'];
@@ -286,10 +275,7 @@ async function permissionRows(): Promise<Rows> {
   const rows: Rows = {};
 
   // Camera: VisionCamera's own view, which is the one the reading flow gates on.
-  rows['camera'] = await safeText(() => {
-    const vc = visionCamera();
-    return vc?.Camera ? vc.Camera.getCameraPermissionStatus() : 'no native module';
-  });
+  rows['camera'] = await safeText(cameraPermissionStatus);
 
   if (Platform.OS === 'android') {
     // eslint-disable-next-line @typescript-eslint/no-require-imports
@@ -326,19 +312,17 @@ async function capabilityRows(): Promise<Rows> {
   const mod = (name: string, probe: () => boolean) => {
     try { rows[name] = probe() ? 'loaded' : 'MISSING'; } catch (e) { rows[name] = `MISSING (${describeError(e)})`; }
   };
+  mod('vision-camera', () => !!loadPpgModules().vc);
   // eslint-disable-next-line @typescript-eslint/no-require-imports
-  mod('vision-camera', () => !!require('react-native-vision-camera')?.Camera);
-  // eslint-disable-next-line @typescript-eslint/no-require-imports
-  mod('worklets-core', () => !!require('react-native-worklets-core')?.useRunOnJS);
+  mod('camera-worklets', () => !!require('react-native-vision-camera-worklets')?.provider);
   // eslint-disable-next-line @typescript-eslint/no-require-imports
   mod('ble-plx', () => !!require('react-native-ble-plx')?.BleManager);
 
-  rows['rear camera'] = await safeText(() => {
-    const vc = visionCamera();
-    if (!vc?.Camera) return 'no native module';
-    const list = vc.Camera.getAvailableCameraDevices();
-    const back = vc.getCameraDevice?.(list, 'back');
-    if (!back) return `none (${list.length} camera(s) listed)`;
+  rows['rear camera'] = await safeText(async () => {
+    const { vc } = loadPpgModules();
+    if (!vc) return 'no native module';
+    const back = await vc.getDefaultCameraDevice('back');
+    if (!back) return `none (${vc.getAllCameraDevices().length} camera(s) listed)`;
     return `present, torch ${back.hasTorch ? 'yes' : 'no'}`;
   });
 
@@ -347,6 +331,10 @@ async function capabilityRows(): Promise<Rows> {
   // there. A broken link hides every Garmin surface on purpose (the reply from
   // Garmin Connect would kill the process), and without this row that looks
   // identical to the feature never having shipped.
+  // How React Native was started this launch. Under the scene life cycle a
+  // background launch only runs JavaScript because modules/background-launch
+  // starts it, and that failing is silent: alerts and widgets just stop.
+  if (Platform.OS === 'ios') rows['launch'] = backgroundLaunchStatus();
   rows['garmin link'] = Platform.OS === 'android'
     ? (garminLinkIntact() ? 'ok' : 'BROKEN — Connect IQ classes renamed by R8, keep rules missing')
     : 'n/a';
@@ -505,7 +493,7 @@ function buildNotes(d: Omit<AppDiagnostics, 'notes'>): string[] {
   if (String(d.permissions['camera']) === 'denied' || String(d.permissions['camera']) === 'restricted') {
     notes.push('Camera permission is refused, so finger (PPG) readings can never start. On Android the prompt will not reappear — it needs system Settings.');
   }
-  if (d.capabilities['worklets-core'] !== 'loaded' || d.capabilities['vision-camera'] !== 'loaded') {
+  if (d.capabilities['camera-worklets'] !== 'loaded' || d.capabilities['vision-camera'] !== 'loaded') {
     notes.push('A camera native module is missing from this build, so camera readings cannot work here at all.');
   }
   if (typeof d.capabilities['garmin link'] === 'string' && String(d.capabilities['garmin link']).startsWith('BROKEN')) {

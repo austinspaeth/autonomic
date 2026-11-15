@@ -1,8 +1,10 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Animated as RNAnimated, Easing, InteractionManager, type LayoutChangeEvent, Platform, Pressable, ScrollView, Text, View, type ViewStyle } from 'react-native';
-import Animated, { Easing as REasing, runOnJS, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
+import { Animated as RNAnimated, Easing, type LayoutChangeEvent, Platform, Pressable, type ScrollViewInstance, Text, View, type ViewStyle } from 'react-native';
+import Animated, { Easing as REasing, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming, type SharedValue } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { BlurView } from 'expo-blur';
-import { useIsFocused } from '@react-navigation/native';
+import { useIsFocused } from 'expo-router';
+import { runAfterInteractions } from '@/lib/defer';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomFade, Screen, headerHeight } from '../../src/components/Header';
 import { Icon } from '../../src/components/Icon';
@@ -54,7 +56,7 @@ export default function AnalysisScreen() {
   const units = useUnits();
   const profile = state.profile;
 
-  const scrollRef = useRef<ScrollView>(null);
+  const scrollRef = useRef<ScrollViewInstance>(null);
   // Seeded to the header's exact height (see Screen) so the sticky bar and the
   // range veil aren't pinned to the top of the window before it measures.
   const insets = useSafeAreaInsets();
@@ -64,7 +66,7 @@ export default function AnalysisScreen() {
   // Pinned-section tracking runs as a Reanimated worklet: the per-frame scan
   // (which section header has scrolled up to the bottom of the top bar) stays
   // on the UI thread, so scrolling never contends with the chart trees for JS
-  // time. JS only hears runOnJS(setPinned) on an actual handoff — as one title
+  // time. JS only hears scheduleOnRN(setPinned) on an actual handoff — as one title
   // slides behind the blur the pinned bar adopts it, and the next section takes
   // over when its title reaches the line.
   // Section id -> y in the scroll content. The map is *owned* by `offsetsRef` on
@@ -228,7 +230,7 @@ export default function AnalysisScreen() {
     if (timers.current.lift) { clearTimeout(timers.current.lift); timers.current.lift = undefined; }
     restore(true);                         // no-op unless the ceiling beat the layout
     stage.current = 'out';
-    veilOp.value = withTiming(0, VEIL_OUT, (fin) => { if (fin) runOnJS(clearVeil)(); });
+    veilOp.value = withTiming(0, VEIL_OUT, (fin) => { if (fin) scheduleOnRN(clearVeil); });
   }, [restore, veilOp, clearVeil]);
 
   const raiseCeiling = useCallback(() => {
@@ -291,7 +293,7 @@ export default function AnalysisScreen() {
 
   const fadeUp = useCallback(() => {
     fadeStarted.current = true;
-    veilOp.value = withTiming(1, VEIL_IN, (fin) => { if (fin) runOnJS(onVeilOpaque)(); });
+    veilOp.value = withTiming(1, VEIL_IN, (fin) => { if (fin) scheduleOnRN(onVeilOpaque); });
   }, [veilOp, onVeilOpaque]);
 
   // Start the fade only once the veil is mounted and measured: a timing kicked
@@ -538,7 +540,7 @@ export default function AnalysisScreen() {
   // under the veil is mounting the chart tree.
   useEffect(() => {
     if (renderArgsRef.current != null) return;
-    const task = InteractionManager.runAfterInteractions(() => {
+    const task = runAfterInteractions(() => {
       if (renderArgsRef.current != null) return;   // beaten by a fast tab-in
       // Wrapped because this queue is SHARED. A task that throws stops it, and the
       // symptom lands on whichever screen defers next rather than on the one that
@@ -625,7 +627,7 @@ export default function AnalysisScreen() {
       }
       if (active !== activeSv.value) {
         activeSv.value = active;
-        runOnJS(setPinned)(active, dirSv.value);
+        scheduleOnRN(setPinned, active, dirSv.value);
       }
     },
   }, [pinIds, setPinned]);

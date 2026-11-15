@@ -85,12 +85,12 @@ describe('cameraVerdict', () => {
     const trace = { ...ppgTrace.snapshot(), reached: reachedUpTo('torch-on'), frameFaults: 3 };
     const v = cameraVerdict(report({ trace }));
     expect(v).toContain('Failed to lock HardwareBuffer');
-    expect(v).not.toContain('worklets-core not installed');
+    expect(v).not.toContain('frame worklets not installed');
   });
 
   it('still blames the worklet when no frame arrived at all', () => {
     const trace = { ...ppgTrace.snapshot(), reached: reachedUpTo('torch-on'), frameFaults: 0 };
-    expect(cameraVerdict(report({ trace }))).toContain('worklets-core not installed');
+    expect(cameraVerdict(report({ trace }))).toContain('frame worklets not installed');
   });
 });
 

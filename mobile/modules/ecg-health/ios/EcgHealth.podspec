@@ -5,7 +5,7 @@ Pod::Spec.new do |s|
   s.description    = 'Local Expo module exposing HKElectrocardiogramQuery to JS for the Autonomic journal.'
   s.author         = 'Autonomic'
   s.homepage       = 'https://autonomic.app'
-  s.platforms      = { :ios => '15.1' }
+  s.platforms      = { :ios => '16.4' }
   s.source         = { git: '' }
   s.static_framework = true
 

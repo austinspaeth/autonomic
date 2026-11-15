@@ -111,7 +111,8 @@ final class CrashLog: NSObject, MXMetricManagerSubscriber {
       add("bgMemPressure", bg.cumulativeMemoryPressureExitCount)
       add("fgWatchdog", fg.cumulativeAppWatchdogExitCount)
       add("bgWatchdog", bg.cumulativeAppWatchdogExitCount)
-      add("fgCpu", fg.cumulativeCPUResourceLimitExitCount)
+      // CPU-limit kills are a BACKGROUND-only count: MXForegroundExitData has no such member.
+      add("bgCpu", bg.cumulativeCPUResourceLimitExitCount)
       add("bgTaskTimeout", bg.cumulativeBackgroundTaskAssertionTimeoutExitCount)
       add("bgLockedFile", bg.cumulativeSuspendedWithLockedFileExitCount)
       if parts.isEmpty { continue }
@@ -122,7 +123,7 @@ final class CrashLog: NSObject, MXMetricManagerSubscriber {
         "type": "AppExit",
       ]
       row["message"] = parts.joined(separator: " ")
-      row["version"] = clip(payload.latestApplicationVersion)
+      row["version"] = Self.clip(payload.latestApplicationVersion)
       rows.append(row)
     }
     if rows.isEmpty { return }

@@ -12,7 +12,7 @@
  * affordance should sit still and say one thing.
  */
 import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
-import { Platform, Pressable, StyleSheet, Text, View, type StyleProp, type ViewStyle } from 'react-native';
+import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
@@ -331,7 +331,7 @@ function ReportRow({ icon, title, sub, onPress, chevStyle, bare }: {
   sub: string;
   onPress: () => void;
   /** When present, the chevron points DOWN and rotates via `useAccordion`. */
-  chevStyle?: StyleProp<ViewStyle>;
+  chevStyle?: React.ComponentProps<typeof Animated.View>['style'];
   /** Rendered inside a container that already draws the card chrome. */
   bare?: boolean;
 }) {

@@ -26,7 +26,7 @@ import { View } from 'react-native';
 import Svg, { Circle } from 'react-native-svg';
 import Animated, {
   Easing, cancelAnimation, interpolate, interpolateColor, useAnimatedProps,
-  useAnimatedStyle, useSharedValue, withTiming,
+  useAnimatedStyle, useSharedValue, withTiming, type SharedValue,
 } from 'react-native-reanimated';
 import { usePalette } from '../../theme';
 import { type BreathPattern, glowAt, phaseAt, progressAt } from '../../lib/breathClock';
@@ -121,8 +121,8 @@ export const BreathingViz = React.memo(function BreathingViz({ pattern, startMs,
 });
 
 function Ring({ index, radius, progress, glow, accent, track }: {
-  index: number; radius: number; progress: Animated.SharedValue<number>;
-  glow: Animated.SharedValue<number>; accent: string; track: string;
+  index: number; radius: number; progress: SharedValue<number>;
+  glow: SharedValue<number>; accent: string; track: string;
 }) {
   // Ring i lights as `progress` climbs past its threshold (innermost first), so
   // the glow blooms outward on inhale and retreats inward on exhale. During a
@@ -178,8 +178,8 @@ export const BreathBars = React.memo(function BreathBars({ pattern, startMs, run
 });
 
 function Bar({ index, progress, glow, color }: {
-  index: number; progress: Animated.SharedValue<number>;
-  glow: Animated.SharedValue<number>; color: string;
+  index: number; progress: SharedValue<number>;
+  glow: SharedValue<number>; color: string;
 }) {
   const threshold = (index + 1) / BAR_COUNT;
   const style = useAnimatedStyle(() => {

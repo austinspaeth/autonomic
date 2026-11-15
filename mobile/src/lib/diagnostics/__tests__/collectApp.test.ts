@@ -35,7 +35,7 @@ jest.mock('react-native-mmkv', () => ({
   MMKV: class { constructor() { throw new Error('no native MMKV in this build'); } },
 }), { virtual: true });
 jest.mock('react-native-vision-camera', () => { throw new Error('not in this build'); }, { virtual: true });
-jest.mock('react-native-worklets-core', () => ({ useRunOnJS: () => {} }), { virtual: true });
+jest.mock('react-native-vision-camera-worklets', () => ({ provider: {} }), { virtual: true });
 jest.mock('react-native-ble-plx', () => ({ BleManager: class {} }), { virtual: true });
 jest.mock('expo-store-review', () => ({ isAvailableAsync: async () => true, hasAction: async () => true }), { virtual: true });
 jest.mock('expo-sharing', () => ({ isAvailableAsync: async () => true }), { virtual: true });
@@ -55,6 +55,7 @@ jest.mock('../../ble/manager', () => ({ bleIfStarted: () => null }));
 // bridges above are: the real module pulls in the Connect IQ native link, which
 // jest cannot load. (This suite runs as iOS, where that row reads "n/a".)
 jest.mock('../../garmin/receiver', () => ({ garminLinkIntact: () => true }));
+jest.mock('../../../../modules/background-launch', () => ({ backgroundLaunchStatus: () => 'a scene started React Native' }));
 jest.mock('../../../../modules/app-env', () => ({ isTestFlightBuild: () => true, isSideloadedAndroidBuild: () => false }));
 jest.mock('../../../../modules/watch-bridge', () => ({
   watchBridge: () => ({ getState: async () => ({ supported: true, activated: true, paired: true, watchAppInstalled: false, reachable: false }), pendingUserInfo: async () => [{}, {}] }),

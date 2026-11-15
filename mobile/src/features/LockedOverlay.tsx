@@ -28,7 +28,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Platform, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
-import Animated, { Easing as REasing, runOnJS, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import Animated, { Easing as REasing, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
+import { scheduleOnRN } from 'react-native-worklets';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '../components/Icon';
 import { Button } from '../components/ui';
@@ -71,7 +72,7 @@ export function LockedOverlay({ visible, top, revealTop = 0, title, body, onUpgr
       setAlive(true);
       show.value = withSpring(1, ENTER_SPRING);
     } else {
-      show.value = withTiming(0, EXIT, (fin) => { if (fin) runOnJS(setAlive)(false); });
+      show.value = withTiming(0, EXIT, (fin) => { if (fin) scheduleOnRN(setAlive, false); });
     }
   }, [visible, show]);
   const scrimStyle = useAnimatedStyle(() => ({ opacity: show.value }));

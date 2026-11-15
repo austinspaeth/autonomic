@@ -1,24 +1,24 @@
-apply plugin: 'com.android.library'
-apply plugin: 'kotlin-android'
+// `expo-module-gradle-plugin` is NOT optional from Expo SDK 58. It applies the
+// Kotlin compiler plugin (io.github.expo.pika) that the module DSL's reified
+// type lookups are rewritten by; a module compiled without it builds clean and
+// then throws "This function has a reified type parameter and thus can only be
+// inlined at compilation time" from `definition()` — at app launch, since every
+// module's definition is read when React Native starts. It also supplies the
+// Kotlin plugin, expo-modules-core and the SDK levels the old
+// ExpoModulesCorePlugin.gradle helpers used to.
+plugins {
+  id 'com.android.library'
+  id 'expo-module-gradle-plugin'
+}
 
 group = 'com.autonomic.appenv'
 version = '1.0.0'
 
-def expoModulesCorePlugin = new File(project(":expo-modules-core").projectDir.absolutePath, "ExpoModulesCorePlugin.gradle")
-apply from: expoModulesCorePlugin
-applyKotlinExpoModulesCorePlugin()
-useCoreDependencies()
-
-def safeExtGet(prop, fallback) {
-  rootProject.ext.has(prop) ? rootProject.ext.get(prop) : fallback
-}
-
 android {
   namespace "com.autonomic.appenv"
-  compileSdkVersion safeExtGet("compileSdkVersion", 35)
   defaultConfig {
-    minSdkVersion safeExtGet("minSdkVersion", 26)
-    targetSdkVersion safeExtGet("targetSdkVersion", 35)
+    versionCode 1
+    versionName "1.0.0"
   }
   lintOptions {
     abortOnError false

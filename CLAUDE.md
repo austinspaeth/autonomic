@@ -744,12 +744,12 @@ old web app so old `export.json` files import directly.
   stamped BEFORE the sweep so one that throws is not retried every launch, and
   an unreadable or FUTURE stamp reads as DUE, since a clock moved backwards must
   not park it for a week); and `pruneOrphanWaveforms` in `store/store.ts`,
-  called from the ROOT LAYOUT behind `InteractionManager.runAfterInteractions`
+  called from the ROOT LAYOUT behind `runAfterInteractions` (`lib/defer.ts`)
   beside `runDailyBackup`, so it can only run in a process that actually opened
   the app. **The deferral and the clock answer different questions** — one is
   WHEN within a launch, the other HOW OFTEN across launches — and only the
-  second cuts blast radius. Nothing on that queue may throw (one task that does
-  stops every deferred build in the app), so it swallows its own failures.
+  second cuts blast radius. A deferred task must not throw (an uncaught throw there is an uncaught
+  fatal), so it swallows its own failures.
   Reclaiming bytes may never be the reason anything else fails: the sweep's own
   catch says it, "strays cost bytes, not correctness", and the support dump's
   `orphan waveforms` row is almost always 0.
@@ -1410,10 +1410,12 @@ old web app so old `export.json` files import directly.
   downturn, and `findTrend`'s improvements-only rule is untouched. Results are
   cached in `cache.ts` keyed `todayKey()|meta.lastUpdated|demo`; the screen's
   render path only ever calls `getCachedInsights`, and builds run in
-  `InteractionManager.runAfterInteractions` behind a skeleton. **Anything queued on
-  that queue must not throw**: a task that throws stops the queue, and every deferred
-  build in the app shares it, so one Insights failure left Progress sitting on its
-  skeletons at every range with no visible connection to Insights at all. The build
+  `runAfterInteractions` (`src/lib/defer.ts`) behind a skeleton. That helper replaced
+  React Native's `InteractionManager`, which RN 0.88 removed: it is `requestIdleCallback`
+  with a timeout, and each task is INDEPENDENT. The old shared queue was not — a task
+  that threw stopped it for every screen, so one Insights failure once left Progress
+  sitting on its skeletons at every range with no visible connection to Insights at all.
+  **A deferred task still must not throw**: it would now be an uncaught fatal instead. The build
   and the shape write in `app/(tabs)/insights.tsx` are therefore wrapped and reported
   through `logError` ("finding nothing" is a state this view already renders). The
   app's own error log is how that was diagnosed — `errorLog` in the plaintext
@@ -2584,7 +2586,7 @@ old web app so old `export.json` files import directly.
   (WidgetKit cannot animate) and there is no hatching anywhere. Figures use
   Manrope ExtraBold, bundled via the widget `Info.plist` on iOS and the
   android-widget plugin's `fonts` on Android. Android: `react-native-android-widget`
-  (pinned 0.17.1 — 0.18+ needs Expo 54); JSX renderers in `src/widgets/android.tsx`,
+  (0.26); JSX renderers in `src/widgets/android.tsx`,
   headless handler registered in the custom entry `index.js`, widget list configured
   in app.json. **Android sizing gotcha:** a launcher can hand a widget a taller cell
   than its content needs; a `height: 'match_parent'` root with centered content then
@@ -2644,47 +2646,54 @@ old web app so old `export.json` files import directly.
   strand a user are the silent ones. A rung that binds at 30 fps coarsens RR
   timing but still produces a reading.
 - **A frame the camera will not hand over is caught, counted, and then stopped
-  asking for.** `frame.toArrayBuffer()` copies the frame GPU→CPU by locking its
-  HardwareBuffer, and on some Android devices that lock simply fails.
-  VisionCamera catches whatever a worklet throws and rethrows it on the JS
-  thread as "Frame Processor Error: Failed to lock HardwareBuffer for
-  reading!", where nothing catches it — an uncaught fatal, which on Android is
-  a process kill, and it was the app's most common crash (it arrived TWICE per
-  crash, as `uncaught.fatal` from the JS hook and again as the Java handler's
-  `native.crash`). The worklet in `ppg/CameraView.tsx` now wraps its WHOLE body
-  rather than just the read, because every `frame.*` access is a JSI host call
-  that throws the same way once the buffer is gone. Three things hang off that
-  catch. (1) **It must stop asking.** Upstream acquires the HardwareBuffer
-  before it locks and only releases it after the copy, so a failed lock leaks
-  the acquired reference (mrousavy/react-native-vision-camera#3128) — which
-  never mattered while the first one killed the process and is a leak per frame
-  now that it does not. So the tally is a worklets-core `useSharedValue`
+  asking for.** The camera is **VisionCamera 5** (the Nitro rewrite): a frame
+  processor is a callback on a `CameraFrameOutput` (`useFrameOutput`), run on
+  that output's own thread in a **react-native-worklets** runtime — the SAME
+  worklets library Reanimated 4 runs on, so the app carries one worklet
+  runtime (react-native-worklets-core is gone, and babel-preset-expo adds the
+  worklets babel plugin itself, so `babel.config.js` lists none). The three
+  packages are loaded guardedly in ONE place, `lib/ppg/modules.ts`, which also
+  translates v5's `'authorized'` into the `'granted'` every caller was written
+  against. The worklet in `ppg/CameraView.tsx` wraps its WHOLE body in a
+  try/catch/finally, because every `frame.*` access is a native call that
+  throws once the buffer is gone, and **`frame.dispose()` is in the `finally`**:
+  an undisposed frame holds its buffer and stalls the pipeline. Three things
+  hang off the catch. (1) **It must stop asking.** The tally is a
+  `createSynchronizable` (react-native-worklets' cross-runtime box; a
+  Reanimated shared value belongs to the UI runtime, not the frame thread)
   incremented INSIDE the worklet, the only place that can gate the next frame
-  without a round trip to JS, and `FRAME_FAULT_LIMIT` is both the per-rung
-  allowance and the leak bound. (2) **Spending a rung's allowance is a failed
-  attempt**, calling the same `fallback` the frame watchdog calls, so a format
-  this device WILL release is still found; the counter resets per rung. (3) **It
-  is reported, not swallowed** — `ppgBridge.noteFrameFault` →
-  `ppgTrace.countFrameFault` + `logError('ppg.frame')`, once per distinct cause
-  per session. That last part is the load-bearing one: an unreadable frame is
-  never counted as a frame, so "no frames at all" and "no READABLE frames"
-  stall on the SAME milestone while wanting opposite answers — the worklet
-  versus the camera driver — and `trace.frameFaults` is the only thing that
-  tells them apart, in `cameraVerdict`, in the collected notes, and in the
-  setup card's own `frames` fault card ("close the other app using the camera"
-  is useless advice when there is nothing to close).
-  **Android no longer calls `toArrayBuffer()` at all.** On a Galaxy S25
-  (Android 16) EVERY lock was refused, on every rung — upstream locks with
-  `AHARDWAREBUFFER_USAGE_CPU_READ_MASK`, a mask rather than a usage, and a
-  strict gralloc rejects it — so the catch above turned a crash into a camera
-  that could never read. The frame is now read by `ppgMeanRgb`, a VisionCamera
-  frame processor plugin in the local `modules/ppg-frame` (Android-only Expo
-  module), which computes the same strided centre-crop mean from
-  `Image.getPlanes()` and never touches an AHardwareBuffer, so it cannot leak
-  one either. Its arithmetic mirrors the worklet's JS read (same crop, same
-  `TARGET_SAMPLES` stride rule — move both); iOS, and any Android binary without
-  the plugin, keep the JS read and every guard above. The report's SESSION
-  block names which path ran (`frame reader`). Native: needs a build, not OTA.
+  without a round trip to JS; `FRAME_FAULT_LIMIT` is the per-rung allowance.
+  (2) **Spending a rung's allowance is a failed attempt**, calling the same
+  `fallback` the frame watchdog calls. Each rung is its own keyed component
+  (`PpgRung`), so the frame output, its worklet runtime, the session and the
+  counter are all rebuilt per rung rather than reconfigured in place. (3) **It
+  is reported, not swallowed** — VisionCamera 5 would merely `console.error` a
+  throwing frame processor, which is the opposite failure from v4's process
+  kill: a phone that can NEVER read looking like one that never tried. So
+  `frameFaultJS` → `ppgBridge.noteFrameFault` → `ppgTrace.countFrameFault` +
+  `logError('ppg.frame')`, once per distinct cause per session. An unreadable
+  frame is never counted as a frame, so "no frames at all" and "no READABLE
+  frames" stall on the SAME milestone while wanting opposite answers, and
+  `trace.frameFaults` is the only thing that tells them apart, in
+  `cameraVerdict`, in the collected notes, and in the setup card's own `frames`
+  fault card.
+  **Android reads the IMAGE PLANES, never `frame.getPixelBuffer()`.** On a
+  Galaxy S25 (Android 16) every HardwareBuffer lock was refused by a strict
+  gralloc, which is why 1.3x shipped its own native frame reader
+  (`modules/ppg-frame`, now deleted). v5's whole-frame read still PREFERS the
+  HardwareBuffer when it claims to be CPU-readable; `frame.getPlanes()` wraps
+  `ImageProxy.getPlanes()` — the platform's own CPU mapping, the same bytes the
+  deleted plugin read — without a copy and without going near an
+  AHardwareBuffer. So the worklet computes the strided centre-crop mean from
+  plane 0 (RGBA; a YUV fallback mirrors the old plugin's) on Android and from
+  the one locked CVPixelBuffer (BGRA) on iOS, with the same `TARGET_SAMPLES`
+  stride rule on both. The report's SESSION block names the path
+  (`frame reader`). The ladder is expressed in v5's terms: `targetResolution`
+  on the frame output, an `{ fps }` constraint only when
+  `device.supportsFPS` says the rate exists, `onStarted` for "initialized".
+  **None of the camera path has been validated on a device since the
+  rewrite** — same finger, same light, against a 1.40 reading, on both
+  platforms, is the test.
 - **The app's whole state is diagnosable too.** An 8-second hold on the brand
   card at the top of Settings collects the general support dump
   (`src/lib/diagnostics/collectApp.ts` → `formatAppDiagnostics`), rendered into
@@ -2744,7 +2753,7 @@ old web app so old `export.json` files import directly.
   fatal: the app came back, and a main thread stuck for seconds is what a
   JavaScript infinite loop looks like from outside. The `MX*` API is
   deprecated from iOS 27.2 in favour of a `MetricManager` Swift API; it still
-  works and the floor is 15.1. **A crash also says WHERE** — see the
+  works and the floor is 16.4. **A crash also says WHERE** — see the
   breadcrumbs bullet below. Call `logError('area.thing', e)` from a catch that would otherwise
   be silent (already wired: store persist/load, the waveform sidecar, IAP,
   health reads + the one-shot history backfill, the strap connect loop,
@@ -2984,26 +2993,27 @@ old web app so old `export.json` files import directly.
   Live HRV) of registry types; choosing one stacks its `EntryForm` to capture
   fields. See `src/features/forms.tsx` and `src/features/JournalSections.tsx`.
 - **An animation that runs FOREVER is native-driven, never Reanimated**
-  (`useNativeLoop`, `src/components/nativeLoop.ts`). Reanimated 3.17 under the
-  New Architecture applies every frame as a full shadow-tree commit, even for
+  (`useNativeLoop`, `src/components/nativeLoop.ts`). Reanimated (3 and 4 alike:
+  4's synchronous-props fast path ships off) applies every frame as a full shadow-tree commit, even for
   opacity, and on Android each one is mounted on the UI thread a ScrollView is
   flinging on. The Journal stays mounted under every tab and sheet, so one
   ambient loop on it (the giveaway ribbon's bloom, the budget ember) made every
   scroll in the app stutter. Core `Animated` with `useNativeDriver` sets the
   view prop directly; opacity/transform only. Reanimated stays the tool for
-  anything that finishes. **And Reanimated itself is PATCHED**
-  (`mobile/patches/react-native-reanimated+3.19.5.patch`, applied by
-  `postinstall`; 3.19 sits above the SDK's 3.17, so it is in
-  `expo.install.exclude`): its commit hook re-applied the last props of every view it
-  had EVER animated on every commit, and Android's ScrollView commits its
-  offset as state on every scroll frame (iOS too), so each fling frame
-  re-mounted all of them and re-rasterised their SVGs. The patch skips a view
-  whose props that commit did not change (a React commit always differs, since
-  React's tree never holds Reanimated's values, so it is still re-applied), and
-  a skipped Reanimated commit now asks for the full re-commit after the pause.
-  Measured on a Galaxy S25 Edge: main-thread frames over budget during a fling
-  354 → 41 of ~1,400. Native, so not OTA. **Re-check the patch on any
-  Reanimated upgrade**; Reanimated 4 on RN 0.81+ fixes this upstream.
+  anything that finishes. **Reanimated is no longer patched.** 3.19 was
+  (its commit hook re-applied the last props of every view it had EVER animated
+  on every commit, and a ScrollView commits its offset as state on every scroll
+  frame, so each fling frame re-mounted all of them; the patch took main-thread
+  frames over budget during a fling from 354 to 41 of ~1,400 on a Galaxy S25
+  Edge). Reanimated 4 does it upstream: `USE_COMMIT_HOOK_ONLY_FOR_REACT_COMMITS`
+  (a static feature flag, on by default) returns early from the commit hook for
+  any commit React did not make, which is the fling case exactly. **That number
+  has not been re-measured on the S25 Edge since the patch came out**; if it
+  regresses, the lever is Reanimated's static feature flags in package.json,
+  not a new patch. Two v4 changes to remember: the default spring is now
+  stiffness 900 / damping 120 / **mass 4**, so every spring here states all
+  three (`LogPicker`'s layout spring gained `.mass(1)` for that reason), and
+  `runOnJS(fn)(a)` is `scheduleOnRN(fn, a)` from react-native-worklets.
 - **Sheets are bottom sheets that stack iOS-style** via `useSheets` /
   `src/components/Sheet.tsx` (`openSheet`, `closeSheet`, `closeAll`). A sheet
   whose content FITS does not scroll — content and viewport heights are measured
@@ -3149,7 +3159,85 @@ old web app so old `export.json` files import directly.
   `src/lib/scoring/` to adjust. Thresholds are the product — the scoring framework
   is ported **verbatim** from the original web app.
 
+- **The app runs under the UIScene life cycle, and a background launch only
+  runs JavaScript because `modules/background-launch` starts it.** The iOS 27
+  SDK (required for App Store uploads from April 2027) traps at launch on any
+  app without a scene manifest, so Expo SDK 58's template starts React Native
+  from `ExpoAppSceneDelegate.scene(_:willConnectTo:)` and NOWHERE else. When
+  iOS launches a terminated app in the background — HealthKit background
+  delivery, BGTaskScheduler, which is how every iOS pacing alert and
+  background widget refresh happens — no scene connects, the React host is
+  never created, and nothing fails or logs (expo/expo#52878, open, confirmed
+  on a real device). The module's `ExpoAppDelegateSubscriber` waits 2 seconds
+  and, if no scene has started React Native, starts the React HOST with no
+  view (`RCTRootViewFactory.initializeReactHost`). That runs the bundle's
+  top-level code, which is all the background path needs: `index.js` defines
+  the pacing task and its HealthKit observers at bundle load, for the same
+  reason on Android. No root component mounts; a scene that connects later
+  reuses the host. Three things in it are load-bearing. **The bundle**: with
+  expo-updates the launch bundle is chosen by `AppController`, so the host
+  waits for it, or background JS would run the embedded bundle while the
+  foreground runs the latest OTA. **The hand-back**: `AppController` has one
+  delegate, and expo-updates' own handler only installs itself when IT calls
+  `start()`; if a scene connects while a start we began is in flight, the
+  answer is forwarded to that handler, or it holds a splash screen for ever.
+  **The first link**: a host started this way has no launch URL, so
+  `Linking.getInitialURL()` is null for the scene that connects later and its
+  `url` event fires before anything is mounted to hear it — a widget tap would
+  open the app and do nothing. The native side keeps that URL and
+  `sceneLaunchURL()` hands it to the two consumers (`useCaptureDeepLink`, the
+  Garmin device-select callback), which must only call it from mounted code.
+  "No scene after a grace period" is the test on purpose:
+  `applicationState` is `.background` inside `didFinishLaunching` even on an
+  ordinary tap under scenes. The support dump's `launch` row says which way
+  this launch went. **Written against the Expo and expo-updates source and
+  compiled, never yet exercised by a real background launch**: kill the app,
+  raise the heart rate, and a pacing alert has to arrive. Delete the module
+  when Expo fixes it upstream. Related: nothing may cache the window size at
+  module scope any more (a folding iPhone resizes the app between displays
+  mid-session) — the tab and day slides read the live width.
+- **The runtime fingerprint is `strict`, deliberately** (`mobile/fingerprint.config.js`).
+  SDK 58's default `balanced` preset hashes an autolinked native module by
+  package name and version instead of by its files. The six modules under
+  `mobile/modules/` are autolinked from the repo and have no version that
+  moves, so an edit to their Swift or Kotlin would leave the fingerprint
+  alone and the next OTA would reach binaries that do not contain it — the
+  one mistake that crashes users at launch. `strict` is what every release
+  to 1.40 shipped under, including its known cost: `version` in app.json is
+  part of the fingerprint. **A native release strands the previous version's
+  phones on `main`'s OTAs**; `release/<version>` branches publish from
+  `eas-update.yml` too, so a JS-only fix cherry-picked to `release/1.40`
+  still reaches 1.40.x binaries (JS and assets only there, and its app.json
+  `version` must not move).
+
+- **A local Android module MUST apply `expo-module-gradle-plugin`** (`plugins {
+  id 'com.android.library'; id 'expo-module-gradle-plugin' }`, as
+  `modules/app-env` and `modules/garmin-link` do). From Expo SDK 58 the module
+  DSL's reified type lookups are rewritten by a Kotlin compiler plugin
+  (`io.github.expo.pika`) that only that Gradle plugin applies. A module built
+  the old way (`apply from: ExpoModulesCorePlugin.gradle` +
+  `applyKotlinExpoModulesCorePlugin()`) COMPILES, and then throws "This
+  function has a reified type parameter and thus can only be inlined at
+  compilation time" out of `definition()` — at app launch, on every start,
+  debug or release, because every module's definition is read as React Native
+  comes up. It was caught only by launching the built APK; the Gradle build was
+  green. `javap -c` on the module class is the quick check: no
+  `reifiedOperationMarker` call may survive in it.
+- **VisionCamera is loaded lazily, never at module scope**
+  (`loadPpgModules()` in `lib/ppg/modules.ts`, called from inside functions).
+  Importing VisionCamera 5 builds its camera device factory, which starts
+  CameraX; `CameraView.tsx` is in the launch bundle, and the bundle also loads
+  in headless background wake-ups, so an eager load opened the camera system
+  on every process start. It now loads when a sensor choice is on screen.
+
 ## Running / testing
+
+Toolchain (Expo SDK 58 / React Native 0.88 / React 19.3): **Node 22.13+ or 24**
+(Node 20 no longer works), Xcode 27, minimum iOS **16.4**, Android compileSdk
+37 / targetSdk 36 / minSdk 26, Kotlin 2.2, TypeScript 6. `ios/` and `android/`
+are generated (`npx expo prebuild --clean`) and never edited by hand. There
+are **no patch-package patches**: every local workaround is a config plugin
+in `mobile/plugins/` or a module in `mobile/modules/`.
 
 Native modules (Bluetooth + HealthKit) mean **Expo Go will not work** — you need a
 development build.
@@ -3165,7 +3253,7 @@ npm run lint     # eslint
 Device builds ship via EAS — see `mobile/EAS_UPDATE.md` and the workflows in
 `.github/workflows/` (`eas-build.yml`, `eas-update.yml`).
 
-**Android release builds are minified.** `enableProguardInReleaseBuilds` +
+**Android release builds are minified.** `enableMinifyInReleaseBuilds` +
 `enableShrinkResourcesInReleaseBuilds` are on in `expo-build-properties`, so R8
 shrinks and obfuscates every release (dex 42 MB → 13 MB, 5 dex files → 2).
 Consequences worth remembering: keep rules for anything reached by reflection,

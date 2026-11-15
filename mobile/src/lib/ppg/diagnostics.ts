@@ -62,14 +62,14 @@ const MILESTONE_LABEL: Record<PpgMilestone, string> = {
  *  FIRST milestone that was never reached. */
 const STALLED_NOTE: Record<PpgMilestone, string> = {
   'card-opened': 'The setup card never reported opening — the trace is empty, so this dump was taken from somewhere else in the app.',
-  'module-loaded': 'react-native-vision-camera or react-native-worklets-core is missing from this build. Camera readings cannot work at all here (Expo Go, a simulator, or a broken release build).',
+  'module-loaded': 'react-native-vision-camera or its worklets (react-native-vision-camera-worklets, react-native-worklets) are missing from this build. Camera readings cannot work at all here (Expo Go, a simulator, or a broken release build).',
   'permission-granted': 'Camera permission is NOT granted, so the camera view is never even mounted. Grant Camera to Autonomic in system Settings. On Android a second refusal makes the prompt stop appearing entirely.',
   'device-found': 'Permission is granted but the OS reported no rear camera. Suspect a system camera-privacy toggle (Android Quick Settings "Camera access"), a work-profile/MDM restriction, or another app holding the camera exclusively.',
   'format-chosen': 'A rear camera exists but no usable capture format came back from it. The device reports an empty format list, which is a driver-level problem.',
   'view-mounted': 'Everything resolved but the camera view was never mounted — see "render blocked" below for the exact reason.',
   'session-initialized': 'The view mounted but CameraX/AVFoundation never finished binding a session. This is the classic "black preview, no flash" failure: the requested format/fps combination was refused, or another app owns the camera. See ATTEMPTS for what was tried and the error each time.',
   'torch-on': 'The session initialized but the torch was never switched on. Either the device reports no torch, or the reading was stopped before the torch engaged.',
-  'frames-arriving': 'The session is live and the torch is on, but zero frames reached the frame processor. Suspect the frame processor worklet (worklets-core not installed correctly, or stripped by R8 in a release build).',
+  'frames-arriving': 'The session is live and the torch is on, but zero frames reached the frame processor. Suspect the frame processor worklet (frame worklets not installed correctly, or stripped by R8 in a release build).',
   'finger-detected': 'Frames are arriving but none look like a covered lens. The fingertip is not over the camera, or the torch is not lighting it — check that the flash chosen in setup matches the real flash position.',
   'pulse-locked': 'Frames arrive and a finger is detected, but no steady pulse was found. This is a placement/pressure problem, not a fault: lighter pressure, cover both lens and flash, hold still.',
 };
@@ -106,20 +106,16 @@ export const ATTEMPT_FRAME_TIMEOUT_MS = 4000;
  * How many frames a rung may fail to READ before it counts as a failed attempt
  * and the ladder drops to the next one.
  *
- * `frame.toArrayBuffer()` copies the frame GPU→CPU by locking its
- * HardwareBuffer, and on some Android devices that lock simply fails
- * ("Failed to lock HardwareBuffer for reading!"). It is not a per-frame
- * hiccup to ride out: the buffer either comes back CPU-readable for this
- * capture configuration or it never does, so the allowance is small — enough
- * to shrug off a one-off across a session rebind, not enough to sit there.
+ * A frame that cannot be read is not a per-frame hiccup to ride out: the
+ * buffer either comes back CPU-readable for this capture configuration or it
+ * never does (the original case was a HardwareBuffer lock a strict gralloc
+ * refused on every frame), so the allowance is small — enough to shrug off a
+ * one-off across a session rebind, not enough to sit there.
  *
- * It is also a LEAK bound, which is why the gate lives in the worklet rather
- * than in the JS that hears about it. VisionCamera acquires the HardwareBuffer
- * before it locks and only releases it after the copy, so a failed lock leaks
- * the acquired reference (mrousavy/react-native-vision-camera#3128). That
- * never mattered while the throw killed the process on the first frame; now
- * that the worklet catches it, the frame processor has to STOP ASKING, and
- * this is how many buffers per rung that costs.
+ * The gate lives in the worklet rather than in the JS that hears about it, so
+ * a rung that has proved unreadable stops touching its frames at once instead
+ * of a round trip later. Each rung gets a fresh allowance (the view remounts
+ * per rung), because the next configuration may be one this device will read.
  */
 export const FRAME_FAULT_LIMIT = 3;
 
@@ -159,7 +155,7 @@ export interface PpgTraceState {
   events: PpgTraceEvent[];
   moduleLoaded: boolean | null;
   workletsLoaded: boolean | null;
-  /** Last status `Camera.getCameraPermissionStatus()` reported. */
+  /** Last camera permission status VisionCamera reported ('granted' = authorized). */
   permissionStatus: string | null;
   /** Result of the one `requestCameraPermission()` call the flow makes. */
   permissionRequested: string | null;
@@ -178,9 +174,8 @@ export interface PpgTraceState {
   frameFaults: number;
   /** What the last unreadable frame said. */
   lastFrameFault: string | null;
-  /** How the worklet reads a frame: the native `ppgMeanRgb` plugin (Android,
-   *  image planes) or `frame.toArrayBuffer()` (iOS, and any Android build
-   *  without the plugin). The two fail differently, so the report names it. */
+  /** How the worklet reads a frame: the image planes (Android) or the whole
+   *  pixel buffer (iOS). The two fail differently, so the report names it. */
   frameReader: string | null;
   firstFrameMs: number | null;
   lastFrameMs: number | null;
