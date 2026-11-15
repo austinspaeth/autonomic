@@ -16,7 +16,7 @@ app:
   hook: "See whether a workout cost you a crash."
   line: "Autonomic prices each workout into your daily pacing budget and checks the next two days, so you can see whether exercise is helping or setting off crashes."
 photoLocation: "/articles/pots-exercise-or-pacing-which-advice-applies/cover.webp"
-photoAttribution: "Autonomic"
+photoAttribution: "Margaret Young / Unsplash"
 categories:
   - pots
   - postviral
