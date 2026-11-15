@@ -108,7 +108,14 @@ final class BackgroundLaunch: NSObject, AppControllerDelegate {
 
   /// A scene has asked for (or already has) a React Native view.
   private var sceneHasStarted: Bool {
-    provider?.window != nil || provider?.reactNativeFactory?.rootViewFactory.reactHost != nil
+    provider?.window != nil || Self.hasHost(provider?.reactNativeFactory)
+  }
+
+  /// Whether the factory already owns a React host. Read through KVC:
+  /// `RCTRootViewFactory.reactHost` is typed `RCTHost`, a class Swift only sees
+  /// forward-declared from this header, so the property is not importable.
+  private static func hasHost(_ factory: RCTReactNativeFactory?) -> Bool {
+    factory?.rootViewFactory.value(forKey: "reactHost") != nil
   }
 
   private func evaluate() {
@@ -157,7 +164,7 @@ final class BackgroundLaunch: NSObject, AppControllerDelegate {
 
   private func updatesDidStart(_ appController: AppControllerInterface, success: Bool) {
     guard let factory = provider?.reactNativeFactory else { return }
-    if factory.rootViewFactory.reactHost != nil {
+    if Self.hasHost(factory) {
       outcome = "a scene started React Native while updates loaded"
       return
     }
@@ -185,7 +192,7 @@ final class BackgroundLaunch: NSObject, AppControllerDelegate {
 
   private func startHost(factory: RCTReactNativeFactory, bundleURL: URL?, why: String) {
     let rootViewFactory = factory.rootViewFactory
-    guard rootViewFactory.reactHost == nil else { return }
+    guard !Self.hasHost(factory) else { return }
 
     // The host reads its bundle URL from the root view factory's configuration
     // block, not from the bundle configuration alone — the same pair
