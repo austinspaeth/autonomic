@@ -180,8 +180,12 @@ final class CrashLog: NSObject, MXMetricManagerSubscriber {
    * `libswiftCore +0x1a2b < Autonomic +0x3c4d` — since "which of OUR calls got
    * here" is the half a fix needs.
    *
-   * The tree's roots are the OUTERMOST frames and `subFrames` descend toward
-   * the crash site, so the leaf of the attributed thread's first path is it.
+   * The tree's root is the INNERMOST frame — the crash site itself — and
+   * `subFrames` walk OUTWARD toward the thread's entry point. This said the
+   * opposite until 2.0, and every iOS crash row through 1.40 therefore named
+   * the thread entry (`libsystem_pthread +0x910`, `dyld +0x55b8`) and the
+   * OUTERMOST app frame — the dispatch block that started the work — instead
+   * of where it died. So the walk stops at the FIRST app frame it meets.
    */
   private static func topFrame(_ tree: MXCallStackTree) -> String? {
     guard
@@ -189,17 +193,19 @@ final class CrashLog: NSObject, MXMetricManagerSubscriber {
       let stacks = json["callStacks"] as? [[String: Any]], !stacks.isEmpty
     else { return nil }
     let stack = stacks.first { ($0["threadAttributed"] as? Bool) == true } ?? stacks[0]
-    guard var frame = (stack["callStackRootFrames"] as? [[String: Any]])?.first else { return nil }
+    guard let site = (stack["callStackRootFrames"] as? [[String: Any]])?.first else { return nil }
     let app = Bundle.main.infoDictionary?["CFBundleExecutable"] as? String
+    var frame = site
     var ownFrame: [String: Any]? = (frame["binaryName"] as? String) == app ? frame : nil
     var depth = 0
-    while let subs = frame["subFrames"] as? [[String: Any]], let next = subs.first, depth < 512 {
+    while ownFrame == nil, let app = app,
+          let subs = frame["subFrames"] as? [[String: Any]], let next = subs.first, depth < 512 {
       frame = next
       depth += 1
-      if let app = app, (frame["binaryName"] as? String) == app { ownFrame = frame }
+      if (frame["binaryName"] as? String) == app { ownFrame = frame }
     }
-    let leaf = describe(frame)
-    if let own = ownFrame, (own["binaryName"] as? String) != (frame["binaryName"] as? String) {
+    let leaf = describe(site)
+    if let own = ownFrame, (own["binaryName"] as? String) != (site["binaryName"] as? String) {
       return "\(leaf) < \(describe(own))"
     }
     return leaf
