@@ -27,7 +27,7 @@
  * ../typeCatalog, which imports the store.
  */
 import { ACTIVITY_TYPES, MED_TYPES, SYMPTOM_TYPES, TRIGGER_TYPES } from '../registry';
-import { DEFAULT_PROTOCOL, activityGrade, dayCleanliness, sleepHours, waterGoalL, type DaysMap } from '../scoring/day';
+import { DEFAULT_PROTOCOL, activityGrade, dayCleanliness, sleepHours, sleepInterruption, waterGoalL, type DaysMap } from '../scoring/day';
 import type { ScoreContext } from '../scoring';
 import type { AppState, DayRecord, TypeDef } from '../types';
 import { lowPressureValue, type PressureMap } from '../pressure';
@@ -500,9 +500,11 @@ function derivedFactors(state: AppState): FactorDef[] {
       kind: 'binary',
       lags: [0, 1],
       blocks: ['sleep'],
-      value: (d) => {
+      // As GRADED: with a CPAP only a long wake counts, so the factor reads
+      // "long wakes" there, which is still a meaningful thing to correlate.
+      value: (d, _dk, _days, ctx) => {
         if (!d || !d.sleep || !(d.sleep.bed || d.sleep.wake)) return null;
-        return d.sleep.quality === 'interrupted' ? 1 : 0;
+        return sleepInterruption(d.sleep, ctx).interrupted ? 1 : 0;
       },
     },
     {

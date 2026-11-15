@@ -18,6 +18,7 @@ import { usePaywall } from '../../src/features/Paywall';
 import { pingViewOpened } from '../../src/store/ping';
 import { buildCategories, cycleSymptomsCard, type AnalysisCard, type BpPeriod, type MarginChart, type OrthoTransition } from '../../src/lib/analysis/categories';
 import { SCORE_COLORS, profileCtx } from '../../src/lib/scoring';
+import type { Profile } from '../../src/lib/types';
 import { hexA } from '../../src/lib/color';
 import { resolveProtocol, type DaysMap } from '../../src/lib/scoring/day';
 import { acBuckets, catFromBands, type BucketView, type CustomRange, type Mode } from '../../src/lib/analysis/buckets';
@@ -50,10 +51,8 @@ export default function AnalysisScreen() {
   // HRV filter lives here (not inside HrvProgress) so the same All/Morning/Evening
   // toggle can appear both inline beside the section title and in the pinned bar.
   const [hrvFilt, setHrvFilt] = useState<Filt>('all');
-  const sex = state.profile.sex;
-  const height = state.profile.height;
   const units = useUnits();
-  const pacemaker = state.profile.pacemaker;
+  const profile = state.profile;
 
   const scrollRef = useRef<ScrollView>(null);
   // Seeded to the header's exact height (see Screen) so the sticky bar and the
@@ -482,11 +481,11 @@ export default function AnalysisScreen() {
   // shortening a window the veil already hides. The cache is dropped wholesale
   // whenever any build input changes.
   const buildArgs = useMemo(
-    () => ({ days, sex, height, protocol: resolveProtocol(state.settings.protocol), customTypes: state.customTypes, hrCurve }),
+    () => ({ days, ...profileCtx(profile), protocol: resolveProtocol(state.settings.protocol), customTypes: state.customTypes, hrCurve }),
     // `units` is not read by the build's arguments: the cards format through
     // lib/units, so a new identity here is what drops the cached documents.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [days, sex, height, state.settings.protocol, state.customTypes, units],
+    [days, profile, state.settings.protocol, state.customTypes, units],
   );
   // What the document is *actually* built from. Frozen while the tab is
   // unfocused: a journal edit made elsewhere doesn't rebuild this pre-mounted
@@ -729,9 +728,7 @@ export default function AnalysisScreen() {
             days={renderArgs ? renderArgs.days : days}
             mode={chartMode}
             custom={chartCustom}
-            sex={sex}
-            height={height}
-            pacemaker={pacemaker}
+            profile={profile}
             hrvFilt={hrvFilt}
             setHrvFilt={setHrvFilt}
             revealed={revealed}
@@ -886,15 +883,15 @@ function ColdSkeleton() {
 
 /** The whole document of category sections, memoized as one unit so pinned-bar
  *  handoffs (parent state flipping mid-scroll) never touch the chart trees. */
-const SectionsBody = React.memo(function SectionsBody({ sections, demo, days, mode, custom, sex, height, pacemaker, hrvFilt, setHrvFilt, revealed, onSectionLayout, onCardLayout }: {
+const SectionsBody = React.memo(function SectionsBody({ sections, demo, days, mode, custom, profile, hrvFilt, setHrvFilt, revealed, onSectionLayout, onCardLayout }: {
   sections: Section[];
   demo: boolean;
   days: DaysMap;
   mode: Mode;
   custom: CustomRange | null;
-  sex?: string;
-  height?: string;
-  pacemaker?: boolean;
+  /** The whole profile, through profileCtx, so no scoring input (birthday,
+   *  pacemaker, CPAP) can be left out of the Analysis cards. */
+  profile: Profile;
   hrvFilt: Filt;
   setHrvFilt: (f: Filt) => void;
   revealed: number;
@@ -907,7 +904,7 @@ const SectionsBody = React.memo(function SectionsBody({ sections, demo, days, mo
   const freeTier = useTier() === 'free';
   const cycleReady = cycleProgressReady(useCycleModel());
   // Stable identity — HrvProgress keys its aggregation memo on `ctx`.
-  const ctx = useMemo(() => profileCtx({ sex, height, pacemaker }), [sex, height, pacemaker]);
+  const ctx = useMemo(() => profileCtx(profile), [profile]);
   // The Triggers-style "Cycle symptoms" card, over the same buckets as the
   // range being shown; only while cycle tracking is on.
   const cycleOn = !!useAppState().settings.cycle?.enabled;

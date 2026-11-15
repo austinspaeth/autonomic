@@ -8,7 +8,7 @@ import { addDays, dateFromKey, fmtNum, fmtTime12, keyOf } from '../dates';
 import type { AppState, CustomTypes, DayRecord, Entry } from '../types';
 import type { Downturn } from '../scoring/downturn';
 import { RECENT_DAYS as STRAIN_RECENT_DAYS, type Strain } from '../scoring/strain';
-import { blueZone, dayCleanliness, scoreSet, sleepHours, type DaysMap } from '../scoring/day';
+import { CPAP_INTERRUPTED_AWAKE_MIN, blueZone, dayCleanliness, scoreSet, sleepHours, type DaysMap } from '../scoring/day';
 import { ACTIVITY_TYPES, MED_TYPES, READING_TYPES, SYMPTOM_TYPES, TRIGGER_TYPES, bmLabel, entryFields, isDivider } from '../registry';
 import { bpBce, bpKerdo, bpKvas, bpMap, bpPP, bpRobinson, hrvComposite, numOr, orthoMaxDelta, type ScoreContext } from '../scoring';
 import { estimatedHrMax, hrZones, timeInZones } from '../workoutZones';
@@ -579,6 +579,8 @@ export function profileLine(profile: AppState['profile']): string {
     profile && profile.sex ? `Sex: ${profile.sex}` : '',
     // Without this a model reads a paced floor as a resting rate that never settles.
     profile && profile.pacemaker ? 'Has a pacemaker (its lower rate sets a heart-rate floor; resting and overnight HR are not graded)' : '',
+    // Without this a model reads a CPAP user's many brief wakes as broken sleep.
+    profile && profile.cpap ? `Uses a CPAP (brief wakes are expected; a night counts as interrupted only past ${CPAP_INTERRUPTED_AWAKE_MIN} min awake)` : '',
   ].filter(Boolean).join(' | ');
 }
 

@@ -293,15 +293,20 @@ export interface ScoreContext {
    *  `hr` grade, the day score drops its Resting HR input, the sleep grade
    *  ignores the overnight low). */
   pacemaker?: boolean;
+  /** profile.cpap: a watch-staged night counts as interrupted only past
+   *  CPAP_INTERRUPTED_AWAKE_MIN awake, read through `sleepInterruption`.
+   *  Duration, the overnight HR and every weight are untouched. */
+  cpap?: boolean;
 }
 
 /** The profile half of a ScoreContext. Build contexts through this so a new
  *  profile-driven scoring input cannot be forgotten at one of the call sites. */
-export const profileCtx = (profile?: { sex?: string; height?: string | number; birthday?: string; pacemaker?: boolean } | null): ScoreContext => ({
+export const profileCtx = (profile?: { sex?: string; height?: string | number; birthday?: string; pacemaker?: boolean; cpap?: boolean } | null): ScoreContext => ({
   sex: profile?.sex,
   height: profile?.height,
   age: ageFromBirthday(profile?.birthday),
   pacemaker: !!profile?.pacemaker,
+  cpap: !!profile?.cpap,
 });
 
 export function computeScores(r: Entry, ctx: ScoreContext = {}): Record<string, ScoreCat> {

@@ -12,7 +12,7 @@ import { TRIGGER_TYPES } from '../registry';
 import type { CustomTypes, Protocol } from '../types';
 import type { ScoreContext } from './index';
 import {
-  DEFAULT_PROTOCOL, activityGrade, dayCleanliness, sleepHours,
+  DEFAULT_PROTOCOL, activityGrade, dayCleanliness, sleepHours, sleepInterruption,
   type DaysMap,
 } from './day';
 import { keyRange, metricSeries } from '../trends/series';
@@ -128,7 +128,7 @@ export function detectDownturn(
     if (g === 'bad') heavy += 2;
     else if (g === 'ok') heavy++;
     const hrs = sleepHours(days, k);
-    if ((hrs != null && hrs < 6) || (d.sleep && d.sleep.quality === 'interrupted')) shortNights++;
+    if ((hrs != null && hrs < 6) || sleepInterruption(d.sleep, ctx).interrupted) shortNights++;
     // Only days ../digestion can speak for; an unlogged gut is not a clean one.
     const gut = gutDay(days, k);
     if (gut && gut.grade === 'loose') looseDays++;

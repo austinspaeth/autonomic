@@ -38,6 +38,7 @@ export const DIG_LINES: Line[] = [
   { kind: 'use', L: 'P', label: 'Protocol saved' },
   { kind: 'use', L: 'B', label: 'Pacing budget opened' },
   { kind: 'use', L: 'C', label: 'Cycle tracking turned on' },
+  { kind: 'use', L: 'A', label: 'CPAP switch turned on' },
   { kind: 'fnd', L: 'E', label: 'Early signal opened' },
   { kind: 'fnd', L: 'U', label: 'Unconfirmed pattern opened' },
   { kind: 'fnd', L: 'C', label: 'Biggest change opened' },

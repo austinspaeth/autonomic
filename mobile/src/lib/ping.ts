@@ -342,8 +342,12 @@ export function logCode(kind: LogKind | string | undefined, type?: string): LogC
  * ever says about the cycle feature: no phase, no flow, no mode, nothing logged
  * there. A headcount of people who chose it, which is all a feature this
  * sensitive should be measured by.
+ *
+ * `A` ("airway") is the CPAP switch TURNED ON in the profile, fired once when a
+ * save turns it on (never on a save that leaves it on). A headcount of people
+ * it was built for, and like `C` nothing else about them goes on the wire.
  */
-export type FeatureCode = 'M' | 'P' | 'B' | 'U' | 'C';
+export type FeatureCode = 'M' | 'P' | 'B' | 'U' | 'C' | 'A';
 
 export function featureCode(feature: string | undefined): FeatureCode | undefined {
   if (feature === 'milestones') return 'M';
@@ -351,6 +355,7 @@ export function featureCode(feature: string | undefined): FeatureCode | undefine
   if (feature === 'pacing') return 'B';
   if (feature === 'unpause') return 'U';
   if (feature === 'cycle') return 'C';
+  if (feature === 'cpap') return 'A';
   return undefined;
 }
 

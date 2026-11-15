@@ -244,6 +244,12 @@ describe('migrate: top-level sections', () => {
     expect(migrate({ profile: { pacemaker: 'yes' } }).profile).not.toHaveProperty('pacemaker');
   });
 
+  it('keeps the CPAP flag, and only a real true', () => {
+    expect(migrate({ profile: { cpap: true } }).profile.cpap).toBe(true);
+    expect(migrate({ profile: { cpap: 'yes' } }).profile).not.toHaveProperty('cpap');
+    expect(migrate({ profile: {} }).profile).not.toHaveProperty('cpap');
+  });
+
   it('sanitizes meta and custom/hidden types', () => {
     const out = migrate({
       meta: { lastUpdated: 42, lastImport: { name: 'x.json' }, onboarded: '2026-01-01T00:00:00Z' },

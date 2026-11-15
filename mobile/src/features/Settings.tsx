@@ -17,6 +17,7 @@ import { radius, usePalette } from '../theme';
 import { clearAllData, getState, replaceState, save, useAppState, useStore } from '../store/store';
 import { deleteAllBackups } from '../lib/backup';
 import { ageFromBirthday } from '../lib/dates';
+import { CPAP_INTERRUPTED_AWAKE_MIN } from '../lib/scoring/day';
 import { cmToInches, getUnits, heightCmText, weightText, weightToLb, weightUnit, type UnitSystem } from '../lib/units';
 import { DATE_KEY_RE, assertImportVersion, isPlainObject } from '../lib/migrate';
 import { useIap, paywallBypassed, manageSubscription, restore, priceOf, storeName, MONTHLY_SKU, YEARLY_SKU } from '../store/iap';
@@ -41,7 +42,7 @@ import { formatAppDiagnostics } from '../lib/diagnostics/appReport';
 // the user is told to write to must be the one that is watched.
 import { SupportCard } from './SupportCard';
 import { disablePressure, enablePressure, usePressureStatus } from '../store/pressure';
-import { isPingExcluded, setPingExcluded } from '../store/ping';
+import { isPingExcluded, pingFeature, setPingExcluded } from '../store/ping';
 import { currentOta, versionLabel } from '../lib/otaRevision';
 
 const PRIVACY_URL = 'https://autonomic.care/privacy-policy/';
@@ -155,7 +156,7 @@ export function MenuSheet({ controls }: { controls: SheetControls }) {
         <BrandMark size={26} />
         <Text style={{ fontSize: 22, fontWeight: '800', color: p.text, letterSpacing: -0.3 }}>Autonomic</Text>
       </Pressable>
-      {item('user', 'Profile', 'Units, sex, birthday, height, weight, pacemaker', () => openSheet((c) => <ProfileSheet controls={c} />))}
+      {item('user', 'Profile', 'Units, sex, birthday, height, weight, pacemaker, CPAP', () => openSheet((c) => <ProfileSheet controls={c} />))}
       <NotificationsRow />
       {item('bluetooth', 'Devices', 'Heart-rate straps', () => openSheet(() => <DevicesScreen />), !!state.settings.lastBleDeviceId)}
       {item('heart', healthAppName(), 'Read & write health data', () => openSheet(() => <HealthScreen />), !!state.settings.healthEnabled)}
@@ -246,6 +247,27 @@ function PacemakerNoticeSheet({ controls }: { controls: SheetControls }) {
   );
 }
 
+/** The CPAP twin of the notice above: said once as the switch goes on, since
+ *  past nights re-grade under it. */
+function CpapNoticeSheet({ controls }: { controls: SheetControls }) {
+  const p = usePalette();
+  return (
+    <View>
+      <Text style={{ fontSize: 20, fontWeight: '700', color: p.text, marginBottom: 8 }}>Scoring with a CPAP</Text>
+      <Text style={{ fontSize: 14, color: p.textDim, lineHeight: 20, marginBottom: 10 }}>
+        Putting your mask back on or adjusting it wakes you for a moment, and most watches record each of those as time
+        awake. That can mark a night as interrupted even when it felt restful.
+      </Text>
+      <Text style={{ fontSize: 14, color: p.textDim, lineHeight: 20, marginBottom: 20 }}>
+        With this on, a night only counts as interrupted when your watch recorded more than {CPAP_INTERRUPTED_AWAKE_MIN} minutes
+        awake in total. How long you slept and your overnight heart rate count the same as before. Past nights are re-scored
+        the same way. This also applies to APAP and BiPAP.
+      </Text>
+      <Button title="OK" variant="primary" onPress={() => controls.close()} />
+    </View>
+  );
+}
+
 /** A label on the left, its two-way toggle on the right. */
 const PROFILE_ROW = { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingTop: 8, paddingBottom: 12, paddingHorizontal: 4 } as const;
 const PROFILE_SEG_W = 184;
@@ -270,6 +292,7 @@ function ProfileSheet({ controls }: { controls: SheetControls }) {
     setHeightCm(heightCmText(height));
   };
   const [pacemaker, setPacemaker] = useState(!!prof.pacemaker);
+  const [cpap, setCpap] = useState(!!prof.cpap);
   const age = ageFromBirthday(birthday);
   return (
     <View>
@@ -324,13 +347,29 @@ function ProfileSheet({ controls }: { controls: SheetControls }) {
         }}
         accessibilityRole="switch"
         accessibilityState={{ checked: pacemaker }}
-        style={{ flexDirection: 'row', alignItems: 'center', gap: 12, borderTopWidth: 1, borderBottomWidth: 1, borderColor: 'rgba(255,255,255,0.05)', paddingVertical: 14, paddingHorizontal: 4, marginBottom: 12 }}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 12, borderTopWidth: 1, borderBottomWidth: 1, borderColor: 'rgba(255,255,255,0.05)', paddingVertical: 14, paddingHorizontal: 4 }}
       >
         <View style={{ flex: 1 }}>
           <Text style={{ color: p.text, fontSize: 15, fontWeight: '600' }}>I have a pacemaker</Text>
           <Text style={{ color: p.textDim, fontSize: 12.5, marginTop: 2 }}>Resting heart rate stops counting toward scores</Text>
         </View>
         <Toggle on={pacemaker} />
+      </Pressable>
+      <Pressable
+        onPress={() => {
+          const v = !cpap;
+          setCpap(v);
+          if (v) openSheet((c) => <CpapNoticeSheet controls={c} />, { fitContent: true });
+        }}
+        accessibilityRole="switch"
+        accessibilityState={{ checked: cpap }}
+        style={{ flexDirection: 'row', alignItems: 'center', gap: 12, borderBottomWidth: 1, borderColor: 'rgba(255,255,255,0.05)', paddingVertical: 14, paddingHorizontal: 4, marginBottom: 12 }}
+      >
+        <View style={{ flex: 1 }}>
+          <Text style={{ color: p.text, fontSize: 15, fontWeight: '600' }}>I sleep with a CPAP</Text>
+          <Text style={{ color: p.textDim, fontSize: 12.5, marginTop: 2 }}>Brief wake-ups no longer lower your sleep grade</Text>
+        </View>
+        <Toggle on={cpap} />
       </Pressable>
       <View style={[PROFILE_ROW, { paddingBottom: 20 }]}>
         <Text style={{ color: p.text, fontSize: 15, fontWeight: '600' }}>Units</Text>
@@ -343,13 +382,15 @@ function ProfileSheet({ controls }: { controls: SheetControls }) {
       </View>
       <Button title="Save" variant="primary" onPress={() => {
         const s = getState();
-        s.profile = { sex, birthday, weight: weight.trim(), height: height.trim(), ...(pacemaker ? { pacemaker: true } : {}) };
+        const cpapTurnedOn = cpap && !s.profile.cpap;
+        s.profile = { sex, birthday, weight: weight.trim(), height: height.trim(), ...(pacemaker ? { pacemaker: true } : {}), ...(cpap ? { cpap: true } : {}) };
         s.settings.units = units;
         save();
         // A profile set to Male turns cycle-aware tracking off: the Journal card
         // and every phase adjustment go with it. The logged days stay, and
         // Settings → Cycle can still turn it back on.
         if (sex === 'Male' && s.settings.cycle?.enabled) disableCycle();
+        if (cpapTurnedOn) pingFeature('cpap');
         controls.close();
       }} />
       <View style={{ height: 20 }} />

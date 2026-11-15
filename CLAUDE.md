@@ -64,7 +64,7 @@ old web app so old `export.json` files import directly.
                 "units": "imperial" | "metric",   // display only; undefined = imperial (lib/units)
                 "reminder": { "enabled": true, "time": "08:00" },  // daily morning nudge; source of truth for the OS schedule
                 "cycle": { "enabled": true, "mode": "regular" } },  // cycle-aware tracking (lib/cycle); phases are derived, never stored
-  "profile": { "sex", "birthday", "weight", "height" },  // age+sex: HRV norm bubbles (lib/hrvNorms), max-HR formula, AI prompts; no score reads it
+  "profile": { "sex", "birthday", "weight", "height", "pacemaker?", "cpap?" },  // read into every ScoreContext via profileCtx: age recentres the baseline RMSSD band, pacemaker and cpap change grading (below)
   "customTypes": { "meds": { "custom-magnesium": { /* pure-JSON TypeDef */ } } },  // user-created types (activities/meds/symptoms/triggers)
   "hiddenTypes": { "symptoms": ["nausea"] },  // built-in types the user deleted (only allowed while unused)
   "meta": {
@@ -3058,6 +3058,26 @@ old web app so old `export.json` files import directly.
   EVERY source (the HRV readings' average HR too), redistributing its weight.
   Resting HR is still shown everywhere, just uncoloured. It does not touch HRV,
   the nocturnal dip, strain or the budget.
+- **A CPAP raises the "interrupted" bar, nothing else.** `profile.cpap`
+  (Settings → Profile, "I sleep with a CPAP") rides every `ScoreContext` as
+  `cpap`. Mask adjustments are many short Awake blocks, and the import marks a
+  night interrupted past 10 minutes awake (`INTERRUPTED_AWAKE_MIN`), which
+  costs an 8h+ night TWO steps (great → ok: the ladder reaches great only
+  uninterrupted, and 7h+ interrupted is ok). With the switch on, a staged night
+  counts as interrupted only past `CPAP_INTERRUPTED_AWAKE_MIN` (45) awake.
+  **`sleepInterruption(sleep, ctx)` (`lib/scoring/day.ts`) is the ONLY grading
+  reader of the flag**: the sleep grade, the score-explain sheet, the downturn's
+  sleep cause, the milestones' good-sleep day, the `sleep:interrupted` Insights
+  factor, the sleep report's shared trait and the Journal card's note all go
+  through it, and nothing may branch on `quality === 'interrupted'` for grading.
+  A night with no trustworthy awake minutes (hand-logged, or a window edited
+  away from its stages) keeps the flag as recorded. The record itself never
+  changes: the Journal card's window line, the sleep report's night line, the
+  import log and the CSV say what the watch recorded, and the grade line says
+  why it did not count. Duration, overnight low and peak, weights and the
+  budget are untouched. Default off, so nobody else's history moves, which is
+  why it shipped by OTA where a global re-grade ships as a store build. Turning
+  it on sends `use` letter `A`.
 - **A DAY BAND'S IDENTITY IS ITS `key`, NEVER ITS LABEL, AND THE WORST ONE IS
   `severe`.** `SCORE_CATS` (`lib/scoring/day.ts`) is Excellent / Good /
   Moderate / Compromised / Bad / **Severe** at 85/70/55/40/25/0. It used to end

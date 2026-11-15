@@ -18,7 +18,7 @@ import { typesFor } from '../lib/typeCatalog';
 import { sortedTriggerLogs, ungroupedTriggers } from '../lib/triggerLogs';
 import { orthoDeltaCat, orthoMaxDelta, rowScoreCategory, SCORE_COLORS, GRADE_LABEL, profileCtx } from '../lib/scoring';
 import { fmtWater, getUnits, waterNum } from '../lib/units';
-import { sleepGrade, sleepHours, stagesForWindow, waterGoalL, type DaysMap } from '../lib/scoring/day';
+import { sleepGrade, sleepHours, sleepInterruption, stagesForWindow, waterGoalL, type DaysMap } from '../lib/scoring/day';
 import type { SleepRecord, SleepStages } from '../lib/types';
 import { ensureDay, getSleepSeries, getState, getWaveform, save, storeSleepSeries, useAppState, useStore } from '../store/store';
 import { setJournalSectionY } from '../store/nav';
@@ -365,8 +365,11 @@ function SleepGrade({ dk, sleep }: { dk: string; sleep: { bed: string; wake: str
   const hrs = asleepMin != null ? asleepMin / 60 : sleepHours(state.days, dk);
   const color = grade ? SCORE_COLORS[grade] : p.textDim;
   const interrupted = sleep.quality === 'interrupted';
+  // The note explains the GRADE, so it reads the flag as graded (a CPAP's brief
+  // wakes cost nothing); the window line below still says what was recorded.
+  const gradedInterrupted = sleepInterruption(sleep as SleepRecord, profileCtx(state.profile)).interrupted;
   const hrLowN = parseFloat(String(sleep.hrLow ?? ''));
-  const note = sleepNote(state.days as never, dk, hrs, interrupted, Number.isFinite(hrLowN) ? hrLowN : null);
+  const note = sleepNote(state.days as never, dk, hrs, gradedInterrupted, Number.isFinite(hrLowN) ? hrLowN : null);
   const hrRange = sleep.hrLow != null && sleep.hrLow !== '' && sleep.hrHigh != null && sleep.hrHigh !== ''
     ? `${sleep.hrLow}–${sleep.hrHigh} bpm`
     : sleep.hrLow != null && sleep.hrLow !== '' ? `${sleep.hrLow} bpm low` : null;

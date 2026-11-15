@@ -13,6 +13,12 @@ export interface Profile {
    *  so the overnight low and resting HR say nothing about recovery: neither is
    *  graded (see `ScoreContext.pacemaker`). */
   pacemaker?: boolean;
+  /** Sleeps with a CPAP (or APAP / BiPAP). Putting the mask back on wakes
+   *  somebody for a moment, many times a night, and a watch stages each one as
+   *  Awake, so the import's 10-minute rule marks restful nights interrupted.
+   *  With this on a staged night counts as interrupted only past
+   *  `CPAP_INTERRUPTED_AWAKE_MIN` awake (see `ScoreContext.cpap`). */
+  cpap?: boolean;
 }
 
 /** Per-stage minutes for a night, when the Health source recorded stages

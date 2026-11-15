@@ -19,7 +19,7 @@
  * stays free of even the date helpers' module graph, and jest exercises it
  * directly.
  */
-import { scoreSet, sleepGradeParts, sleepHours, SLEEP_HR_HIGH, SLEEP_HR_LOW_1, SLEEP_HR_LOW_2, resolveProtocol } from '../scoring/day';
+import { CPAP_INTERRUPTED_AWAKE_MIN, scoreSet, sleepGradeParts, sleepHours, sleepInterruption, SLEEP_HR_HIGH, SLEEP_HR_LOW_1, SLEEP_HR_LOW_2, resolveProtocol } from '../scoring/day';
 import type { DaysMap } from '../scoring/day';
 import type { ScoreContext } from '../scoring';
 import { trustedReadings } from '../hrvQuality';
@@ -78,15 +78,22 @@ export function gradeReasons(days: DaysMap, dk: string, ctx: ScoreContext = {}):
     : parts.base === 'good' ? 'a Good'
       : parts.base === 'ok' ? 'a Moderate'
         : parts.base === 'bad' ? 'a Compromised' : 'a Bad';
+  // With a CPAP the awake minutes decide, and the line says which side of the
+  // bar they fell on, since the night may still READ "interrupted" elsewhere.
+  const cpapLine = parts.cpapRule && parts.recordedInterrupted && parts.awakeMin != null
+    ? parts.interrupted
+      ? `${durText}, with ${fmtMin(parts.awakeMin)} awake. That's over the ${CPAP_INTERRUPTED_AWAKE_MIN} minutes that counts as interrupted with a CPAP, which costs a step. On duration and quality this was ${baseWord} night.`
+      : `${durText}, with ${fmtMin(parts.awakeMin)} awake. That's under the ${CPAP_INTERRUPTED_AWAKE_MIN} minutes that counts as interrupted with a CPAP, so it cost nothing. On duration alone this was ${baseWord} night.`
+    : null;
   out.push({
     cat: parts.base,
-    text: parts.interrupted
+    text: cpapLine ?? (parts.interrupted
       // "recorded as", not "you marked it": the flag is usually NOT the user's.
       // A Health import sets it whenever the watch staged more than
       // INTERRUPTED_AWAKE_MIN minutes awake (health/sleepSummary), so telling
       // someone they marked a night they never touched is simply wrong.
       ? `${durText}, but the night was recorded as interrupted, which costs a step. On duration and quality this was ${baseWord} night.`
-      : `${durText}, uninterrupted. On duration alone this was ${baseWord} night.`,
+      : `${durText}, uninterrupted. On duration alone this was ${baseWord} night.`),
   });
 
   if (parts.hrLow != null) {
@@ -121,10 +128,17 @@ export function gradeNote(days: DaysMap, dk: string, ctx: ScoreContext = {}): st
   const parts = sleepGradeParts(days, dk, ctx);
   if (!parts) return '';
   if (parts.hrLow == null && parts.hrHigh == null) {
-    return 'This night has no overnight heart rate recorded, so times and interruption are all this grade used.';
+    return ctx.cpap
+      ? "This night has no overnight heart rate recorded, so times and long wakes are all this grade used; brief wakes from your CPAP don't count."
+      : 'This night has no overnight heart rate recorded, so times and interruption are all this grade used.';
   }
-  if (parts.pacedLow) return 'Duration and interruption set the base grade. Only a very high overnight peak can demote it, since your pacemaker sets the floor of your overnight low.';
-  return 'Duration and interruption set the base grade. An elevated overnight low then demotes it.';
+  const base = ctx.cpap
+    ? "Duration and long wakes set the base grade; brief wakes from your CPAP don't count."
+    : 'Duration and interruption set the base grade.';
+  const hr = parts.pacedLow
+    ? 'Only a very high overnight peak can demote it, since your pacemaker sets the floor of your overnight low.'
+    : 'An elevated overnight low then demotes it.';
+  return `${base} ${hr}`;
 }
 
 /* ---------- what this night did ---------- */
@@ -223,13 +237,14 @@ const SHARED_MIN_RATE = 0.6;
 /** ...and be at least this much more common there than on the rest. */
 const SHARED_MIN_LIFT = 0.2;
 
-interface Trait { label: string; holds: (n: Night, days: DaysMap) => boolean | null }
+interface Trait { label: string; holds: (n: Night, days: DaysMap, ctx: ScoreContext) => boolean | null }
 
 /** Deliberately few, and each one is something the user can act on tonight. */
 const TRAITS: Trait[] = [
   { label: 'Bed before 11pm', holds: (n) => n.bedAt < 11 * 60 },
   { label: 'Seven hours or more', holds: (n) => (n.asleepMin != null ? n.asleepMin : n.inBedMin) >= 7 * 60 },
-  { label: 'An uninterrupted night', holds: (n) => !n.interrupted },
+  // As graded, so a CPAP night of brief wakes counts as uninterrupted here too.
+  { label: 'An uninterrupted night', holds: (n, days, ctx) => !sleepInterruption(days[n.dk]?.sleep, ctx).interrupted },
   {
     label: `A dip of ${DIP_DIPPING_PCT} percent or more`,
     holds: (n, days) => {
@@ -264,7 +279,7 @@ export function sharedTraits(days: DaysMap, dk: string, ctx: ScoreContext, addDa
   if (!rest.length) return [];
 
   const rate = (set: typeof rows, t: Trait) => {
-    const known = set.map((r) => t.holds(r.night, days)).filter((v): v is boolean => v != null);
+    const known = set.map((r) => t.holds(r.night, days, ctx)).filter((v): v is boolean => v != null);
     return known.length >= 4 ? known.filter(Boolean).length / known.length : null;
   };
   return TRAITS.filter((t) => {
@@ -285,6 +300,8 @@ export interface SleepReport {
   gradeNote: string;
   /** The user has a pacemaker: the overnight HR is shown but not graded. */
   paced: boolean;
+  /** The user sleeps with a CPAP: only a long wake counts as interrupted. */
+  cpap: boolean;
   hrLow: number | null;
   hrHigh: number | null;
   /** The dip, when both an overnight low and a real baseline exist. */
@@ -389,6 +406,7 @@ export function buildSleepReport(
     reasons: gradeReasons(days, dk, ctx),
     gradeNote: gradeNote(days, dk, ctx),
     paced: !!ctx.pacemaker,
+    cpap: !!ctx.cpap,
     hrLow: parts ? parts.hrLow : null,
     hrHigh: parts ? parts.hrHigh : null,
     dip,

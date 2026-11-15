@@ -138,6 +138,7 @@ describe('cohort ping wire format', () => {
     expect(featureCode('milestones')).toBe('M');
     expect(featureCode('protocol')).toBe('P');
     expect(featureCode('cycle')).toBe('C');
+    expect(featureCode('cpap')).toBe('A');
     // The pacing budget, opened by somebody who can read it. The locked half of
     // that same tap is `see` B, and the two must stay separate letters on
     // separate routes: pooled they are only "somebody tapped the strip", which

@@ -463,6 +463,7 @@ export function migrate(s: unknown): AppState {
       weight: str(profile.weight),
       height: str(profile.height),
       ...(profile.pacemaker === true ? { pacemaker: true } : {}),
+      ...(profile.cpap === true ? { cpap: true } : {}),
     },
     customTypes: cleanCustomTypes(src.customTypes),
     hiddenTypes: cleanHiddenTypes(src.hiddenTypes),

@@ -209,7 +209,7 @@ window.Analytics = (function () {
     S: 'Sleep', A: 'Activity', M: 'Med or supplement', Y: 'Symptom',
     W: 'Water', B: 'Bowel movement', P: 'Blood pressure', R: 'Resting heart rate'
   };
-  var FEATURE_NAME = { M: 'Milestones opened', P: 'Protocol saved', B: 'Pacing budget opened', U: 'Pacing budget unpaused', C: 'Cycle tracking turned on' };
+  var FEATURE_NAME = { M: 'Milestones opened', P: 'Protocol saved', B: 'Pacing budget opened', U: 'Pacing budget unpaused', C: 'Cycle tracking turned on', A: 'CPAP switch turned on' };
   var FINDING_NAME = { E: 'Early signal', U: 'Unconfirmed pattern', C: 'Biggest change', R: 'Correlation' };
   var REPORT_NAME = { D: 'Data for prompt', H: 'Full health report', C: 'Doctor summary' };
   var READING_KIND_NAME = { M: 'Morning baseline', B: 'Later baseline', T: 'Training' };
@@ -243,7 +243,7 @@ window.Analytics = (function () {
     not: ['M', 'C', 'P', '?'], pot: ['T', 'E', '?'], see: ['I', 'P', 'B', '?'],
     osh: ['A', 'F', 'H', '?'], odm: ['A', 'F', 'H', '?'], oac: ['A', 'F', 'H', '?'],
     log: ['S', 'A', 'M', 'Y', 'W', 'B', 'P', 'R', '?'],
-    use: ['M', 'P', 'B', '?'], fnd: ['E', 'U', 'C', 'R', '?'], rpt: ['D', 'H', 'C', '?'],
+    use: ['M', 'P', 'B', 'C', 'A', '?'], fnd: ['E', 'U', 'C', 'R', '?'], rpt: ['D', 'H', 'C', '?'],
     rdg: ['M', 'B', 'T', '?'], mbp: ['S', 'T', 'X', '?'], stp: ['C', 'G', 'T', '?'],
     sub: ['Y', 'M', 'P', 'F', '?'], rst: ['Y', 'M', 'P', 'F', '?'], lap: ['Y', 'M', 'P', 'F', '?']
   };

@@ -130,6 +130,40 @@ export function stagesForWindow(sleep: SleepRecord | undefined | null): SleepSta
   return Math.abs(hrs * 60 - stageTotal(sleep.stages)) <= STAGE_WINDOW_TOLERANCE_MIN ? sleep.stages : null;
 }
 
+/** With a CPAP a staged night counts as interrupted only past this many
+ *  minutes awake. Mask adjustments are many short Awake blocks, and they trip
+ *  the import's 10-minute rule (health/sleepSummary INTERRUPTED_AWAKE_MIN) on
+ *  nights that were restful. 45 still catches a genuinely broken night. */
+export const CPAP_INTERRUPTED_AWAKE_MIN = 45;
+
+export interface SleepInterruption {
+  /** What the grade treats the night as. */
+  interrupted: boolean;
+  /** Awake minutes the call was judged on; null when it fell back to the
+   *  recorded flag (no staging, or a hand-edited window). */
+  awakeMin: number | null;
+  /** The CPAP rule decided it (a staged night with ctx.cpap). */
+  cpapRule: boolean;
+  /** What the record itself says, before the CPAP rule. */
+  recorded: boolean;
+}
+
+/**
+ * Whether a night counts as interrupted FOR GRADING. Every scoring reader of
+ * the flag goes through this, never `quality === 'interrupted'` directly, or
+ * the CPAP switch would hold in one place and not the next. A night with no
+ * trustworthy awake minutes (hand-logged, or a window edited away from its
+ * stages) keeps the flag exactly as recorded: there is nothing to judge.
+ */
+export function sleepInterruption(sleep: SleepRecord | undefined | null, ctx: ScoreContext = {}): SleepInterruption {
+  const recorded = !!sleep && sleep.quality === 'interrupted';
+  const stages = ctx.cpap ? stagesForWindow(sleep) : null;
+  if (stages) {
+    return { interrupted: stages.awake > CPAP_INTERRUPTED_AWAKE_MIN, awakeMin: stages.awake, cpapRule: true, recorded };
+  }
+  return { interrupted: recorded, awakeMin: sleep?.stages ? sleep.stages.awake : null, cpapRule: false, recorded };
+}
+
 /** Overnight-HR thresholds that demote the sleep grade. Exported so the sleep
  *  report can quote the exact numbers it graded against instead of restating
  *  them in copy that then drifts. */
@@ -143,7 +177,15 @@ const SLEEP_GRADE_ORDER: ScoreCat[] = ['great', 'good', 'ok', 'bad', 'crash'];
 export interface SleepGradeParts {
   /** Hours between bed and wake (the window, not staged sleep). */
   hours: number;
+  /** As graded: with a CPAP, only a long wake counts (`sleepInterruption`). */
   interrupted: boolean;
+  /** What the night's record says, before the CPAP rule. */
+  recordedInterrupted: boolean;
+  /** Awake minutes the CPAP rule judged, or the staged awake minutes; null
+   *  when the night carries none. */
+  awakeMin: number | null;
+  /** The CPAP rule decided `interrupted`. */
+  cpapRule: boolean;
   /** Grade from duration + quality alone, before any HR demotion. */
   base: ScoreCat;
   hrLow: number | null;
@@ -167,7 +209,8 @@ export function sleepGradeParts(days: DaysMap, dk: string, ctx: ScoreContext = {
   const dur = sleepHours(days, dk);
   if (dur == null) return null;
   const d = days[dk];
-  const good = !(d && d.sleep && d.sleep.quality === 'interrupted');
+  const intr = sleepInterruption(d?.sleep, ctx);
+  const good = !intr.interrupted;
   let cat: ScoreCat;
   if (dur >= 8 && good) cat = 'great';
   else if (dur >= 7) cat = good ? 'good' : 'ok';
@@ -187,7 +230,7 @@ export function sleepGradeParts(days: DaysMap, dk: string, ctx: ScoreContext = {
   if (demote) {
     cat = SLEEP_GRADE_ORDER[Math.min(SLEEP_GRADE_ORDER.length - 1, SLEEP_GRADE_ORDER.indexOf(cat) + demote)];
   }
-  return { hours: dur, interrupted: !good, base, hrLow: lo, hrHigh: hi, demoteLow, demoteHigh, demote, pacedLow, cat };
+  return { hours: dur, interrupted: !good, recordedInterrupted: intr.recorded, awakeMin: intr.awakeMin, cpapRule: intr.cpapRule, base, hrLow: lo, hrHigh: hi, demoteLow, demoteHigh, demote, pacedLow, cat };
 }
 
 /** Sleep recovery grade for the night before `dk`. Duration + quality set the
@@ -465,13 +508,18 @@ export function scoreSet(readings: Entry[], d: DayRecord, dk: string, days: Days
   const rhrDetail: CompDetail = { value: rhrV != null ? `${rhrV} bpm` : '', metrics: rhrV != null ? [{ label: rhrLabel, raw: rhrV, bands: rhrBands, unit: 'bpm', lowerBetter: true }] : [], note: fromN(rhrN) || undefined };
 
   const slH = sleepHours(days, dk);
-  const slInt = !!(d && d.sleep && d.sleep.quality === 'interrupted');
+  const slInt = sleepInterruption(d?.sleep, ctx).interrupted;
   const sleepDetail: CompDetail = {
     value: slH != null ? `${slH.toFixed(1)} h${slInt ? ', interrupted' : ''}` : 'not logged',
     metrics: [],
-    note: ctx.pacemaker
-      ? 'Targets 7h or more for a good grade; 8h+ and uninterrupted scores best. Your overnight low is not graded, since your pacemaker sets its floor; a very high overnight peak (110+ bpm) still lowers the grade. An earlier, consistent bedtime is usually the single biggest lever.'
-      : 'Targets 7h or more for a good grade; 8h+ and uninterrupted scores best. An elevated overnight heart rate (sleeping low of 65+ bpm) lowers the grade, since restorative sleep needs the rate to settle. An earlier, consistent bedtime is usually the single biggest lever.',
+    note: [
+      'Targets 7h or more for a good grade; 8h+ and uninterrupted scores best.',
+      ctx.cpap ? `With a CPAP, only more than ${CPAP_INTERRUPTED_AWAKE_MIN} minutes awake counts as interrupted.` : '',
+      ctx.pacemaker
+        ? 'Your overnight low is not graded, since your pacemaker sets its floor; a very high overnight peak (110+ bpm) still lowers the grade.'
+        : 'An elevated overnight heart rate (sleeping low of 65+ bpm) lowers the grade, since restorative sleep needs the rate to settle.',
+      'An earlier, consistent bedtime is usually the single biggest lever.',
+    ].filter(Boolean).join(' '),
   };
 
   const actDetail: CompDetail = {

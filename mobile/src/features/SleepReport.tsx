@@ -42,7 +42,7 @@ import { useEntryForms } from './forms';
 
 const SLEEP_HELP: Record<string, HelpContent> = {
   grade: {
-    what: 'How long you actually slept, and the recovery grade that came out of it. On a night your watch staged, this is time asleep rather than time in bed; on a night you logged by hand it is the window you entered. Duration and whether you marked it interrupted set the base grade, then an elevated overnight heart rate can demote it, because a long night spent at a high rate is not restorative sleep.',
+    what: 'How long you actually slept, and the recovery grade that came out of it. On a night your watch staged, this is time asleep rather than time in bed; on a night you logged by hand it is the window you entered. Duration and whether you marked it interrupted set the base grade, then an elevated overnight heart rate can demote it, because a long night spent at a high rate is not restorative sleep. If you use a CPAP, Settings → Profile can stop brief wake-ups from counting.',
     why: 'Sleep is the single biggest daily lever on autonomic recovery, and it is one of the components behind your Autonomic Score. Open "Why this grade" to see exactly which input moved it and by how much, so you can act on the one that did rather than guess.',
     learnMore: '/insights/recovery/sleep-and-autonomic-recovery/',
   },
@@ -95,7 +95,7 @@ export function SleepReportSheet({ dk }: { dk: string }) {
   useAppState(); // re-render after an edit underneath
   const state = getState();
   const report = useMemo(() => {
-    const ctx = profileCtx({ sex: state.profile.sex, height: state.profile.height, birthday: state.profile.birthday, pacemaker: state.profile.pacemaker });
+    const ctx = profileCtx(state.profile);
     // The night's series lives in the waveform sidecar, never the journal, so
     // it is read here and handed to the (store-free) builder.
     const w = getSleepSeries(dk);
@@ -110,7 +110,7 @@ export function SleepReportSheet({ dk }: { dk: string }) {
     return buildSleepReport(state.days, dk, addDays, ctx, state.settings.protocol, {
       hr: w?.sampledHr, resp: w?.sampledResp, spans: w?.stageSpans, hrByDay,
     });
-  }, [state.days, dk, state.settings.protocol, state.profile.sex, state.profile.height, state.profile.birthday, state.profile.pacemaker]);
+  }, [state.days, dk, state.settings.protocol, state.profile]);
 
   if (!report) return null;
   // "Logged by hand" is the honest label for a night with no heart rate and no

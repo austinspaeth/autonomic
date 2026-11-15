@@ -343,7 +343,7 @@ const LOGS = {
  *  is why they are not on SEE; `B` is the pacing budget actually opened, and is
  *  on both routes split by what the tap got (see VIEWS). `U` is the budget
  *  revealed on a day the app had paused it, read against `B`. */
-const FEATURES = { M: 'milestones-opened', P: 'protocol-saved', B: 'pacing-budget-opened', U: 'pacing-budget-unpaused', C: 'cycle-tracking-enabled' };
+const FEATURES = { M: 'milestones-opened', P: 'protocol-saved', B: 'pacing-budget-opened', U: 'pacing-budget-unpaused', C: 'cycle-tracking-enabled', A: 'cpap-enabled' };
 
 /**
  * Which subscription product — the SUB / RST / LAP routes, one alphabet across

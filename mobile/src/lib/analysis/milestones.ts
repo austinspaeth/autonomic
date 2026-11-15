@@ -6,7 +6,7 @@
 import { dateFromKey, keyOf } from '../dates';
 import type { DayRecord, Entry } from '../types';
 import { type ScoreContext } from '../scoring';
-import { dayCleanliness, scoreSet, sleepHours, type DaysMap } from '../scoring/day';
+import { dayCleanliness, scoreSet, sleepHours, sleepInterruption, type DaysMap } from '../scoring/day';
 import { isTrustedReading, trustedReadings } from '../hrvQuality';
 import { isEngagedDay } from '../review/eligibility';
 import { gutDay } from '../digestion';
@@ -80,7 +80,7 @@ export function buildMilestoneDays(days: DaysMap, ctx: ScoreContext): { map: Rec
       highBpEvent: syms.some((s) => s.type === 'highBp') || bps.some((r) => parseFloat(r.sys as string) >= 140),
       bpGood: bps.length ? bps.every((r) => parseFloat(r.sys as string) < 130 && parseFloat(r.dia as string) < 85) : null,
       sleepH: sleepHours(days, dk),
-      sleepGood: (() => { const h = sleepHours(days, dk); return h != null && !(d.sleep && d.sleep.quality === 'interrupted'); })(),
+      sleepGood: (() => { const h = sleepHours(days, dk); return h != null && !sleepInterruption(d.sleep, ctx).interrupted; })(),
       sleepLow: d.sleep && d.sleep.hrLow != null ? parseFloat(String(d.sleep.hrLow)) : null,
       // A movement that was neither loose nor hard/severely strained. A bare
       // count let a week of daily diarrhea earn the streak.
