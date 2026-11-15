@@ -35,7 +35,14 @@ import {
 import { cameraPermissionStatus, loadPpgModules } from './modules';
 import { describeError } from '../diagnostics/env';
 
-const { vc, worklets, frameWorklets } = loadPpgModules();
+// Resolved on first use, NEVER at module scope. Importing VisionCamera 5 is not
+// free: its JS builds the camera device factory as it loads, which starts
+// CameraX (and logs "Failed to load Camera Devices!" on a phone whose camera is
+// unavailable). This file is imported by the setup card, which the app bundle
+// reaches at launch — and the bundle also loads in headless background
+// wake-ups — so an eager load would open the camera system on every start of
+// the process for a feature most launches never touch.
+const mods = () => loadPpgModules();
 
 /**
  * Record whether the native modules made it into this build, and return it.
@@ -44,6 +51,7 @@ const { vc, worklets, frameWorklets } = loadPpgModules();
  * otherwise report the modules as missing when they are simply unexamined.
  */
 export function probePpgModules(): boolean {
+  const { vc, worklets, frameWorklets } = mods();
   const workletsOk = !!worklets && frameWorklets;
   const ok = !!vc && workletsOk;
   ppgTrace.set(
@@ -96,7 +104,7 @@ export function PpgCameraView({ preview }: { preview?: number }) {
 }
 
 function PpgCameraInner({ preview }: { preview?: number }) {
-  const { useCameraDevice } = vc!;
+  const { useCameraDevice } = mods().vc!;
   const [running, setRunning] = useState(ppgBridge.isRunning());
   useEffect(() => ppgBridge.subscribe(setRunning), []);
 
@@ -282,8 +290,8 @@ function PpgRung({ device, running, torch, width, height, fps, preview, onStarte
   width: number | null; height: number | null; fps: number | null;
   preview?: number; onStarted: () => void; onError: (e: unknown) => void;
 }) {
-  const { Camera, useFrameOutput } = vc!;
-  const { createSynchronizable, scheduleOnRN } = worklets!;
+  const { Camera, useFrameOutput } = mods().vc!;
+  const { createSynchronizable, scheduleOnRN } = mods().worklets!;
 
   // Unreadable frames on this rung. Counted inside the worklet rather than on
   // the JS thread so the frame processor can stop asking without waiting on a

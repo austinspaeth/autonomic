@@ -3175,6 +3175,26 @@ old web app so old `export.json` files import directly.
   still reaches 1.40.x binaries (JS and assets only there, and its app.json
   `version` must not move).
 
+- **A local Android module MUST apply `expo-module-gradle-plugin`** (`plugins {
+  id 'com.android.library'; id 'expo-module-gradle-plugin' }`, as
+  `modules/app-env` and `modules/garmin-link` do). From Expo SDK 58 the module
+  DSL's reified type lookups are rewritten by a Kotlin compiler plugin
+  (`io.github.expo.pika`) that only that Gradle plugin applies. A module built
+  the old way (`apply from: ExpoModulesCorePlugin.gradle` +
+  `applyKotlinExpoModulesCorePlugin()`) COMPILES, and then throws "This
+  function has a reified type parameter and thus can only be inlined at
+  compilation time" out of `definition()` — at app launch, on every start,
+  debug or release, because every module's definition is read as React Native
+  comes up. It was caught only by launching the built APK; the Gradle build was
+  green. `javap -c` on the module class is the quick check: no
+  `reifiedOperationMarker` call may survive in it.
+- **VisionCamera is loaded lazily, never at module scope**
+  (`loadPpgModules()` in `lib/ppg/modules.ts`, called from inside functions).
+  Importing VisionCamera 5 builds its camera device factory, which starts
+  CameraX; `CameraView.tsx` is in the launch bundle, and the bundle also loads
+  in headless background wake-ups, so an eager load opened the camera system
+  on every process start. It now loads when a sensor choice is on screen.
+
 ## Running / testing
 
 Toolchain (Expo SDK 58 / React Native 0.88 / React 19.3): **Node 22.13+ or 24**
