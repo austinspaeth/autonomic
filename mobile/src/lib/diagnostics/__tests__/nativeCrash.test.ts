@@ -1,5 +1,5 @@
 import {
-  NATIVE_CRASH_TAG, NATIVE_HANG_TAG, NATIVE_SWALLOWED_TAG, isFatalNativeCrash, type NativeCrash, describeNativeCrash, parseNativeCrashes, tagForNativeCrash,
+  NATIVE_CRASH_TAG, NATIVE_EXIT_TAG, NATIVE_HANG_TAG, NATIVE_SWALLOWED_TAG, isFatalNativeCrash, type NativeCrash, describeNativeCrash, parseNativeCrashes, tagForNativeCrash,
 } from '../nativeCrash';
 import { redactMessage } from '../../errorReport';
 
@@ -184,4 +184,15 @@ describe('a swallowed exception', () => {
     expect(isFatalNativeCrash(c)).toBe(true);
     expect(tagForNativeCrash(c)).toBe(NATIVE_CRASH_TAG);
   });
+});
+
+// iOS MetricKit's exit tally (CrashLog.swift writes kind: 'exit'). The parser
+// used to drop the kind, so a memory-kill tally filed as a fatal native.crash.
+test('an exit tally parses as exit, under its own non-fatal tag', () => {
+  const [c] = parseNativeCrashes(JSON.stringify([{
+    at: 1, kind: 'exit', source: 'metrickit', type: 'AppExit', message: 'fgMemLimit 2',
+  }]));
+  expect(c.kind).toBe('exit');
+  expect(tagForNativeCrash(c)).toBe(NATIVE_EXIT_TAG);
+  expect(isFatalNativeCrash(c)).toBe(false);
 });

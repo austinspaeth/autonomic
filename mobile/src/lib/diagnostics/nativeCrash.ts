@@ -176,7 +176,7 @@ export function parseNativeCrashes(raw: string | null | undefined): NativeCrash[
       causeType: str(r.causeType),
       causeMessage: str(r.causeMessage),
       frame: str(r.frame),
-      kind: r.kind === 'hang' ? 'hang' : r.kind === 'swallowed' ? 'swallowed' : 'crash',
+      kind: r.kind === 'hang' || r.kind === 'exit' || r.kind === 'swallowed' ? r.kind : 'crash',
       version: str(r.version),
       source: r.source === 'metrickit' ? 'metrickit' : 'java',
     };
