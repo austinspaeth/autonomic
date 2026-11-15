@@ -50,6 +50,14 @@ export function fmtReleaseDate(iso: string): string {
 
 export const RELEASES: Release[] = [
   {
+    version: '2.0',
+    date: '2026-11-15',
+    notes: [
+      'A stability and performance update. The app is faster and more reliable throughout.',
+      'If you sleep with a CPAP, you can now say so in Settings, Profile. Brief wake-ups from adjusting your mask will no longer lower your sleep grade or your score.',
+    ],
+  },
+  {
     version: '1.40',
     date: '2026-11-09',
     notes: [
