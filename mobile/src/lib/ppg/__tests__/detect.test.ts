@@ -5,7 +5,7 @@
  * must (a) recover the mean RR / HR within tolerance, (b) beat frame-clock
  * quantization via sub-frame refinement, and (c) reject junk.
  */
-import { assessPulse, bandpass, detectBeats, fingerPresent, neighbourDeviation, STEADY_MAX_NEIGHBOUR_DEV } from '../detect';
+import { assessPulse, bandpass, detectBeats, fingerPresent, neighbourDeviation, STEADY_MAX_NEIGHBOUR_DEV, pulseGate } from '../detect';
 
 /** Brightness series at `fps` for `seconds`, pulsing at `bpm`. */
 function makeSeries(opts: {
@@ -214,5 +214,32 @@ describe('a steady pulse may have a direction', () => {
     // a CV of 0.18, and nowhere near their neighbours' midpoints either.
     const scattered = [900, 640, 1130, 700, 1090, 660];
     expect(neighbourDeviation(scattered)).toBeGreaterThan(2 * STEADY_MAX_NEIGHBOUR_DEV);
+  });
+});
+
+describe('pulseGate', () => {
+  const G = 2000;
+  it('good resets the dip', () => {
+    expect(pulseGate('good', 1000, 1500, G)).toEqual({ gate: 'good', weakSince: null });
+  });
+  it('a fresh dip starts its grace now', () => {
+    expect(pulseGate('weak', null, 5000, G)).toEqual({ gate: 'grace', weakSince: 5000 });
+  });
+  it('a dip inside its grace is held, not a gap', () => {
+    expect(pulseGate('weak', 5000, 6900, G).gate).toBe('grace');
+    expect(pulseGate('none', 5000, 6900, G).gate).toBe('grace');
+  });
+  it('a dip that outlasts the grace is a gap', () => {
+    expect(pulseGate('weak', 5000, 7000, G)).toEqual({ gate: 'gap', weakSince: 5000 });
+  });
+  it('a quarter-second flicker inside a good run never ends it', () => {
+    let ws: number | null = null;
+    const gates: string[] = [];
+    for (const [q, t] of [['good', 0], ['weak', 250], ['good', 500], ['weak', 750], ['weak', 1000], ['good', 1250]] as const) {
+      const r = pulseGate(q, ws, t, G);
+      ws = r.weakSince;
+      gates.push(r.gate);
+    }
+    expect(gates).not.toContain('gap');
   });
 });

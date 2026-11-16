@@ -151,7 +151,8 @@ function PpgCameraInner({ preview }: { preview?: number }) {
   // that but still produces a reading.
   const fps = useMemo(() => {
     if (!spec.fps || !device) return null;
-    try { return device.supportsFPS(spec.fps) ? spec.fps : null; } catch { return null; }
+    const want = Platform.OS === 'android' ? Math.min(spec.fps, ANDROID_MAX_FPS) : spec.fps;
+    try { return device.supportsFPS(want) ? want : null; } catch { return null; }
   }, [spec.fps, device]);
 
   // Register each rung as it starts, so the report lists every configuration
@@ -232,6 +233,12 @@ function PpgCameraInner({ preview }: { preview?: number }) {
     return () => { clearTimeout(off); clearTimeout(on); setTorchBlip(false); };
   }, [running, initialized]);
 
+  // A new reading on the same rung waits for its own onStarted before it may
+  // ask for the torch again (the stop above already sent 'off').
+  useEffect(() => {
+    if (running) setInitialized(false);
+  }, [running]);
+
   const onStarted = useCallback(() => {
     setInitialized(true);
     ppgTrace.patchAttempt({ initialized: true });
@@ -265,8 +272,10 @@ function PpgCameraInner({ preview }: { preview?: number }) {
   // Withheld until the session has started: VisionCamera 5 calls setTorchMode
   // the moment its controller exists, and on Android that throws "Camera is not
   // active" before the session is running. Undefined makes the library skip
-  // the call; stopping the session puts the torch out on its own.
-  const torchMode = running && initialized ? torch : undefined;
+  // the call. But once a session HAS started, 'off' must still be sent when the
+  // reading stops: withholding it there left the torch lit after the reading
+  // on a Galaxy S25 Edge, because stopping the session does not put it out.
+  const torchMode = initialized ? torch : undefined;
   ppgTrace.mark('view-mounted');
   ppgTrace.set({ renderBlocked: null, torch });
   if (torch === 'on') ppgTrace.mark('torch-on');
@@ -291,9 +300,21 @@ function PpgCameraInner({ preview }: { preview?: number }) {
   );
 }
 
-/** Same figure as the native reader this replaced, and the reason every device
- *  sits on one noise floor — see the stride rule in the worklet. */
-const TARGET_SAMPLES = 1200;
+/** Pixels averaged per frame, whatever the frame size — see the stride rule in
+ *  the worklet for why it is not the 1,200 it used to be. */
+const TARGET_SAMPLES = 40000;
+
+/**
+ * Android readings run at 30 fps, not the 60 the first rung asks for. Measured
+ * on a Galaxy S25 Edge (2.0.0, VisionCamera 5): at 60 fps the pulse graded
+ * 'good' 54-81% of the time and every full reading was stopped early; at 30
+ * fps, same phone and finger, 85% and the first complete five-minute reading.
+ * A frame capped at 1/60 s gathers half the light, and with the torch through a
+ * fingertip the pulse is only 1-2% of the brightness, so the longer exposure is
+ * worth more than the finer frame interval (the peak refinement in detect.ts
+ * already interpolates between frames). iOS keeps 60 until it is measured.
+ */
+const ANDROID_MAX_FPS = 30;
 
 /**
  * One rung of the ladder: a frame output, the worklet that reads it, and the
@@ -330,18 +351,18 @@ function PpgRung({ device, running, torch, width, height, fps, preview, onStarte
       // This rung has already proved it cannot be read — see FRAME_FAULT_LIMIT.
       if (frameFaults.getBlocking() >= FRAME_FAULT_LIMIT) return;
       const w = frame.width, h = frame.height;
-      // Average a fixed ~1200 pixels no matter what resolution the device
-      // actually handed back. The per-frame mean's noise floor is set by how
-      // many pixels go into it, not by the frame size, and `targetResolution`
-      // only promises the CLOSEST available size to the one requested — so a
-      // fixed stride would silently give a device that only offers 1280x720 a
-      // very different signal from one that offers 320x240. At 640x480 this
-      // evaluates to exactly 8, the stride this loop has always used there.
-      const stride = Math.max(1, Math.round(Math.sqrt((w * h) / (4 * TARGET_SAMPLES))));
-      // Strided mean over the center half of the frame — keep the worklet
-      // trivial, detection happens in JS.
-      const x0 = w >> 2, x1 = (3 * w) >> 2;
-      const y0 = h >> 2, y1 = (3 * h) >> 2;
+      // Average ~40,000 pixels over the middle 80% of the frame, whatever size
+      // the device handed back. It was ~1,200 over the middle half, which was
+      // right while frames were 320x240 (each pixel already the ISP's average
+      // of many sensor pixels) and badly wrong once VisionCamera 5 started
+      // handing over 1440x1080 whatever `targetResolution` asks for: 1,200
+      // single pixels out of 1.5 million left enough noise in the per-frame
+      // mean that the beat detector missed and split beats, and a Galaxy S25
+      // Edge that read fine on 1.40 could not hold a pulse. The fingertip covers
+      // the whole lens, so the border is the only part worth leaving out.
+      const stride = Math.max(1, Math.round(Math.sqrt((w * h * 0.64) / TARGET_SAMPLES)));
+      const x0 = Math.floor(w * 0.1), x1 = Math.floor(w * 0.9);
+      const y0 = Math.floor(h * 0.1), y1 = Math.floor(h * 0.9);
       let r = 0, g = 0, b = 0, count = 0;
 
       // ANDROID READS THE IMAGE PLANES, never `frame.getPixelBuffer()`. The
@@ -447,6 +468,8 @@ function PpgRung({ device, running, torch, width, height, fps, preview, onStarte
     onFrameDropped: onFrameDroppedJS,
   });
   const outputs = useMemo(() => [frameOutput], [frameOutput]);
+
+
   const constraints = useMemo(() => (fps ? [{ fps }] : []), [fps]);
 
   return (

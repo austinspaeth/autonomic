@@ -204,3 +204,27 @@ export function assessPulse(ts: number[], vs: number[]): PulseQuality {
 export function fingerPresent(red: number, green: number, blue: number): boolean {
   return red > 70 && red > 1.4 * green && red > 1.4 * blue;
 }
+
+/**
+ * The pulse grade is re-taken several times a second over a trailing window,
+ * so on a faint signal it flickers out of 'good' for a moment at a time. Ending
+ * the stretch on every flicker cut a Galaxy S25 Edge reading that graded good
+ * 81% of the time into 14 pieces, none long enough to keep, and the app stopped
+ * it as hopeless. So a dip is a GAP only once it has lasted `graceMs`; until
+ * then it is 'grace', and the caller holds that stretch's beats for the moment
+ * the grade comes back. Bad intervals inside a held dip are still judged by the
+ * artifact correction, like any other beat.
+ */
+export type PulseGate = 'good' | 'grace' | 'gap';
+
+export function pulseGate(
+  quality: PulseQuality,
+  weakSince: number | null,
+  now: number,
+  graceMs: number,
+): { gate: PulseGate; weakSince: number | null } {
+  if (quality === 'good') return { gate: 'good', weakSince: null };
+  const since = weakSince ?? now;
+  return { gate: now - since < graceMs ? 'grace' : 'gap', weakSince: since };
+}
+

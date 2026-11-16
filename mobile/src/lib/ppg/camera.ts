@@ -14,7 +14,7 @@
  * present (Expo Go / simulator / web) without crashing — createPpg() returns a
  * stub that reports unavailable.
  */
-import { assessPulse, detectBeats, fingerPresent, type PulseQuality } from './detect';
+import { assessPulse, detectBeats, fingerPresent, pulseGate, type PulseQuality } from './detect';
 import { ppgTrace } from './diagnostics';
 import { cameraPermissionStatus, loadPpgModules, requestCameraPermission } from './modules';
 import { createPermissionGate } from './permission';
@@ -56,6 +56,7 @@ const BUFFER_MS = 12000; // trailing brightness kept for detection
 const SIGNAL_WINDOW_MS = 5000; // pulse-quality / lock assessment window
 const ANALYZE_EVERY_MS = 250; // detection cadence (frames arrive at 30–60 Hz)
 const FINGER_FLIP_FRAMES = 4; // debounce finger on/off across frames
+export const WEAK_GRACE_MS = 2000; // a dip in the pulse grade shorter than this is not a gap
 
 let onSampleCb: ((s: PpgSample) => void) | null = null;
 let onSignalCb: ((s: PpgSignal) => void) | null = null;
@@ -65,6 +66,7 @@ const runListeners = new Set<(running: boolean) => void>();
 let tBuf: number[] = [];
 let vBuf: number[] = [];
 let fingerOn = false;
+
 let fingerStreak = 0;
 let lastEmittedPeak = 0;
 let lastAnalyzedAt = 0;
@@ -74,6 +76,9 @@ let recentRr: number[] = [];
 // reading as a pulse). The next emitted sample carries it as `gap` so the
 // consumer can start a new segment, then it clears.
 let pendingGap = false;
+/** When the pulse grade last left 'good', and the beats held since — see `pulseGate`. */
+let weakSince: number | null = null;
+let heldRr: number[] = [];
 // Frame timestamps arrive in whatever unit the platform uses (ns/µs/ms/s);
 // the scale is inferred from the first inter-frame delta.
 let tScale: number | null = null;
@@ -92,6 +97,8 @@ function resetSignalState() {
   lastSignalKey = '';
   recentRr = [];
   pendingGap = false;
+  weakSince = null;
+  heldRr = [];
   tScale = null;
   prevRawT = null;
   lastFrameFault = '';
@@ -128,6 +135,8 @@ function analyze(now: number) {
 
   if (!fingerOn) {
     pendingGap = true;
+    weakSince = null;
+    heldRr = [];
     emitSignal({ locked: false, quality: 'none' });
     return;
   }
@@ -136,7 +145,11 @@ function analyze(now: number) {
   let lo = 0;
   while (lo < tBuf.length && tBuf[lo] < from) lo++;
   const quality = assessPulse(tBuf.slice(lo), vBuf.slice(lo));
-  emitSignal({ locked: quality === 'good', quality });
+  const g = pulseGate(quality, weakSince, now, WEAK_GRACE_MS);
+  weakSince = g.weakSince;
+  const inGrace = g.gate === 'grace';
+  // A dip still inside its grace keeps the lock, so "Pulse lost" means lost.
+  emitSignal({ locked: quality === 'good' || inGrace, quality: inGrace ? 'good' : quality });
 
   // Beat emission over the full buffer: peaks newer than the last emitted one
   // become RR intervals (their spacing to the preceding detected peak).
@@ -159,10 +172,13 @@ function analyze(now: number) {
   // `lastEmittedPeak` has already advanced past them, so recovering the lock
   // resumes cleanly instead of retroactively flushing the junk.
   if (quality !== 'good') {
+    if (inGrace) { heldRr.push(...fresh); return; }
     pendingGap = true;
     recentRr = [];
+    heldRr = [];
     return;
   }
+  if (heldRr.length) { fresh.unshift(...heldRr); heldRr = []; }
 
   if (fresh.length && onSampleCb) {
     recentRr = [...recentRr, ...fresh].slice(-5);
@@ -198,7 +214,7 @@ export const ppgBridge = {
       fingerStreak = 0;
       ppgTrace.set({ fingerOn }, 'finger', fingerOn ? 'covered' : 'uncovered');
       if (fingerOn) ppgTrace.mark('finger-detected');
-      if (!fingerOn) { tBuf = []; vBuf = []; recentRr = []; pendingGap = true; }
+      if (!fingerOn) { tBuf = []; vBuf = []; recentRr = []; pendingGap = true; weakSince = null; heldRr = []; }
     }
     if (!fingerOn) { analyze(t); return; }
 
