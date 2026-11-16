@@ -14,7 +14,6 @@
 import React, { useEffect, useMemo, useState, useSyncExternalStore } from 'react';
 import { Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { useAccordion } from '../../components/ui';
 import { Icon } from '../../components/Icon';
@@ -37,6 +36,7 @@ import { usePaywall } from '../Paywall';
 import { useTier } from '../../store/tier';
 import { pingReport } from '../../store/ping';
 import { profileCtx } from '../../lib/scoring';
+import { usePillAnchor } from '../../store/fold';
 
 /* ---------- pill chrome, matched to HealthUpdates / WhatsNew ---------- */
 
@@ -48,7 +48,8 @@ export const ASK_AI_LABEL = 'Get AI Insights & Reports';
 export const AI_SHEET_TITLE = 'AI Insights & Reports';
 
 export function AskAiPill() {
-  const insets = useSafeAreaInsets();
+  // Above the bottom bar, or over the content where there is none (src/lib/fold.ts).
+  const anchor = usePillAnchor();
   const { openSheet } = useSheets();
 
   /**
@@ -91,7 +92,7 @@ export function AskAiPill() {
   };
 
   return (
-    <Animated.View pointerEvents="box-none" style={[styles.wrap, { bottom: insets.bottom + 88 }, style]}>
+    <Animated.View pointerEvents="box-none" style={[styles.wrap, anchor, style]}>
       {/* Shadow OUTSIDE, clipping inside. A shadow and `overflow: hidden` on the same
           view cancel out on iOS — the clip takes the shadow with it — which is why the
           pill looked flat against the content behind it despite having a shadow

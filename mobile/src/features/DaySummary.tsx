@@ -1215,7 +1215,7 @@ function zoneAdvice(raw: number | null, bands: Band[] | null, unit?: string) {
   return { cur, ideal, done: false, dir };
 }
 
-function ScoreExplain({ all, dk }: { all: ScoreSetResult; dk: string }) {
+export function ScoreExplain({ all, dk }: { all: ScoreSetResult; dk: string }) {
   const p = usePalette();
   const cat = scoreCat(all.score!);
   const ptsToCat = catFromPts;

@@ -44,6 +44,7 @@ import { initInsightsBadge } from '../src/store/insightsBadge';
 import { loadIssue, pruneOrphanWaveforms } from '../src/store/store';
 import { drainNativeCrashes, installErrorLogging, logError } from '../src/lib/diagnostics/errorLog';
 import { usePalette } from '../src/theme';
+import { DevDemoLink } from '../src/features/DevDemoLink';
 
 function Themed({ children }: { children: React.ReactNode }) {
   const p = usePalette();
@@ -217,6 +218,8 @@ export default function RootLayout() {
               {/* The day's first open, before 1pm, with no baseline yet: the
                   morning card asks for it once (src/features/MorningBaseline). */}
               <MorningBaselinePrompt />
+              {/* Dev builds only: autonomic://?demo=load fills the journal with the sample. */}
+              {__DEV__ ? <DevDemoLink /> : null}
               {/* Freemium: no blocking paywall. Locked surfaces raise the
                   PaywallCard sheet on demand (src/features/Paywall.tsx). */}
               {/* First-run welcome wizard — overlays the tabs until completed,

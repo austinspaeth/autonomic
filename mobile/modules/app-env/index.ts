@@ -19,8 +19,11 @@ interface AppEnvNative {
   takeSwallowedHrRead?: (sinceMs: number) => boolean;
   /** Android, debug builds only: rehearse that throw on a background thread. */
   simulateHrSampleCrash?: () => boolean;
-  /** iOS: MetricKit handed over diagnostics and they were written to the log. */
-  addListener?: (event: 'onCrashLog', cb: () => void) => { remove(): void };
+  /** iOS: MetricKit handed over diagnostics and they were written to the log;
+   *  or (onFoldState) a folding iPhone's posture or size class may have moved. */
+  addListener?: (event: 'onCrashLog' | 'onFoldState', cb: () => void) => { remove(): void };
+  /** iOS: a folding iPhone's posture facts (ios/FoldState.swift). */
+  foldState?: () => Promise<Record<string, unknown>>;
   /** iOS: UIApplication.beginBackgroundTask, resolving its identifier. */
   beginBackgroundTask?: (name: string) => Promise<number>;
   /** iOS: end a task `beginBackgroundTask` started. */
@@ -180,5 +183,31 @@ export function simulateHrSampleCrash(): boolean {
     return appEnvNative()?.simulateHrSampleCrash?.() === true;
   } catch {
     return false;
+  }
+}
+
+/**
+ * A folding iPhone's posture facts, raw (ios/FoldState.swift); src/lib/fold.ts
+ * parses them. Null where the call does not exist (Android, an older binary)
+ * or failed, which every caller reads as "not a foldable".
+ */
+export async function readFoldState(): Promise<Record<string, unknown> | null> {
+  const fn = appEnvNative()?.foldState;
+  if (!fn) return null;
+  try {
+    return (await fn()) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+/** Fires when the posture or size class may have changed; re-read then. */
+export function onFoldStateChange(fn: () => void): { remove(): void } | null {
+  const m = appEnvNative();
+  if (!m?.addListener || !m.foldState) return null;
+  try {
+    return m.addListener('onFoldState', fn);
+  } catch {
+    return null;
   }
 }

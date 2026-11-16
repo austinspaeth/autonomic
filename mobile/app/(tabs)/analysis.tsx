@@ -5,7 +5,6 @@ import { scheduleOnRN } from 'react-native-worklets';
 import { BlurView } from 'expo-blur';
 import { useIsFocused } from 'expo-router';
 import { runAfterInteractions } from '@/lib/defer';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BottomFade, Screen, headerHeight } from '../../src/components/Header';
 import { Icon } from '../../src/components/Icon';
 import { Ghost, HelpDot, ScoreDot } from '../../src/components/ui';
@@ -30,6 +29,7 @@ import { demoDays, hasOwnData } from '../../src/lib/demo';
 import { logError } from '../../src/lib/diagnostics/errorLog';
 import { DemoBanner, DEMO_PROGRESS_TEXT } from '../../src/features/DemoBanner';
 import { MODE_LABEL, ProgressRangeBar } from '../../src/features/ProgressRange';
+import { useContentInsets, useHeaderTop } from '../../src/store/fold';
 
 /** Sidecar lookup handed to the category builders (POTS Episodes grades each
  *  event on the max delta across its captured curve). Module-level so the
@@ -59,9 +59,9 @@ export default function AnalysisScreen() {
   const scrollRef = useRef<ScrollViewInstance>(null);
   // Seeded to the header's exact height (see Screen) so the sticky bar and the
   // range veil aren't pinned to the top of the window before it measures.
-  const insets = useSafeAreaInsets();
-  const [headerH, setHeaderH] = useState(() => headerHeight(insets.top));
-  const headerRef = useRef(headerHeight(insets.top));   // same value, readable synchronously off the UI runtime
+  const headerTop = useHeaderTop();
+  const [headerH, setHeaderH] = useState(() => headerHeight(headerTop));
+  const headerRef = useRef(headerHeight(headerTop));   // same value, readable synchronously off the UI runtime
 
   // Pinned-section tracking runs as a Reanimated worklet: the per-frame scan
   // (which section header has scrolled up to the bottom of the top bar) stays
@@ -100,7 +100,7 @@ export default function AnalysisScreen() {
   // y of the document wrapper itself — the offsets above are relative to it.
   const bodyRef = useRef(0);
   const bodySv = useSharedValue(0);
-  const headerSv = useSharedValue(headerHeight(insets.top));
+  const headerSv = useSharedValue(headerHeight(headerTop));
   const lastYSv = useSharedValue(0);
   const dirSv = useSharedValue(1);                               // +1 = scrolling down, -1 = up
   const activeSv = useSharedValue<string | null>(null);
@@ -827,13 +827,16 @@ function RangeVeil({ top, op, items, banner, hrvFilt, onLayout }: {
   top: number; op: SharedValue<number>; items: VeilItem[]; banner: boolean; hrvFilt: Filt; onLayout: () => void;
 }) {
   const p = usePalette();
+  // The same side room the document beneath keeps (the closed folding iPhone's
+  // strip, src/lib/fold.ts), or the veil runs wider than the page it covers.
+  const side = useContentInsets();
   const style = useAnimatedStyle(() => ({ opacity: op.value }));
   return (
     <Animated.View
       onLayout={onLayout}
       style={[{
         position: 'absolute', top, left: 0, right: 0, bottom: 0,
-        backgroundColor: p.bg, paddingHorizontal: CONTENT_PAD, paddingTop: CONTENT_PAD, overflow: 'hidden',
+        backgroundColor: p.bg, paddingLeft: CONTENT_PAD + side.left, paddingRight: CONTENT_PAD + side.right, paddingTop: CONTENT_PAD, overflow: 'hidden',
       }, style]}
     >
       {/* Only when the document below starts at the top, where the banner is. */}
@@ -1014,6 +1017,7 @@ function StickyBar({ headerH, active, dir, onUp, hrvFilt, setHrvFilt }: {
   headerH: number; active: Active; dir: number; onUp: () => void; hrvFilt: Filt; setHrvFilt: (f: Filt) => void;
 }) {
   const p = usePalette();
+  const side = useContentInsets();
   const BAR_H = STICKY_BAR_H, SLIDE = 16;
   const shown = active != null;
 
@@ -1072,7 +1076,7 @@ function StickyBar({ headerH, active, dir, onUp, hrvFilt, setHrvFilt }: {
           has no real blur there and replaces this style's near-opaque fill
           with its own translucent tint, so the stat tiles scrolling beneath
           ghosted straight through the section title. */}
-      <PinBar intensity={50} tint="dark" style={{ flexDirection: 'row', alignItems: 'center', height: BAR_H, paddingHorizontal: 16, backgroundColor: Platform.OS === 'android' ? '#040407' : 'rgba(4,4,7,0.97)', borderBottomWidth: 0.5, borderBottomColor: p.border }}>
+      <PinBar intensity={50} tint="dark" style={{ flexDirection: 'row', alignItems: 'center', height: BAR_H, paddingLeft: 16 + side.left, paddingRight: 16 + side.right, backgroundColor: Platform.OS === 'android' ? '#040407' : 'rgba(4,4,7,0.97)', borderBottomWidth: 0.5, borderBottomColor: p.border }}>
         <Pressable onPress={onUp} hitSlop={10} style={{ marginLeft: -4, marginRight: 8 }}>
           <Icon name="arrowUp" size={22} color={p.text} />
         </Pressable>

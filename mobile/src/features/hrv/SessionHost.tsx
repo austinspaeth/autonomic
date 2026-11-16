@@ -19,7 +19,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Animated, AppState, Platform, Pressable, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import { useSheets } from '../../components/Sheet';
 import { noteCrumb } from '../../lib/diagnostics/breadcrumbs';
@@ -43,6 +42,7 @@ import {
   endSession, getSessionSnapshot, restoreSession, streamsLive, useSession,
   type SessionConfig,
 } from './sessionStore';
+import { usePillAnchor } from '../../store/fold';
 
 export function HrvSessionHost() {
   const { openSheet, closeAll, depth } = useSheets();
@@ -227,7 +227,8 @@ const DIAL = 28, DIAL_SW = 2.6;
  */
 function SessionPill() {
   const p = usePalette();
-  const insets = useSafeAreaInsets();
+  // Above the bottom bar, or over the content where there is none (src/lib/fold.ts).
+  const anchor = usePillAnchor();
   const { openSheet } = useSheets();
   const s = useSession((x) => x);
   const shown = s.minimized && s.status !== 'idle' && s.status !== 'finished';
@@ -263,7 +264,7 @@ function SessionPill() {
   };
 
   return (
-    <Animated.View pointerEvents="box-none" style={[styles.wrap, { bottom: insets.bottom + 88, opacity }]}>
+    <Animated.View pointerEvents="box-none" style={[styles.wrap, { ...anchor, opacity }]}>
       <Pressable onPress={reopen} accessibilityRole="button" accessibilityLabel="Reading in progress, tap to reopen">
         <BlurView intensity={40} tint="dark" style={[styles.pill, { borderColor: p.accent + '66' }]}>
           <View style={styles.row}>

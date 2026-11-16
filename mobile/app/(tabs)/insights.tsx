@@ -53,7 +53,6 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Pressable, Text, View, type LayoutChangeEvent, type ScrollViewInstance } from 'react-native';
 import { useIsFocused } from 'expo-router';
 import { runAfterInteractions } from '@/lib/defer';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen, headerHeight } from '../../src/components/Header';
 import { Icon } from '../../src/components/Icon';
 import { useSheets } from '../../src/components/Sheet';
@@ -82,6 +81,7 @@ import { insightsAnchor } from '../../src/lib/insights/anchorMemory';
 import { markInsightsSeen } from '../../src/store/insightsBadge';
 import { peekInsightsCard, takeInsightsCard, useInsightsCardSignal } from '../../src/store/nav';
 import { profileCtx } from '../../src/lib/scoring';
+import { useHeaderTop } from '../../src/store/fold';
 
 /**
  * How long after interactions finish before the real content mounts.
@@ -168,8 +168,8 @@ export default function InsightsScreen() {
 
   // Seeded to the header's exact height (see Screen) so overlays anchored to it
   // aren't positioned at the top of the window on the first paint.
-  const insets = useSafeAreaInsets();
-  const [headerH, setHeaderH] = useState(() => headerHeight(insets.top));
+  const headerTop = useHeaderTop();
+  const [headerH, setHeaderH] = useState(() => headerHeight(headerTop));
   // Null until BUILT. Never seeded from the cache during render, so the first
   // paint is always the skeleton rather than a synchronous cache lookup that
   // might miss and jank.

@@ -48,7 +48,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, AppState, Easing, Platform, Pressable, ScrollView, StyleSheet, Text, useWindowDimensions, View } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetControls, useSheets } from '../components/Sheet';
 import { noteCrumb } from '../lib/diagnostics/breadcrumbs';
 import { Button, ConfirmDeleteSheet } from '../components/ui';
@@ -72,6 +71,7 @@ import { importedRows, pillSummary, type ImportKind, type ImportRow, type LabelO
 import { syncCycleFromHealth } from '../store/cycle';
 import { setPillSlotClaim } from '../store/pillSlot';
 import { fmtTime12, todayKey } from '../lib/dates';
+import { usePillAnchor } from '../store/fold';
 
 /** Group tints, shared with the watch/design palette (see forms.tsx). */
 const SLEEP_BLUE = '#4aa3f0';
@@ -184,7 +184,8 @@ export function HealthUpdatePill() {
   const { openSheet, depth } = useSheets();
   const depthRef = useRef(depth);
   depthRef.current = depth;
-  const insets = useSafeAreaInsets();
+  // Above the bottom bar, or over the content where there is none (src/lib/fold.ts).
+  const anchor = usePillAnchor();
   const [phase, setPhase] = useState<PillPhase>('hidden');
   const [found, setFound] = useState<Receipt | null>(null);
   // Natural width of the "found" content, measured off-screen (below) so the
@@ -451,7 +452,7 @@ export function HealthUpdatePill() {
   );
 
   return (
-    <Animated.View pointerEvents="box-none" style={[styles.wrap, { bottom: insets.bottom + 88, opacity }]}>
+    <Animated.View pointerEvents="box-none" style={[styles.wrap, { ...anchor, opacity }]}>
       <Animated.View
         style={[styles.pill, morphing && { width: pillW }]}
         onLayout={(e) => { if (!morphing) restW.current = e.nativeEvent.layout.width; }}

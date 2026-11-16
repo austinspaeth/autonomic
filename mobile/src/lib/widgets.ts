@@ -573,6 +573,24 @@ export function buildLiveWidgetPayload(): WidgetPayload {
   return buildWidgetPayload(getState(), todayKey(), liveWidgetOpts());
 }
 
+// The last payload pushed, for the one in-app surface that draws the same
+// thing: the folding iPhone's sidebar (features/SideNav.tsx), which shows the
+// score and the pacing figure. It reads this build rather than running its own
+// for the reason the wrist does: the budget is expensive, and a second build
+// could answer differently from the widget beside it.
+let lastPayload: WidgetPayload | null = null;
+const payloadListeners = new Set<() => void>();
+
+/** The payload most recently pushed to the widgets, or null before the first. */
+export function getLastWidgetPayload(): WidgetPayload | null {
+  return lastPayload;
+}
+
+export function subscribeWidgetPayload(l: () => void): () => void {
+  payloadListeners.add(l);
+  return () => { payloadListeners.delete(l); };
+}
+
 async function pushWidgetData(): Promise<void> {
   // Lazy requires throughout (react-native included): the pure builder above
   // must stay importable from jest's node environment, the store must not be
@@ -582,6 +600,8 @@ async function pushWidgetData(): Promise<void> {
   const { Platform } = require('react-native') as typeof import('react-native');
   try {
     const payload = buildLiveWidgetPayload();
+    lastPayload = payload;
+    payloadListeners.forEach((l) => { try { l(); } catch { /* a listener never stops the push */ } });
     if (Platform.OS === 'ios') {
       // eslint-disable-next-line @typescript-eslint/no-require-imports
       const { widgetBridge } = require('../../modules/widget-bridge') as typeof import('../../modules/widget-bridge');

@@ -1,9 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { Animated as RNAnimated, AppState, Dimensions, Easing, Platform, Pressable, Text, useWindowDimensions, View } from 'react-native';
+import { Animated as RNAnimated, Dimensions, Easing, Platform, Pressable, Text, useWindowDimensions, View } from 'react-native';
 import { useIsFocused } from 'expo-router';
 import { Tabs, type BottomTabBarProps } from 'expo-router/js-tabs';
 import { BlurView } from 'expo-blur';
-import Svg, { Path } from 'react-native-svg';
 import Animated, { Easing as REasing, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandMark, brandMarkWidth, Icon, IconName } from '../../src/components/Icon';
@@ -16,9 +15,9 @@ import { navBarCover, useSheets } from '../../src/components/Sheet';
 import { MenuSheet } from '../../src/features/Settings';
 import { GRADE_COLORS, usePalette } from '../../src/theme';
 import { useInsightsUnseen } from '../../src/store/insightsBadge';
-import { usePaywall } from '../../src/features/Paywall';
-import { MONTHLY_SKU, priceOf, useIap } from '../../src/store/iap';
-import { getTrialDaysLeft, useAccessGrant, useTier } from '../../src/store/tier';
+import { useAccessGrant, useTier } from '../../src/store/tier';
+import { RailBar, SideNav, SolidCog, usePlanStatus } from '../../src/features/FoldNav';
+import { currentSceneWidth, useHeaderTop, useNavLayout } from '../../src/store/fold';
 import { noteCrumb } from '../../src/lib/diagnostics/breadcrumbs';
 
 /**
@@ -52,7 +51,9 @@ const SPRING = { damping: 19, stiffness: 210, mass: 1 };
 // mid-session), and a width captured at launch would slide scenes by the wrong
 // distance for the rest of the process.
 const shiftFor = (width: number) => Math.round(width * 0.32);
-const windowShift = () => shiftFor(Dimensions.get('window').width);
+// Beside the folding iPhone's sidebar the scenes are narrower than the window,
+// and they slide by a share of their own width (src/store/fold).
+const windowShift = () => shiftFor(currentSceneWidth() ?? Dimensions.get('window').width);
 const TAB_TRANSITION = {
   animation: 'shift' as const,
   transitionSpec: {
@@ -125,20 +126,6 @@ function AndroidSceneFx({ children }: { children: React.ReactNode }) {
   }, [focused, tx, fade]);
   const style = useAnimatedStyle(() => ({ opacity: fade.value, transform: [{ translateX: tx.value }] }));
   return <Animated.View style={[{ flex: 1 }, style]}>{children}</Animated.View>;
-}
-
-// Solid (filled) cog — hollow center via even-odd fill. Opens the menu sheet.
-function SolidCog({ size = 22, color = '#000' }: { size?: number; color?: string }) {
-  return (
-    <Svg width={size} height={size} viewBox="0 0 24 24">
-      <Path
-        fillRule="evenodd"
-        clipRule="evenodd"
-        fill={color}
-        d="M19.14 12.94c.04-.3.06-.61.06-.94 0-.32-.02-.64-.07-.94l2.03-1.58a.49.49 0 0 0 .12-.61l-1.92-3.32a.49.49 0 0 0-.59-.22l-2.39.96a7.03 7.03 0 0 0-1.62-.94l-.36-2.54a.48.48 0 0 0-.5-.42h-3.84a.48.48 0 0 0-.5.42l-.36 2.54c-.59.24-1.13.56-1.62.94l-2.39-.96a.48.48 0 0 0-.59.22L2.74 8.87a.49.49 0 0 0 .12.61l2.03 1.58c-.05.3-.07.62-.07.94 0 .32.02.64.07.94l-2.03 1.58a.49.49 0 0 0-.12.61l1.92 3.32c.14.24.42.34.59.22l2.39-.96c.5.38 1.03.7 1.62.94l.36 2.54c.05.24.25.42.5.42h3.84c.25 0 .46-.18.5-.42l.36-2.54c.59-.24 1.13-.56 1.62-.94l2.39.96c.17.07.45-.02.59-.22l1.92-3.32a.49.49 0 0 0-.12-.61l-2.03-1.58zM12 15.6a3.6 3.6 0 1 1 0-7.2 3.6 3.6 0 0 1 0 7.2z"
-      />
-    </Svg>
-  );
 }
 
 function FloatingTabBar({ state, navigateToTab }: BottomTabBarProps) {
@@ -235,6 +222,39 @@ function FloatingTabBar({ state, navigateToTab }: BottomTabBarProps) {
   const [rowH, setRowH] = useState(0);
   const lift = showPlan ? Math.max(0, PLAN_TAB_H + PLAN_EDGE_GAP - 12 - insets.bottom) : 0;
 
+  // The folding iPhone (src/lib/fold.ts): a vertical rail in the closed
+  // phone's strip, or a column on the open phone in landscape. Same tabs, same
+  // press handler; only where they are drawn changes.
+  const layout = useNavLayout();
+  if (layout.kind !== 'bar') {
+    const items = tabRoutes.map((route) => {
+      const tab = TABS.find((t) => t.name === route.name)!;
+      return { key: route.key, label: tab.label, icon: tab.icon, badge: tab.name === 'insights' && insightsUnseen };
+    });
+    const nav = {
+      items,
+      active: shownIndex,
+      onPress: (i: number) => pressTab(tabRoutes[i].key, i),
+      onSettings: () => openSheet((c) => <MenuSheet controls={c} />),
+    };
+    // The same mark the bottom bar leads with, seasonal variants and their
+    // greeting included, stacked at the top of the rail.
+    const brand = (
+      <Pressable
+        disabled={!halloween && !thanksgiving}
+        onPress={() => toast(thanksgiving ? 'Gobble gobble! Happy Thanksgiving! 🦃' : 'Happy Halloween 🎃', 3000)}
+        hitSlop={8}
+      >
+        {thanksgiving
+          ? <TurkeyMark width={brandMarkWidth(18)} />
+          : <BrandMark size={18} color={halloween ? PUMPKIN : undefined} />}
+      </Pressable>
+    );
+    return layout.kind === 'rail'
+      ? <RailBar {...nav} edge={layout.edge} strip={layout.width} brand={brand} />
+      : <SideNav {...nav} width={layout.width} />;
+  }
+
   const cover = navBarCover(insets.bottom);
   return (
     <>
@@ -321,7 +341,6 @@ function FloatingTabBar({ state, navigateToTab }: BottomTabBarProps) {
           sides continue the bar's outline and it reads as coming out of the bar. */}
       {showPlan ? (
         <PlanStatusTab
-          trial={tier === 'trial'}
           width={rowW > 0 ? rowW + 2 : undefined}
           overlap={rowH > 0 ? rowH / 2 + 1 : PLAN_OVERLAP}
         />
@@ -347,24 +366,13 @@ const PLAN_EDGE_GAP = 6;
  * whole tab is the tap target and opens the paywall on the monthly plan. Pro
  * never renders it; their plan lives in Settings.
  */
-function PlanStatusTab({ trial, width, overlap }: { trial: boolean; width?: number; overlap: number }) {
+function PlanStatusTab({ width, overlap }: { width?: number; overlap: number }) {
   const p = usePalette();
-  const { products } = useIap();
-  const openPaywall = usePaywall('plan-bar', 'monthly');
-  // Days left is a function of the clock, and the tier store only notifies when
-  // the tier itself flips, so re-read it whenever the app comes back.
-  const [, setTick] = useState(0);
-  useEffect(() => {
-    const sub = AppState.addEventListener('change', (s) => { if (s === 'active') setTick((t) => t + 1); });
-    return () => sub.remove();
-  }, []);
-
-  const days = getTrialDaysLeft();
-  const headline = trial ? `${days} day${days === 1 ? '' : 's'} left` : 'Free plan';
-  const detail = trial
-    ? 'of Pro trial'
-    : `· ${priceOf(products.find((s) => s.productId === MONTHLY_SKU), MONTHLY_SKU)}/mo for Pro`;
-  const cta = trial ? 'Keep it' : 'Upgrade Now';
+  // The copy and the paywall door are shared with the folding iPhone's sidebar
+  // (features/FoldNav), which says the same thing in its own shape.
+  const plan = usePlanStatus();
+  if (!plan) return null;
+  const { headline, detail, cta, open: openPaywall } = plan;
 
   const shell = {
     width, height: PLAN_TAB_H + overlap, paddingTop: overlap, paddingHorizontal: 20,
@@ -413,8 +421,17 @@ function BarShell({ children, maxWidth }: { children: React.ReactNode; maxWidth:
 }
 
 export default function TabLayout() {
-  const insets = useSafeAreaInsets();
   const p = usePalette();
+  // On the open folding iPhone in landscape the scenes sit left of the sidebar
+  // (src/lib/fold.ts). A MARGIN on a wrapper rather than padding on the scene,
+  // so every absolutely positioned thing inside a scene (its header, overlays,
+  // the pull mark) lays out in the content area without knowing about it.
+  const layout = useNavLayout();
+  const headerTop = useHeaderTop();
+  const column = layout.kind === 'sidebar' ? layout.width : 0;
+  const trail = column || (layout.kind === 'rail' && layout.edge === 'right' ? layout.width : 0);
+  const lead = layout.kind === 'rail' && layout.edge === 'left' ? layout.width : 0;
+  const offset = (children: React.ReactElement) => (column ? <View style={{ flex: 1, marginRight: column }}>{children}</View> : children);
   return (
     <View style={{ flex: 1 }}>
       {/* lazy: false pre-mounts every scene at startup, mirroring the journal's
@@ -431,9 +448,9 @@ export default function TabLayout() {
         // holds nothing but that background on screen between out and in, so
         // it must be the app background or the gap flashes white.
         screenOptions={{ headerShown: false, lazy: false, sceneStyle: { backgroundColor: p.bg }, ...(Platform.OS === 'ios' ? TAB_TRANSITION : { animation: 'none' as const }) }}
-        {...(Platform.OS === 'android'
-          ? { screenLayout: ({ children }: { children: React.ReactElement }) => <AndroidSceneFx>{children}</AndroidSceneFx> }
-          : null)}
+        screenLayout={({ children }: { children: React.ReactElement }) => (
+          Platform.OS === 'android' ? offset(<AndroidSceneFx>{children}</AndroidSceneFx>) : offset(children)
+        )}
       >
         <Tabs.Screen name="index" />
         <Tabs.Screen name="analysis" />
@@ -441,7 +458,7 @@ export default function TabLayout() {
       </Tabs>
       {/* Fixed header rule: sits at the header's bottom edge, on top of the
           sliding scenes, so the divider stays put during tab transitions. */}
-      <View pointerEvents="none" style={{ position: 'absolute', top: headerHeight(insets.top), left: 0, right: 0, height: 1 }}>
+      <View pointerEvents="none" style={{ position: 'absolute', top: headerHeight(headerTop), left: lead, right: trail, height: 1 }}>
         <HeaderRule />
       </View>
     </View>

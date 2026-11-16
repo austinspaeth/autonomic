@@ -12,15 +12,16 @@
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { ActivityIndicator, Animated, Pressable, StyleSheet, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useSheets } from '../../components/Sheet';
 import { GarminSyncSheet } from './GarminSync';
 import { getGarminSyncState, restoreGarminSync, subscribeGarminSync } from './garminSyncStore';
 import { setPillSlotClaim } from '../../store/pillSlot';
+import { usePillAnchor } from '../../store/fold';
 
 export function GarminSyncPill() {
   const { openSheet } = useSheets();
-  const insets = useSafeAreaInsets();
+  // Above the bottom bar, or over the content where there is none (src/lib/fold.ts).
+  const anchor = usePillAnchor();
   const st = useSyncExternalStore(subscribeGarminSync, getGarminSyncState);
   const opacity = useRef(new Animated.Value(0)).current;
   const [shown, setShown] = useState(false);
@@ -53,7 +54,7 @@ export function GarminSyncPill() {
 
   if (!shown) return null;
   return (
-    <Animated.View pointerEvents="box-none" style={[styles.wrap, { bottom: insets.bottom + 88, opacity }]}>
+    <Animated.View pointerEvents="box-none" style={[styles.wrap, { ...anchor, opacity }]}>
       <Pressable onPress={reopen} accessibilityRole="button" accessibilityLabel="Waiting for Garmin reading, tap to reopen">
         <BlurView intensity={40} tint="dark" style={styles.pill}>
           <View style={styles.row}>

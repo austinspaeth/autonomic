@@ -27,6 +27,7 @@ import { noteCrumb } from '../lib/diagnostics/breadcrumbs';
 import { notifyChartsBlur } from './charts';
 import { Icon } from './Icon';
 import { tapAwayBlur } from './tapAway';
+import { useSheetFrame } from '../store/fold';
 
 /** The pill's delete tint: the Button `danger` red (#d63b3b) lifted a step,
  *  because the pill it sits in is near-black glass and the darker red reads as
@@ -238,6 +239,9 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
   // useSafeAreaFrame() reports the frame the provider actually occupies (the
   // same area the host fills) and is reactive to rotation.
   const SCREEN_H = useSafeAreaFrame().height;
+  // Centred on a wide window, and kept out of the closed folding iPhone's strip
+  // (src/lib/fold.ts). Edge to edge on every ordinary phone, as before.
+  const frame = useSheetFrame();
   const translateY = useSharedValue(SCREEN_H);
   const exiting = useRef(false);
   // 0 = front-most, 1 = pushed back behind a sheet stacked on top. Driven by the
@@ -456,6 +460,7 @@ function SheetView({ entry, isTop, behind, closing, requestClose, onExited, clos
         onLayout={(e) => { cardH.value = e.nativeEvent.layout.height; }}
         style={[
           styles.sheet,
+          { left: full ? 0 : frame.left, right: full ? 0 : frame.right },
           fit ? { maxHeight: sheetH } : { height: sheetH },
           { backgroundColor: p.surface, borderColor: p.border, borderTopLeftRadius: full ? 0 : 18, borderTopRightRadius: full ? 0 : 18 },
           sheetStyle,

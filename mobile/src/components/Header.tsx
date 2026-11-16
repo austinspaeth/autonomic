@@ -13,9 +13,9 @@ import Animated from 'react-native-reanimated';
 import { BlurView } from 'expo-blur';
 import { useFocusEffect } from 'expo-router';
 import Svg, { Defs, LinearGradient as SvgGradient, Rect, Stop } from 'react-native-svg';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { usePalette } from '../theme';
 import { notifyChartsBlur } from './charts';
+import { useContentInsets, useHeaderTop, useNavLayout, useTopBar } from '../store/fold';
 
 // Fixed height of the header content band (below the safe-area top inset), so
 // every screen's header bar is identical regardless of the injected node. Tall
@@ -25,9 +25,22 @@ export const HEADER_CONTENT_HEIGHT = 58;
 /** Total header height for a given top safe-area inset (paddingTop + band). */
 export const headerHeight = (insetTop: number) => insetTop + 6 + HEADER_CONTENT_HEIGHT;
 
-export function Header({ children, onHeight }: { children?: React.ReactNode; onHeight?: (h: number) => void }) {
-  const insets = useSafeAreaInsets();
-  const barStyle = { position: 'absolute' as const, top: 0, left: 0, right: 0, zIndex: 10, paddingTop: insets.top + 6 };
+export function Header({ children, onHeight, centered }: {
+  children?: React.ReactNode; onHeight?: (h: number) => void;
+  /** The band's contents are narrow and centred (the Journal's date picker),
+   *  so they stay centred on the open folding iPhone rather than shifting left
+   *  to clear the status bar corner they never reach. */
+  centered?: boolean;
+}) {
+  // The safe area's sides (the closed folding iPhone's strip beside the camera,
+  // src/lib/fold.ts). The glass runs edge to edge; its contents keep clear.
+  const side = useContentInsets();
+  // The open folding iPhone in portrait: the band moves up into the status
+  // bar's row and leaves the top-right corner to the clock and camera.
+  const top = useHeaderTop();
+  const topBar = useTopBar();
+  const reserve = centered ? 0 : (topBar?.right ?? 0);
+  const barStyle = { position: 'absolute' as const, top: 0, left: 0, right: 0, zIndex: 10, paddingTop: top + 6, paddingLeft: side.left, paddingRight: side.right + reserve };
   const onLayout = (e: { nativeEvent: { layout: { height: number } } }) => onHeight?.(e.nativeEvent.layout.height);
   const band = <View style={{ height: HEADER_CONTENT_HEIGHT, justifyContent: 'center' }}>{children}</View>;
   // expo-blur has no real blur on Android (it renders plain translucency), so
@@ -98,6 +111,7 @@ export function Screen({
   onScroll,
   scrollEventThrottle,
   onHeaderHeight,
+  headerCentered,
   refreshControl,
   scrollEnabled,
 }: {
@@ -112,6 +126,8 @@ export function Screen({
   onScroll?: React.ComponentProps<typeof Animated.ScrollView>['onScroll'];
   scrollEventThrottle?: number;
   onHeaderHeight?: (h: number) => void;
+  /** See `Header`'s `centered`. */
+  headerCentered?: boolean;
   /** Native pull-to-refresh control (Android — iOS screens draw their own
    *  overscroll graphic off `onScroll` instead). */
   refreshControl?: React.ComponentProps<typeof Animated.ScrollView>['refreshControl'];
@@ -124,14 +140,18 @@ export function Screen({
   scrollEnabled?: boolean;
 }) {
   const p = usePalette();
-  const insets = useSafeAreaInsets();
+  const side = useContentInsets();
+  const headerTop = useHeaderTop();
+  // The fade exists to sink content under the floating bottom bar. The folding
+  // iPhone's rail and sidebar leave nothing down there to sink it under.
+  const bottomBar = useNavLayout().kind === 'bar';
   // Seed the top inset from `headerHeight`, which is the header's EXACT height
   // (its paddingTop plus the fixed band) rather than an estimate — the seed used
   // to omit the band, so every screen's first paint sat HEADER_CONTENT_HEIGHT
   // too high and then dropped by that much when the header's onLayout landed.
   // Held as measured-or-null so the seed keeps tracking a late inset change.
   const [measuredH, setMeasuredH] = useState<number | null>(null);
-  const headerH = measuredH ?? headerHeight(insets.top);
+  const headerH = measuredH ?? headerHeight(headerTop);
   // Tab scenes stay mounted, so keep our own handle on the scroll view (merged
   // with any caller-provided ref) and snap back to the top whenever the screen
   // regains focus — switching tabs always starts you at the top.
@@ -160,7 +180,7 @@ export function Screen({
         onScroll={onScroll}
         scrollEventThrottle={scrollEventThrottle ?? 16}
         refreshControl={refreshControl}
-        contentContainerStyle={{ paddingTop: headerH + contentPadding, paddingHorizontal: contentPadding, paddingBottom: bottomPad }}
+        contentContainerStyle={{ paddingTop: headerH + contentPadding, paddingLeft: contentPadding + side.left, paddingRight: contentPadding + side.right, paddingBottom: bottomPad }}
         showsVerticalScrollIndicator={false}
         // No keyboard-inset handling here on purpose: nothing inline needs it
         // (day notes edit in a sheet), and iOS's automaticallyAdjustKeyboardInsets
@@ -169,9 +189,9 @@ export function Screen({
       >
         {children}
       </Animated.ScrollView>
-      <BottomFade />
+      {bottomBar ? <BottomFade /> : null}
       {footer}
-      <Header onHeight={(h) => { setMeasuredH(h); onHeaderHeight?.(h); }}>{header}</Header>
+      <Header centered={headerCentered} onHeight={(h) => { setMeasuredH(h); onHeaderHeight?.(h); }}>{header}</Header>
     </View>
   );
 }

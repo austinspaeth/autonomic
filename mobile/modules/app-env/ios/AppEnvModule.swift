@@ -37,12 +37,23 @@ public class AppEnvModule: Module {
     // of those, delivered on the launch after (see CrashLog.swift). The
     // subscriber is started from the AppDelegate; this call connects it to the
     // event below so a delivery after the launch-time drain is drained too.
-    Events("onCrashLog")
+    Events("onCrashLog", "onFoldState")
     OnCreate {
       CrashLog.shared.onWrite = { [weak self] in
         DispatchQueue.main.async { self?.sendEvent("onCrashLog", [:]) }
       }
+      // Folding iPhone posture (FoldState.swift). The event carries nothing:
+      // JS re-reads the whole snapshot, so a missed or coalesced event can
+      // never leave it holding half an answer.
+      DispatchQueue.main.async { [weak self] in
+        MainActor.assumeIsolated {
+          FoldState.shared.onChange = { self?.sendEvent("onFoldState", [:]) }
+        }
+      }
     }
+    AsyncFunction("foldState") { () -> [String: Any] in
+      MainActor.assumeIsolated { FoldState.shared.snapshot() }
+    }.runOnQueue(.main)
     Function("installCrashHandler") { () -> Bool in CrashLog.shared.start() }
     Function("takeCrashLog") { () -> String in CrashLog.take() }
 

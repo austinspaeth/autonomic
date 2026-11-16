@@ -27,7 +27,6 @@ import Animated, {
 import Svg, { Path } from 'react-native-svg';
 import { BlurView } from 'expo-blur';
 import Constants from 'expo-constants';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { SheetControls, useSheets } from '../components/Sheet';
 import { useNativeLoop } from '../components/nativeLoop';
 import { Icon } from '../components/Icon';
@@ -40,6 +39,7 @@ import {
 } from '../store/pillSlot';
 import { RELEASES, fmtReleaseDate, minorOf, releaseFor, shouldOfferWhatsNew } from '../lib/whatsNew';
 import { getWhatsNewSeen, markWhatsNewSeen } from '../lib/whatsNewSeen';
+import { usePillAnchor } from '../store/fold';
 
 /** Same fixed height, border and offset as the health-import pill, so the two
  *  read as one family and stack cleanly. */
@@ -64,7 +64,8 @@ export function openWhatsNew(openSheet: (b: (c: SheetControls) => React.ReactNod
 
 export function WhatsNewPill() {
   const { openSheet } = useSheets();
-  const insets = useSafeAreaInsets();
+  // Above the bottom bar, or over the content where there is none (src/lib/fold.ts).
+  const anchor = usePillAnchor();
   const p = usePalette();
   // The wizard stamps meta.onboarded; journals from before that field existed
   // are recognised by having been written at all (same test Onboarding uses).
@@ -124,7 +125,7 @@ export function WhatsNewPill() {
 
   if (!offer || !mounted) return null;
   return (
-    <Animated.View pointerEvents="box-none" style={[styles.wrap, { bottom: insets.bottom + 88 }, style]}>
+    <Animated.View pointerEvents="box-none" style={[styles.wrap, anchor, style]}>
       <Animated.View style={styles.pill}>
         <Pressable
           // While receded the pill is decoration behind the pill that owns the

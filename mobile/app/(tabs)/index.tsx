@@ -2,7 +2,6 @@ import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Platform, Pressable, RefreshControl, type ScrollViewInstance, Text, useWindowDimensions, View } from 'react-native';
 import Animated, { Easing, Extrapolation, interpolate, useAnimatedScrollHandler, useAnimatedStyle, useSharedValue, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Screen, headerHeight } from '../../src/components/Header';
 import { BrandMark, brandMarkWidth } from '../../src/components/Icon';
 import { HangingSpider } from '../../src/components/Halloween';
@@ -18,6 +17,8 @@ import { usePalette } from '../../src/theme';
 import { fmtDateLong, todayKey } from '../../src/lib/dates';
 import { getCurrentKey, registerJournalScroller, setCurrentKey, shiftCurrent, useCurrentKey } from '../../src/store/nav';
 import { useFocusEffect } from 'expo-router';
+import { useHeaderTop, useNavLayout } from '../../src/store/fold';
+import { sceneWidth } from '../../src/lib/fold';
 
 // Date changes echo the tab-switch motion (TAB_TRANSITION in _layout.tsx) but
 // run it strictly in sequence so the two days never overlap: the current day
@@ -26,7 +27,7 @@ import { useFocusEffect } from 'expo-router';
 // does the content swap; and the new day slides in from the opposite side
 // only after its tree has mounted and laid out (so the slide-in is never
 // fighting a heavy render).
-// How far a day slides, as a share of the window. Derived from the LIVE width
+// How far a day slides, as a share of the scene. Derived from the LIVE width
 // inside the component, never cached at module load: a folding iPhone resizes
 // the app between its two displays mid-session.
 const SHIFT_SHARE = 0.32;
@@ -103,8 +104,8 @@ export default function JournalScreen() {
   // Seeded to the header's exact height rather than 0: the pull graphic is
   // anchored to it and Android's RefreshControl offsets by it, both of which
   // would sit under the header on the first gesture after launch.
-  const insets = useSafeAreaInsets();
-  const [headerH, setHeaderH] = useState(() => headerHeight(insets.top));
+  const headerTop = useHeaderTop();
+  const [headerH, setHeaderH] = useState(() => headerHeight(headerTop));
   const pullY = useSharedValue(0);
   const pullScroll = useAnimatedScrollHandler({
     onScroll: (e) => { pullY.value = e.contentOffset.y; },
@@ -141,7 +142,10 @@ export default function JournalScreen() {
     // The spinner only acknowledges the gesture — the pill shows real progress.
     setTimeout(() => setRefreshing(false), 700);
   };
-  const SHIFT = Math.round(useWindowDimensions().width * SHIFT_SHARE);
+  // The scene's own width: beside the open folding iPhone's sidebar it is
+  // narrower than the window (src/lib/fold.ts).
+  const navLayout = useNavLayout();
+  const SHIFT = Math.round(sceneWidth(navLayout, useWindowDimensions()) * SHIFT_SHARE);
   const tx = useSharedValue(0);
   const fade = useSharedValue(1);
   // True between the swap commit and the new day's first layout; the
@@ -219,6 +223,9 @@ export default function JournalScreen() {
 
   return (
     <Screen
+      // The date picker is narrow and centred: it never reaches the open
+      // folding iPhone's status bar corner, so it stays centred.
+      headerCentered
       scrollRef={scrollRef}
       onScroll={Platform.OS === 'ios' ? pullScroll : undefined}
       onHeaderHeight={setHeaderH}

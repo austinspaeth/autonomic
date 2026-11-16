@@ -30,11 +30,11 @@ import { Platform, Text, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import Animated, { Easing as REasing, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
 import { scheduleOnRN } from 'react-native-worklets';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Icon } from '../components/Icon';
 import { Button } from '../components/ui';
 import { usePalette } from '../theme';
 import { MONTHLY_SKU, YEARLY_SKU, priceOf, useIap } from '../store/iap';
+import { useContentInsets, usePillAnchor } from '../store/fold';
 
 const ENTER_SPRING = { damping: 23, stiffness: 200, mass: 0.9 } as const;
 const EXIT = { duration: 220, easing: REasing.in(REasing.cubic) };
@@ -59,7 +59,10 @@ export function LockedOverlay({ visible, top, revealTop = 0, title, body, onUpgr
   onUpgrade: () => void;
 }) {
   const p = usePalette();
-  const insets = useSafeAreaInsets();
+  // Clear of the bottom bar when there is one, and of the closed folding
+  // iPhone's strip (src/lib/fold.ts). The scene is already beside any sidebar.
+  const anchor = usePillAnchor();
+  const side = useContentInsets();
   const { products } = useIap();
   // Kept mounted through the exit so the card can play it out, and holding the
   // last title so it doesn't change wording on the way out.
@@ -103,7 +106,7 @@ export function LockedOverlay({ visible, top, revealTop = 0, title, body, onUpgr
       </Animated.View>
       <Animated.View
         style={[{
-          position: 'absolute', left: 12, right: 12, bottom: insets.bottom + 88,
+          position: 'absolute', left: 12 + side.left, right: 12 + side.right, bottom: anchor.bottom,
           backgroundColor: p.surface, borderColor: p.border, borderWidth: 1, borderRadius: 18, padding: 18,
           shadowColor: '#000', shadowOpacity: 0.5, shadowRadius: 24, shadowOffset: { width: 0, height: 12 }, elevation: 12,
         }, cardStyle]}

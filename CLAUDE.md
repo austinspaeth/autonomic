@@ -3196,6 +3196,34 @@ old web app so old `export.json` files import directly.
   when Expo fixes it upstream. Related: nothing may cache the window size at
   module scope any more (a folding iPhone resizes the app between displays
   mid-session) — the tab and day slides read the live width.
+- **The folding iPhone (iPhone Duo) gets its own navigation, decided from
+  ENVIRONMENT facts, never a model check** — Apple ships no "is this a Duo" API
+  on purpose. `modules/app-env/ios/FoldState.swift` reports the
+  `UIHingeInteraction` status (only a device with a hinge ever reports one, so
+  nil = not a foldable), the window's size classes (inner display = regular in
+  both), the iOS 27.1 occlusion reserved regions and the safe area;
+  `src/lib/fold.ts` (pure + tested) turns them into ONE `NavLayout`:
+  `bar` (every other phone, Android, an older binary, and the OPEN phone in
+  portrait), `rail` (CLOSED: the bar turned vertical and stood in the bottom of
+  the trailing strip the outer display keeps clear beside the camera) or
+  `sidebar` (OPEN in landscape: a column down the RIGHT edge with the three views, today's
+  score and the pacing figure, content beside it). `src/store/fold.ts` is the
+  shell and the hooks; `features/FoldNav.tsx` draws `RailBar` / `SideNav` from
+  the tab layout's own tab list and press handler. Four consequences, each a
+  hook so no call site works it out alone: tab scenes sit beside the sidebar
+  by a MARGIN wrapper in `screenLayout` (so a scene's absolute children need
+  not know); `Screen` and `Header` pad by `useContentInsets` (the strip); the
+  floating pills read `usePillAnchor` (no bottom bar → they drop to the bottom
+  of the content area); sheets read `useSheetFrame` (centred at
+  `SHEET_MAX_W` on a wide window, kept out of the strip) and anything sized to
+  the card reads its width there, not the window's. **The sidebar's score and
+  pacing are the WIDGET PAYLOAD** (`getLastWidgetPayload` in `lib/widgets.ts`),
+  never a build of their own, so the column, the home-screen widget and the
+  wrist cannot disagree; a payload for another day reads as awaiting. The
+  bottom bar's plan folder tab has no room on the rail and is not drawn there;
+  the sidebar carries the same line (`usePlanStatus`). The inner display
+  ignores the app's portrait lock, which is the only reason a landscape layout
+  exists at all. Native build (the module), not OTA.
 - **The runtime fingerprint is `strict`, deliberately** (`mobile/fingerprint.config.js`).
   SDK 58's default `balanced` preset hashes an autolinked native module by
   package name and version instead of by its files. The six modules under

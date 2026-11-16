@@ -31,7 +31,8 @@
  *   problem as one that jumps phase.
  */
 import React, { useEffect, useRef } from 'react';
-import { Pressable, Text, View, useWindowDimensions } from 'react-native';
+import { Pressable, Text, View } from 'react-native';
+import { useSheetFrame } from '../../store/fold';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Circle } from 'react-native-svg';
 import { SheetControls, SheetFooter, SheetPill, SheetPillButton } from '../../components/Sheet';
@@ -89,7 +90,9 @@ const VIZ_SIZE = 168;
 function SessionCard({ controls }: { controls: SheetControls }) {
   const p = usePalette();
   const insets = useSafeAreaInsets();
-  const { width } = useWindowDimensions();
+  // The card's own width, not the window's: on a wide window (the open folding
+  // iPhone) the sheet is centred at a capped width (src/lib/fold.ts).
+  const { width } = useSheetFrame();
   const s = useSession((x) => x);
   // Named rather than described: "Charge 6 sends a heart rate" is a sentence the
   // reader can act on, where "your device" makes them work out which one we mean.
