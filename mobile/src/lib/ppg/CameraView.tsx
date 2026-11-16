@@ -29,6 +29,7 @@ import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Platform } from 'react-native';
 import type { CameraDevice, Frame } from 'react-native-vision-camera';
 import { ppgBridge } from './camera';
+import { isNotActiveError } from './cameraErrors';
 import {
   ATTEMPT_FRAME_TIMEOUT_MS, ATTEMPT_INIT_TIMEOUT_MS, FRAME_FAULT_LIMIT, PPG_ATTEMPTS, ppgTrace,
 } from './diagnostics';
@@ -240,6 +241,15 @@ function PpgCameraInner({ preview }: { preview?: number }) {
   const onError = useCallback((e: unknown) => {
     const why = describeError(e);
     console.warn('PPG camera error', e);
+    // A controller call that landed while the session was not running (the
+    // torch, mostly) says nothing about whether THIS configuration binds.
+    // VisionCamera 5 routes those through the same onError as a real bind
+    // failure, and treating them as one walked a Galaxy S25 Edge down every
+    // rung in 120 ms onto the library default at 15 fps, where no pulse locks.
+    if (isNotActiveError(why)) {
+      ppgTrace.note('not-active', why.split('\n')[0]);
+      return;
+    }
     fallback(why);
   }, [fallback]);
 
@@ -252,6 +262,11 @@ function PpgCameraInner({ preview }: { preview?: number }) {
     return null;
   }
   const torch = running && initialized && !torchBlip && device.hasTorch ? 'on' : 'off';
+  // Withheld until the session has started: VisionCamera 5 calls setTorchMode
+  // the moment its controller exists, and on Android that throws "Camera is not
+  // active" before the session is running. Undefined makes the library skip
+  // the call; stopping the session puts the torch out on its own.
+  const torchMode = running && initialized ? torch : undefined;
   ppgTrace.mark('view-mounted');
   ppgTrace.set({ renderBlocked: null, torch });
   if (torch === 'on') ppgTrace.mark('torch-on');
@@ -265,7 +280,7 @@ function PpgCameraInner({ preview }: { preview?: number }) {
       key={attempt}
       device={device}
       running={running}
-      torch={torch}
+      torch={torchMode}
       width={spec.width}
       height={spec.height}
       fps={fps}
@@ -286,7 +301,7 @@ const TARGET_SAMPLES = 1200;
  * here ever has to be reconfigured in place.
  */
 function PpgRung({ device, running, torch, width, height, fps, preview, onStarted, onError }: {
-  device: CameraDevice; running: boolean; torch: 'on' | 'off';
+  device: CameraDevice; running: boolean; torch: 'on' | 'off' | undefined;
   width: number | null; height: number | null; fps: number | null;
   preview?: number; onStarted: () => void; onError: (e: unknown) => void;
 }) {
