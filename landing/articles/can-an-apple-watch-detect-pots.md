@@ -16,7 +16,7 @@ app:
   hook: "Run a guided stand test on your Apple Watch."
   line: "Autonomic's Apple Watch app runs a guided ten-minute stand test, measures your heart rate rise the way clinicians do and keeps every result, so you have something concrete to show your doctor."
 photoLocation: "/articles/can-an-apple-watch-detect-pots/cover.webp"
-photoAttribution: "Luke Chesser / Unsplash"
+photoAttribution: "Autonomic"
 categories:
   - pots
   - hrv
