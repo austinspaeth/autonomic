@@ -14,7 +14,7 @@
  */
 import React, { useEffect, useRef, useState, useSyncExternalStore } from 'react';
 import { AppState, Text, View } from 'react-native';
-import { useKeepAwake } from 'expo-keep-awake';
+import { useScreenAwake } from '../../lib/screenAwake';
 import { SheetControls, SheetFooter, useSheets } from '../../components/Sheet';
 import { Button } from '../../components/ui';
 import { fonts, usePalette, GRADE_COLORS } from '../../theme';
@@ -70,7 +70,7 @@ function SettleCard({ conn, onStart }: { conn: ConnBus; onStart: () => void }) {
 export function StandTestSession({ controls }: { controls: SheetControls }) {
   const p = usePalette();
   const { openSheet } = useSheets();
-  useKeepAwake();
+  useScreenAwake();
 
   const [stage, setStage] = useState<Stage>('intro');
   const [delta, setDelta] = useState<number | null>(null);

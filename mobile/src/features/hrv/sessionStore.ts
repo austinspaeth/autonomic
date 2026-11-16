@@ -26,7 +26,7 @@
 import { useSyncExternalStore } from 'react';
 import { AppState, type NativeEventSubscription } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { activateKeepAwakeAsync, deactivateKeepAwake } from 'expo-keep-awake';
+import { holdScreenAwake, releaseScreenAwake } from '../../lib/screenAwake';
 import { ble, type StrapLink } from '../../lib/ble/manager';
 import {
   notePpiStarted, notePpiTimeout, noteRrSample, ppiWarming, rrSupport, RR_WATCH_START, type RrSupport, type RrWatch,
@@ -472,7 +472,7 @@ export function startSession(config: SessionConfig, autoStart?: boolean) {
 
   // The phone must not sleep mid-reading — the timer, BLE stream and breathing
   // guide all die with the screen.
-  activateKeepAwakeAsync('hrv-session').catch(() => {});
+  holdScreenAwake('hrv-session');
   armBreath();
 
   // Returning to the foreground: re-sync both clocks immediately (and auto-finish
@@ -825,7 +825,7 @@ export function endSession() {
   if (breathTimer) { clearTimeout(breathTimer); breathTimer = null; }
   appSub?.remove(); appSub = null;
   void releaseCapture();
-  deactivateKeepAwake('hrv-session');
+  releaseScreenAwake('hrv-session');
   rr = []; segmentStarts = []; hrSamples = []; sdnnSamples = []; recentRr = [];
   usableMs = 0; judgedSec = null; lastBeatMs = 0;
   rrWatch = RR_WATCH_START;

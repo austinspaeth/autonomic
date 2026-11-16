@@ -13,7 +13,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { Pressable, Text, type TextInputInstance, View } from 'react-native';
-import { useKeepAwake } from 'expo-keep-awake';
+import { useScreenAwake } from '../../lib/screenAwake';
 import { SheetControls, SheetFooter, useSheets } from '../../components/Sheet';
 import { Button } from '../../components/ui';
 import { TextField } from '../../components/Field';
@@ -127,7 +127,7 @@ type CardKind = 'settle' | 'reading' | 'stand';
 export function ManualStandTest({ controls }: { controls: SheetControls }) {
   const p = usePalette();
   const { openSheet } = useSheets();
-  useKeepAwake();
+  useScreenAwake();
 
   const [phase, setPhase] = useState<'intro' | 'run' | 'done'>('intro');
   // The test clock only advances while nothing is being asked: `base` is the

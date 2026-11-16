@@ -38,7 +38,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { Linking, Platform, Pressable, Text, View } from 'react-native';
 import * as Haptics from 'expo-haptics';
-import { useKeepAwake } from 'expo-keep-awake';
+import { useScreenAwake } from '../../lib/screenAwake';
 import Animated, {
   Easing, FadeIn, cancelAnimation,
   useAnimatedStyle, useSharedValue, withDelay, withRepeat, withTiming,
@@ -209,7 +209,7 @@ export function CameraSetup({ config, controls: _controls }: { config: SessionCo
   const [diagnosing, setDiagnosing] = useState(false);
 
   // Torch is lit and the user is watching the back of the phone — don't sleep.
-  useKeepAwake();
+  useScreenAwake();
 
   // One trace per visit to this card, so a dump describes THIS attempt. Done
   // during the first render, NOT in an effect: React runs child effects before

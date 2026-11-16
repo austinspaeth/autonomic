@@ -12,7 +12,7 @@
  */
 import React, { useEffect, useRef, useState } from 'react';
 import { AppState, Pressable, Text, View } from 'react-native';
-import { useKeepAwake } from 'expo-keep-awake';
+import { useScreenAwake } from '../../lib/screenAwake';
 import { SheetControls, SheetFooter, useSheets } from '../../components/Sheet';
 import { Button } from '../../components/ui';
 import { Icon } from '../../components/Icon';
@@ -44,7 +44,7 @@ type Stage = 'setup' | 'baseline' | 'during' | 'recovery';
 export function OrthostaticSession({ controls }: { controls: SheetControls }) {
   const p = usePalette();
   const { openSheet } = useSheets();
-  useKeepAwake();
+  useScreenAwake();
 
   const [event, setEvent] = useState<EventDef>(EVENTS[0]);
   const [stage, setStage] = useState<Stage>('setup');
