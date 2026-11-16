@@ -33,7 +33,7 @@ import { isFirstBaseline } from '../ping';
 import { todayKey } from '../dates';
 import { logError } from '../diagnostics/errorLog';
 import { reportEvent, reportFault } from '../../store/errorReport';
-import { GARMIN_DIAG_TAG, GARMIN_READING_TAG, garminDiagMessage, garminReadingMessage, parseGarminDiag } from './diag';
+import { GARMIN_DIAG_TAG, GARMIN_READING_TAG, garminDiagMessage, garminReadingMessage, parseGarminDiag, signalWord } from './diag';
 import { health } from '../health';
 import { arrivalHealthWrite } from '../health/hrvWrite';
 import { computeScores, profileCtx } from '../scoring';
@@ -109,7 +109,9 @@ export function subscribeGarminArrivals(fn: ArrivalListener): () => void {
 type DeviceListener = (list: GarminDevice[]) => void;
 const deviceListeners = new Set<DeviceListener>();
 
-type FailureListener = () => void;
+/** What the watch saw: `nopulse` (no contact), `nobeats` (a pulse but no
+ *  beat-to-beat), `thin` (beats, too few to use) — `signalWord` in ./diag. */
+type FailureListener = (signal: string) => void;
 const failureListeners = new Set<FailureListener>();
 
 /** A reading that failed ON THE WRIST (a `diag` message), once per diagnostic. */
@@ -176,7 +178,8 @@ function receive(msg: GarminMessage) {
       const model = (deviceIdRaw ? devices.find((d) => d.id === deviceIdRaw) : undefined)
         ?? (devices.length === 1 ? devices[0] : undefined);
       reportFault(GARMIN_DIAG_TAG, garminDiagMessage(diag, model?.model || model?.name));
-      failureListeners.forEach((fn) => { try { fn(); } catch { /* a listener must not cost the ack */ } });
+      const signal = signalWord(diag);
+      failureListeners.forEach((fn) => { try { fn(signal); } catch { /* a listener must not cost the ack */ } });
     }
     if (deviceIdRaw && diagId) native.ackMessage(deviceIdRaw, diagId).catch(() => {});
     return;

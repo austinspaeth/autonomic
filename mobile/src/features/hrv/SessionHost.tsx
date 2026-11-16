@@ -34,7 +34,7 @@ import { weakSensorFor } from '../../lib/strapSuggest';
 import { noteReadingFailure } from '../../lib/review/cardMemory';
 import { strapSuggestionDue } from '../../store/strapSuggest';
 import { GarminSyncSheet } from './GarminSync';
-import { startGarminSync, stopGarminSync } from './garminSyncStore';
+import { failGarminSync, getGarminSyncState, startGarminSync, stopGarminSync } from './garminSyncStore';
 import { garminDevices, subscribeGarminArrivals, subscribeGarminFailures } from '../../lib/garmin/receiver';
 import { WatchSyncSheet } from './WatchSync';
 import { startWatchSync } from './watchSyncStore';
@@ -90,17 +90,44 @@ export function HrvSessionHost() {
   // as a reading, so nothing above sees it. Counted always; the strap card
   // only opens with the app in front of the user, stacked over whatever is up
   // (usually the Garmin sync card, which its ✕ returns to).
-  useEffect(() => subscribeGarminFailures(() => {
+  useEffect(() => subscribeGarminFailures((signal) => {
     // Counted whether or not the app is in front of the user: a reading that
     // failed on the wrist failed (../../lib/review/cardMemory).
     noteReadingFailure();
-    const active = AppState.currentState === 'active';
-    if (!strapSuggestionDue('garmin', active)) return;
     const s = getSessionSnapshot();
     const cfg = s.config?.source === 'garmin' ? s.config : null;
-    openSheet((c) => (
+
+    // The phone was waiting for this reading — counting alongside the watch,
+    // or already on "Waiting for your watch". Nothing is coming now, so END
+    // the wait and say what the watch saw. Before this the session ran out its
+    // five minutes and then spun on "Waiting for Garmin" for ever, with the
+    // watch already showing "No signal" and no way to stop either.
+    const sync = getGarminSyncState();
+    const sessionLive = !!cfg && s.status !== 'idle';
+    let raised = false;
+    if (sessionLive || sync.waiting) {
+      const cardUp = sync.waiting && !sync.minimized;
+      if (sessionLive) {
+        handed.current = true;   // no 'finished' hand-off for this reading
+        endSession();
+      }
+      failGarminSync(signal, garminDevices()[0]?.name ?? null);
+      // An open sync card re-renders into its failed state on its own; any
+      // other state (the session card, the minimized pill) needs it raised.
+      if (!cardUp) {
+        openSheet((c) => <GarminSyncSheet controls={c} />, { hideClose: true, dismissAll: true });
+        raised = true;
+      }
+    }
+
+    const active = AppState.currentState === 'active';
+    if (!strapSuggestionDue('garmin', active)) return;
+    const strap = () => openSheet((c) => (
       <StrapSuggestionSheet sensor="garmin" controls={c} onRetry={cfg ? () => retry(cfg) : () => closeAll()} />
     ), { fitContent: true });
+    // After the failure card has risen, so the two do not arrive as one lurch.
+    if (raised) setTimeout(strap, 450);
+    else strap();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }), [openSheet, retry]);
 
