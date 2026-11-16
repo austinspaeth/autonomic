@@ -212,6 +212,35 @@ const sameItemType = (kind: ItemKind, a: string, b: unknown) =>
   (kind === 'reading' && hrvish(a) ? hrvish(b) : a === b);
 
 /**
+ * Two keyed HRV samples whose series start this close are one session that the
+ * health store holds twice (a mirroring app, or phone and watch both writing),
+ * not two sessions. Two real sessions cannot start this close: neither counts
+ * as a reading under four minutes of beats (`HRV_MIN_MS`, `MIN_PICK_MS`), so
+ * the next one starts at least that long after the first.
+ */
+export const SAME_SESSION_MS = 2 * 60 * 1000;
+
+/** The series start a sample key carries (`hrv-<startMs>`), or null. */
+const startOfKey = (key: unknown): number | null => {
+  const m = /^hrv-(\d+)$/.exec(String(key ?? ''));
+  return m ? Number(m[1]) : null;
+};
+
+/**
+ * Whether a keyed entry holds the same HRV session as the sample `key`: the
+ * same key, or a key whose series starts within `SAME_SESSION_MS` of it. A
+ * DIFFERENT key further apart is a different session, however close the two
+ * minutes on the clock are; a morning baseline and the training reading taken
+ * straight after it are exactly that.
+ */
+function keyedSameSession(e: Entry, key: string): boolean {
+  if (typeof e.healthKey !== 'string') return false;
+  if (e.healthKey === key) return true;
+  const a = startOfKey(e.healthKey); const b = startOfKey(key);
+  return a != null && b != null && Math.abs(a - b) <= SAME_SESSION_MS;
+}
+
+/**
  * The entry that ALREADY holds this health sample, if the day holds one.
  *
  * `dayAlreadyHas` asks the same question for the import build, which has no
@@ -223,17 +252,29 @@ const sameItemType = (kind: ItemKind, a: string, b: unknown) =>
  * it. One Apple Health sample is one journal reading, whoever gets there first.
  *
  * The sample's own key leads — `healthKey` is exact, and it is the only thing
- * that still matches when the two paths disagree about the minute. The
- * type/time rule behind it is the fallback for an entry written before the
- * stamp existed, and is the same rule, to the same tolerance, that keeps the
- * import from offering a sample the journal already holds.
+ * that still matches when the two paths disagree about the minute. A key a
+ * shade off is the store's own duplicate of the same session.
+ *
+ * The clock is a fallback ONLY for the quiet check's own copy written without
+ * a key: an `imported` wrist reading with no `healthKey`. It must never pick a
+ * reading that carries a different sample's key, or one the user took
+ * themselves — 1.40 let the clock match any HRV reading within `NEAR_MIN`, so
+ * saving a training reading taken minutes after the baseline wrote OVER the
+ * baseline (same id), and importing the lost one wrote over the training.
  */
 export function filedFromSample(
   day: DayRecord | undefined, kind: ItemKind, key: string, type: string, time: string,
 ): Entry | undefined {
   const list = listFor(day, kind);
-  return list.find((e) => typeof e.healthKey === 'string' && e.healthKey === key)
-    ?? list.find((e) => sameItemType(kind, type, e.type) && near(e.time, time, tolFor(kind)));
+  const exact = list.find((e) => typeof e.healthKey === 'string' && e.healthKey === key);
+  if (exact) return exact;
+  if (kind === 'reading' && hrvish(type)) {
+    const dupe = list.find((e) => hrvish(e.type) && keyedSameSession(e, key));
+    if (dupe) return dupe;
+  }
+  return list.find((e) => typeof e.healthKey !== 'string' && e.imported === true
+    && (kind !== 'reading' || !hrvish(type) || e.source === 'watch')
+    && sameItemType(kind, type, e.type) && near(e.time, time, tolFor(kind)));
 }
 
 /** How close counts as "the same thing", per kind. One table, so the journal
@@ -414,7 +455,14 @@ export function buildUpdateSet(
       // Only trustworthy HRV: real beat-to-beat RR spanning at least 4 minutes
       // (SDNN-only samples carry no series and are excluded outright).
       if (!im.rr || rrTotalMs(im.rr) < HRV_MIN_MS) continue;
-      if (readings.some((e) => (e.type === 'hrv' || e.type === 'breathHrv') && near(e.time, im.time, NEAR_MIN))) continue;
+      // A reading near this one on the clock is this sample when nothing says
+      // otherwise. A reading that carries a key says otherwise unless its
+      // series starts within SAME_SESSION_MS: a baseline and the training
+      // reading taken right after it are two sessions, and the one 1.40 wrote
+      // over is still in Apple Health, so the check offers it back.
+      const key = `hrv-${im.startMs}`;
+      if (readings.some((e) => hrvish(e.type) && near(e.time, im.time, NEAR_MIN)
+        && (typeof e.healthKey !== 'string' || keyedSameSession(e, key)))) continue;
       if (out.readings.some((r) => r.type === 'hrv' && near(r.time, im.time, NEAR_MIN))) continue;
       const ms = im.fields.sdnn ?? im.fields.rmssd;
       out.readings.push({
