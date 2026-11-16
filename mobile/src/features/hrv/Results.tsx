@@ -329,6 +329,7 @@ export function HrvResults({ rr, segmentStarts, seamGapsMs, hrSamples, sdnnSampl
       durationSec,
       hasFields: Object.keys(result.fields).length > 0,
       beats: result.rrClean.length,
+      jittery: result.jittery,
       ...shape,
     }));
     // A failed reading, on ANY sensor, permanently retires the review request

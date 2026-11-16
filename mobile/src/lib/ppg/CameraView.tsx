@@ -468,8 +468,6 @@ function PpgRung({ device, running, torch, width, height, fps, preview, onStarte
     onFrameDropped: onFrameDroppedJS,
   });
   const outputs = useMemo(() => [frameOutput], [frameOutput]);
-
-
   const constraints = useMemo(() => (fps ? [{ fps }] : []), [fps]);
 
   return (

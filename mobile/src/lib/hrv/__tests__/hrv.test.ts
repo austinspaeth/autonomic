@@ -611,7 +611,16 @@ describe('the stop rule on what triage will actually keep', () => {
     let stoppedAt: number | null = null;
     let next = 1;
     let seed = 7;
-    const jitter = () => { seed = (seed * 16807) % 2147483647; return (seed / 2147483647 - 0.5) * 40; };
+    // Variability shaped like a real heart's (a breathing rhythm over ~8 beats
+    // plus a little noise), not pure white noise: white noise around a fixed
+    // interval is exactly what the camera timing gate refuses
+    // (CAMERA_MAX_RMSSD_SDNN), and this suite is about the stop rule.
+    let beat = 0;
+    const jitter = () => {
+      seed = (seed * 16807) % 2147483647;
+      beat++;
+      return 20 * Math.sin((2 * Math.PI * beat) / 8) + (seed / 2147483647 - 0.5) * 10;
+    };
     const tick = () => {
       while (next <= t && next < D && stoppedAt === null) {
         const live = liveCoverage(rr, { source: 'camera', segmentStarts: starts });

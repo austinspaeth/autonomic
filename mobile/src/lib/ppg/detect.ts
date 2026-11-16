@@ -228,3 +228,68 @@ export function pulseGate(
   return { gate: now - since < graceMs ? 'grace' : 'gap', weakSince: since };
 }
 
+
+/**
+ * How much of the BLUE channel to add to red before looking for beats.
+ *
+ * On a Galaxy S25 Edge the frame-to-frame noise in red and blue was strongly
+ * anti-correlated (r = -0.69): the camera's colour processing pushes one up as
+ * it pulls the other down, while the pulse moves both the same way. Red alone
+ * graded 0.56 pulse-to-noise on one recording and red + blue 3.24, and only
+ * the mix recovered the right heart rate. The best weight is a property of the
+ * phone's processing, not of physiology, so it is chosen from the reading
+ * itself: the weight whose signal holds the single sharpest rhythm in the
+ * heart-rate band (no heart rate needs to be known). A weight is only taken
+ * when it beats red alone clearly — a camera without this quirk keeps red
+ * alone, exactly as before.
+ */
+export const BLUE_WEIGHTS = [0, 0.25, 0.5, 0.75, 1, 1.25, 1.5];
+const MIX_FS = 30;
+const MIX_MIN_GAIN = 1.25;
+const MIX_MIN_PEAKINESS = 0.3;
+
+/** Share of the 0.7-3 Hz power held within +-0.08 Hz of its strongest bin. */
+export function rhythmPeakiness(ts: number[], vs: number[]): number {
+  const n = ts.length;
+  if (n < 16) return 0;
+  const span = (ts[n - 1] - ts[0]) / 1000;
+  if (span < 6) return 0;
+  // Resample onto an even grid; the detector's own clock is uneven.
+  const m = Math.floor(span * MIX_FS);
+  const x = new Array<number>(m);
+  let j = 0;
+  for (let i = 0; i < m; i++) {
+    const t = ts[0] + (i * 1000) / MIX_FS;
+    while (j < n - 2 && ts[j + 1] < t) j++;
+    const a = ts[j], b = ts[j + 1];
+    const w = b > a ? (t - a) / (b - a) : 0;
+    x[i] = vs[j] + w * (vs[j + 1] - vs[j]);
+  }
+  const base = movingAverage(x, Math.round(MIX_FS * 1.5));
+  const y = x.map((v, i) => (v - base[i]) * (0.5 - 0.5 * Math.cos((2 * Math.PI * i) / (m - 1))));
+  const df = MIX_FS / m;
+  const p: number[] = [];
+  const f: number[] = [];
+  for (let k = Math.ceil(0.7 / df); k * df <= 3; k++) {
+    let re = 0, im = 0;
+    const w = (2 * Math.PI * k) / m;
+    for (let i = 0; i < m; i++) { re += y[i] * Math.cos(w * i); im -= y[i] * Math.sin(w * i); }
+    p.push(re * re + im * im);
+    f.push(k * df);
+  }
+  const total = p.reduce((s, v) => s + v, 0);
+  if (!(total > 0)) return 0;
+  let best = 0;
+  for (let i = 1; i < p.length; i++) if (p[i] > p[best]) best = i;
+  let near = 0;
+  for (let i = 0; i < p.length; i++) if (Math.abs(f[i] - f[best]) <= 0.08) near += p[i];
+  return near / total;
+}
+
+export function chooseBlueWeight(ts: number[], red: number[], blue: number[]): number {
+  const scores = BLUE_WEIGHTS.map((k) => rhythmPeakiness(ts, red.map((r, i) => r + k * blue[i])));
+  let best = 0;
+  for (let i = 1; i < scores.length; i++) if (scores[i] > scores[best]) best = i;
+  if (best === 0) return 0;
+  return scores[best] >= MIX_MIN_PEAKINESS && scores[best] >= MIX_MIN_GAIN * scores[0] ? BLUE_WEIGHTS[best] : 0;
+}

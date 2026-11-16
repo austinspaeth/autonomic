@@ -14,7 +14,7 @@
  * present (Expo Go / simulator / web) without crashing — createPpg() returns a
  * stub that reports unavailable.
  */
-import { assessPulse, detectBeats, fingerPresent, pulseGate, type PulseQuality } from './detect';
+import { assessPulse, chooseBlueWeight, detectBeats, fingerPresent, pulseGate, type PulseQuality } from './detect';
 import { ppgTrace } from './diagnostics';
 import { cameraPermissionStatus, loadPpgModules, requestCameraPermission } from './modules';
 import { createPermissionGate } from './permission';
@@ -65,6 +65,13 @@ const runListeners = new Set<(running: boolean) => void>();
 
 let tBuf: number[] = [];
 let vBuf: number[] = [];
+// Raw red and blue behind vBuf, which is red + blueWeight x blue (see chooseBlueWeight).
+let rBuf: number[] = [];
+let bBuf: number[] = [];
+let blueWeight = 0;
+let mixChosenAt = 0;
+const MIX_EVERY_MS = 2000;
+const MIX_MIN_MS = 8000;
 let fingerOn = false;
 
 let fingerStreak = 0;
@@ -90,6 +97,10 @@ let lastFrameFault = '';
 function resetSignalState() {
   tBuf = [];
   vBuf = [];
+  rBuf = [];
+  bBuf = [];
+  blueWeight = 0;
+  mixChosenAt = 0;
   fingerOn = false;
   fingerStreak = 0;
   lastEmittedPeak = 0;
@@ -214,15 +225,26 @@ export const ppgBridge = {
       fingerStreak = 0;
       ppgTrace.set({ fingerOn }, 'finger', fingerOn ? 'covered' : 'uncovered');
       if (fingerOn) ppgTrace.mark('finger-detected');
-      if (!fingerOn) { tBuf = []; vBuf = []; recentRr = []; pendingGap = true; weakSince = null; heldRr = []; }
+      if (!fingerOn) { tBuf = []; vBuf = []; rBuf = []; bBuf = []; recentRr = []; pendingGap = true; weakSince = null; heldRr = []; }
     }
     if (!fingerOn) { analyze(t); return; }
 
     tBuf.push(t);
-    vBuf.push(red);
+    rBuf.push(red);
+    bBuf.push(blue);
+    vBuf.push(red + blueWeight * blue);
     let trim = 0;
     while (trim < tBuf.length && tBuf[trim] < t - BUFFER_MS) trim++;
-    if (trim > 0) { tBuf = tBuf.slice(trim); vBuf = vBuf.slice(trim); }
+    if (trim > 0) { tBuf = tBuf.slice(trim); vBuf = vBuf.slice(trim); rBuf = rBuf.slice(trim); bBuf = bBuf.slice(trim); }
+    if (t - mixChosenAt >= MIX_EVERY_MS && tBuf.length && t - tBuf[0] >= MIX_MIN_MS) {
+      mixChosenAt = t;
+      const k = chooseBlueWeight(tBuf, rBuf, bBuf);
+      if (k !== blueWeight) {
+        blueWeight = k;
+        vBuf = rBuf.map((r, i) => r + k * bBuf[i]);
+        ppgTrace.note('blue-weight', String(k));
+      }
+    }
     analyze(t);
   },
   /**

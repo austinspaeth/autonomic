@@ -140,11 +140,17 @@ export function refusalSignature(o: {
   segments?: number;
   /** The session's kind, `'breath'` for paced. */
   kind?: string;
+  /** Refused because the beat TIMING was noise (`HrvResult.jittery`). */
+  jittery?: boolean;
 }): string {
   const src = o.source || 'unknown';
   const cov = coverageBand(o.coverageSec, o.durationSec);
+  // `jitter` before the coverage bands: those readings held enough pulse, and
+  // filing them as noisy or thin would hide the one refusal with its own fix.
   const kind = !o.hasFields
     ? 'nodata'
+    : o.jittery
+    ? 'jitter'
     : cov === 'cov<25' || cov === 'cov25-50'
       ? 'thin'
       : 'noisy';

@@ -5,7 +5,7 @@
  * must (a) recover the mean RR / HR within tolerance, (b) beat frame-clock
  * quantization via sub-frame refinement, and (c) reject junk.
  */
-import { assessPulse, bandpass, detectBeats, fingerPresent, neighbourDeviation, STEADY_MAX_NEIGHBOUR_DEV, pulseGate } from '../detect';
+import { assessPulse, bandpass, detectBeats, fingerPresent, neighbourDeviation, STEADY_MAX_NEIGHBOUR_DEV, pulseGate, chooseBlueWeight, rhythmPeakiness } from '../detect';
 
 /** Brightness series at `fps` for `seconds`, pulsing at `bpm`. */
 function makeSeries(opts: {
@@ -241,5 +241,43 @@ describe('pulseGate', () => {
       gates.push(r.gate);
     }
     expect(gates).not.toContain('gap');
+  });
+});
+
+describe('chooseBlueWeight', () => {
+  // A 72 bpm pulse in both channels, sampled at 30 fps for 12 s.
+  function channels(opts: { mirrored: boolean }) {
+    let seed = 7;
+    const rnd = () => { seed = (seed * 16807) % 2147483647; return seed / 2147483647 - 0.5; };
+    const ts: number[] = [], red: number[] = [], blue: number[] = [];
+    for (let i = 0; i < 360; i++) {
+      const t = (i * 1000) / 30;
+      const pulse = Math.sin((2 * Math.PI * 1.2 * t) / 1000);
+      // Slow wandering noise, large next to the pulse, shared between channels.
+      const n = 6 * rnd() + 4 * Math.sin((2 * Math.PI * 0.45 * t) / 1000 + 1) + 3 * Math.sin((2 * Math.PI * 2.3 * t) / 1000);
+      ts.push(t);
+      red.push(170 + pulse + n);
+      blue.push(40 + pulse + (opts.mirrored ? -n : 0.3 * rnd()));
+    }
+    return { ts, red, blue };
+  }
+  it('mixes blue in when its noise mirrors red', () => {
+    const { ts, red, blue } = channels({ mirrored: true });
+    const k = chooseBlueWeight(ts, red, blue);
+    expect(k).toBeGreaterThanOrEqual(0.75);
+    expect(rhythmPeakiness(ts, red.map((r, i) => r + k * blue[i]))).toBeGreaterThan(rhythmPeakiness(ts, red));
+  });
+  it('keeps red alone when blue adds nothing', () => {
+    const ts: number[] = [], red: number[] = [], blue: number[] = [];
+    for (let i = 0; i < 360; i++) {
+      const t = (i * 1000) / 30;
+      ts.push(t);
+      red.push(170 + 2 * Math.sin((2 * Math.PI * 1.2 * t) / 1000));
+      blue.push(40 + Math.sin((2 * Math.PI * 0.5 * t) / 1000 + i));
+    }
+    expect(chooseBlueWeight(ts, red, blue)).toBe(0);
+  });
+  it('needs enough signal to judge', () => {
+    expect(rhythmPeakiness([0, 33, 66], [1, 2, 3])).toBe(0);
   });
 });

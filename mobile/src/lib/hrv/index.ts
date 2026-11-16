@@ -533,6 +533,12 @@ export interface HrvResult {
    * question the results card asks that `ok` cannot answer.
    */
   salvageable: boolean;
+  /**
+   * A camera reading whose beats arrived but whose TIMING is mostly noise —
+   * see {@link CAMERA_MAX_RMSSD_SDNN}. Refused, and never offered as
+   * salvageable: the numbers it would keep are the inflated ones.
+   */
+  jittery: boolean;
   reason?: string;
   artifactPct: number;
   rrClean: number[];
@@ -646,6 +652,24 @@ export const MIN_COVERAGE_RATIO = 0.5;
  */
 export const SALVAGE_MAX_ARTIFACT_PCT = 30;
 export const SALVAGE_MIN_COVERAGE_SEC = 60;
+
+/**
+ * The most RMSSD may exceed SDNN by on a CAMERA reading before its beat timing
+ * is judged to be noise rather than heart-rate variability.
+ *
+ * Random error in WHERE each beat is marked inflates RMSSD faster than SDNN
+ * (successive differences double-count it), and pure timing noise drives the
+ * ratio to sqrt(2) = 1.41. Resting physiology sits well under 1: a Galaxy S25
+ * Edge's watch reading the same evening read RMSSD 21 / SDNN 29 (0.72), while
+ * the camera readings that passed every other gate read 97/69 and 127/88
+ * (both 1.44) — three to five times the true RMSSD, and the 97/69 one was
+ * filed. 1.3 leaves a wide margin above real readings and still catches them.
+ * Camera only: a strap or a watch stamps each beat electrically or on its own
+ * clock and has no such noise to detect.
+ */
+export const CAMERA_MAX_RMSSD_SDNN = 1.3;
+/** Beats needed before the ratio above means anything. */
+const JITTER_MIN_BEATS = 30;
 
 /**
  * Seconds a camera reading gets before its coverage is judged at all, and the
@@ -856,7 +880,7 @@ export function computeHrv(
       // Nothing was computed, so there is nothing to offer: `salvageable` is
       // about a reading the app declines to FILE, not about one that does not
       // exist. The results card shows no Save anyway button here, correctly.
-      ok: false, salvageable: false, reason, artifactPct,
+      ok: false, salvageable: false, jittery: false, reason, artifactPct,
       rrClean: clean, time: time as TimeDomain, freq: freq as FrequencyDomain, fields: {},
       coverageSec, longestCleanSec, bandSec, bridged, cleanSegmentStarts: keptStarts,
       segmentsUsed: kept.length, segmentsDropped: dropped, repairPct, confidence: 'low',
@@ -891,25 +915,33 @@ export function computeHrv(
   }
 
   const coverageRatio = durationSec > 0 ? Math.min(1, coverageSec / durationSec) : 1;
+  const jittery = opts.source === 'camera' && !noisy && !thin
+    && clean.length >= JITTER_MIN_BEATS && time.sdnn > 0
+    && time.rmssd / time.sdnn > CAMERA_MAX_RMSSD_SDNN;
+
   const confidence: HrvResult['confidence'] =
-    artifactPct <= 5 && repairPct <= 5 && dropped === 0 && coverageRatio >= 0.9 ? 'high'
+    jittery ? 'low'
+      : artifactPct <= 5 && repairPct <= 5 && dropped === 0 && coverageRatio >= 0.9 ? 'high'
       : !noisy && !thin && artifactPct <= 10 && coverageRatio >= 0.7 ? 'fair'
         : 'low';
 
-  const reason = noisy
+  const reason = jittery
+    ? 'Your pulse came through, but the beat timing was too uneven to measure HRV accurately. Try lighter pressure and keep very still, or use a chest strap for a precise reading.'
+    : noisy
     ? `Signal too noisy (${Math.round(artifactPct)}% artifacts). ${opts.source === 'camera' ? 'Hold your finger still with light pressure and try again.' : 'Adjust the strap and try again.'}`
     : thin
       ? `Only ${Math.round(coverageSec)}s of usable pulse out of ${Math.round(durationSec)}s. Keep your finger still and fully covering the lens, then try again.`
       : undefined;
 
-  const ok = !noisy && !thin;
+  const ok = !noisy && !thin && !jittery;
   return {
     ok,
+    jittery,
     // Refused, and still worth offering. Both bars have to hold: the artifact
     // rate says the numbers are a noisy version of this person's variability
     // rather than of our interpolation, and the coverage says there is enough
     // pulse behind them for a time-domain statistic to have settled.
-    salvageable: !ok
+    salvageable: !ok && !jittery
       && artifactPct <= SALVAGE_MAX_ARTIFACT_PCT
       && coverageSec >= SALVAGE_MIN_COVERAGE_SEC,
     reason,
