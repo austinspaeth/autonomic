@@ -3,7 +3,7 @@
  * aren't ours and wouldn't duplicate a journal entry may be offered.
  */
 import {
-  allItemKeys, buildUpdateSet, dayAlreadyHas, filedFromSample, filterDeclined, filterSeen, importFingerprint,
+  allItemKeys, buildUpdateSet, dayAlreadyHas, filedFromSample, filterDeclined, SAME_SESSION_MS, filterSeen, importFingerprint,
   sleepItemKey, sleepToFile, splitForReview, updateCount, updateSignature, type RawHealthDay,
 } from '../updateSet';
 import type { ImportedMed, ImportedReading, ImportedSymptom, ImportedWorkout, SleepImport } from '../index';
@@ -129,12 +129,52 @@ describe('buildUpdateSet', () => {
 
   it('finds the entry that already holds a sample, by key or by the clock', () => {
     const byKey = entry({ id: 'k', type: 'breathHrv', time: '23:30', healthKey: 'hrv-1000' });
-    const byClock = entry({ id: 'c', type: 'hrv', time: '06:55' });
+    // The clock only ever finds the quiet check's own copy written without a key.
+    const byClock = entry({ id: 'c', type: 'hrv', time: '06:55', source: 'watch', imported: true });
     expect(filedFromSample(day({ readings: [byKey] }), 'reading', 'hrv-1000', 'hrv', '06:52')?.id).toBe('k');
     expect(filedFromSample(day({ readings: [byClock] }), 'reading', 'hrv-1000', 'hrv', '06:52')?.id).toBe('c');
     // A different sample at a different time is not it.
     expect(filedFromSample(day({ readings: [entry({ time: '12:00' })] }), 'reading', 'hrv-1000', 'hrv', '06:52')).toBeUndefined();
     expect(filedFromSample(day(), 'reading', 'hrv-1000', 'hrv', '06:52')).toBeUndefined();
+  });
+
+  it('never files a second session over the first, however close the clock', () => {
+    // Jo Anne's morning: a baseline from the watch at 06:52, then the training
+    // reading straight after. 1.40 matched the training save to the baseline
+    // by the clock and wrote over it; importing the lost one then wrote over
+    // the training.
+    const baseline = entry({ id: 'b', type: 'hrv', time: '06:52', source: 'watch', healthKey: 'hrv-1000' });
+    const training = entry({ id: 't', type: 'breathHrv', time: '06:58', source: 'watch', healthKey: 'hrv-361000' });
+    expect(filedFromSample(day({ readings: [baseline] }), 'reading', 'hrv-361000', 'breathHrv', '06:58')).toBeUndefined();
+    expect(filedFromSample(day({ readings: [training] }), 'reading', 'hrv-1000', 'hrv', '06:52')).toBeUndefined();
+    // Nor over a reading the user took themselves, with the camera or a strap.
+    const camera = entry({ id: 'cam', type: 'hrv', time: '06:50', source: 'camera' });
+    expect(filedFromSample(day({ readings: [camera] }), 'reading', 'hrv-361000', 'breathHrv', '06:58')).toBeUndefined();
+    // Nor over the quiet check's copy of a DIFFERENT sample.
+    const otherCopy = entry({ id: 'o', type: 'hrv', time: '06:52', source: 'watch', imported: true, kindOpen: true, healthKey: 'hrv-1000' });
+    expect(filedFromSample(day({ readings: [otherCopy] }), 'reading', 'hrv-361000', 'breathHrv', '06:58')).toBeUndefined();
+  });
+
+  it('still lands on the store\u2019s duplicate of the same session', () => {
+    // Phone and watch both wrote the session; the check filed one copy, the
+    // card is filing the other a shade later. One session, one reading.
+    const copy = entry({ id: 'c', type: 'hrv', time: '06:52', source: 'watch', imported: true, healthKey: 'hrv-1000' });
+    expect(filedFromSample(day({ readings: [copy] }), 'reading', 'hrv-1001', 'breathHrv', '06:52')?.id).toBe('c');
+    expect(filedFromSample(day({ readings: [copy] }), 'reading', `hrv-${1000 + SAME_SESSION_MS + 1}`, 'hrv', '06:54')).toBeUndefined();
+  });
+
+  it('offers back a sample 1.40 wrote over, and only that', () => {
+    // The day holds the training reading under its own key; the baseline the
+    // save wrote over is still in Apple Health, minutes earlier.
+    const training = entry({ id: 't', type: 'breathHrv', time: '06:58', source: 'watch', healthKey: 'hrv-361000' });
+    const set = buildUpdateSet(DK, day({ readings: [training] }), raw({ imports: [hrvImport()] }), TYPES);
+    expect(set.readings.map((r) => r.key)).toEqual(['hrv-1000']);
+    // The store's own duplicate of a filed session is still not offered.
+    const filed = entry({ id: 'f', type: 'hrv', time: '06:52', source: 'watch', healthKey: 'hrv-1000' });
+    expect(buildUpdateSet(DK, day({ readings: [filed] }), raw({ imports: [hrvImport({ startMs: 1001 })] }), TYPES).readings).toHaveLength(0);
+    // And a nearby reading with no key still holds, as it always did.
+    const keyless = entry({ id: 'k', type: 'hrv', time: '06:58', source: 'camera' });
+    expect(buildUpdateSet(DK, day({ readings: [keyless] }), raw({ imports: [hrvImport()] }), TYPES).readings).toHaveLength(0);
   });
 
   it('offers one row per sample when the health store returns duplicates', () => {
