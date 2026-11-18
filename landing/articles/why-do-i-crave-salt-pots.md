@@ -1,15 +1,15 @@
 ---
-title: "Why Do I Crave Salt With POTS?"
+title: "Do People With POTS Crave Salt, and Is It a Sign of POTS?"
 slug: why-do-i-crave-salt-pots
 published: true
 summary: "If you have POTS and find yourself reaching for the salt shaker, pickle juice or crisps, your body is probably asking for something it genuinely runs short on: blood volume. Here is the physiology, what the evidence actually shows, and how much salt is safe."
-description: "Why do I crave salt with POTS? Because POTS often comes with low blood volume, and salt helps raise it. The physiology, the evidence and how much is safe."
+description: "Do people with POTS crave salt? Often, yes. Is craving salt a sign of POTS? Not on its own. Why low blood volume drives it and how much salt is safe."
 keywords: "why do I crave salt with POTS, POTS salt craving, salt craving dysautonomia, POTS low blood volume, hypovolemia POTS, salt and fluids POTS, how much salt POTS, renin aldosterone POTS"
 date: 2026-11-09
 updated: 2026-11-09
 reviewed: 2026-11-09
 author: "Austin Spaeth"
-question: "Why do I crave salt with POTS?"
+question: "Do people with POTS crave salt?"
 tldr: "You crave salt with POTS because the condition often comes with low blood volume, and salt helps your body hold on to fluid and push that volume back up, which eases the racing heart and dizziness on standing. That is also why extra salt and fluids are a standard first-line treatment. But a hormone paradox in POTS means your salt-retaining system does not work the usual way, so how much you actually need is individual, and you should follow your clinician's guidance, especially if you have high blood pressure or a kidney or heart condition."
 app:
   feature: insights
