@@ -1,18 +1,18 @@
 ---
-title: "Why Does My Vision Go Blurry When I Stand Up With POTS?"
+title: "Can POTS Cause Blurry Vision and Other Eye Problems?"
 slug: blurry-vision-visual-symptoms-pots-dysautonomia
 published: true
-summary: "Blurry vision, graying out, tunnel vision, light sensitivity and dry eyes are common in POTS and dysautonomia, and most of the time they come from your eyes briefly getting less blood when you are upright, not from an eye disease. Here is why vision fades first when you stand, what the different visual symptoms mean, and what to track."
-description: "Blurry or gray vision on standing in POTS usually means your eyes briefly get less blood. Why it happens, what to track, and the red flags worth an eye exam."
-keywords: "blurry vision POTS, visual symptoms dysautonomia, graying out when standing, tunnel vision POTS, light sensitivity POTS, photophobia long covid, dry eyes dysautonomia, vision goes dark when I stand up, orthostatic visual symptoms"
+summary: "Yes, POTS can cause blurry vision. Graying, tunnel vision and blur on standing, light sensitivity and dry eyes are all common, and most come from your eyes briefly getting less blood while you are upright, not from an eye disease. Here is why it happens, what a 2025 eye-tracking study found, what floaters and double vision mean, and which eye signs need a doctor."
+description: "Yes, POTS can cause blurry vision, graying and tunnel vision when you stand, plus light sensitivity and dry eyes. Why it happens and which eye signs need a doctor."
+keywords: "can POTS cause blurry vision, POTS eye problems, POTS vision symptoms, blurry vision when standing up, tunnel vision POTS, POTS double vision, POTS eye floaters, light sensitivity POTS, dry eyes dysautonomia, graying out when standing"
 date: 2026-10-14
-updated: 2026-11-12
-reviewed: 2026-11-04
+updated: 2026-11-19
+reviewed: 2026-11-19
 author: "Austin Spaeth"
 photoLocation: https://images.unsplash.com/photo-1551184451-76b762941ad6?q=80&w=1760&auto=format&fit=crop
 photoAttribution: "Kamila Maciejewska / Unsplash"
-tldr: "Blurry vision when you stand up with POTS usually comes from your eyes briefly getting less blood while you're upright, not from an eye disease. It typically clears when you sit or lie down, and because the retina burns oxygen faster than almost any tissue, vision can fade before you feel faint. Light sensitivity and dry eyes are common too. Track visual symptoms beside a stand test to read the pattern, and get sudden, one-eyed or persistent vision changes checked by a clinician."
-question: "Why does my vision go blurry when I stand up?"
+tldr: "Yes. POTS commonly causes blurry vision, graying and tunnel vision when you stand, and these usually come from your eyes briefly getting less blood while you are upright, not from an eye disease. They typically clear when you sit or lie down. A 2025 eye-tracking study found that standing narrowed where people with POTS looked toward the center and nearly tripled their blurred-vision ratings. Light sensitivity and dry eyes are common too. Floaters are usually not from POTS, and sudden, one-eyed or persistent vision changes need a clinician."
+question: "Can POTS cause blurry vision and other eye problems?"
 app:
   feature: pots-stand-test
   hook: "See what your heart does when vision fades."
@@ -21,14 +21,18 @@ categories:
   - pots
   - basics
 faq:
+  - q: "Can POTS cause blurry vision?"
+    a: "Yes. Blurry vision is one of the most common POTS symptoms, and in one large survey cited by researchers, 69% of people with POTS reported visual symptoms every day. It is usually worst when you stand and clears when you sit or lie down, because your eyes briefly get less blood while you are upright. In a 2025 eye-tracking study, tilting people with POTS upright nearly tripled their blurred-vision ratings and narrowed where they looked toward the center of a scene, a measurable form of tunnel vision."
   - q: "Why does my vision go blurry or gray when I stand up with POTS?"
     a: "When you stand, gravity pulls blood down into your legs and abdomen, and for a few seconds to a few minutes less blood reaches your head. Your eyes feel this first, because the retina sits above the heart and uses oxygen faster than almost any tissue in the body, so it has the least margin to spare. In POTS the heart rate climbs sharply but blood vessels often do not tighten enough, so retinal blood flow dips and your vision blurs, dims, grays, or tunnels. It usually clears within a minute or two of sitting or lying down. That rapid relief when you recline is the classic fingerprint of the orthostatic kind of visual symptom."
   - q: "Is blurry vision in POTS dangerous? Can it damage my eyes?"
     a: "The everyday blurring, graying, and tunneling of orthostatic intolerance is uncomfortable and limiting but is usually brief and reversible, and it does not damage the eye the way a sustained blockage would. The main risk is fainting and injury if vision blacks out while you are standing, so sit or lie down at the first gray. What does deserve an eye exam rather than being filed under POTS is sudden painless loss of vision, loss in one eye, vision changes that do not clear when you lie down, persistent double vision, or flashes with a shower of floaters or a curtain across your sight. Those point somewhere else and are time sensitive."
   - q: "Why am I so sensitive to light with dysautonomia and long COVID?"
-    a: "Light sensitivity (photophobia) is common in dysautonomia, long COVID, and migraine, and the systems overlap. Your pupils are run by the same autonomic nerves that are dysregulated elsewhere, so they can be slow to constrict against bright light. Migraine pathways, which many people with POTS and long COVID also carry, amplify light and glare. The result is that screens, sunlight, and fluorescent light feel harsh and can trigger headache or dizziness. Tinted or blue-light glasses, dimmer screens, and managing any migraine component with a clinician usually help more than powering through."
+    a: "Light sensitivity (photophobia) is common in dysautonomia, long COVID, and migraine, and the systems overlap. Your pupils are run by the same autonomic nerves that are dysregulated elsewhere, and a 2025 study found pupils sat slightly wider when people with POTS were upright, which lets in more light. Migraine pathways, which many people with POTS and long COVID also carry, amplify light and glare. The result is that screens, sunlight, and fluorescent light feel harsh and can trigger headache or dizziness. Tinted or blue-light glasses, dimmer screens, and managing any migraine component with a clinician usually help more than powering through."
   - q: "Can POTS and dysautonomia cause dry eyes?"
     a: "Yes. Tear production is controlled by autonomic nerves, so the same dysregulation that affects heart rate and sweating can leave eyes dry, gritty, and prone to blurring that improves when you blink. Dry eye is also linked to Sjogren's syndrome, which overlaps with dysautonomia, so persistent dryness is worth mentioning to your clinician. Lubricating drops, blinking breaks during screen work, and staying well hydrated are reasonable first steps, and an eye doctor can check for an underlying cause."
+  - q: "Can POTS cause eye floaters or double vision?"
+    a: "Floaters usually come from normal age-related changes in the gel inside the eye, and POTS is not a known cause, though brief sparkles or spots during a head rush are common. A sudden shower of new floaters, flashes of light or a curtain across your sight needs an eye doctor the same day, because it can mean a retinal tear. Brief doubling after long reading or screen time fits focusing fatigue, but new or constant double vision is a red flag that needs prompt evaluation."
   - q: "When should I see an eye doctor instead of assuming it is POTS?"
     a: "Posture-linked blurring or graying that clears when you lie down fits the orthostatic picture and can be tracked at home. See an eye doctor or seek urgent care for sudden painless vision loss, vision loss in one eye, vision changes that persist when reclining, new or constant double vision, flashing lights with many new floaters or a shadow or curtain across part of your sight, or vision loss alongside a severe headache, weakness, trouble speaking, or facial droop. New, severe, or one-sided visual symptoms always deserve a proper look rather than being assumed to be dysautonomia."
 social:
@@ -54,7 +58,7 @@ social:
 
     Not medical advice, just a patient sharing what helped. The one thing I will flag: vision loss that does NOT clear when you lie down, loss in one eye, new double vision, or flashes with a bunch of floaters is a different situation and worth getting looked at rather than assuming it is POTS. Wrote up the physiology and what to track here: https://autonomic.care/insights/pots/blurry-vision-visual-symptoms-pots-dysautonomia/?utm_source=reddit&utm_medium=social&utm_campaign=blurry-vision-visual-symptoms-pots-dysautonomia
   x: |
-    Vision blurs or grays out when you stand with POTS? Your retina burns oxygen faster than almost any tissue and sits above your heart, so it loses blood flow first. It is an early-warning gauge: sit at the first gray. Why it happens + what to track: https://autonomic.care/insights/pots/blurry-vision-visual-symptoms-pots-dysautonomia/?utm_source=x&utm_medium=social&utm_campaign=blurry-vision-visual-symptoms-pots-dysautonomia #POTS #Dysautonomia
+    Can POTS cause blurry vision? Yes. Your retina burns oxygen fast and sits above your heart, so it loses blood flow first when you stand. A 2025 study measured the tunnel vision. Why it happens + which eye signs need a doctor: https://autonomic.care/insights/pots/blurry-vision-visual-symptoms-pots-dysautonomia/?utm_source=x&utm_medium=social&utm_campaign=blurry-vision-visual-symptoms-pots-dysautonomia #POTS #Dysautonomia
   facebook: |
     If your vision blurs, grays, or tunnels when you stand up, you are not imagining it, and it usually is not an eye disease. In POTS and dysautonomia it most often means your eyes are briefly getting less blood while you are upright. The retina uses oxygen faster than almost any tissue, and your eyes sit above your heart, so vision tends to fade a step before you actually feel faint. It clears when you sit or lie down.
 
@@ -63,7 +67,9 @@ social:
     #POTS #Dysautonomia #LongCovid #OrthostaticIntolerance
 ---
 
-## The symptom that scares people the most
+## Can POTS cause blurry vision?
+
+**Yes. POTS commonly causes blurry vision, graying and tunnel vision when you stand, and most of the time it comes from your eyes briefly getting less blood while you are upright, not from an eye disease.** Visual symptoms are far from rare: in one large survey cited by researchers, 69% of people with POTS reported them every day ([Rodriguez et al., 2025](https://doi.org/10.1111/ene.16507)). They usually clear when you sit or lie down. Light sensitivity, dry eyes and tired eyes on screens are common too, and a few eye symptoms are not POTS at all, which this guide sorts out.
 
 Ask people with POTS or dysautonomia which symptom frightens them, and **visual** changes are near the top, often above the dizziness itself. Vision that blurs, dims, grays, or narrows to a tunnel when you stand feels like something is wrong with your eyes, and the fear can be worse than the symptom.
 
@@ -71,7 +77,7 @@ Here is the reassuring headline. In POTS and most dysautonomia, the visual sympt
 
 These are educational field notes, not medical advice. Visual symptoms have a long list of possible causes, and the goal here is to help you describe yours clearly, track them, and know which ones belong at an eye doctor rather than filed under POTS.
 
-## Why your eyes fade first when you stand
+## Why does vision blur when you stand up?
 
 Standing up is a small cardiovascular challenge your body normally solves without you noticing. The moment you rise, gravity pulls roughly **half a liter of blood** down into the veins of your legs and abdomen. Less returns to the heart, so for a beat or two the heart pumps less and blood pressure starts to sag, including the pressure feeding your head.
 
@@ -84,7 +90,7 @@ Your eyes feel this before anything else, for two reasons.
 Put those together and your vision becomes an early-warning gauge. Pilots pulling G-forces describe the same cascade in order: a **gray-out** (dimming and loss of color), then a **blackout** (vision gone but still conscious), then loss of consciousness. People with orthostatic intolerance live a gentler version of exactly this every time they stand up too quickly, at normal gravity, because the blood pressure at eye level has briefly dropped below what the retina needs.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 300" role="img" aria-label="A bar chart of the pressure margin available to the retina in three situations. Lying flat gives a tall green bar of comfortable margin. Standing in a healthy body gives a slightly shorter green bar. Standing with POTS or low blood pressure gives a short bar whose tip drops below a dashed line labeled vision dims, shaded red.">
+  <svg class="fig-d" viewBox="0 0 720 300" role="img" aria-label="A bar chart of the pressure margin available to the retina in three situations. Lying flat gives a tall green bar of comfortable margin. Standing in a healthy body gives a slightly shorter green bar. Standing with POTS or low blood pressure gives a short bar whose tip drops below a dashed line labeled vision dims, shaded red.">
     <line x1="70" y1="40" x2="70" y2="240" stroke="var(--line)" stroke-width="1"/>
     <line x1="70" y1="240" x2="690" y2="240" stroke="var(--line)" stroke-width="1"/>
     <text x="70" y="28" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">pressure margin at the retina</text>
@@ -100,12 +106,30 @@ Put those together and your vision becomes an early-warning gauge. Pilots pullin
     <text x="545" y="258" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12" text-anchor="middle">standing, POTS</text>
     <text x="545" y="274" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10.5" text-anchor="middle">margin runs out</text>
   </svg>
+  <svg class="fig-m" viewBox="0 0 360 320" role="img" aria-label="A bar chart of the pressure margin available to the retina in three situations. Lying flat gives a tall green bar of comfortable margin. Standing in a healthy body gives a slightly shorter green bar. Standing with POTS or low blood pressure gives a short bar whose tip drops below a dashed line labeled vision dims, shaded red.">
+    <line x1="30" y1="40" x2="30" y2="240" stroke="var(--line)" stroke-width="1"/>
+    <line x1="30" y1="240" x2="345" y2="240" stroke="var(--line)" stroke-width="1"/>
+    <text x="30" y="26" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="12">pressure margin at the retina</text>
+    <line x1="30" y1="150" x2="345" y2="150" stroke="#f97316" stroke-width="1.5" stroke-dasharray="5 4"/>
+    <text x="345" y="143" fill="#f97316" font-family="Space Mono, monospace" font-size="10" text-anchor="end">vision dims below here</text>
+    <rect x="55" y="70" width="70" height="170" rx="4" fill="#54d98a" opacity="0.85"/>
+    <text x="90" y="258" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11.5" text-anchor="middle">lying flat</text>
+    <rect x="150" y="110" width="70" height="130" rx="4" fill="#54d98a" opacity="0.7"/>
+    <text x="185" y="258" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11.5" text-anchor="middle">standing,</text>
+    <text x="185" y="273" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11.5" text-anchor="middle">healthy</text>
+    <rect x="245" y="162" width="70" height="78" rx="4" fill="#e03127" opacity="0.85"/>
+    <text x="280" y="258" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11.5" text-anchor="middle">standing,</text>
+    <text x="280" y="273" fill="var(--dim-2)" font-family="Space Grotesk, sans-serif" font-size="11.5" text-anchor="middle">POTS</text>
+    <text x="280" y="298" fill="var(--dim-2)" font-family="Space Mono, monospace" font-size="10" text-anchor="middle">margin runs out</text>
+  </svg>
   <figcaption>Vision is the gauge that reads empty first. Lying flat, the retina has a comfortable pressure margin. Standing, a healthy reflex tightens vessels and raises heart rate to hold most of it. In POTS the heart races but vessels often lag, so the margin drops below what the retina needs and your sight dims before you feel anything else.</figcaption>
 </figure>
 
+Researchers have now measured this. In a 2025 study, people with POTS looked at pictures while lying flat and again while tilted upright, with eye-tracking cameras recording where they looked. Upright, their gaze pulled in toward the center of each scene and explored the edges less, a measurable version of tunnel vision, and their blurred-vision ratings nearly tripled. The authors suggest that reduced blood flow to the brain areas that steer the eyes may play a part, alongside the eye itself ([Rodriguez et al., 2025](https://doi.org/10.1111/ene.16507)).
+
 This is also why the symptoms **clear when you sit or lie down**. Reclining removes the gravitational tax, blood returns to your head, and retinal flow recovers, usually within a minute or two. That rapid relief on lying flat is the classic fingerprint of the orthostatic kind of visual symptom, and it is a good clue that what you are seeing is about blood flow and posture, not the eye itself.
 
-## The different visual symptoms, and what they mean
+## What eye problems can POTS cause?
 
 "Vision problems" covers several very different experiences in dysautonomia, and they point in different directions. Naming yours is the fastest way to know whether it is the orthostatic kind you can track at home or something that needs its own look.
 
@@ -122,7 +146,7 @@ The first three are mostly the **orthostatic** picture: posture-linked, brief, a
 
 ### Why light feels so harsh
 
-Your pupils are controlled by autonomic nerves: the sympathetic branch widens them, the parasympathetic branch narrows them against bright light. When that control is sluggish or off balance, pupils can be slow to clamp down, so bright light floods in and feels painful. Many people with POTS and long COVID also carry **migraine** biology, which amplifies light and glare independently. The two stack, which is why a bright screen or a sunny day can set off both squinting and a headache. This is a real, physical sensitivity, not fragility.
+Your pupils are controlled by autonomic nerves: the sympathetic branch widens them, the parasympathetic branch narrows them against bright light. In the 2025 eye-tracking study, pupils of people with POTS were slightly wider when upright (about 3.98 mm versus 3.75 mm lying down), though they still constricted at a normal speed. A wider pupil lets in more light, which may be part of why glare feels harsher when you are on your feet. Many people with POTS and long COVID also carry **migraine** biology, which amplifies light and glare independently. The two stack, which is why a bright screen or a sunny day can set off both squinting and a headache. This is a real, physical sensitivity, not fragility.
 
 ### Why focusing and screens get hard
 
@@ -131,6 +155,14 @@ Shifting focus from far to near (accommodation) and pointing both eyes at the sa
 ### A word on visual snow
 
 Some people with long COVID and dysautonomia describe **visual snow**: a constant fine static or TV-like grain over the whole field, often with afterimages and light sensitivity. Visual snow is its own syndrome, tied mostly to migraine pathways rather than to blood flow, so it does not clear when you lie down the way orthostatic symptoms do. If that is what you see, it is worth describing precisely to a clinician rather than lumping it in with the graying-on-standing kind, because the two are different mechanisms with different workups.
+
+## Can POTS cause eye floaters or double vision?
+
+**Floaters** are the drifting specks, threads or cobwebs that move when your eyes move. They usually come from normal age-related changes in the gel inside the eye, and POTS is not a known cause ([Mayo Clinic](https://www.mayoclinic.org/diseases-conditions/eye-floaters/symptoms-causes/syc-20372346)). What POTS does often cause is a brief burst of sparkles or dark spots during a head rush, which fades within seconds as you sit. The difference matters: a **sudden shower of new floaters, flashes of light, or a shadow or curtain** creeping across your sight can mean a retinal tear and needs an eye doctor the same day.
+
+**Double vision** that appears after long reading or screen time and settles with rest fits the focusing fatigue described above. Double vision that is new, constant, or arrives with a headache, a droopy eyelid or weakness is not a POTS symptom to wait out, and needs prompt evaluation.
+
+Two other things are worth knowing. Some medicines used in POTS list visual side effects: ivabradine, for example, lists visual disturbances such as brief bright patches among its side effects ([Raj et al., 2022](https://doi.org/10.1503/cmaj.211373)). If visual symptoms started with a new medicine, talk to the prescriber rather than stopping it on your own. And persistent dry, gritty eyes can point to an autoimmune condition such as [Sjogren's](/insights/pots/sjogrens-dysautonomia-pots/), which shows up alongside POTS in a notable minority of people.
 
 ## What sets off the orthostatic visual symptoms
 
@@ -163,7 +195,7 @@ Posture-linked visual symptoms are rarely random. They pile up when several smal
   <figcaption>Your sight reads out how much blood is reaching your retina. Blurring and dimming are the early rungs; graying and tunneling are the warning that a blackout and faint are close. The first gray is your cue to get low, before the lights go out.</figcaption>
 </figure>
 
-## What helps
+## What helps blurry vision in POTS?
 
 The orthostatic visual symptoms respond to the same toolkit as the rest of orthostatic intolerance, because they share the cause. The steadier symptoms (light sensitivity, dry eye, screen fatigue) have their own simple measures on top.
 
@@ -191,7 +223,7 @@ The orthostatic visual symptoms respond to the same toolkit as the rest of ortho
   <strong>Some visual symptoms are not the orthostatic kind.</strong> Get prompt medical attention for sudden painless vision loss, vision loss in one eye, vision changes that do NOT clear when you lie down, new or constant double vision, a shower of new floaters or flashing lights or a shadow or curtain across part of your sight, or vision loss alongside a severe headache, weakness, trouble speaking, or facial droop. These point away from dysautonomia and are time sensitive.
 </div>
 
-## Telling the ordinary from the urgent
+## When is it not POTS?
 
 The single most useful question is whether the symptom **follows your posture and clears when you lie down**. That behavior is the signature of the blood-flow kind. Symptoms that ignore posture, stay put when you recline, or hit one eye only are the ones that need a separate look.
 
@@ -206,27 +238,29 @@ The single most useful question is whether the symptom **follows your posture an
 
 Having POTS does not protect you from ordinary eye problems, and the two can coexist. The point of the table is not to diagnose yourself, it is to know when to stop tracking and start calling.
 
-## What to track, and how it helps
+## What to track
 
 Visual symptoms feel chaotic until you see them on a timeline next to the rest of your data, at which point they usually turn out to be some of the most **predictable** symptoms you have.
 
-The raw material is a quick note each time it happens: what you were doing (standing, reaching up, getting out of a hot shower), how long you had been upright, and how fast it cleared. Tag it as a symptom so it sits beside everything else. A brief [orthostatic stand test](/insights/pots/the-orthostatic-stand-test-at-home/) shows the circulation behind the pattern, since the heart rate rise and any blood pressure drop are the same event your eyes are reporting. And your morning [HRV](/insights/hrv/hrv-complete-guide/) and resting heart rate give a rough read on how depleted your nervous system is, which is why the grayer-vision days tend to be the low-HRV, high-resting-heart-rate ones.
+The raw material is a quick note each time it happens: what you were doing (standing, reaching up, getting out of a hot shower), how long you had been upright, and how fast it cleared. Tag it as a symptom so it sits beside everything else. A brief [orthostatic stand test](/insights/pots/the-orthostatic-stand-test-at-home/) shows the circulation behind the pattern, since the heart rate rise and any blood pressure drop are the same event your eyes are reporting. And your morning HRV and resting heart rate give a rough read on how depleted your nervous system is, which is why the grayer-vision days tend to be the low-HRV, high-resting-heart-rate ones.
 
 Over a few weeks, that combination answers the real questions: are salt and fluids, compression, or slower position changes actually cutting the frequency, and is the overall trend moving the right way. It also catches the thing worth catching, which is a visual symptom that stops behaving like the orthostatic kind.
 
-<div class="callout callout-tip">
-  <strong>Turn "my vision keeps doing weird things" into a pattern you can read.</strong> Autonomic lets you log visual symptoms and their triggers beside your HRV, resting heart rate, and a stand test, and it scores each reading against both clinical thresholds and your own rolling baseline, so you can see whether salt and fluids, compression, or pacing are calming things over time. It is private and offline, with no account, and it brings your own strap, ring, or cuff into one timeline. <strong><a href="/">See how Autonomic tracks your nervous system →</a></strong>
-</div>
+If you use Autonomic, logging each episode as a symptom puts it on the same timeline as your stand tests and morning readings, so the pattern shows up without relying on memory.
 
 ## Frequently asked questions
+
+**Can POTS cause blurry vision?** Yes. It is one of the most common POTS symptoms, usually worst when you stand and better when you sit or lie down. In a 2025 eye-tracking study, standing nearly tripled blurred-vision ratings in people with POTS and narrowed where they looked toward the center of a scene.
 
 **Why does my vision go blurry or gray when I stand up with POTS?** When you stand, gravity pulls blood down into your legs and abdomen, and for a few seconds to a few minutes less blood reaches your head. Your eyes feel it first, because the retina sits above the heart and uses oxygen faster than almost any tissue in the body, so it has the least margin to spare. In POTS the heart rate climbs sharply but blood vessels often do not tighten enough, so retinal blood flow dips and your vision blurs, dims, grays, or tunnels. It usually clears within a minute or two of sitting or lying down, and that rapid relief is the fingerprint of the orthostatic kind.
 
 **Is blurry vision in POTS dangerous? Can it damage my eyes?** The everyday blurring, graying, and tunneling of orthostatic intolerance is uncomfortable but usually brief and reversible, and it does not damage the eye the way a sustained blockage would. The main risk is fainting and injury if vision blacks out while you are standing, so sit or lie down at the first gray. Sudden painless vision loss, loss in one eye, vision that does not clear when you recline, persistent double vision, or flashes with a shower of floaters are different and deserve prompt attention.
 
-**Why am I so sensitive to light with dysautonomia and long COVID?** Your pupils are run by the same autonomic nerves that are dysregulated elsewhere, so they can be slow to constrict against bright light. Migraine pathways, which many people with POTS and long COVID also carry, amplify glare independently. Screens, sunlight, and fluorescents feel harsh and can trigger headache or dizziness. Tinted or blue-light glasses, dimmer screens, and managing any migraine component with a clinician usually help more than pushing through.
+**Why am I so sensitive to light with dysautonomia and long COVID?** Your pupils are run by the same autonomic nerves that are dysregulated elsewhere, and pupils sit slightly wider when you are upright, letting in more light. Migraine pathways, which many people with POTS and long COVID also carry, amplify glare independently. Screens, sunlight, and fluorescents feel harsh and can trigger headache or dizziness. Tinted or blue-light glasses, dimmer screens, and managing any migraine component with a clinician usually help more than pushing through.
 
 **Can POTS and dysautonomia cause dry eyes?** Yes. Tear production is an autonomic job, so the same dysregulation that affects heart rate and sweating can leave eyes dry, gritty, and prone to blur that improves when you blink. Dry eye also links to Sjogren's syndrome, which overlaps with dysautonomia, so persistent dryness is worth raising with your clinician. Lubricating drops, blinking breaks, and good hydration are reasonable first steps.
+
+**Can POTS cause eye floaters?** Not directly, as far as research shows. Floaters usually come from age-related changes inside the eye. Brief sparkles or spots during a head rush are common with POTS, but a sudden shower of new floaters, flashes or a curtain across your sight needs an eye doctor the same day.
 
 **When should I see an eye doctor instead of assuming it is POTS?** Posture-linked blurring or graying that clears when you lie down fits the orthostatic picture and can be tracked at home. See an eye doctor or seek urgent care for sudden painless vision loss, loss in one eye, vision changes that persist when reclining, new or constant double vision, flashing lights with many new floaters or a curtain across part of your sight, or vision loss with a severe headache, weakness, or trouble speaking.
 
@@ -242,6 +276,8 @@ For the fuller picture of why standing sets all of this off, the companion piece
 
 ## Sources
 
+- Raj SR, Fedorowski A, Sheldon RS. [Diagnosis and management of postural orthostatic tachycardia syndrome](https://doi.org/10.1503/cmaj.211373). *CMAJ*, 2022.
+- Mayo Clinic Staff. [Eye floaters: symptoms and causes](https://www.mayoclinic.org/diseases-conditions/eye-floaters/symptoms-causes/syc-20372346). Mayo Clinic.
 - Shaw BH, Stiles LE, Bourne K, et al. [The face of postural tachycardia syndrome: insights from a large cross-sectional online community-based survey](https://doi.org/10.1111/joim.12895). *Journal of Internal Medicine*, 2019.
 - Rodriguez B, Pantano L, Nef T, et al. [Visual symptoms in postural tachycardia syndrome: an investigation of position-dependent visual exploration](https://doi.org/10.1111/ene.16507). *European Journal of Neurology*, 2025.
 - Metzler M, Duerr S, Granata R, et al. [Neurogenic orthostatic hypotension: pathophysiology, evaluation, and management](https://doi.org/10.1007/s00415-012-6736-7). *Journal of Neurology*, 2013.
