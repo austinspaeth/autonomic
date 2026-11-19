@@ -1,16 +1,16 @@
 ---
-title: "Electrolyte Drinks for POTS: How to Choose One (and a DIY Recipe)"
+title: "Best Electrolytes for POTS: Is Gatorade Enough, or Do You Need More?"
 slug: electrolyte-drinks-for-pots
 published: true
-summary: "Most sports drinks are far too dilute to help POTS. The number that actually matters is sodium per serving, not the color of the bottle. Here is how to read a label, a comparison of common options, and a cheap recipe you can make at home."
-description: "How to choose an electrolyte drink for POTS: why sodium per serving is the number that matters, a comparison of LMNT, Liquid IV, Nuun, Pedialyte and Gatorade, plus a simple DIY electrolyte recipe."
-keywords: "electrolyte drinks for POTS, best electrolyte drink POTS, sodium for POTS, DIY electrolyte drink, LMNT POTS, Liquid IV POTS, oral rehydration solution POTS, how much sodium POTS, electrolytes dysautonomia, salt drink POTS"
+summary: "Most sports drinks are far too dilute to help POTS. The number that matters is sodium per serving: a 20 oz Gatorade has 270 mg, one LMNT stick has 1,000 mg. Here is what the research says electrolytes do in POTS, a label-checked comparison of Gatorade, Powerade, Pedialyte, LMNT, Liquid I.V. and salt tablets, and a cheap recipe you can make at home."
+description: "Which electrolytes help POTS? A Gatorade has 270 mg of sodium. Compare LMNT, Liquid I.V., Pedialyte, Powerade and salt tabs, plus a cheap DIY recipe."
+keywords: "electrolytes for POTS, best electrolyte drink for POTS, is Gatorade good for POTS, Powerade POTS, Pedialyte for POTS, LMNT POTS, Liquid IV POTS, salt tablets POTS, DIY electrolyte drink POTS, how much sodium POTS"
 date: 2026-10-09
-updated: 2026-11-04
-reviewed: 2026-11-04
+updated: 2026-11-19
+reviewed: 2026-11-19
 author: "Austin Spaeth"
 photoLocation: "https://images.unsplash.com/photo-1744209375191-889d9fdef3f7?q=80&w=687&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D"
-tldr: "For POTS, the useful number on an electrolyte drink is milligrams of sodium per serving, not the brand or flavor. Most sports drinks (Gatorade, Powerade) carry only 150 to 160 mg of sodium per cup, which is far below what most POTS protocols aim for. Higher-sodium options like LMNT (~1000 mg) or an oral rehydration mix get you there faster, and a pinch of salt plus a splash of juice in a liter of water does the same job for pennies. A little glucose actually helps your gut absorb the sodium and water. None of this replaces medical advice, and anyone with high blood pressure, kidney or heart conditions should set a sodium target with their clinician first."
+tldr: "The best electrolytes for POTS are the ones that deliver a real dose of sodium, and most sports drinks don't: a 20 oz Gatorade has 270 mg, while one LMNT stick has 1,000 mg. In a small 2021 trial, a high sodium diet raised plasma volume and lowered standing heart rate in people with POTS. One clinical review suggests starting around 2 teaspoons of salt (about 4,600 mg of sodium) and 3 liters of water a day. A higher-sodium mix, salt capsules, salty food, or a pinch of salt in a liter of water all get you there. Anyone with high blood pressure, kidney or heart conditions should set a sodium target with their clinician first."
 question: "Which electrolyte drink is best for POTS?"
 app:
   feature: insights
@@ -20,23 +20,25 @@ categories:
   - food
   - pots
 faq:
-  - q: "What is the best electrolyte drink for POTS?"
-    a: "The best one is whichever gets you to your daily sodium target consistently and that you will actually drink. The single most useful label number is milligrams of sodium per serving. Many POTS protocols aim for a lot of sodium each day, and standard sports drinks like Gatorade carry only about 150 mg per cup, so most people need a higher-sodium option (an oral rehydration mix or a high-sodium stick) or a homemade version with added salt. Taste and cost matter too, because the drink only helps if you keep drinking it."
-  - q: "How much sodium should I get from electrolyte drinks with POTS?"
-    a: "Sodium targets for POTS are individual and should be set with your clinician, but published management guidance commonly lands in the range of several grams of extra sodium per day alongside generous fluids. Electrolyte drinks are one way to reach that, along with salty food and, for some people, salt capsules. Anyone with high blood pressure, kidney disease or heart failure should not salt-load without medical guidance."
+  - q: "What are the best electrolytes for POTS?"
+    a: "The best electrolytes for POTS are whichever ones get you to your daily sodium target consistently and that you will actually keep drinking. Read milligrams of sodium per serving first. High-sodium options include LMNT (1,000 mg per stick), Liquid I.V. (530 mg) and Gatorlyte (490 mg per 20 oz bottle), and salt capsules or a homemade mix with table salt do the same job. Taste, sugar and cost come second, because a drink only helps if you keep using it."
   - q: "Is Gatorade good for POTS?"
-    a: "Gatorade is fine as a flavored fluid, but it is weak on sodium: a 12 oz serving has roughly 150 to 160 mg, well under what most POTS protocols want, and it is relatively high in sugar. If you like it, you can boost a bottle with a pinch of added salt, or choose a higher-sodium oral rehydration product instead."
-  - q: "Why do electrolyte drinks have sugar in them?"
-    a: "A small amount of glucose is not just for flavor. Sodium and glucose are absorbed together across the gut wall by the same transporter, and that process pulls water along with them, so a little sugar actually speeds up how fast you rehydrate. This is the principle behind oral rehydration solutions. You do not need much, and a very sugary drink is not better."
+    a: "Gatorade is fine as a flavored fluid, but it is weak on sodium and heavy on sugar: a 20 oz bottle of Gatorade Thirst Quencher has 270 mg of sodium and 34 g of sugar. Matching one LMNT stick would take nearly four bottles. Powerade has a bit more sodium (400 mg per 20 oz) with the same sugar, and Gatorlyte has 490 mg with 12 g of sugar. If you like Gatorade, stirring 1/4 teaspoon of salt into a bottle adds roughly 575 mg of sodium."
+  - q: "Do electrolytes actually help POTS?"
+    a: "For many people, yes. Sodium holds water in the bloodstream, and many people with POTS have low blood volume. In a small 2021 crossover trial, 14 people with POTS on a high sodium diet for six days had more plasma volume, lower standing norepinephrine and a smaller heart rate jump on standing than on a low sodium diet. Their heart rate still stayed above healthy controls, so salt helps without curing POTS, and long-term data is still limited."
+  - q: "Is Pedialyte good for POTS?"
+    a: "Pedialyte Classic is a reasonable choice: about 370 to 390 mg of sodium per 12 oz with little sugar, built on oral rehydration principles. It is especially useful on sick days. For a typical POTS sodium target you would need several servings, so many people combine it with salty food, salt capsules or a stronger mix."
+  - q: "How much sodium should I get with POTS?"
+    a: "Set your target with your clinician. As a starting point, a 2022 clinical review in CMAJ suggests about 2 teaspoons of salt (roughly 4,600 mg of sodium) and 3 liters of water a day, along with waist-high compression. Electrolyte drinks are one way to get there, along with salty food and, for some people, salt capsules. Anyone with high blood pressure, kidney disease or heart failure should not salt-load without medical guidance."
   - q: "Can I just make my own electrolyte drink?"
-    a: "Yes. A quarter teaspoon of table salt in a liter of water gives roughly 575 mg of sodium, and a splash of fruit juice adds flavor and a little glucose to aid absorption. It costs almost nothing and lets you control the sodium exactly. Add a pinch of potassium-based 'lite salt' only if your clinician is comfortable with it, since potassium interacts with several conditions and medications."
+    a: "Yes. A quarter teaspoon of table salt in a liter of water gives roughly 575 mg of sodium, and a splash of fruit juice adds flavor and a little glucose to help absorption. It costs almost nothing and lets you control the dose exactly. Add potassium-based 'lite salt' only if your clinician is comfortable with it, since potassium interacts with several conditions and medications."
 social:
   linkedin: |
     One of the most repeated pieces of POTS advice is "drink electrolytes," but almost nobody explains the number that actually matters: milligrams of sodium per serving.
 
-    Here is the gap. Many POTS management protocols aim for several grams of extra sodium a day. A 12 oz serving of a standard sports drink carries only about 150 mg. So the drink most people reach for is off by an order of magnitude, and they feel no better and assume electrolytes "don't work" for them.
+    Here is the gap. A 2022 clinical review suggests starting around 2 teaspoons of salt a day, roughly 4,600 mg of sodium. A 20 oz bottle of a standard sports drink carries about 270 mg. So the drink most people reach for is off by more than tenfold, and people feel no better and assume electrolytes "don't work" for them.
 
-    I wrote a plain-language guide to choosing an electrolyte drink for POTS: how to read the label, a side-by-side of common products by sodium content, why a little glucose actually helps absorption (sodium-glucose cotransport), and a DIY recipe that costs pennies. It is educational, not medical advice, and it is clear that salt-loading is not safe for everyone.
+    I refreshed our plain-language guide to electrolytes for POTS: what a 2021 sodium trial found, a label-checked comparison of common products, why a little glucose helps absorption, and a DIY recipe that costs pennies. It is educational, not medical advice, and it is clear that salt-loading is not safe for everyone.
 
     https://autonomic.care/insights/food/electrolyte-drinks-for-pots/?utm_source=linkedin&utm_medium=social&utm_campaign=electrolyte-drinks-for-pots
 
@@ -45,19 +47,19 @@ social:
     Subreddit: r/POTS
     Title: The number that matters on an electrolyte drink is sodium per serving, and most sports drinks are way too dilute
 
-    Something that took me way too long to figure out: when people say "drink electrolytes" for POTS, the only label number that really matters for us is milligrams of sodium per serving. Everything else is secondary.
+    Something that took me way too long to figure out: when people say "drink electrolytes" for POTS, the label number that really matters is milligrams of sodium per serving.
 
-    The trap is that a normal sports drink like Gatorade has only ~150 mg of sodium per cup, and a lot of POTS protocols are aiming for several grams of added sodium a day. So you can chug the blue stuff all afternoon and barely move the needle, then conclude electrolytes don't help you.
+    The trap is that a 20 oz Gatorade has about 270 mg of sodium, and a lot of POTS care starts around 2 teaspoons of salt a day (roughly 4,600 mg). So you can drink the blue stuff all afternoon and barely move the needle, then conclude electrolytes don't help you.
 
-    What actually worked for me: either a high-sodium oral rehydration style mix, or just making my own. A 1/4 tsp of table salt in a liter of water is about 575 mg sodium, add a splash of juice for taste and a tiny bit of sugar (the glucose genuinely helps your gut absorb the salt and water, that is how ORS works). Costs basically nothing and I control the dose.
+    What actually worked for me: either a high-sodium mix, or just making my own. A 1/4 tsp of table salt in a liter of water is about 575 mg sodium, add a splash of juice for taste (the glucose genuinely helps your gut absorb the salt and water, that is how oral rehydration works). Costs basically nothing and I control the dose.
 
-    Big caveat: salt-loading is not safe for everyone (blood pressure, kidney, heart stuff), so the sodium target is worth setting with your doctor. I put the longer version with a product comparison table and the recipe here, not medical advice, just what helped me make sense of it: https://autonomic.care/insights/food/electrolyte-drinks-for-pots/?utm_source=reddit&utm_medium=social&utm_campaign=electrolyte-drinks-for-pots
+    Big caveat: salt-loading is not safe for everyone (blood pressure, kidney, heart stuff), so the sodium target is worth setting with your doctor. Longer version with a label-checked comparison table and the recipe here, not medical advice: https://autonomic.care/insights/food/electrolyte-drinks-for-pots/?utm_source=reddit&utm_medium=social&utm_campaign=electrolyte-drinks-for-pots
   x: |
-    One number matters on a POTS electrolyte drink: sodium per serving. Gatorade ~150mg/cup; most protocols want more. DIY recipe: #POTS https://autonomic.care/insights/food/electrolyte-drinks-for-pots/?utm_source=x&utm_medium=social&utm_campaign=electrolyte-drinks-for-pots
+    Is Gatorade enough for POTS? A 20 oz bottle has 270 mg sodium. One LMNT stick has 1,000. Label-checked comparison + a DIY recipe: #POTS https://autonomic.care/insights/food/electrolyte-drinks-for-pots/?utm_source=x&utm_medium=social&utm_campaign=electrolyte-drinks-for-pots
   facebook: |
     If you have POTS and keep hearing "drink electrolytes," here is the part that often gets skipped: the number that matters most is how much sodium is actually in each serving. A lot of popular sports drinks are surprisingly low, so people drink them all day and wonder why they still feel wobbly.
 
-    I put together a gentle guide on how to read the label, how common drinks compare, and a cheap recipe you can mix at home with salt, water and a splash of juice. It is educational, not medical advice, and it is honest that extra salt is not right for everyone. Have you found an electrolyte routine that actually helps you?
+    We refreshed our gentle guide on how to read the label, how Gatorade, Powerade, Pedialyte, LMNT and others compare, and a cheap recipe you can mix at home with salt, water and a splash of juice. It is educational, not medical advice, and it is honest that extra salt is not right for everyone. Have you found an electrolyte routine that actually helps you?
 
     https://autonomic.care/insights/food/electrolyte-drinks-for-pots/?utm_source=facebook&utm_medium=social&utm_campaign=electrolyte-drinks-for-pots
 
@@ -98,82 +100,146 @@ social:
 <\/script>`;
 </script>
 
-## The one number that actually matters
+**The best electrolytes for POTS are the ones that give you a real dose of sodium, and most sports drinks don't: a 20 oz Gatorade has 270 mg, while one LMNT stick has 1,000 mg.** If you have been told to "drink electrolytes" and felt no different, the dose is the usual reason, not your body. The number to read on any label is milligrams of sodium per serving. Flavor, brand, sugar and the list of trace minerals all come second.
 
-If you have POTS, you have been told to drink electrolytes roughly a thousand times. What almost nobody tells you is which number on the label to look at. It is not the flavor, the brand, the "advanced hydration" badge, or the long list of trace minerals. It is a single figure: **milligrams of sodium per serving.**
+## Do electrolytes actually help POTS?
 
-Sodium is the electrolyte that holds water inside your blood vessels. In POTS, a large share of people run with low blood volume, so when you stand up there is simply less fluid for your heart to work with, your heart rate spikes to compensate, and you feel it. Pulling more sodium (and the water it carries) into circulation is the whole rationale behind the "salt and fluids" advice, and it is covered in more depth in our pieces on [the science of salt and fluids](/insights/research/science-of-salt-and-fluids-for-pots/) and [low blood volume in POTS](/insights/pots/low-blood-volume-pots-hypovolemia/).
+For many people, yes, and sodium is the reason. Sodium holds water inside your blood vessels, and a large share of people with POTS run with [low blood volume](/insights/pots/low-blood-volume-pots-hypovolemia/). In a classic study, people with POTS had a plasma volume deficit alongside low renin and aldosterone, the hormones that normally tell your kidneys to keep salt ([Raj et al., 2005](https://doi.org/10.1161/01.CIR.0000160356.97313.5D)). Less fluid in circulation means less blood returning to your heart when you stand, so your heart rate climbs to make up for it.
 
-Here is the problem with most electrolyte drinks: they were designed for healthy athletes replacing modest sweat losses, not for someone trying to expand blood volume. So they are diluted for taste. A standard sports drink gives you about as much sodium as a light snack, when many POTS protocols are aiming far higher across the day. You can drink it all afternoon and barely move the needle, then conclude electrolytes "don't work for you." They do. The dose was just too small.
+The best direct evidence is a small crossover trial. Fourteen people with POTS spent six days on a high sodium diet (300 mEq a day) and six days on a very low one (10 mEq a day). On high sodium, their plasma volume rose, standing norepinephrine fell, and the jump in heart rate on standing got smaller ([Garland et al., 2021](https://doi.org/10.1016/j.jacc.2021.03.005)). Their heart rate still stayed above healthy controls. Salt helps; it does not cure POTS, and long-term data is still thin. That is why guidelines treat salt and fluids as the foundation, not the whole plan ([Sheldon et al., 2015](https://doi.org/10.1016/j.hrthm.2015.03.029)).
+
+## Is Gatorade good for POTS?
+
+Gatorade is fine as a flavored fluid, but it is a weak salt source. A 20 oz bottle of Gatorade Thirst Quencher has **270 mg of sodium and 34 g of sugar**. Matching one LMNT stick would take nearly four bottles and around 125 g of sugar. That is the trap: you drink the blue stuff all afternoon, barely move your sodium, and decide electrolytes don't work for you.
+
+The other drinks people ask about most:
+
+- **Powerade:** 400 mg of sodium per 20 oz, with the same 34 g of sugar. A little better on sodium, same sugar problem.
+- **Gatorlyte:** 490 mg of sodium and 350 mg of potassium per 20 oz, with 12 g of sugar. Gatorade's rehydration line, and a much better fit.
+- **Propel:** 230 mg per 500 mL bottle and no sugar. Easy to drink, but light.
+- **Pedialyte Classic:** 370 to 390 mg per 12 oz with modest sugar, built on oral rehydration principles. Good on sick days.
+
+If you like Gatorade, you don't have to give it up. Stirring **1/4 teaspoon of table salt** into a bottle adds roughly 575 mg of sodium and makes it a different drink.
+
+## How do popular electrolyte drinks compare?
+
+These figures come from current product labels. Serving sizes differ, and brands reformulate, so the label in your hand always wins over any table.
 
 <figure class="prose-figure">
-  <svg viewBox="0 0 720 320" role="img" aria-label="Horizontal bar chart comparing sodium per serving across common electrolyte drinks. LMNT is about 1000 mg, an oral rehydration mix about 500 to 700 mg, Liquid IV about 500 mg, Pedialyte about 370 mg, Nuun Sport about 300 mg, Gatorade about 160 mg, and packaged coconut water about 60 mg. A homemade mix with a quarter teaspoon of salt sits around 575 mg.">
+  <svg class="fig-d" viewBox="0 0 720 360" role="img" aria-label="Horizontal bar chart of sodium per serving. LMNT 1,000 mg, a homemade liter with a quarter teaspoon of salt about 575 mg, Liquid I.V. 530 mg, Gatorlyte 490 mg, Powerade 400 mg, Pedialyte Classic 390 mg, Nuun Sport 300 mg, Gatorade 270 mg, Propel 230 mg and coconut water about 60 mg.">
     <g font-family="Space Grotesk, sans-serif" font-size="13" fill="var(--dim-2)">
       <text x="10" y="34">LMNT (1 stick)</text>
-      <text x="10" y="70">Oral rehydration mix</text>
-      <text x="10" y="106">DIY: 1/4 tsp salt / L</text>
-      <text x="10" y="142">Liquid IV (1 stick)</text>
-      <text x="10" y="178">Pedialyte (12 oz)</text>
-      <text x="10" y="214">Nuun Sport (1 tab)</text>
-      <text x="10" y="250">Gatorade (12 oz)</text>
-      <text x="10" y="286">Coconut water (1 cup)</text>
+      <text x="10" y="66">DIY: 1/4 tsp salt in 1 L</text>
+      <text x="10" y="98">Liquid I.V. (1 stick)</text>
+      <text x="10" y="130">Gatorlyte (20 oz)</text>
+      <text x="10" y="162">Powerade (20 oz)</text>
+      <text x="10" y="194">Pedialyte Classic (12 oz)</text>
+      <text x="10" y="226">Nuun Sport (1 tablet)</text>
+      <text x="10" y="258">Gatorade (20 oz)</text>
+      <text x="10" y="290">Propel (500 mL)</text>
+      <text x="10" y="322">Coconut water (1 cup)</text>
     </g>
     <g>
-      <rect x="210" y="22" width="460" height="18" rx="4" fill="#54d98a" />
-      <rect x="210" y="58" width="276" height="18" rx="4" fill="#54d98a" opacity="0.85" />
-      <rect x="210" y="94" width="264" height="18" rx="4" fill="#54d98a" opacity="0.7" />
-      <rect x="210" y="130" width="230" height="18" rx="4" fill="#eab308" />
-      <rect x="210" y="166" width="170" height="18" rx="4" fill="#eab308" opacity="0.8" />
-      <rect x="210" y="202" width="138" height="18" rx="4" fill="#f97316" />
-      <rect x="210" y="238" width="74" height="18" rx="4" fill="#e03127" />
-      <rect x="210" y="274" width="28" height="18" rx="4" fill="#e03127" opacity="0.7" />
+      <rect x="230" y="20" width="420.0" height="18" rx="4" fill="#54d98a" />
+      <rect x="230" y="52" width="241.5" height="18" rx="4" fill="#54d98a" opacity="0.7" />
+      <rect x="230" y="84" width="222.6" height="18" rx="4" fill="#54d98a" />
+      <rect x="230" y="116" width="205.8" height="18" rx="4" fill="#54d98a" />
+      <rect x="230" y="148" width="168.0" height="18" rx="4" fill="var(--dim-2)" />
+      <rect x="230" y="180" width="163.8" height="18" rx="4" fill="var(--dim-2)" />
+      <rect x="230" y="212" width="126.0" height="18" rx="4" fill="var(--dim-2)" />
+      <rect x="230" y="244" width="113.4" height="18" rx="4" fill="#e03127" />
+      <rect x="230" y="276" width="96.6" height="18" rx="4" fill="#e03127" />
+      <rect x="230" y="308" width="25.2" height="18" rx="4" fill="#e03127" />
     </g>
     <g font-family="Space Mono, monospace" font-size="12" fill="var(--dim-2)">
-      <text x="678" y="37">~1000</text>
-      <text x="494" y="73">~500-700</text>
-      <text x="482" y="109">~575</text>
-      <text x="448" y="145">~500</text>
-      <text x="388" y="181">~370</text>
-      <text x="356" y="217">~300</text>
-      <text x="292" y="253">~160</text>
-      <text x="246" y="289">~60</text>
+      <text x="658.0" y="34">1,000</text>
+      <text x="479.5" y="66">575</text>
+      <text x="460.6" y="98">530</text>
+      <text x="443.8" y="130">490</text>
+      <text x="406.0" y="162">400</text>
+      <text x="401.8" y="194">390</text>
+      <text x="364.0" y="226">300</text>
+      <text x="351.4" y="258">270</text>
+      <text x="334.6" y="290">230</text>
+      <text x="263.2" y="322">~60</text>
     </g>
-    <text x="365" y="312" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">Approximate milligrams of sodium per serving. Formulas change, so always check the current label.</text>
+    <text x="360" y="350" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">Milligrams of sodium per serving, from labels checked November 19, 2026.</text>
   </svg>
-  <figcaption>The spread is enormous. A sports drink and a high-sodium mix are not two versions of the same thing; they differ roughly sixfold in the number that matters.</figcaption>
+  <svg class="fig-m" viewBox="0 0 360 420" role="img" aria-label="Horizontal bar chart of sodium per serving. LMNT 1,000 mg, a homemade liter with a quarter teaspoon of salt about 575 mg, Liquid I.V. 530 mg, Gatorlyte 490 mg, Powerade 400 mg, Pedialyte Classic 390 mg, Nuun Sport 300 mg, Gatorade 270 mg, Propel 230 mg and coconut water about 60 mg.">
+    <g font-family="Space Grotesk, sans-serif" font-size="12" fill="var(--dim-2)">
+      <text x="10" y="20">LMNT (1 stick)</text>
+      <text x="10" y="58">DIY: 1/4 tsp salt in 1 L</text>
+      <text x="10" y="96">Liquid I.V. (1 stick)</text>
+      <text x="10" y="134">Gatorlyte (20 oz)</text>
+      <text x="10" y="172">Powerade (20 oz)</text>
+      <text x="10" y="210">Pedialyte Classic (12 oz)</text>
+      <text x="10" y="248">Nuun Sport (1 tablet)</text>
+      <text x="10" y="286">Gatorade (20 oz)</text>
+      <text x="10" y="324">Propel (500 mL)</text>
+      <text x="10" y="362">Coconut water (1 cup)</text>
+    </g>
+    <g>
+      <rect x="10" y="26" width="280.0" height="12" rx="3" fill="#54d98a" />
+      <rect x="10" y="64" width="161.0" height="12" rx="3" fill="#54d98a" opacity="0.7" />
+      <rect x="10" y="102" width="148.4" height="12" rx="3" fill="#54d98a" />
+      <rect x="10" y="140" width="137.2" height="12" rx="3" fill="#54d98a" />
+      <rect x="10" y="178" width="112.0" height="12" rx="3" fill="var(--dim-2)" />
+      <rect x="10" y="216" width="109.2" height="12" rx="3" fill="var(--dim-2)" />
+      <rect x="10" y="254" width="84.0" height="12" rx="3" fill="var(--dim-2)" />
+      <rect x="10" y="292" width="75.6" height="12" rx="3" fill="#e03127" />
+      <rect x="10" y="330" width="64.4" height="12" rx="3" fill="#e03127" />
+      <rect x="10" y="368" width="16.8" height="12" rx="3" fill="#e03127" />
+    </g>
+    <g font-family="Space Mono, monospace" font-size="11" fill="var(--dim-2)">
+      <text x="296.0" y="36">1,000</text>
+      <text x="177.0" y="74">575</text>
+      <text x="164.4" y="112">530</text>
+      <text x="153.2" y="150">490</text>
+      <text x="128.0" y="188">400</text>
+      <text x="125.2" y="226">390</text>
+      <text x="100.0" y="264">300</text>
+      <text x="91.6" y="302">270</text>
+      <text x="80.4" y="340">230</text>
+      <text x="32.8" y="378">~60</text>
+    </g>
+    <text x="180" y="408" text-anchor="middle" font-family="Space Grotesk, sans-serif" font-size="11" fill="var(--dim-2)">mg of sodium per serving, labels checked Nov 19, 2026</text>
+  </svg>
+  <figcaption>The spread is enormous. A sports drink and a high-sodium mix are not two versions of the same thing: they differ about fourfold in the number that matters. Brands reformulate, so the label in your hand always wins.</figcaption>
 </figure>
 
-## How much sodium are we talking about?
+<div class="table-wrap">
 
-This is where you need a clinician, not an article. Sodium targets for POTS are genuinely individual, and published management guidance tends to land in the range of several grams of *extra* sodium per day on top of a normal diet, paired with generous fluids (often a couple of liters or more). Some people do well toward the lower end; some protocols go higher. Our [POTS treatment overview](/insights/pots/pots-treatment-salt-fluids-compression-medication/) walks through where salt-loading fits alongside compression and exercise.
+| Drink | Sodium | Sugar | Notes |
+| --- | --- | --- | --- |
+| LMNT (1 stick) | 1,000 mg | 0 g | Also 200 mg potassium, 60 mg magnesium. Very salty at first. |
+| DIY: 1/4 tsp salt in 1 L | ~575 mg | Your choice | Costs pennies. Dose is fully in your control. |
+| Liquid I.V. (1 stick) | 530 mg | 11 g | 370 mg potassium. The sugar helps absorption. |
+| Vitassium (2 capsules) | 500 mg | 0 g | Salt capsules sold as a medical food for POTS. No taste. |
+| Gatorlyte (20 oz) | 490 mg | 12 g | 350 mg potassium. The best of the Gatorade range for POTS. |
+| Powerade (20 oz) | 400 mg | 34 g | More sodium than Gatorade, same sugar. |
+| Pedialyte Classic (12 oz) | 370 to 390 mg | Low | 280 mg potassium. Made for rehydration. |
+| Nuun Sport (1 tablet) | 300 mg | 1 g | Convenient, but modest sodium. |
+| Gatorade (20 oz) | 270 mg | 34 g | A flavored fluid more than a salt source. |
+| Propel (500 mL) | 230 mg | 0 g | Light on everything. |
+| Coconut water (1 cup) | ~60 mg | ~6 g | High potassium, low sodium. Almost backward for POTS. |
 
-Drinks are only one way to get there; salted meals and snacks count too, and [what to eat with POTS](/insights/food/pots-diet-what-to-eat/) covers how to build a day of food around salt and fluids.
-
-The practical point for choosing a drink: once you have a daily sodium target, you can work backward to how many servings of which product get you there without drowning yourself in fluid or sugar. A target met with two high-sodium servings is easier on your stomach than the same target spread across eight weak ones.
-
-<div class="callout callout-warn">
-  <strong>Salt is not safe for everyone.</strong> If you have high blood pressure, kidney disease, heart failure, or you take certain medications, deliberately loading sodium can be harmful. Some people with POTS also have supine hypertension (high pressure lying down) that salt can worsen. Set your target with your clinician before you start, and treat everything here as general education, not a prescription.
 </div>
 
-## Comparing the common options
+Two things stand out. Coconut water gets marketed as "nature's sports drink," but for POTS it is the wrong way round: lots of potassium, very little sodium. And the high-sodium products are not magic. They are concentrated, and you can copy any of them at home.
 
-Below are rough sodium figures for popular choices. Treat them as ballpark: manufacturers reformulate, and serving sizes differ, so the label in your hand always wins over any table on the internet.
+## How much sodium do you need a day?
 
-| Drink | Approx. sodium per serving | Approx. potassium | Notes |
-| --- | --- | --- | --- |
-| LMNT | ~1000 mg | ~200 mg | Built for salt-loading; no sugar. Can taste very salty at first. |
-| Oral rehydration mix (ORS-style) | ~500 to 700 mg | varies | Glucose-to-sodium ratio tuned for absorption. |
-| Liquid IV | ~500 mg | ~370 mg | Contains sugar, which aids absorption. |
-| Pedialyte (classic, 12 oz) | ~370 mg | ~280 mg | Designed for rehydration; widely available. |
-| Nuun Sport | ~300 mg | ~150 mg | Low sugar tablets; convenient but modest sodium. |
-| Gatorade / Powerade (12 oz) | ~150 to 160 mg | ~45 mg | Weak on sodium, higher sugar. A flavored fluid, not a salt source. |
-| Coconut water (1 cup) | ~60 mg (packaged) | ~470 mg | High potassium, low sodium. Fresh coconut water can carry much more, but still far less than a POTS target. Not a POTS salt source. |
+Set your target with your clinician, because it depends on your blood pressure, kidneys, heart and medicines. As a starting point, a 2022 clinical review in *CMAJ* suggests about **2 teaspoons of salt a day (roughly 4,600 mg of sodium)** and **3 liters of water**, alongside waist-high compression ([Raj et al., 2022](https://doi.org/10.1503/cmaj.211373)). For scale, one level teaspoon of table salt holds about 2,300 mg of sodium ([FDA](https://www.fda.gov/food/nutrition-education-resources-materials/sodium-your-diet)).
 
-A few things stand out. Coconut water gets marketed as "nature's sports drink," but for POTS it is almost backward: lots of potassium, little sodium. Standard Gatorade and Powerade are fine as something pleasant to sip, but you would need roughly six to seven cups to match one high-sodium stick, which is a lot of sugar and fluid for the sodium you get. And the higher-sodium products are not magic, they are just concentrated. You can reproduce any of them at home.
+Once you have a target, work backward. Two high-sodium servings get you further than eight weak ones, with far less fluid and sugar. Salty meals count too, and [what to eat with POTS](/insights/food/pots-diet-what-to-eat/) covers building a day of food around salt and fluids.
 
-## Why a little sugar actually helps
+<div class="callout callout-warn">
+  <strong>Salt is not safe for everyone.</strong> If you have high blood pressure, kidney disease or heart failure, or take medicines that affect sodium or potassium, loading salt can be harmful. Some people with POTS also have high blood pressure when lying down, which extra salt can worsen. Agree a target with your clinician before you start.
+</div>
 
-It seems like plain salt water should hydrate you best, but it does not. Your small intestine absorbs sodium and glucose *together*, through the same molecular transporter (SGLT1), and water follows that movement across the gut wall by osmosis. Add a little glucose and you switch on a pump that drags sodium and water in faster than salt alone. This is the entire principle behind oral rehydration solutions, the formula that is a frontline treatment for dehydration worldwide.
+## Why does a little sugar help?
+
+Plain salt water seems like it should hydrate you best, but it doesn't. Your small intestine absorbs sodium and glucose *together*, through the same transporter (SGLT1), and water follows them across the gut wall. A little glucose speeds up how fast salt and water reach your blood. That is the whole idea behind oral rehydration solutions ([Ofei & Fuchs, 2019](https://doi.org/10.1007/s11894-019-0734-1)).
 
 <figure class="prose-figure">
   <svg viewBox="0 0 720 230" role="img" aria-label="A simple diagram of the gut wall. On the left, in the intestine, sodium and glucose molecules move together through a transporter in the wall. On the right, in the bloodstream, water is shown following them across, illustrating that sodium plus glucose pulls water in faster than salt alone.">
@@ -198,23 +264,23 @@ It seems like plain salt water should hydrate you best, but it does not. Your sm
   <figcaption>Sodium and glucose ride the same transporter into the bloodstream, and water trails along. A pinch of sugar makes salt water absorb faster, not slower.</figcaption>
 </figure>
 
-You do not need much. The classic rehydration ratio is modest, and a very sugary drink is not better. For POTS, a small splash of fruit juice or a half teaspoon of sugar in a liter is plenty to get the benefit without a sugar spike, which matters if you also deal with [reactive blood-sugar swings](/insights/food/reactive-hypoglycemia-blood-sugar-pots/).
+You need very little. A splash of fruit juice or half a teaspoon of sugar in a liter is plenty, and a very sugary drink is not better. If you are avoiding sugar, a plain salt-and-water mix still works; you may just need a little more of it.
 
-## The DIY recipe
+## How do you make your own electrolyte drink?
 
-Once you understand the parts, you can make a liter of effective electrolyte drink for a few cents, and dial the sodium exactly where your clinician wants it.
+You can make a liter for a few cents and set the sodium exactly where your clinician wants it.
 
 <div class="callout callout-note">
-  <strong>House electrolyte drink (per 1 liter / ~4 cups water):</strong>
+  <strong>House electrolyte drink (per 1 liter, about 4 cups of water):</strong>
   <ul>
-    <li><strong>1/4 teaspoon table salt</strong> (~575 mg sodium). Use 1/2 tsp (~1150 mg) for a stronger mix.</li>
-    <li><strong>A splash of fruit juice</strong> (orange, grape or apple), or 1/2 tsp sugar, for flavor and a little glucose to speed absorption.</li>
-    <li><strong>Optional: a pinch of potassium "lite salt"</strong> for some potassium, only if your clinician is fine with it.</li>
+    <li><strong>1/4 teaspoon table salt</strong> (~575 mg sodium). Use 1/2 tsp (~1,150 mg) for a stronger mix.</li>
+    <li><strong>A splash of fruit juice</strong> (orange, grape or apple), or 1/2 tsp sugar, for flavor and a little glucose.</li>
+    <li><strong>Optional: a pinch of potassium "lite salt"</strong>, only if your clinician is fine with it, since potassium interacts with several conditions and medicines.</li>
     <li>A squeeze of lemon or lime makes the salt much easier to drink.</li>
   </ul>
 </div>
 
-Mix, taste, and adjust. If it tastes like weak seawater you have the dose about right; most people are surprised how little salt it takes to be noticeable. Make a jug in the morning and sip it across the day rather than downing it all at once, which both absorbs better and is gentler on your stomach.
+Mix, taste and adjust. If it tastes like weak seawater, the dose is about right. Make a jug in the morning and sip it across the day, which absorbs better and is gentler on your stomach than downing it at once.
 
 <div class="mini-calc" id="na-calc">
   <p style="margin:0 0 .6rem"><strong>Work backward from a sodium goal.</strong> Enter the milligrams of added sodium you and your clinician are aiming for in a day, and see roughly how much table salt that is, spread across the house recipe.</p>
@@ -226,40 +292,43 @@ Mix, taste, and adjust. If it tastes like weak seawater you have the dose about 
 
 {@html sodiumScript}
 
-## When to drink it
+## Drinks, salt tablets or salty food?
 
-Timing is where an electrolyte drink earns its place in [a pacing routine](/insights/recovery/pacing-101-energy-envelope/). A few patterns people find useful, all worth personalizing:
+All three work, and most people mix them. Drinks are easy to sip and bring fluid with the salt. Salt capsules such as Vitassium give a fixed dose with no taste or sugar, which suits people who can't face another salty drink. Salty food (broth, pickles, olives, salted nuts) is the cheapest route of all. If you find yourself reaching for salt without trying, that is common in POTS, and [why you crave salt](/insights/pots/why-do-i-crave-salt-pots/) explains what it may be telling you.
 
-- **First thing in the morning.** POTS symptoms are often [worst on waking](/insights/pots/pots-symptoms-worse-in-the-morning/), partly because you lose fluid overnight. A glass of your mix before you stand up can take the edge off.
-- **Before upright activity.** A fast intake of fluid can briefly raise blood pressure and blunt the heart-rate jump on standing, which is the idea behind the [water bolus response](/insights/pots/water-bolus-osmopressor-response-pots/).
-- **Across the day, not all at once.** Steady sipping keeps blood volume topped up better than one large drink your kidneys quickly dump.
-- **Around heat, showers and exercise**, when you lose more sodium and fluid.
+Whatever you use, pair it with fluid. Salt without water can leave you thirsty and bloated rather than better hydrated.
 
-What an electrolyte drink cannot do is fix everything. If salt and fluids alone are not enough, that is common and expected, and it is why POTS care usually layers compression, a gradual exercise ramp, and sometimes medication on top. Hydration is the foundation, not the whole house.
+## When should you drink electrolytes?
 
-## Tracking whether it actually helps
+Timing matters as much as the product. A few patterns people find useful:
 
-The honest way to know if an electrolyte routine is working is not how you feel in the ten minutes after a drink, it is what your trend does over weeks. Standing heart rate, symptom load and morning HRV all respond slowly to better blood volume, and day-to-day noise can easily hide a real improvement if you are only going on memory.
+- **Before you get up.** Symptoms are often [worse in the morning](/insights/pots/pots-symptoms-worse-in-the-morning/) after a night without fluid. A glass of your mix before standing can take the edge off.
+- **Before upright activity.** Drinking about 500 mL of water quickly can briefly raise blood pressure ([Jordan et al., 2000](https://doi.org/10.1161/01.cir.101.5.504)), the idea behind the [water bolus](/insights/pots/water-bolus-osmopressor-response-pots/).
+- **Across the day.** Steady sipping keeps blood volume topped up better than one big drink your kidneys quickly clear.
+- **Around heat, showers and exercise**, when you lose more fluid and salt.
 
-<div class="callout callout-tip">
-  <strong>Log your salt and fluids next to your readings.</strong> In Autonomic you can track water, sodium and symptoms alongside your HRV, resting heart rate and stand-test numbers, all private and offline on your device, then watch whether a consistent electrolyte habit actually moves your trend against your own baseline. It scores each reading against both medical thresholds and your rolling baseline, so a genuine shift stands out from the daily wobble. <a href="/">See how it works.</a>
-</div>
+To know if it's working, look at your trend over weeks, not how you feel ten minutes after a drink. Logging your drinks next to your standing heart rate in Autonomic shows whether your better days line up with the days you hit your target.
 
 ## Frequently asked questions
 
-**What is the best electrolyte drink for POTS?** The one that reliably hits your sodium target and that you will actually keep drinking. Read the label for milligrams of sodium per serving first; taste and cost second.
+**Is LMNT good for POTS?** Its 1,000 mg of sodium and zero sugar make it a convenient way to salt-load, which is why it's popular. A homemade mix gets you the same sodium for much less. Whether that much sodium is right for you is a question for your clinician.
 
-**Is LMNT good for POTS?** Its high sodium (~1000 mg per stick) and lack of sugar make it a convenient way to salt-load, which is why it is popular in the community. The same sodium is achievable with a homemade mix if cost is a factor. Whether that much sodium is right for you is a clinician question.
+**Is Liquid I.V. good for POTS?** It's a solid middle option: 530 mg of sodium with 11 g of sugar, which helps absorption. You'd usually need more than one a day to reach a typical POTS target.
 
-**Do I need the sugar?** A little helps you absorb the sodium and water faster through sodium-glucose cotransport. You do not need a lot, and if you are avoiding sugar you can use a plain salt-and-water mix and simply drink a bit more of it.
+**Can electrolytes replace my medication?** No. Salt and fluids are a foundation, and many people also need compression, a gradual exercise plan or medication. Never change a prescribed treatment based on an article.
 
-**Can electrolyte drinks replace my medication?** No. Salt and fluids are a foundation, but many people need compression, graded exercise or medication as well. Never change a prescribed treatment based on an article.
+## The bottom line
 
-<p style="font-size:.85rem;color:var(--dim-2);margin-top:2rem">These are educational field notes, not medical advice. POTS and dysautonomia overlap with conditions where extra salt can be harmful, and individual needs vary widely. Set your sodium and fluid targets with a clinician who knows your history, and discuss any changes with them first.</p>
+Read sodium first. Most sports drinks are too dilute to help POTS much, while high-sodium mixes, salt capsules, salty food or a pinch of salt in a liter of water can actually move your blood volume. Start from a target you agree with your clinician, and judge it by your trend over weeks.
+
+<div class="callout callout-warn">
+  <strong>Not medical advice.</strong> This article is general education. POTS overlaps with conditions where extra salt can be harmful, and needs vary widely. Talk to a clinician who knows your history before you change your salt, fluids or treatment.
+</div>
 
 ## Sources
 
 - Raj SR, Fedorowski A, Sheldon RS. [Diagnosis and management of postural orthostatic tachycardia syndrome](https://doi.org/10.1503/cmaj.211373). *CMAJ*, 2022.
+- Garland EM, Gamboa A, Nwazue VC, et al. [Effect of high dietary sodium intake in patients with postural tachycardia syndrome](https://doi.org/10.1016/j.jacc.2021.03.005). *Journal of the American College of Cardiology*, 2021.
 - Sheldon RS, Grubb BP, Olshansky B, et al. [2015 Heart Rhythm Society expert consensus statement on the diagnosis and treatment of postural tachycardia syndrome, inappropriate sinus tachycardia, and vasovagal syncope](https://doi.org/10.1016/j.hrthm.2015.03.029). *Heart Rhythm*, 2015.
 - Raj SR, Biaggioni I, Yamhure PC, et al. [Renin-aldosterone paradox and perturbed blood volume regulation underlying postural tachycardia syndrome](https://doi.org/10.1161/01.CIR.0000160356.97313.5D). *Circulation*, 2005.
 - Ofei SY, Fuchs GJ. [Principles and practice of oral rehydration](https://doi.org/10.1007/s11894-019-0734-1). *Current Gastroenterology Reports*, 2019.

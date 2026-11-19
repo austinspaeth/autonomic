@@ -80,7 +80,7 @@ The single biggest step forward is to stop using one word for four different fee
 | Disequilibrium | Unsteady on your feet, off balance, especially when walking | Balance, vision, sensation, or coordination |
 | Nonspecific dizziness | A vague foggy, detached, or "not right" feeling with no clear spin or faintness | Many causes, including sleep, medications, blood sugar, and anxiety |
 
-POTS and dysautonomia mostly produce the **first** kind, and sometimes a bit of the fourth. Genuine spinning **vertigo** is a different mechanism and worth having checked rather than filed under POTS, even if you also have POTS. Naming your type is not pedantry. It is the fastest way to know whether you are looking at a blood flow problem you can influence at home or something that needs a separate workup.
+POTS and dysautonomia mostly produce the **first** kind, and sometimes a bit of the fourth. Genuine spinning **vertigo** is a different mechanism and worth having checked rather than filed under POTS, even if you also have POTS. Naming your type is not pedantry. It is the fastest way to know whether you are looking at a blood flow problem you can influence at home or something that needs a separate workup. If vision is the part that fades for you, [blurry vision and other eye symptoms in POTS](/insights/pots/blurry-vision-visual-symptoms-pots-dysautonomia/) explains why the eyes often go first.
 
 ## Why standing makes you lightheaded
 
