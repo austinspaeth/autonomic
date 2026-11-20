@@ -205,10 +205,15 @@ final class BackgroundLaunch: NSObject, AppControllerDelegate {
       ? ExpoBundleConfiguration.configuration(bundleURL: bundleURL)
       : factory.bundleConfiguration
 
-    rootViewFactory.initializeReactHost(
+    // Not `factory.devMenuConfiguration ?? RCTDevMenuConfiguration.default()`:
+    // in a release build both are nil, and Swift traps on the nil default.
+    // That trap killed every background launch on 2.0.0. The Objective-C
+    // helper passes nil through, as React does in release (BackgroundLaunchHost.h).
+    BackgroundLaunchHost.initializeReactHost(
+      on: rootViewFactory,
       launchOptions: launchOptions,
       bundleConfiguration: bundleConfiguration,
-      devMenuConfiguration: factory.devMenuConfiguration ?? RCTDevMenuConfiguration.default()
+      devMenuConfiguration: factory.devMenuConfiguration
     )
     startedHost = true
     outcome = "started the React host (\(why))"
