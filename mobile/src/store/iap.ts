@@ -29,6 +29,7 @@ import {
   type ExpoPurchaseError, type Purchase,
 } from 'expo-iap';
 import { isSideloadedAndroidBuild, isTestFlightBuild } from '../../modules/app-env';
+import { appleNetworkFailure } from '../lib/appleNetwork';
 import { blockedMessage, classifyPlayCode, inappVerdict } from '../lib/billingCodes';
 import { logError } from '../lib/diagnostics/errorLog';
 import { describeError } from '../lib/diagnostics/format';
@@ -473,9 +474,12 @@ let blockedFault: unknown;
  *  failed, never the reason, and the reason is a number in a sibling field. */
 function iapDetail(e: unknown, note?: string): unknown {
   const d = e as { responseCode?: number; debugMessage?: string; isEmptyProductList?: boolean } | undefined;
+  const net = networkFailureOf(e);
   const bits = [
     d?.responseCode != null ? `response ${d.responseCode}` : '',
     d?.isEmptyProductList ? 'no products returned' : '',
+    // Before the message: Ping redacts the NSURL number, and the name survives.
+    net ? net.name : '',
     d?.debugMessage ? String(d.debugMessage) : '',
     note || '',
   ].filter(Boolean);
@@ -565,6 +569,15 @@ async function connect() {
       // The store's own failure path (Play's dialog closing on an error, a
       // declined card). A cancel is not a failure and says nothing.
       if (isCancel(e)) { settleAttempt('cancelled', e); set({ purchasing: false }); return; }
+      // openiap ALSO emits here when a plain product fetch fails (launch,
+      // paywall open, every return to the foreground), not only when a
+      // purchase does. With no purchase in flight that is not a purchase
+      // error: the caller that fetched catches the same failure and logs it
+      // under its own tag (iap.init / iap.retryProducts). Taking it here put a
+      // phone with no signal on the Failures tab as `iap.purchaseError` on
+      // every foreground, and set "This plan isn't available" on a paywall
+      // nobody had tapped.
+      if (!attempt && !state.purchasing && PRODUCT_FETCH_CODES.has(codeOf(e))) return;
       logError('iap.purchaseError', iapDetail(e));
       settleAttempt(outcomeOf(e), e);
       set({ purchasing: false, error: purchaseMessage(e) });
@@ -703,6 +716,17 @@ export async function refreshEntitlement(): Promise<boolean> {
 const codeOf = (e: unknown): string =>
   String((e as ExpoPurchaseError | undefined)?.code ?? '');
 
+/** Codes openiap uses when fetching products, rather than buying one. */
+const PRODUCT_FETCH_CODES = new Set(['query-product', 'empty-sku-list', 'not-prepared']);
+
+/** An App Store call that never reached Apple: no signal, a timeout, cellular
+ *  data off for the app. iOS only in practice; the text test is harmless on
+ *  Android, whose network failures arrive as response code 12 instead. */
+const networkFailureOf = (e: unknown) => {
+  const d = e as { message?: unknown; debugMessage?: unknown } | undefined;
+  return appleNetworkFailure(`${String(d?.message ?? '')} ${String(d?.debugMessage ?? '')}`);
+};
+
 /** Backing out of the store's own sheet. Not a failure, and says nothing. */
 const isCancel = (e: unknown) => {
   const c = codeOf(e).toLowerCase();
@@ -719,6 +743,10 @@ function purchaseMessage(e: unknown): string {
   // here, since no amount of retrying updates the Play Store app.
   const terminal = blockedMessage(responseCodeOf(e));
   if (terminal) return terminal;
+  // Also read before the switch: StoreKit 2 reports a product query that
+  // never reached Apple as `query-product`, which the switch would answer
+  // "This plan isn't available on your App Store account yet".
+  if (networkFailureOf(e)) return `Couldn’t reach ${store}. Check your connection and try again.`;
   switch (codeOf(e)) {
     case 'network-error':
     case 'service-timeout':
