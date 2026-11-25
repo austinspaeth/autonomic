@@ -2,9 +2,9 @@
 title: "How Is ME/CFS Diagnosed?"
 slug: how-is-me-cfs-diagnosed
 published: true
-date: 2026-11-23
-updated: 2026-11-23
-reviewed: 2026-11-23
+date: 2026-11-25
+updated: 2026-11-25
+reviewed: 2026-11-25
 author: "Austin Spaeth"
 question: "How is ME/CFS diagnosed?"
 summary: "There is no blood test or scan for ME/CFS. A clinician diagnoses it from your symptoms, mainly post-exertional malaise, after ruling out other causes with a history, an exam and routine blood tests. US criteria ask for six months of symptoms; UK guidance allows a diagnosis at three months. A symptom diary that shows your crashes helps more than any single test."
