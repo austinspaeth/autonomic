@@ -2,9 +2,9 @@
 title: "Can an Apple Watch Alert You When You Go Over Your Pacing Heart Rate?"
 slug: apple-watch-heart-rate-alert-for-pacing
 published: true
-date: 2026-11-24
-updated: 2026-11-24
-reviewed: 2026-11-24
+date: 2026-11-25
+updated: 2026-11-25
+reviewed: 2026-11-25
 author: "Austin Spaeth"
 question: "Can an Apple Watch alert you when you go over your pacing heart rate?"
 summary: "Yes, but only during a workout. Apple's built-in High Heart Rate notification only checks after about 10 minutes of inactivity, so it stays quiet while you cook, shower or walk. To get a buzz when you cross your pacing line, set a heart rate alert in the Workout app and keep a workout running. Garmin works the same way."
