@@ -50,6 +50,15 @@ export function fmtReleaseDate(iso: string): string {
 
 export const RELEASES: Release[] = [
   {
+    version: '2.1',
+    date: '2026-11-25',
+    notes: [
+      'Made for the folding iPhone. Closed, your tabs sit in a slim rail beside the camera. Open in landscape, a sidebar keeps today\u2019s score and your pacing in view.',
+      'Fixed background updates on iPhone, so Apple Health syncing, pacing alerts and your widgets keep working while the app is closed.',
+      'Bug fixes and performance improvements throughout the app.',
+    ],
+  },
+  {
     version: '2.0',
     date: '2026-11-15',
     notes: [
